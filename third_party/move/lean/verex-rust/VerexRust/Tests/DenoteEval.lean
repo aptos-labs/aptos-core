@@ -350,6 +350,127 @@ theorem Tree.walk_sound {α : Type} (distinct : Bool) (oracle : Array (Option Ch
 
 end Means
 
+section NoDataInvariants
+
+/-- Every type parameter and nominal declaration has trivial data invariants
+(satisfied at `Carriers.runtime` and `runtimeCarriers`). -/
+class NoDataInvariants [C : Carriers] : Prop where
+  holds : ∀ index (value : C.carrier index), C.holds index value
+  own : ∀ source arguments value, C.own source arguments value
+
+instance (unit : ValidatedUnit) :
+    @NoDataInvariants (@Carriers.runtime unit (FunctionCarriers.runtime unit)) :=
+  ⟨fun _ _ => trivial, fun _ _ _ => trivial⟩
+
+mutual
+theorem NTy.deepHolds_of_noDataInvariants [Carriers] [NoDataInvariants] :
+    (τ : NTy) → (value : τ.carrier) → NTy.deepHolds τ value
+  | .tuple elements, values => HList.deepHolds_of_noDataInvariants elements values
+  | .struct source arguments fields, row =>
+      ⟨NoDataInvariants.own source arguments _, HList.deepHolds_of_noDataInvariants fields row⟩
+  | .enum source arguments names rows _, value =>
+      ⟨NoDataInvariants.own source arguments _,
+        variantCarrier.deepHolds_of_noDataInvariants names rows value⟩
+  | .vector element, vector => fun value _ =>
+      NTy.deepHolds_of_noDataInvariants element value
+  | .slice element, vector => fun value _ =>
+      NTy.deepHolds_of_noDataInvariants element value
+  | .array element _, array => fun value _ =>
+      NTy.deepHolds_of_noDataInvariants element value
+  | .table key value, entries => fun entry _ =>
+      ⟨NTy.deepHolds_of_noDataInvariants key entry.1,
+        NTy.deepHolds_of_noDataInvariants value entry.2⟩
+  | .ghost slot, value => NTy.deepHolds_of_noDataInvariants slot value
+  | .ref referent, value => NTy.deepHolds_of_noDataInvariants referent value.2
+  | .sliceRef element, value =>
+      ⟨fun current _ => NTy.deepHolds_of_noDataInvariants element current,
+        fun final _ => NTy.deepHolds_of_noDataInvariants element final⟩
+  | .observed referent, value => NTy.deepHolds_of_noDataInvariants referent value
+  | .param index, value => NoDataInvariants.holds index value
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
+  | .string, _ | .bytes, _ | .char, _ | .function _ _ _, _ | .nominal _ _ _, _ => trivial
+termination_by structural τ _ => τ
+
+theorem HList.deepHolds_of_noDataInvariants [Carriers] [NoDataInvariants] :
+    (row : NRow) → (values : HList row) → HList.deepHolds row values
+  | .nil, _ => trivial
+  | .cons τ rest, values =>
+      ⟨NTy.deepHolds_of_noDataInvariants τ values.1,
+        HList.deepHolds_of_noDataInvariants rest values.2⟩
+termination_by structural row _ => row
+
+theorem variantCarrier.deepHolds_of_noDataInvariants [Carriers] [NoDataInvariants] :
+    (names : List String) → (rows : NRows) → (value : variantCarrier names rows) →
+      variantCarrier.deepHolds names rows value
+  | _, .nil, _ => trivial
+  | [], .cons _ _, _ => trivial
+  | _ :: names, .cons fields rest, value =>
+      match value with
+      | .inl row => HList.deepHolds_of_noDataInvariants fields row
+      | .inr later => variantCarrier.deepHolds_of_noDataInvariants names rest later
+termination_by structural names rows _ => rows
+end
+
+theorem NTy.holds_of_noDataInvariants [Carriers] [NoDataInvariants] (τ : NTy)
+    (value : τ.carrier) : NTy.Holds τ value :=
+  ⟨NTy.deepHolds_of_noDataInvariants τ value⟩
+
+instance {outer : Carriers} [@NoDataInvariants outer] (θ : TypeArgs) :
+    @NoDataInvariants (Carriers.instantiate θ outer) where
+  holds := fun index value =>
+    @NTy.deepHolds_of_noDataInvariants outer _ ((NTy.param index).subst θ.1) value
+  own := fun source arguments value =>
+    @NoDataInvariants.own outer _ source (NRow.subst θ.1 arguments) value
+
+theorem checkingAt_of_noDataInvariants [Carriers] [NoDataInvariants] {State : Type}
+    (site : Nat) (kind : CertifyKind) (τ : NTy) (value : τ.carrier) :
+    checkingAt (State := State) site kind τ value = Spec.pure () := by
+  have holds := NTy.holds_of_noDataInvariants τ value
+  simp only [checkingAt, checking, Interpretation.checking, Spec.certified, Spec.pure,
+    Spec.mk.injEq]
+  refine ⟨?_, trivial, ?_⟩
+  · funext initial result final
+    exact propext ⟨fun ⟨_, result_eq, final_eq⟩ => ⟨result_eq, final_eq⟩,
+      fun ⟨result_eq, final_eq⟩ => ⟨holds, result_eq, final_eq⟩⟩
+  · funext _
+    exact propext ⟨fun fails => fails holds, False.elim⟩
+
+theorem Proj.setOwner?_of_noDataInvariants [Carriers] [NoDataInvariants] {State : Type}
+    {Γ : NRow} (env : HEnv Γ) (site : Nat) :
+    {τ σ : NTy} → (path : Proj τ σ) → (replacement : σ.carrier) → (value : τ.carrier) →
+      path.setOwner? (State := State) env site replacement value =
+        (path.set? env replacement value).map Spec.pure
+  | _, _, .nil, _, _ => rfl
+  | _, _, .deref rest, replacement, value => by
+      simp only [Proj.setOwner?_deref, Proj.set?_deref, Option.map_map]
+      rfl
+  | _, _, .field x rest, replacement, value => by
+      rw [Proj.setOwner?_field]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .index position rest, replacement, value => by
+      rw [Proj.setOwner?_index]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .element x rest, replacement, value => by
+      rw [Proj.setOwner?_element]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .arrayIndex position rest, replacement, value => by
+      rw [Proj.setOwner?_arrayIndex]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .sliceElement position rest, replacement, value => by
+      rw [Proj.setOwner?_sliceElement]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .sliceIndex position rest, replacement, value => by
+      rw [Proj.setOwner?_sliceIndex]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .variant choices rest, replacement, value => by
+      rw [Proj.setOwner?_variant]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+  | _, _, .ghost rest, replacement, value => by
+      rw [Proj.setOwner?_ghost]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+
+end NoDataInvariants
+
 section Term
 variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
@@ -460,12 +581,131 @@ def loopTree {ρ : ResultShape} {Γ : NRow}
         | .break_ (nest + 1) env => .ok (.break_ nest env)
         | .return_ result env => .ok (.return_ result env)
 
+private def evalConstruct (parameters : NRow) (shared : Sharing) (results : NRow)
+    (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array (TypeId × TypeId))
+    {σs : NRow} (captures : HList σs)
+    (typed : SiteTyped parameters shared results handle mask typeInstantiation σs) :
+    (NTy.function parameters shared results).carrier :=
+  let raw : ClosureValue := ⟨handle, mask, typeInstantiation, (HList.encode captures).toArray,
+    fun capture member => rowCodec_plain _ captures capture (by simpa [HList.encode] using member)⟩
+  ((Carriers.functions parameters shared results).ofClosure? raw).get (typed.decodes captures)
+
+private theorem evalConstruct_eq (parameters : NRow) (shared : Sharing) (results : NRow)
+    (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array (TypeId × TypeId))
+    {σs : NRow} (captures : HList σs)
+    (typed : SiteTyped parameters shared results handle mask typeInstantiation σs) :
+    evalConstruct parameters shared results handle mask typeInstantiation captures typed =
+      Skolems.construct parameters shared results handle mask typeInstantiation captures typed := by
+  apply (Carriers.functions parameters shared results).closure_injective
+  rw [Skolems.closure_construct]
+  exact (Carriers.functions parameters shared results).closure_of_ofClosure? _ _
+    (Option.some_get _).symm
+
+private def evalFunctionOfGeneric (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (shape : ResultShape) (shared : Sharing)
+    (handle : FunctionHandle) (captures : HList (NRow.subst θ.1 captured))
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs)
+      (NRow.subst θ.1 captured)) :
+    (NTy.function (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row).carrier :=
+  evalConstruct (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row handle weave.mask
+    (frameInstantiation unit handle outer typeArgs) captures typed
+
+private theorem evalFunctionOfGeneric_eq (outer : Array (TypeId × TypeId))
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (shape : ResultShape) (shared : Sharing)
+    (handle : FunctionHandle) (captures : HList (NRow.subst θ.1 captured))
+    (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
+      handle weave.mask (frameInstantiation unit handle outer typeArgs)
+      (NRow.subst θ.1 captured)) :
+    evalFunctionOfGeneric outer typeArgs θ weave shape shared handle captures typed =
+      functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed :=
+  evalConstruct_eq _ _ _ _ _ _ captures typed
+
+/-- `Lender.resolve` as a tree. -/
+def Lender.resolveTree {ρ : ResultShape} {Γ : NRow} {σ : NTy} (env : HEnv Γ)
+    (reference : (NTy.ref σ).carrier) : Lender Γ σ → Tree (Flow ρ Γ Unit)
+  | .slot => .assumeEq σ reference.1 reference.2 (.ok (.value () env))
+  | .place (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.1 held with
+          | some rebuilt =>
+              .assumeEq τ rebuilt held
+                (.assumeEq σ reference.1 reference.2 (.ok (.value () env)))
+          | none => .bottom
+      | none => .assumeEq σ reference.1 reference.2 (.ok (.value () env))
+  | .candidate _ _ => .ok (.value () env)
+  | .referent => .ok (.value () env)
+  | .equation => .assumeEq σ reference.1 reference.2 (.ok (.value () env))
+  | .seq first second =>
+      Tree.flowBind (first.resolveTree env reference) fun _ env =>
+        second.resolveTree env reference
+
+/-- `SliceLender.resolve` as a tree. -/
+def SliceLender.resolveTree {ρ : ResultShape} {Γ : NRow} {σ : NTy} (env : HEnv Γ)
+    (reference : (NTy.sliceRef σ).carrier) : SliceLender Γ σ → Tree (Flow ρ Γ Unit)
+  | .slot => .assumeEq (.array σ reference.extent) reference.current reference.final
+      (.ok (.value () env))
+  | .array (τ := τ) (length := length) owner path =>
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match path.set? env ⟨reference.currentVector, sized⟩ held with
+            | some rebuilt =>
+                .assumeEq τ rebuilt held
+                  (.assumeEq (.array σ reference.extent) reference.current reference.final
+                    (.ok (.value () env)))
+            | none => .bottom
+          else .bottom
+      | none =>
+          .assumeEq (.array σ reference.extent) reference.current reference.final
+            (.ok (.value () env))
+  | .vector (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.currentVector held with
+          | some rebuilt =>
+              .assumeEq τ rebuilt held
+                (.assumeEq (.array σ reference.extent) reference.current reference.final
+                  (.ok (.value () env)))
+          | none => .bottom
+      | none =>
+          .assumeEq (.array σ reference.extent) reference.current reference.final
+            (.ok (.value () env))
+  | .slice (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.get? env held with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩) held with
+                | some rebuilt =>
+                    .assumeEq τ rebuilt held
+                      (.assumeEq (.array σ reference.extent) reference.current reference.final
+                        (.ok (.value () env)))
+                | none => .bottom
+              else .bottom
+          | none => .bottom
+      | none =>
+          .assumeEq (.array σ reference.extent) reference.current reference.final
+            (.ok (.value () env))
+  | .candidateArray _ _ | .candidateVector _ _ | .candidateSlice _ _ | .referent =>
+      .ok (.value () env)
+  | .equation =>
+      .assumeEq (.array σ reference.extent) reference.current reference.final
+        (.ok (.value () env))
+  | .seq first second =>
+      Tree.flowBind (first.resolveTree env reference) fun _ env =>
+        second.resolveTree env reference
+
 set_option maxHeartbeats 800000 in
 mutual
 /-- `Term.denote` as a tree, read case by case against it. -/
 def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} :
     {Γ : NRow} → {τ : NTy} → Term unit ρ Γ τ → HEnv Γ → Tree (Flow ρ Γ τ.carrier)
-  | _, _, .lit value, env => .ok (.value (NTy.ofGround _ value) env)
+  | _, _, .lit value literal, env => .ok (.value (NTy.ofGround _ literal value) env)
   | _, _, .var x, env =>
       match x.get env with
       | some value => .ok (.value value env)
@@ -576,9 +816,10 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
       Tree.flowBind (arguments.tree calls fuel env) fun values env =>
         (calls.generic handle typeArgs θ _ shape
           (HList.toSkolem θ _ (cast (congrArg HList (resolvedCall resolved).1.symm) values))).bind
-          fun result => .ok (.value (shape'.toBody
-            (cast (congrArg ResultShape.carrier (resolvedCall resolved).2)
-              (ResultShape.ofSkolem θ shape result))) env)
+          fun result => .ok (.value
+            (cast ((congrArg ResultShape.carrier (resolvedCall resolved).2).trans
+              shape'.carrier_eq_bodyType)
+              (ResultShape.ofSkolem θ shape result)) env)
   | _, _, .callInstance _ handle typeArgs θ shape arguments, env =>
       Tree.flowBind (arguments.tree calls fuel env) fun values env =>
         (calls handle (some (typeArgs, θ)) _ shape values).bind fun result =>
@@ -586,7 +827,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
   | _, _, .closure (supplied := supplied) handle weave results shared rows sharing closed faithful
       captures, env =>
       Tree.flowBind (captures.tree calls fuel env) fun values env =>
-        .ok (.value (Skolems.construct supplied shared results handle weave.mask #[] values
+        .ok (.value (evalConstruct supplied shared results handle weave.mask #[] values
           (SiteTyped.ofClosure rows sharing closed faithful)) env)
   | _, _, .closureGeneric handle weave typeArgs θ shape _ shared rows sharing below resolved captures, env =>
       Tree.flowBind (captures.tree calls fuel env) fun values env =>
@@ -594,7 +835,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
         if coherent : @coherentCheck unit _ (Skolems.instantiate θ ‹_›) handle instantiation = true then
           if faithful : closureFaithful unit handle instantiation = true then
             .ok (.value (cast (congrArg NTy.carrier (resolvedClosure (shared := shared) resolved).2)
-              (functionOfGeneric unit calls.typeInstantiation typeArgs θ weave shape shared handle
+              (evalFunctionOfGeneric calls.typeInstantiation typeArgs θ weave shape shared handle
                 (cast (congrArg HList (resolvedClosure (shared := shared) resolved).1.symm) values)
                 (closureOfGeneric_typed calls.typeInstantiation typeArgs θ weave shape rows sharing below
                   ⟨@Coherent.ofCheck unit _ (Skolems.instantiate θ ‹_›) handle _ coherent, faithful⟩))) env)
@@ -607,11 +848,13 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
             .ok (.value (shape.toBody result) env)
   | _, _, .tuple elements, env =>
       Tree.flowBind (elements.tree calls fuel env) fun values env => .ok (.value values env)
-  | _, _, .pack _ _ fields, env =>
+  | _, _, .pack _ _ _ fields .nil, env =>
       Tree.flowBind (fields.tree calls fuel env) fun values env => .ok (.value values env)
-  | _, _, .variant _ _ _ choice fields, env =>
+  | _, _, .pack _ _ _ _ (.cons ..), _ => .unknown "ghostInit"
+  | _, _, .variant _ _ _ _ choice fields .nil, env =>
       Tree.flowBind (fields.tree calls fuel env) fun values env =>
         .ok (.value (choice.inject values) env)
+  | _, _, .variant _ _ _ _ _ _ (.cons ..), _ => .unknown "ghostInit"
   | _, _, .field x value, env =>
       Tree.flowBind (value.tree calls fuel env) fun v env => .ok (.value (x.select v) env)
   | _, _, .isVariant tests value, env =>
@@ -630,35 +873,40 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
         body.tree calls fuel (targets.set values env)
   | _, _, .caseOf scrutinee arms, env =>
       Tree.flowBind (scrutinee.tree calls fuel env) fun value env => arms.tree calls fuel value env
-  | _, _, .deref value, env =>
+  | _, _, .deref _ value, env =>
       Tree.flowBind (value.tree calls fuel env) fun v env => .ok (.value v.1 env)
   | _, _, .take x, env =>
       match x.get env with
       | some value => .ok (.value value (x.clear env))
       | none => .bottom
-  | _, _, @Term.resolve _ _ _ τ x, env =>
+  | _, _, .resolve _ x lender, env =>
       match x.get env with
-      | some reference => .assumeEq τ reference.1 reference.2 (.ok (.value () env))
+      | some reference => lender.resolveTree env reference
       | none => .ok (.value () env)
-  | _, _, @Term.resolveAt _ _ _ _ σ x path, env =>
+  | _, _, .resolveAt _ x path lender, env =>
       match (x.get env).bind (path.get? env) with
-      | some reference => .assumeEq σ reference.1 reference.2 (.ok (.value () env))
+      | some reference => lender.resolveTree env reference
       | none => .ok (.value () env)
+  | _, _, .assumeCurrent _, env => .ok (.value () env)
+  | _, _, .handedOver _ reference, env =>
+      Tree.flowBind (reference.tree calls fuel env) fun v env => .ok (.value v env)
+  | _, _, .returned _ reference, env =>
+      Tree.flowBind (reference.tree calls fuel env) fun v env => .ok (.value v env)
   | _, _, .mutate x value, env =>
       Tree.flowBind (value.tree calls fuel env) fun v env =>
         match x.get env with
         | some current => .ok (.value () (x.set (v, current.2) env))
         | none => .bottom
-  | _, _, @Term.observe _ _ _ τ value, env =>
+  | _, _, @Term.observe _ _ _ τ _ value, env =>
       Tree.flowBind (value.tree calls fuel env) fun v env => .ok (.value (τ.observe v) env)
-  | _, _, .readPlace mismatch x path, env =>
+  | _, _, .readPlace _ mismatch x path, env =>
       match x.get env with
       | some value =>
           match path.get? env value with
           | some component => .ok (.value component env)
           | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, .takeAt mismatch x path, env =>
+  | _, _, .takeAt _ mismatch x path, env =>
       match x.get env with
       | some value =>
           match path.get? env value with
@@ -668,7 +916,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
               | none => mismatchTree mismatch
           | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, .writePlace mismatch x path value, env =>
+  | _, _, .writePlace _ mismatch x path value, env =>
       Tree.flowBind (value.tree calls fuel env) fun v env =>
         match x.get env with
         | some current =>
@@ -692,7 +940,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
   | _, _, .sliceCurrent value, env =>
       Tree.flowBind (value.tree calls fuel env) fun value env =>
         .ok (.value value.currentVector env)
-  | _, _, @Term.borrowArraySlice _ _ _ _ σ length mismatch x path, env =>
+  | _, _, @Term.borrowArraySlice _ _ _ _ σ length _ mismatch x path, env =>
       match x.get env with
       | some value => match path.get? env value with
         | some current =>
@@ -702,7 +950,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
               | none => .bottom
         | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, @Term.borrowVectorSlice _ _ _ _ σ mismatch x path, env =>
+  | _, _, @Term.borrowVectorSlice _ _ _ _ σ _ mismatch x path, env =>
       match x.get env with
       | some value => match path.get? env value with
         | some current =>
@@ -713,7 +961,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
               | none => .bottom
         | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, @Term.reborrowSlice _ _ _ _ σ mismatch x path, env =>
+  | _, _, @Term.reborrowSlice _ _ _ _ σ _ mismatch x path, env =>
       match x.get env with
       | some value => match path.get? env value with
         | some current =>
@@ -724,7 +972,7 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
               | none => .bottom
         | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, .takeSliceAt mismatch x path, env =>
+  | _, _, .takeSliceAt _ mismatch x path, env =>
       match x.get env with
       | some value => match path.get? env value with
         | some reference =>
@@ -733,10 +981,9 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
             | none => mismatchTree mismatch
         | none => mismatchTree mismatch
       | none => .bottom
-  | _, _, @Term.resolveSliceAt _ _ _ _ σ x path, env =>
+  | _, _, .resolveSliceAt _ x path lender, env =>
       match (x.get env).bind (path.get? env) with
-      | some reference => .assumeEq (.array σ reference.extent) reference.current reference.final
-          (.ok (.value () env))
+      | some reference => lender.resolveTree env reference
       | none => .ok (.value () env)
   | _, _, .vectorLit count elements, env =>
       Tree.flowBind (elements.tree calls fuel env) fun values env =>
@@ -797,7 +1044,6 @@ def Term.tree (calls : CallTree (unit := unit)) (fuel : Nat) {ρ : ResultShape} 
   | _, _, .assume .., _ => .unknown "assume"
   | _, _, .arbitrary, _ => .unknown "arbitrary"
   | _, _, .ghostValue .., _ => .unknown "ghostValue"
-  | _, _, .ghostInit .., _ => .unknown "ghostInit"
   | _, _, .ghostSlot .., _ => .unknown "ghostSlot"
   | _, _, .ghostRead .., _ => .unknown "ghostRead"
   | _, _, .mutationEnd _, env => .ok (.value () env)
@@ -1050,9 +1296,332 @@ theorem loop_means {ρ : ResultShape} {Γ : NRow} {iteration : HEnv Γ → Tree 
       | .break_ (_ + 1) _ => exact rfl
       | .return_ _ _ => exact rfl
 
+variable [NoDataInvariants]
+
+theorem Lender.resolve_means {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.ref σ).carrier) :
+    (lender : Lender Γ σ) →
+      (lender.resolveTree (ρ := ρ) env reference).Means
+        (lender.resolve (State := Memory unit) site env reference)
+  | .slot => by
+      rw [Lender.resolveTree, Lender.resolve_slot]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+      exact Tree.means_assume (Tree.means_ok _)
+  | .place owner path => by
+      rw [Lender.resolveTree, Lender.resolve_place]
+      cases owner.get env with
+      | none =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (Tree.means_ok _)
+      | some held =>
+          dsimp only
+          cases path.set? env reference.1 held with
+          | none => rfl
+          | some rebuilt =>
+              dsimp only
+              cases path.isRootDeref <;> cases path.hasDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind]
+              all_goals exact Tree.means_assume (Tree.means_assume (Tree.means_ok _))
+  | .candidate owner path => by
+      rw [Lender.resolveTree, Lender.resolve_candidate]
+      cases owner.get env with
+      | none => rfl
+      | some held =>
+          dsimp only
+          cases path.set? env reference.1 held with
+          | none => rfl
+          | some rebuilt =>
+              dsimp only
+              cases path.isRootDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind, Tree.Means]
+  | .referent => by
+      rw [Lender.resolveTree, Lender.resolve_referent]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+      rfl
+  | .equation => by
+      rw [Lender.resolveTree, Lender.resolve_equation]
+      exact Tree.means_assume (Tree.means_ok _)
+  | .seq first second =>
+      means_flowBind (Lender.resolve_means site env reference first) fun _ env =>
+        Lender.resolve_means site env reference second
+
+theorem SliceLender.resolve_means {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).carrier) :
+    (lender : SliceLender Γ σ) →
+      (lender.resolveTree (ρ := ρ) env reference).Means
+        (lender.resolve (State := Memory unit) site env reference)
+  | .slot => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_slot]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+      exact Tree.means_assume (Tree.means_ok _)
+  | .array (length := length) owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_array]
+      cases owner.get env with
+      | none =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (Tree.means_ok _)
+      | some held =>
+          dsimp only
+          by_cases sized : reference.currentVector.values.size = length
+          · simp only [sized, ↓reduceDIte]
+            cases path.set? env ⟨reference.currentVector, sized⟩ held with
+            | none => rfl
+            | some rebuilt =>
+                dsimp only
+                cases path.isRootDeref <;> cases path.hasDeref <;>
+                  simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                    Spec.pure_bind]
+                all_goals exact Tree.means_assume (Tree.means_assume (Tree.means_ok _))
+          · simp only [sized, ↓reduceDIte]
+            rfl
+  | .vector owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_vector]
+      cases owner.get env with
+      | none =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (Tree.means_ok _)
+      | some held =>
+          dsimp only
+          cases path.set? env reference.currentVector held with
+          | none => rfl
+          | some rebuilt =>
+              dsimp only
+              cases path.isRootDeref <;> cases path.hasDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind]
+              all_goals exact Tree.means_assume (Tree.means_assume (Tree.means_ok _))
+  | .slice owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_slice]
+      cases owner.get env with
+      | none =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (Tree.means_ok _)
+      | some held =>
+          dsimp only
+          cases path.get? env held with
+          | none => rfl
+          | some heldSlice =>
+              dsimp only
+              by_cases sized : reference.currentVector.values.size = heldSlice.extent
+              · simp only [sized, ↓reduceDIte]
+                cases path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩) held with
+                | none => rfl
+                | some rebuilt =>
+                    dsimp only
+                    cases path.isRootDeref <;> cases path.hasDeref <;>
+                      simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                        Spec.pure_bind]
+                    all_goals exact Tree.means_assume (Tree.means_assume (Tree.means_ok _))
+              · simp only [sized, ↓reduceDIte]
+                rfl
+  | .candidateArray (length := length) owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_candidateArray]
+      cases owner.get env with
+      | none => rfl
+      | some held =>
+          dsimp only
+          by_cases sized : reference.currentVector.values.size = length
+          · simp only [sized, ↓reduceDIte]
+            cases path.set? env ⟨reference.currentVector, sized⟩ held with
+            | none => rfl
+            | some rebuilt =>
+                dsimp only
+                cases path.isRootDeref <;>
+                  simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                    Spec.pure_bind, Tree.Means]
+          · simp only [sized, ↓reduceDIte, Tree.Means]
+  | .candidateVector owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_candidateVector]
+      cases owner.get env with
+      | none => rfl
+      | some held =>
+          dsimp only
+          cases path.set? env reference.currentVector held with
+          | none => rfl
+          | some rebuilt =>
+              dsimp only
+              cases path.isRootDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind, Tree.Means]
+  | .candidateSlice owner path => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_candidateSlice]
+      cases owner.get env with
+      | none => rfl
+      | some held =>
+          dsimp only
+          cases path.get? env held with
+          | none => rfl
+          | some heldSlice =>
+              dsimp only
+              by_cases sized : reference.currentVector.values.size = heldSlice.extent
+              · simp only [sized, ↓reduceDIte]
+                cases path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩) held with
+                | none => rfl
+                | some rebuilt =>
+                    dsimp only
+                    cases path.isRootDeref <;>
+                      simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                        Spec.pure_bind, Tree.Means]
+              · simp only [sized, ↓reduceDIte, Tree.Means]
+  | .referent => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_referent]
+      simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+      rfl
+  | .equation => by
+      rw [SliceLender.resolveTree, SliceLender.resolve_equation]
+      exact Tree.means_assume (Tree.means_ok _)
+  | .seq first second =>
+      means_flowBind (SliceLender.resolve_means site env reference first) fun _ env =>
+        SliceLender.resolve_means site env reference second
+
+private theorem borrowPlace_choose_eq {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
+    (env : HEnv Γ) (x : Var Γ τ) (path : Proj τ σ)
+    (value : τ.carrier) (component : σ.carrier) :
+    (Spec.bind (prophecyOf (State := Memory unit) (α := σ.carrier × τ.carrier) x path) fun chosen =>
+      Spec.bind (Spec.assume (NTy.Holds σ chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+          path.set? env chosen.1 value = some chosen.2)) fun _ =>
+        Spec.pure (Flow.value (ρ := ρ) (component, chosen.1) (x.set chosen.2 env))) =
+    (Spec.bind Spec.choose fun prophecy : σ.carrier =>
+      match path.set? env prophecy value with
+      | some lent => Spec.pure (Flow.value (ρ := ρ) (component, prophecy) (x.set lent env))
+      | none => Spec.bottom) := by
+  apply Spec.extensionality
+  · funext initial result final
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure]
+    constructor
+    · rintro ⟨⟨prophecy, owner⟩, middle, rfl, _, middle', ⟨⟨_, _, set_eq⟩, _, rfl⟩,
+        result_eq, final_eq⟩
+      dsimp only at set_eq result_eq
+      exact ⟨prophecy, initial, rfl, by
+        rw [set_eq]
+        exact ⟨result_eq, final_eq⟩⟩
+    · rintro ⟨prophecy, middle, rfl, step⟩
+      cases set_eq : path.set? env prophecy value with
+      | none =>
+          rw [set_eq] at step
+          exact False.elim step
+      | some lent =>
+          rw [set_eq] at step
+          exact ⟨(prophecy, lent), initial, rfl, (), initial,
+            ⟨⟨NTy.holds_of_noDataInvariants σ prophecy,
+              NTy.holds_of_noDataInvariants τ lent, set_eq⟩, rfl, rfl⟩, step⟩
+  · funext initial error
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure, Spec.bottom]
+    constructor
+    · rintro (h | ⟨_, _, _, h | ⟨_, _, _, h⟩⟩) <;> exact False.elim h
+    · rintro (h | ⟨prophecy, middle, _, h⟩)
+      · exact False.elim h
+      · cases set_eq : path.set? env prophecy value <;> rw [set_eq] at h <;> exact False.elim h
+  · funext initial
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure, Spec.bottom]
+    constructor
+    · rintro (h | ⟨_, _, _, h | ⟨_, _, _, h⟩⟩) <;> exact False.elim h
+    · rintro (h | ⟨prophecy, middle, _, h⟩)
+      · exact False.elim h
+      · cases set_eq : path.set? env prophecy value <;> rw [set_eq] at h <;> exact False.elim h
+
+private theorem sliceBorrowBody_eq {ρ : ResultShape} {Γ : NRow} {τ σ π : NTy}
+    (env : HEnv Γ) (x : Var Γ τ) (path : Proj τ π)
+    (extent : Nat) (currentArr : SpecArray σ.carrier extent)
+    (update : SpecArray σ.carrier extent → Option τ.carrier) :
+    (Spec.bind (prophecyOf (State := Memory unit) (α := (NTy.sliceRef σ).carrier × τ.carrier) x path)
+      fun chosen =>
+        Spec.bind (Spec.assume (NTy.Holds (.sliceRef σ) chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+            ∃ final : SpecArray σ.carrier extent,
+              chosen.1 = SpecSliceRef.ofArrays currentArr final ∧
+                update final = some chosen.2)) fun _ =>
+          Spec.pure (Flow.value (ρ := ρ) chosen.1 (x.set chosen.2 env))) =
+    (Spec.bind Spec.choose fun final : SpecArray σ.carrier extent =>
+      match update final with
+      | some lent =>
+          Spec.pure (Flow.value (ρ := ρ) (SpecSliceRef.ofArrays currentArr final) (x.set lent env))
+      | none => Spec.bottom) := by
+  apply Spec.extensionality
+  · funext initial result finalState
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure]
+    constructor
+    · rintro ⟨⟨chosenSlice, owner⟩, middle, rfl, _, middle',
+        ⟨⟨_, _, final, slice_eq, set_eq⟩, _, rfl⟩, result_eq, final_eq⟩
+      dsimp only at slice_eq set_eq result_eq
+      rw [slice_eq] at result_eq
+      exact ⟨final, initial, rfl, by
+        rw [set_eq]
+        exact ⟨result_eq, final_eq⟩⟩
+    · rintro ⟨final, middle, rfl, step⟩
+      cases set_eq : update final with
+      | none =>
+          rw [set_eq] at step
+          exact False.elim step
+      | some lent =>
+          rw [set_eq] at step
+          let slice : (NTy.sliceRef σ).carrier := SpecSliceRef.ofArrays currentArr final
+          exact ⟨(slice, lent), initial, rfl, (), initial,
+            ⟨⟨NTy.holds_of_noDataInvariants (.sliceRef σ) slice,
+              NTy.holds_of_noDataInvariants τ lent,
+              ⟨final, rfl, set_eq⟩⟩, rfl, rfl⟩, step⟩
+  · funext initial error
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure, Spec.bottom]
+    constructor
+    · rintro (h | ⟨_, _, _, h | ⟨_, _, _, h⟩⟩) <;> exact False.elim h
+    · rintro (h | ⟨final, middle, _, h⟩)
+      · exact False.elim h
+      · cases set_eq : update final <;> rw [set_eq] at h <;> exact False.elim h
+  · funext initial
+    apply propext
+    dsimp only [Spec.bind, prophecyOf, Spec.choose, Spec.assume, Spec.pure, Spec.bottom]
+    constructor
+    · rintro (h | ⟨_, _, _, h | ⟨_, _, _, h⟩⟩) <;> exact False.elim h
+    · rintro (h | ⟨final, middle, _, h⟩)
+      · exact False.elim h
+      · cases set_eq : update final <;> rw [set_eq] at h <;> exact False.elim h
+
 variable {executable : ExecutableUnit unit} (meanings : Meanings executable)
   (calls : CallTree (unit := unit)) (fuel : Nat)
   (callsMean : calls.Means meanings)
+
+private theorem borrowPlace_nonNil_means {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
+    (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ σ) (env : HEnv Γ)
+    (denote_eq : (Term.borrowPlace (ρ := ρ) mismatch x path).denote meanings env =
+      match x.get env with
+      | some value =>
+          match path.get? env value with
+          | some component =>
+              Spec.bind (prophecyOf (α := σ.carrier × τ.carrier) x path) fun chosen =>
+                Spec.bind (Spec.assume (NTy.Holds σ chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+                    path.set? env chosen.1 value = some chosen.2)) fun _ =>
+                  Spec.pure (.value (component, chosen.1) (x.set chosen.2 env))
+          | none => mismatchOutcome mismatch
+      | none => Spec.bottom) :
+    Tree.Means
+      (match x.get env with
+      | some value =>
+          match path.get? env value with
+          | some component =>
+              .choose σ component fun prophecy =>
+                match path.set? env prophecy value with
+                | some lent => .ok (Flow.value (component, prophecy) (x.set lent env))
+                | none => .bottom
+          | none => mismatchTree mismatch
+      | none => .bottom)
+      ((Term.borrowPlace (ρ := ρ) mismatch x path).denote meanings env) := by
+  rw [denote_eq]
+  cases x.get env with
+  | none => rfl
+  | some value =>
+      dsimp only
+      cases path.get? env value with
+      | none => exact mismatch_means mismatch
+      | some component =>
+          rw [borrowPlace_choose_eq env x path value component]
+          refine Tree.means_choose fun prophecy => ?_
+          cases path.set? env prophecy value <;> rfl
 
 set_option linter.unusedSectionVars false in
 include callsMean in
@@ -1060,7 +1629,7 @@ mutual
 /-- A term's tree means its denotation, at every call meaning its tree means. -/
 theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (term : Term unit ρ Γ τ) →
     (env : HEnv Γ) → (term.tree calls fuel env).Means (term.denote meanings env)
-  | _, _, .lit _, _ => rfl
+  | _, _, .lit _ _, _ => rfl
   | _, _, .var x, env => by
       show Tree.Means (match x.get env with
           | some value => .ok (Flow.value value env)
@@ -1156,14 +1725,22 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
   | _, _, .call _ handle shape arguments, env =>
       means_flowBind (Args.tree_means arguments env) fun values _ =>
         Tree.means_bind (callsMean.direct handle none _ shape values) fun _ => rfl
-  | _, _, .callGeneric _ handle typeArgs θ shape _ _ arguments, env =>
-      means_flowBind (Args.tree_means arguments env) fun values _ =>
-        Tree.means_bind (callsMean.generic handle typeArgs θ _ shape _) fun _ => rfl
+  | _, _, .callGeneric site handle typeArgs θ shape shape' resolved arguments, env =>
+      means_flowBind (Args.tree_means arguments env) fun values env => by
+        show Tree.Means _
+          (Spec.bind (callAt site (specializedMeaning θ (meanings.generic handle typeArgs θ _ shape)
+            (cast (congrArg HList (resolvedCall resolved).1.symm) values))) _)
+        unfold callAt specializedMeaning
+        rw [Spec.bind_assoc]
+        refine Tree.means_bind (callsMean.generic handle typeArgs θ _ shape _) fun result => ?_
+        rw [Spec.pure_bind]
+        rfl
   | _, _, .callInstance _ handle typeArgs θ shape arguments, env =>
       means_flowBind (Args.tree_means arguments env) fun values _ =>
         Tree.means_bind (callsMean.direct handle (some (typeArgs, θ)) _ shape values) fun _ => rfl
   | _, _, .closure _ _ _ _ _ _ _ _ captures, env =>
-      means_flowBind (Args.tree_means captures env) fun _ _ => rfl
+      means_flowBind (Args.tree_means captures env) fun _ _ => by
+        simp only [Spec.pure_bind, evalConstruct_eq, Tree.Means]
   | _, _, .closureGeneric handle weave typeArgs θ shape _ shared rows sharing below resolved captures, env =>
       means_flowBind (Args.tree_means captures env) fun values env => by
         dsimp only
@@ -1171,6 +1748,7 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
         · split
           · rename_i coherent faithful
             rw [Spec.given_of ⟨@Coherent.ofCheck unit _ (Skolems.instantiate θ ‹_›) handle _ (callsMean.frame ▸ coherent), callsMean.frame ▸ faithful⟩]
+            rw [Spec.pure_bind, evalFunctionOfGeneric_eq]
             simp only [callsMean.frame, Tree.Means]
           · exact True.intro
         · exact True.intro
@@ -1179,9 +1757,16 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
         means_flowBind (Args.tree_means arguments env) fun values _ =>
           Tree.means_bind (callsMean.invoke _ _ shape closure values) fun _ => rfl
   | _, _, .tuple elements, env => means_flowBind (Args.tree_means elements env) fun _ _ => rfl
-  | _, _, .pack _ _ fields, env => means_flowBind (Args.tree_means fields env) fun _ _ => rfl
-  | _, _, .variant _ _ _ _ fields, env =>
-      means_flowBind (Args.tree_means fields env) fun _ _ => rfl
+  | _, _, .pack _ _ _ fields .nil, env =>
+      means_flowBind (Args.tree_means fields env) fun _ _ => by
+        simp only [GhostInits.initialize_nil, checkingAt_of_noDataInvariants,
+          Spec.pure_bind, Tree.Means]
+  | _, _, .pack _ _ _ _ (.cons ..), _ => True.intro
+  | _, _, .variant _ _ _ _ _ fields .nil, env =>
+      means_flowBind (Args.tree_means fields env) fun _ _ => by
+        simp only [GhostInits.initialize_nil, checkingAt_of_noDataInvariants,
+          Spec.pure_bind, Tree.Means]
+  | _, _, .variant _ _ _ _ _ _ (.cons ..), _ => True.intro
   | _, _, .field _ value, env => means_flowBind (Term.tree_means value env) fun _ _ => rfl
   | _, _, .isVariant _ value, env => means_flowBind (Term.tree_means value env) fun _ _ => rfl
   | _, _, .payload mismatch choices value, env =>
@@ -1198,7 +1783,11 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
   | _, _, .caseOf scrutinee arms, env =>
       means_flowBind (Term.tree_means scrutinee env) fun value env =>
         Arms.tree_means arms value env
-  | _, _, .deref value, env => means_flowBind (Term.tree_means value env) fun _ _ => rfl
+  | _, _, @Term.deref _ _ _ τ _ value, env =>
+      means_flowBind (Term.tree_means value env) fun _ _ => by
+        cases τ.invariantFree <;>
+          simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+            Spec.pure_bind, Tree.Means]
   | _, _, .take x, env => by
       show Tree.Means (match x.get env with
           | some value => .ok (Flow.value value (x.clear env))
@@ -1207,47 +1796,31 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           | some value => Spec.pure (Flow.value value (x.clear env))
           | none => Spec.bottom)
       cases x.get env <;> rfl
-  | _, _, .resolve x, env => by
-      show Tree.Means (match x.get env with
-          | some reference => .assumeEq _ reference.1 reference.2 (.ok (Flow.value () env))
-          | none => .ok (Flow.value () env))
-        (match x.get env with
-          | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
-              Spec.pure (Flow.value () env)
-          | none => Spec.pure (Flow.value () env))
+  | _, _, .resolve site x lender, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn]
       cases x.get env with
       | none => rfl
-      | some _ => exact Tree.means_assume (Tree.means_ok _)
-  | _, _, .resolveAt x path, env => by
-      show Tree.Means (match (x.get env).bind (path.get? env) with
-          | some reference => .assumeEq _ reference.1 reference.2 (.ok (Flow.value () env))
-          | none => .ok (Flow.value () env))
-        (match (x.get env).bind (path.get? env) with
-          | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
-              Spec.pure (Flow.value () env)
-          | none => Spec.pure (Flow.value () env))
+      | some reference => exact Lender.resolve_means site env reference lender
+  | _, _, .resolveAt site x path lender, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn]
       cases (x.get env).bind (path.get? env) with
       | none => rfl
-      | some _ => exact Tree.means_assume (Tree.means_ok _)
-  | _, _, .takeAt mismatch x path, env => by
-      show Tree.Means (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some reference =>
-                  match path.set? env (reference.2, reference.2) value with
-                  | some cleared => .ok (Flow.value reference (x.set cleared env))
-                  | none => mismatchTree mismatch
-              | none => mismatchTree mismatch
-          | none => .bottom)
-        (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some reference =>
-                  match path.set? env (reference.2, reference.2) value with
-                  | some cleared => Spec.pure (Flow.value reference (x.set cleared env))
-                  | none => mismatchOutcome mismatch
-              | none => mismatchOutcome mismatch
-          | none => Spec.bottom)
+      | some reference => exact Lender.resolve_means site env reference lender
+  | _, _, @Term.assumeCurrent _ _ _ σ x, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn]
+      cases x.get env with
+      | none => rfl
+      | some reference =>
+          rw [Spec.assume_bind (NTy.holds_of_noDataInvariants σ reference.1)]
+          rfl
+  | _, _, .handedOver _ reference, env =>
+      means_flowBind (Term.tree_means reference env) fun _ _ => by
+        simp only [checkingAt_of_noDataInvariants, Spec.pure_bind, Tree.Means]
+  | _, _, .returned _ reference, env =>
+      means_flowBind (Term.tree_means reference env) fun _ _ => by
+        simp only [checkingAt_of_noDataInvariants, Spec.pure_bind, Tree.Means]
+  | _, _, .takeAt site mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1256,63 +1829,21 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           | none => exact mismatch_means mismatch
           | some reference =>
               dsimp only
+              rw [Proj.setOwner?_of_noDataInvariants]
               cases path.set? env (reference.2, reference.2) value with
               | none => exact mismatch_means mismatch
-              | some cleared => rfl
+              | some cleared =>
+                  dsimp only [Option.map]
+                  rw [Spec.pure_bind]
+                  rfl
   | _, _, .mutate x value, env =>
       means_flowBind (Term.tree_means value env) fun _ env => by
         cases x.get env <;> rfl
-  | _, _, .observe value, env => means_flowBind (Term.tree_means value env) fun _ _ => rfl
-  | _, _, .readPlace mismatch x path, env => by
-      show Tree.Means (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some component => .ok (Flow.value component env)
-              | none => mismatchTree mismatch
-          | none => .bottom)
-        (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some component => Spec.pure (Flow.value component env)
-              | none => mismatchOutcome mismatch
-          | none => Spec.bottom)
-      cases x.get env with
-      | none => rfl
-      | some value =>
-          dsimp only
-          cases path.get? env value with
-          | none => exact mismatch_means mismatch
-          | some _ => rfl
-  | _, _, .writePlace mismatch x path value, env =>
-      means_flowBind (Term.tree_means value env) fun v env => by
-        cases x.get env with
-        | none => rfl
-        | some current =>
-            dsimp only
-            cases path.set? env v current with
-            | none => exact mismatch_means mismatch
-            | some _ => rfl
-  | _, _, @Term.borrowPlace _ _ _ _ σ mismatch x path, env => by
-      show Tree.Means (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some component =>
-                  .choose σ component fun prophecy =>
-                    match path.set? env prophecy value with
-                    | some lent => .ok (Flow.value (component, prophecy) (x.set lent env))
-                    | none => .bottom
-              | none => mismatchTree mismatch
-          | none => .bottom)
-        (match x.get env with
-          | some value =>
-              match path.get? env value with
-              | some component =>
-                  Spec.bind (prophecyOf x path) fun prophecy =>
-                    match path.set? env prophecy value with
-                    | some lent => Spec.pure (Flow.value (component, prophecy) (x.set lent env))
-                    | none => Spec.bottom
-              | none => mismatchOutcome mismatch
-          | none => Spec.bottom)
+  | _, _, .observe _ value, env =>
+      means_flowBind (Term.tree_means value env) fun _ _ => by
+        simp only [checkingAt_of_noDataInvariants, Spec.pure_bind, Tree.Means]
+  | _, _, @Term.readPlace _ _ _ _ σ _ mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1320,13 +1851,54 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           cases path.get? env value with
           | none => exact mismatch_means mismatch
           | some component =>
-              refine Tree.means_choose fun prophecy => ?_
-              cases path.set? env prophecy value <;> rfl
+              dsimp only
+              cases path.hasDeref <;> cases σ.invariantFree <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind, Tree.Means]
+  | _, _, .writePlace site mismatch x path value, env =>
+      means_flowBind (Term.tree_means value env) fun v env => by
+        cases x.get env with
+        | none => rfl
+        | some current =>
+            dsimp only
+            rw [Proj.setOwner?_of_noDataInvariants]
+            cases path.set? env v current with
+            | none => exact mismatch_means mismatch
+            | some updated =>
+                dsimp only [Option.map]
+                rw [Spec.pure_bind]
+                rfl
+  | _, _, @Term.borrowPlace _ _ _ τ _ mismatch x .nil, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, Proj.get?_nil, Proj.set?_nil, prophecyOf]
+      cases x.get env with
+      | none => rfl
+      | some value =>
+          refine Tree.means_choose fun chosen => ?_
+          rw [Spec.assume_bind (NTy.holds_of_noDataInvariants τ chosen)]
+          rfl
+  | _, _, .borrowPlace mismatch x (.deref rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.deref rest) env rfl
+  | _, _, .borrowPlace mismatch x (.field f rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.field f rest) env rfl
+  | _, _, .borrowPlace mismatch x (.index pos rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.index pos rest) env rfl
+  | _, _, .borrowPlace mismatch x (.element f rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.element f rest) env rfl
+  | _, _, .borrowPlace mismatch x (.arrayIndex pos rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.arrayIndex pos rest) env rfl
+  | _, _, .borrowPlace mismatch x (.sliceElement pos rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.sliceElement pos rest) env rfl
+  | _, _, .borrowPlace mismatch x (.sliceIndex pos rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.sliceIndex pos rest) env rfl
+  | _, _, .borrowPlace mismatch x (.variant choices rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.variant choices rest) env rfl
+  | _, _, .borrowPlace mismatch x (.ghost rest), env =>
+      borrowPlace_nonNil_means meanings mismatch x (.ghost rest) env rfl
   | _, _, .sliceVector value, env | _, _, .vectorSlice value, env =>
       means_flowBind (Term.tree_means value env) fun _ _ => rfl
   | _, _, .sliceCurrent value, env => means_flowBind (Term.tree_means value env) fun _ _ => rfl
-  | _, _, .borrowArraySlice mismatch x path, env => by
-      simp only [Term.tree, Term.denote, borrowArraySliceAt]
+  | _, _, @Term.borrowArraySlice _ _ _ _ σ length _ mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, borrowArraySliceAt]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1334,10 +1906,15 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           cases path.get? env value with
           | none => exact mismatch_means mismatch
           | some current =>
-              refine Tree.means_choose fun prophecy => ?_
-              cases path.set? env (prophecy) value <;> rfl
-  | _, _, .borrowVectorSlice mismatch x path, env => by
-      simp only [Term.tree, Term.denote, borrowVectorSliceAt]
+              cases path.hasDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind]
+              all_goals
+                rw [sliceBorrowBody_eq env x path length current (fun final => path.set? env final value)]
+                refine Tree.means_choose fun final => ?_
+                cases path.set? env final value <;> rfl
+  | _, _, @Term.borrowVectorSlice _ _ _ _ σ _ mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, borrowVectorSliceAt]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1345,10 +1922,16 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           cases path.get? env value with
           | none => exact mismatch_means mismatch
           | some current =>
-              refine Tree.means_choose fun prophecy => ?_
-              cases path.set? env (prophecy.vector) value <;> rfl
-  | _, _, .reborrowSlice mismatch x path, env => by
-      simp only [Term.tree, Term.denote, reborrowSliceAt]
+              cases path.hasDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind]
+              all_goals
+                rw [sliceBorrowBody_eq env x path current.values.size ⟨current, rfl⟩
+                  (fun final => path.set? env final.vector value)]
+                refine Tree.means_choose fun final => ?_
+                cases path.set? env final.vector value <;> rfl
+  | _, _, @Term.reborrowSlice _ _ _ _ σ _ mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, reborrowSliceAt]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1356,10 +1939,16 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           cases path.get? env value with
           | none => exact mismatch_means mismatch
           | some current =>
-              refine Tree.means_choose fun prophecy => ?_
-              cases path.set? env (current.withCurrent prophecy) value <;> rfl
-  | _, _, .takeSliceAt mismatch x path, env => by
-      simp only [Term.tree, Term.denote, takeSliceAtValue]
+              cases path.hasDeref <;>
+                simp only [Bool.false_eq_true, ↓reduceIte, checkingAt_of_noDataInvariants,
+                  Spec.pure_bind]
+              all_goals
+                rw [sliceBorrowBody_eq env x path current.extent current.current
+                  (fun final => path.set? env (current.withCurrent final) value)]
+                refine Tree.means_choose fun final => ?_
+                cases path.set? env (current.withCurrent final) value <;> rfl
+  | _, _, .takeSliceAt site mismatch x path, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, takeSliceAtValue]
       cases x.get env with
       | none => rfl
       | some value =>
@@ -1368,14 +1957,18 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
           | none => exact mismatch_means mismatch
           | some reference =>
               dsimp only
+              rw [Proj.setOwner?_of_noDataInvariants]
               cases path.set? env (SpecSliceRef.ofArrays reference.final reference.final) value with
               | none => exact mismatch_means mismatch
-              | some cleared => rfl
-  | _, _, .resolveSliceAt x path, env => by
-      simp only [Term.tree, Term.denote, resolveSliceAtValue]
+              | some cleared =>
+                  dsimp only [Option.map]
+                  rw [Spec.pure_bind]
+                  rfl
+  | _, _, .resolveSliceAt site x path lender, env => by
+      simp only [Term.tree, Term.denote, Term.denoteIn, resolveSliceAtValue]
       cases (x.get env).bind (path.get? env) with
       | none => rfl
-      | some _ => exact Tree.means_assume (Tree.means_ok _)
+      | some reference => exact SliceLender.resolve_means site env reference lender
   | _, _, .vectorLit count elements, env =>
       means_flowBind (Args.tree_means elements env) fun values _ => by
         cases SpecVector.ofArray? (HList.toListOf count values).toArray <;> rfl
@@ -1425,7 +2018,6 @@ theorem Term.tree_means {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → (ter
   | _, _, .assume .., _ => True.intro
   | _, _, .arbitrary, _ => True.intro
   | _, _, .ghostValue .., _ => True.intro
-  | _, _, .ghostInit .., _ => True.intro
   | _, _, .ghostSlot .., _ => True.intro
   | _, _, .ghostRead .., _ => True.intro
   | _, _, .mutationEnd _, _ => rfl
@@ -1467,38 +2059,32 @@ theorem Arms.tree_means {ρ : ResultShape} : {Γ : NRow} → {σ τ : NTy} → (
   | _, _, _, .guarded .., _, _ => True.intro
 end
 
-theorem resolve_means {Γ : NRow} {α : Type} {tree : Tree α} {spec : Comp unit α}
+theorem resolve_means (site : Nat) {Γ : NRow} {α : Type} {tree : Tree α} {spec : Comp unit α}
     (means : tree.Means spec) (env : HEnv Γ) :
-    (mutables : Mutables Γ) → (resolveTree mutables env tree).Means (mutables.resolve env spec)
+    (mutables : Mutables Γ) →
+      (resolveTree mutables env tree).Means (mutables.resolve site env spec)
   | .nil => means
-  | @Mutables.cons _ τ x rest => by
-      show Tree.Means (match x.get env with
-          | some reference => .assumeEq τ reference.1 reference.2 (resolveTree rest env tree)
-          | none => resolveTree rest env tree)
-        (match x.get env with
-          | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
-              rest.resolve env spec
-          | none => rest.resolve env spec)
+  | .cons x rest => by
+      rw [resolveTree, Mutables.resolve_cons]
       cases x.get env with
-      | none => exact resolve_means means env rest
-      | some _ => exact Tree.means_assume (resolve_means means env rest)
-  | @Mutables.at _ _ σ x path rest => by
-      show Tree.Means (match (x.get env).bind (path.get? env) with
-          | some reference => .assumeEq σ reference.1 reference.2 (resolveTree rest env tree)
-          | none => resolveTree rest env tree)
-        (match (x.get env).bind (path.get? env) with
-          | some reference => Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
-              rest.resolve env spec
-          | none => rest.resolve env spec)
+      | none => exact resolve_means site means env rest
+      | some _ =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (resolve_means site means env rest)
+  | .at x path rest => by
+      rw [resolveTree, Mutables.resolve_at]
       cases (x.get env).bind (path.get? env) with
-      | none => exact resolve_means means env rest
-      | some _ => exact Tree.means_assume (resolve_means means env rest)
-
+      | none => exact resolve_means site means env rest
+      | some _ =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (resolve_means site means env rest)
   | .sliceAt x path rest => by
-      simp only [resolveTree, Mutables.resolve]
+      rw [resolveTree, Mutables.resolve_sliceAt]
       cases (x.get env).bind (path.get? env) with
-      | none => exact resolve_means means env rest
-      | some _ => exact Tree.means_assume (resolve_means means env rest)
+      | none => exact resolve_means site means env rest
+      | some _ =>
+          simp only [checkingAt_of_noDataInvariants, Spec.pure_bind]
+          exact Tree.means_assume (resolve_means site means env rest)
 
 include callsMean in
 /-- A function's tree means its denotation, at every call meaning its tree means. -/
@@ -1508,11 +2094,11 @@ theorem Function.tree_means (f : Function unit) (args : HList f.params) :
       ((f.body.tree calls fuel (initialEnv f.params f.locals f.frame_eq args)).bind
         (finishTree f.mutables f.result)).Means
       (Spec.bind (f.body.denote meanings (initialEnv f.params f.locals f.frame_eq args))
-        (f.result.finish f.mutables)) := by
+        (f.result.finish f.exitSite f.mutables)) := by
     exact Tree.means_bind (Term.tree_means meanings calls fuel callsMean f.body _) fun flow =>
       match flow with
-      | .value _ env => resolve_means (Tree.means_ok _) env f.mutables
-      | .return_ _ env => resolve_means (Tree.means_ok _) env f.mutables
+      | .value _ env => resolve_means f.exitSite (Tree.means_ok _) env f.mutables
+      | .return_ _ env => resolve_means f.exitSite (Tree.means_ok _) env f.mutables
       | .break_ .. => rfl
       | .continue_ .. => rfl
   cases scopes : f.scopedMethods with
@@ -1539,7 +2125,7 @@ def calleeAt {unit : ValidatedUnit} (compiled : CompiledUnit unit) (handle : Fun
   | none => .error "a callee out of range"
 
 section Calls
-variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
+variable {unit : ValidatedUnit} [FunctionCarriers unit] [Θ : Skolems unit]
 
 /-- The callee a call runs: its compilation, or its compilation specialized at
 the call's type arguments. -/
@@ -1560,7 +2146,7 @@ def bodyTree (compiled : CompiledUnit unit) (calls : CallTree (unit := unit)) (l
   | .error reason => .unknown reason
 
 /-- The same compiled body read relationally. -/
-def bodyMeaning {executable : ExecutableUnit unit} (compiled : CompiledUnit unit)
+noncomputable def bodyMeaning {executable : ExecutableUnit unit} (compiled : CompiledUnit unit)
     (meanings : Meanings executable) (handle : FunctionHandle)
     (substitution : Option (Array GenericArgument × TypeArgs))
     (σs : NRow) (shape : ResultShape) (args : HList σs) : Comp unit shape.carrier :=
@@ -1571,7 +2157,8 @@ def bodyMeaning {executable : ExecutableUnit unit} (compiled : CompiledUnit unit
       else Spec.bottom
   | .error _ => Spec.bottom
 
-theorem bodyTree_means {executable : ExecutableUnit unit} (compiled : CompiledUnit unit)
+theorem bodyTree_means [NoDataInvariants] {executable : ExecutableUnit unit}
+    (compiled : CompiledUnit unit)
     (calls : CallTree (unit := unit)) (meanings : Meanings executable) (loopFuel : Nat)
     (agrees : calls.Means meanings) (handle substitution σs shape args) :
     (bodyTree compiled calls loopFuel handle substitution σs shape args).Means
@@ -1609,6 +2196,17 @@ def closureCallee (closure : ClosureValue) (σs : NRow) (shape : ResultShape)
     else throw "closure invocation at another signature"
   else throw "uninhabitable closure type arguments"
 
+private def evalResultToSkolem (θ : TypeArgs) : (shape : ResultShape) →
+    (shape.subst θ.1).carrier → @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape
+  | .none, value => value
+  | .one τ, value => NTy.toSkolem θ τ value
+
+private theorem evalResultToSkolem_eq (θ : TypeArgs) : (shape : ResultShape) →
+    (value : (shape.subst θ.1).carrier) →
+    evalResultToSkolem θ shape value = ResultShape.toSkolem θ shape value
+  | .none, _ => rfl
+  | .one _, _ => rfl
+
 /-- Calls as compiled bodies, retaining each generic call's runtime frame so
 closures created in that body capture the same type instantiation as the IR. -/
 def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) :
@@ -1629,7 +2227,7 @@ def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) :
         generic := fun handle typeArgs θ σs shape args =>
           (body handle (some (typeArgs, θ)) (NRow.subst θ.1 σs) (shape.subst θ.1)
             (HList.ofSkolem θ σs args)).bind fun result =>
-              .ok (ResultShape.toSkolem θ shape result)
+              .ok (evalResultToSkolem θ shape result)
         invoke := fun σs shared shape function args =>
           let closure := (Carriers.functions σs shared shape.row).closure function
           match closureCallee closure σs shape args with
@@ -1639,7 +2237,7 @@ def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) :
 
 /-- The relational counterpart of callTree. Dispatch checks compiled bodies;
 this does not assume compiler correctness or runtime-dispatch agreement. -/
-def inlined (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) :
+noncomputable def inlined (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) :
     Nat → (outer : Array (TypeId × TypeId) := #[]) → Meanings executable
   | 0, outer => { closedMeanings executable outer with
       call := fun _ _ _ _ => Spec.bottom
@@ -1665,7 +2263,8 @@ def inlined (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) :
           | .ok ⟨f, values, same⟩ =>
               same ▸ f.denoteWith (inlined executable compiled depth closure.typeInstantiation) values }
 
-theorem callTree_means (executable : ExecutableUnit unit) (compiled : CompiledUnit unit) (loopFuel : Nat) :
+theorem callTree_means [NoDataInvariants] (executable : ExecutableUnit unit)
+    (compiled : CompiledUnit unit) (loopFuel : Nat) :
     (depth : Nat) → (outer : Array (TypeId × TypeId) := #[]) →
       (callTree compiled loopFuel depth outer).Means (inlined executable compiled depth outer)
   | 0, _ => by
@@ -1686,8 +2285,13 @@ theorem callTree_means (executable : ExecutableUnit unit) (compiled : CompiledUn
             exact bodyTree_means compiled _ _ loopFuel
               (callTree_means executable compiled loopFuel depth _) handle (some entry) σs shape args
       · intro handle typeArgs θ σs shape args
-        exact Tree.means_bind (bodyTree_means compiled _ _ loopFuel
-          (callTree_means executable compiled loopFuel depth _) handle (some (typeArgs, θ)) _ _ _) fun _ => rfl
+        refine Tree.means_bind (bodyTree_means compiled _ _ loopFuel
+          (callTree_means executable compiled loopFuel depth _) handle (some (typeArgs, θ)) _ _ _)
+          fun result => ?_
+        show Tree.Means (.ok (evalResultToSkolem θ shape result))
+          (Spec.pure (ResultShape.toSkolem θ shape result))
+        rw [evalResultToSkolem_eq]
+        rfl
       · intro σs shared shape function args
         dsimp only [callTree, inlined]
         split
@@ -1699,7 +2303,8 @@ theorem callTree_means (executable : ExecutableUnit unit) (compiled : CompiledUn
 
 /-- What the check runs means the denotation of the function, each callee's
 compiled body inlined: a walk's outcome is an outcome of it (`Tree.walk_sound`). -/
-theorem checked_tree_means (executable : ExecutableUnit unit) (compiled : CompiledUnit unit)
+theorem checked_tree_means [NoDataInvariants] (executable : ExecutableUnit unit)
+    (compiled : CompiledUnit unit)
     (loopFuel depth : Nat) (f : Function unit) (args : HList f.params) :
     (Function.tree (callTree compiled loopFuel depth) loopFuel f args).Means
       (f.denoteWith (inlined executable compiled depth) args) :=

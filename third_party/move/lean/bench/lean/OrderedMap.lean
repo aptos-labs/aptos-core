@@ -417,9 +417,7 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
-    all_goals try simp only [← Array.getElem?_map, map_insert,
-      ← VerexIR.Proofs.Denote.NTy.forget_vector_values,
-      VerexIR.Proofs.Denote.NTy.forget_ofDeepHolds]
+    all_goals try simp only [← Array.getElem?_map, map_insert]
     case ensures_2_1 | ensures_2_2 =>
       refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
       all_goals try (intro i h0 hi)
@@ -527,11 +525,9 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
-    all_goals try simp only [← Array.getElem?_map, map_erase,
-      ← VerexIR.Proofs.Denote.NTy.forget_vector_values,
-      VerexIR.Proofs.Denote.NTy.forget_ofDeepHolds]
+    all_goals try simp only [← Array.getElem?_map, map_erase]
     case ensures_2 =>
-      have found := ‹(_ : Array {x : _ // _})[_]? = some _›
+      have found := ‹(_ : Array _)[_]? = some _›
       erw [(Array.getElem_of_getElem? found).choose_spec]
       refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
       all_goals try (intro i h0 hi)

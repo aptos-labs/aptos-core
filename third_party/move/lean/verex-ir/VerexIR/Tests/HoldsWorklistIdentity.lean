@@ -34,39 +34,65 @@ private def countVisibleOwn : TacticM Nat := withMainContext do
       ownCount := ownCount + 1
   return ownCount
 
+-- Negative control first: `NTy.Holds` on handle `s` never supplies `Carriers.own` for
+-- an unrelated handle `t` sharing the same plain carrier.
+set_option linter.unusedVariables false in
+example [Carriers] (s t : StructHandle)
+    (v : (NTy.struct s .nil .nil).carrier)
+    (hs : NTy.Holds (.struct s .nil .nil) v) : True := by
+  fail_if_success
+    have : Carriers.own t .nil (NTy.encode (.struct t .nil .nil) v) := by
+      verex_certified_clauses
+      assumption
+  trivial
+
+-- Negative observation control: `NTy.Holds` on `vector (.struct s ...)` never supplies
+-- `Carriers.own` for handle `t` on an observed element `v.values[0]? = some x`.
+set_option linter.unusedVariables false in
+example [Carriers] (s t : StructHandle)
+    (v : (NTy.vector (.struct s .nil .nil)).carrier)
+    (x : (NTy.struct s .nil .nil).carrier)
+    (hs : NTy.Holds (.vector (.struct s .nil .nil)) v)
+    (found : v.values[0]? = some x) : True := by
+  fail_if_success
+    have : Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
+      verex_observed_elements
+      assumption
+  trivial
+
 -- Early-opening pair: two handles on one value, `(hs, ht)` order, proving the second.
 set_option linter.unusedVariables false in
 example [Carriers] (s t : StructHandle)
-    (v : (NTy.struct s .nil .nil).plain)
+    (v : (NTy.struct s .nil .nil).carrier)
     (hs : NTy.Holds (.struct s .nil .nil) v)
     (ht : NTy.Holds (.struct t .nil .nil) v) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) v) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) v) := by
   verex_certified_clauses
   assumption
 
 -- Early-opening pair: the second hypothesis alone.
 example [Carriers] (t : StructHandle)
-    (v : (NTy.struct t .nil .nil).plain)
+    (v : (NTy.struct t .nil .nil).carrier)
     (ht : NTy.Holds (.struct t .nil .nil) v) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) v) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) v) := by
   verex_certified_clauses
   assumption
 
 -- Early-opening pair in the reverse hypothesis order `(ht, hs)`, proving both handles.
 set_option linter.unusedVariables false in
 example [Carriers] (s t : StructHandle)
-    (v : (NTy.struct s .nil .nil).plain)
+    (v : (NTy.struct s .nil .nil).carrier)
     (ht : NTy.Holds (.struct t .nil .nil) v)
     (hs : NTy.Holds (.struct s .nil .nil) v) :
-    Carriers.own s .nil (NTy.plainEncode (.struct s .nil .nil) v) ∧
-      Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) v) := by
+    Carriers.own s .nil (NTy.encode (.struct s .nil .nil) v) ∧
+      Carriers.own t .nil (NTy.encode (.struct t .nil .nil) v) := by
   verex_certified_clauses
   exact ⟨by assumption, by assumption⟩
 
 -- Container hypotheses on the same value with distinct element handles stay visible (neither is hidden as a duplicate of the other).
 set_option linter.unusedVariables false in
 example [Carriers] (s t : StructHandle)
-    (v : (NTy.vector (.struct s .nil .nil)).plain)
+    (v : (NTy.vector (.struct s .nil .nil)).carrier)
     (hs : NTy.Holds (.vector (.struct s .nil .nil)) v)
     (ht : NTy.Holds (.vector (.struct t .nil .nil)) v) :
     NTy.Holds (.vector (.struct t .nil .nil)) v := by
@@ -79,10 +105,10 @@ example [Carriers] (s t : StructHandle)
 -- Exact duplicate hypotheses on `verex_certified_clauses` (including outer metadata on the duplicate): opened once.
 set_option linter.unusedVariables false in
 example [Carriers] (t : StructHandle)
-    (v : (NTy.struct t .nil .nil).plain)
+    (v : (NTy.struct t .nil .nil).carrier)
     (h1 : NTy.Holds (.struct t .nil .nil) v)
     (h2 : NTy.Holds (.struct t .nil .nil) v) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) v) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) v) := by
   run_tac do
     withMainContext do
       let fvarId ← getFVarId (mkIdent `h2)
@@ -100,7 +126,7 @@ example [Carriers] (t : StructHandle)
 
 set_option linter.unusedVariables false in
 example [Carriers] (t : StructHandle)
-    (v : (NTy.vector (.struct t .nil .nil)).plain)
+    (v : (NTy.vector (.struct t .nil .nil)).carrier)
     (h1 : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (h2 : NTy.Holds (.vector (.struct t .nil .nil)) v) :
     NTy.Holds (.vector (.struct t .nil .nil)) v := by
@@ -113,47 +139,57 @@ example [Carriers] (t : StructHandle)
 -- Observation pair: vector + membership + both `Holds` in `(hs, ht)` order, proving the second.
 set_option linter.unusedVariables false in
 example [Carriers] (s t : StructHandle)
-    (v : (NTy.vector (.struct s .nil .nil)).plain)
-    (x : (NTy.struct s .nil .nil).plain)
+    (v : (NTy.vector (.struct s .nil .nil)).carrier)
+    (x : (NTy.struct s .nil .nil).carrier)
     (hs : NTy.Holds (.vector (.struct s .nil .nil)) v)
     (ht : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (mem : x ∈ v.values) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) x) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
+  verex_observed_elements
+  assumption
+
+-- Observation via `getElem? = some x` (`NTy.Holds.of_getElem?` arm of `observedElementFacts`).
+example [Carriers] (t : StructHandle)
+    (v : (NTy.vector (.struct t .nil .nil)).carrier)
+    (x : (NTy.struct t .nil .nil).carrier)
+    (ht : NTy.Holds (.vector (.struct t .nil .nil)) v)
+    (found : v.values[0]? = some x) :
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
   verex_observed_elements
   assumption
 
 -- Observation pair: the second hypothesis alone.
 example [Carriers] (t : StructHandle)
-    (v : (NTy.vector (.struct t .nil .nil)).plain)
-    (x : (NTy.struct t .nil .nil).plain)
+    (v : (NTy.vector (.struct t .nil .nil)).carrier)
+    (x : (NTy.struct t .nil .nil).carrier)
     (ht : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (mem : x ∈ v.values) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) x) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
   verex_observed_elements
   assumption
 
 -- Observation pair in the reverse hypothesis order `(ht, hs)`, proving both handles.
 set_option linter.unusedVariables false in
 example [Carriers] (s t : StructHandle)
-    (v : (NTy.vector (.struct s .nil .nil)).plain)
-    (x : (NTy.struct s .nil .nil).plain)
+    (v : (NTy.vector (.struct s .nil .nil)).carrier)
+    (x : (NTy.struct s .nil .nil).carrier)
     (ht : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (hs : NTy.Holds (.vector (.struct s .nil .nil)) v)
     (mem : x ∈ v.values) :
-    Carriers.own s .nil (NTy.plainEncode (.struct s .nil .nil) x) ∧
-      Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) x) := by
+    Carriers.own s .nil (NTy.encode (.struct s .nil .nil) x) ∧
+      Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
   verex_observed_elements
   exact ⟨by assumption, by assumption⟩
 
 -- Exact duplicate hypotheses on `verex_observed_elements` (including outer metadata on the duplicate): opened once.
 set_option linter.unusedVariables false in
 example [Carriers] (t : StructHandle)
-    (v : (NTy.vector (.struct t .nil .nil)).plain)
-    (x : (NTy.struct t .nil .nil).plain)
+    (v : (NTy.vector (.struct t .nil .nil)).carrier)
+    (x : (NTy.struct t .nil .nil).carrier)
     (h1 : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (h2 : NTy.Holds (.vector (.struct t .nil .nil)) v)
     (mem : x ∈ v.values) :
-    Carriers.own t .nil (NTy.plainEncode (.struct t .nil .nil) x) := by
+    Carriers.own t .nil (NTy.encode (.struct t .nil .nil) x) := by
   run_tac do
     withMainContext do
       let fvarId ← getFVarId (mkIdent `h2)

@@ -3,9 +3,9 @@
 
 import VerexSL
 
-/-! A specification-only table lookup exposes the stored value's declared
-invariant through its certified field projection. The invariant permits the
-boundary value, so a strict version of the same claim remains unprovable. -/
+/-! A specification-only table lookup exposes the stored value's or key's declared
+invariant when guarded in domain (`has(t, k)` / `0 < size(t)`), and refuses
+off-domain or overly strong claims (`key_read_empty`, `too_strong`, `wrong_type`). -/
 
 verex module 0x42::certified_table_reads where
   pragma verify = false
@@ -19,6 +19,9 @@ verex module 0x42::certified_table_reads where
 
   @[map_spec_get (Table)]
   opaque spec fun get {K} {V}(t : Table<K, V>, k : K) : V
+
+  @[map_spec_len (Table)]
+  opaque spec fun size {K} {V}(t : Table<K, V>) : Int
 
   @[map_spec_insertion_key_at (Table)]
   opaque spec fun key_at {K} {V}(t : Table<K, V>, index : Int) : K
@@ -36,6 +39,11 @@ verex module 0x42::certified_table_reads where
 
   public fun key_read(t : &Table<Payload, u64>) -> u64 := 10
   spec key_read where
+    requires 0 < size(t)
+    ensures key_at(t, 0).value <= 10
+
+  public fun key_read_empty(t : &Table<Payload, u64>) -> u64 := 10
+  spec key_read_empty where
     ensures key_at(t, 0).value <= 10
 
   opaque spec fun permitted {T}(value : u64) : Bool
@@ -61,9 +69,19 @@ verex module 0x42::certified_table_reads where
     requires has(t, k)
     ensures get(t, k).value < 10
 
-verify 0x42::certified_table_reads::direct
-verify 0x42::certified_table_reads::key_read
-verify 0x42::certified_table_reads::concrete
+/--
+error: the specification clause `ensures key_at(t, 0).value <= 10` is not established
+---
+error: verex verification failed: the automatic verification of `key_read_empty` failed; provide a proof in the module:
+  verify key_read_empty by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+-/
+#guard_msgs in
+verify 0x42::certified_table_reads::key_read_empty
 
 /--
 error: the specification clause `ensures get(t, k).value < 10` is not established
@@ -92,3 +110,7 @@ error: verex verification failed: the automatic verification of `wrong_type` fai
 -/
 #guard_msgs in
 verify 0x42::certified_table_reads::wrong_type
+
+verify 0x42::certified_table_reads::direct
+verify 0x42::certified_table_reads::key_read
+verify 0x42::certified_table_reads::concrete

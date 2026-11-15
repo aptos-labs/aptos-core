@@ -580,13 +580,6 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | τ, .deref site value =>
       return mkAppN (mkConst ``Term.deref) #[unitExpr, shape, context, ← toExpr τ,
         Lean.toExpr site, ← quoteTerm unitExpr value]
-  | τ, .copy value _ =>
-      -- The copy of a certificate-free current carries the decision of its
-      -- type, which the kernel checks of the literal (`Term.copy`).
-      return mkAppN (mkConst ``Term.copy) #[unitExpr, shape, context, ← toExpr τ,
-        ← quoteTerm unitExpr value, ← mkDecideProof (← mkEq
-          (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.certificateFree) (← toExpr τ))
-          (mkConst ``Bool.true))]
   | .unit, @Term.mutate _ _ _ τ x value =>
       return mkAppN (mkConst ``Term.mutate) #[unitExpr, shape, context, ← toExpr τ, ← quoteVar x,
         ← quoteTerm unitExpr value]
@@ -599,11 +592,6 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | σ, @Term.readPlace _ _ _ τ _ site mismatch x path =>
       return mkAppN (mkConst ``Term.readPlace) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
         Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
-  | σ, @Term.copyPlace _ _ _ τ _ mismatch x path _ =>
-      return mkAppN (mkConst ``Term.copyPlace) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
-        Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path, ← mkDecideProof (← mkEq
-          (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.certificateFree) (← toExpr σ))
-          (mkConst ``Bool.true))]
   | .unit, @Term.writePlace _ _ _ τ σ site mismatch x path value =>
       return mkAppN (mkConst ``Term.writePlace) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
         Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path,
@@ -856,7 +844,6 @@ partial def _root_.VerexIR.Proofs.Denote.Term.foldNodes {α : Type}
   | _, _, .vectorSlice value, found => value.foldNodes visit atSite atClosure found
   | _, _, .sliceCurrent value, found => value.foldNodes visit atSite atClosure found
   | _, _, .deref _ value, found => value.foldNodes visit atSite atClosure found
-  | _, _, .copy value _, found => value.foldNodes visit atSite atClosure found
   | _, _, .observe _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .mutate _ value, found => value.foldNodes visit atSite atClosure found
   | _, _, .writePlace _ _ _ _ value, found => value.foldNodes visit atSite atClosure found
@@ -1855,8 +1842,7 @@ def declareGivenOwnDeclarations (name : Name) (own : Contract.DataOwn) :
   return mkConst name
 
 /-- Bind a given interpretation whose ADT predicates are the unit's generated
-clauses. The inhabitants of this actual family remain an explicit hypothesis;
-only the internal clause scaffold constructs inhabitants unconditionally. -/
+clauses. -/
 def withGivenInterpretation {m : Type → Type} [Monad m] [MonadControlT MetaM m]
     [MonadLiftT MetaM m] {α : Type} (own : Contract.DataOwn)
     (k : Array Lean.Expr → Contract.TranslationFrame → m α)
@@ -1869,9 +1855,7 @@ def withGivenInterpretation {m : Type → Type} [Monad m] [MonadControlT MetaM m
         | none => liftM (Contract.givenOwnDeclarationsAt own unitExpr functions given)
       let installed := mkApp2 (mkConst ``GivenFrame.withDeclarations) given declarations
       let frame := Contract.TranslationFrame.ofGiven unitExpr functions installed state
-      withLocalDecl `nonempty .instImplicit
-          (mkApp (mkConst ``CarriersNonempty) frame.carriers) fun nonempty =>
-        k #[unitExpr, functions, given, state, nonempty] frame
+      k #[unitExpr, functions, given, state] frame
 
 /-- The same translated contract over independent given sorts and state.
 Storage and behavioral observers require an explicit interpretation capability;
@@ -2042,9 +2026,9 @@ def publicContractOf (params : NRow) (result : ResultShape) (generic : Bool) (ty
   let shape ← quoteShape result
   -- The runtime form relates runtime globals to typed memory by the unit's
   -- resource types: it always takes the unit and an executable unit of it.
-  Contract.withUnitInhabitants .implicit fun unitExpr functions inhabitants =>
+  Contract.withUnitVariable .implicit fun unitExpr functions =>
   withLocalDeclD `executable (Contract.executableType unitExpr) fun executable => do
-    let runtime := mkApp3 (mkConst ``Skolems.runtime) unitExpr functions inhabitants
+    let runtime := mkApp2 (mkConst ``Skolems.runtime) unitExpr functions
     let atFrame (frame : Lean.Expr) :=
       if readsUnit then mkApp4 typed unitExpr functions executable frame
       else mkApp3 typed unitExpr functions frame
@@ -2053,10 +2037,10 @@ def publicContractOf (params : NRow) (result : ResultShape) (generic : Bool) (ty
       if readsUnit && readsRequires then
         withLocalDeclD `requiresMeaning
             (mkApp2 (mkConst ``VerexIR.Proofs.RequiresMeaning) unitExpr functions) fun table => do
-          mkLambdaFVars (#[unitExpr, functions, inhabitants, executable] ++ binders.push table)
+          mkLambdaFVars (#[unitExpr, functions, executable] ++ binders.push table)
             (← contract table)
       else do
-        mkLambdaFVars (#[unitExpr, functions, inhabitants, executable] ++ binders)
+        mkLambdaFVars (#[unitExpr, functions, executable] ++ binders)
           (← contract (mkConst ``Unit.unit))
     let applyTable (typed : Lean.Expr) (table : Lean.Expr) : Lean.Expr :=
       if readsUnit && readsRequires then mkApp typed table else typed
@@ -2132,7 +2116,7 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
     -- Over the unit memory is typed at, then the executable unit where an
     -- invariant reads it.
     let readsUnit := Contract.storedInvariantReadsUnit unit
-    let leadingCount := if readsUnit then 4 else 3
+    let leadingCount := if readsUnit then 3 else 2
     -- Each declaration's invariant behind a constant of its own, over an
     -- instance's type arguments and a value of it, selected by the
     -- declaration before it is applied: a value of another resource type
@@ -2142,14 +2126,14 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
       let constant := name ++ Name.mkSimple s!"case{index}"
       defineWithEquation constant case (leadingCount + 2)
       constants := constants.push constant
-    let predicate ← Contract.withUnitInhabitants .default fun unitExpr functions inhabitants =>
+    let predicate ← Contract.withUnitVariable .default fun unitExpr functions =>
       withLocalDeclD `executable (Contract.unitReaderType unit unitExpr functions) fun executable =>
       withLocalDeclD `resource (mkConst ``ResourceType) fun resource =>
         withLocalDeclD `value (mkApp3 (mkConst ``ResourceType.carrier) unitExpr functions resource)
           fun held => do
           let leading :=
-            if readsUnit then #[unitExpr, functions, inhabitants, executable]
-            else #[unitExpr, functions, inhabitants]
+            if readsUnit then #[unitExpr, functions, executable]
+            else #[unitExpr, functions]
           let handle? := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.handle?)
             (mkApp (mkConst ``VerexIR.Proofs.Denote.ResourceType.type) resource)
           let mut selected := mkConst ``True
@@ -2159,7 +2143,7 @@ def ensureStoredInvariant (segments : Array String) (unit : ValidatedUnit)
             let arguments ← quoteRow arguments
             let test ← mkEq handle? (← mkAppM ``Option.some #[toExpr owner])
             let case := mkAppN (mkConst ``VerexIR.Proofs.Denote.StoredCase)
-              #[unitExpr, functions, inhabitants, ← quoteNTy σ, arguments,
+              #[unitExpr, functions, ← quoteNTy σ, arguments,
                 mkAppN (mkConst constant) leading, resource, held]
             selected ← mkAppM ``ite #[test, case, selected]
           mkLambdaFVars leading (← mkLambdaFVars #[resource, held] selected)
@@ -2206,14 +2190,13 @@ def ensureDataOwn (segments : Array String) (unit : ValidatedUnit) :
   liftTermElabM do
     let unitExpr := mkConst (Contract.unitName segments)
     let baseExpr := mkConst (Contract.functionCarriersBaseName segments)
-    let nonemptyExpr := mkConst (Contract.carriersNonemptyBaseName segments)
     -- Each declaration's clauses behind a constant of its own, at the base
     -- family. The clauses are opened by the own observer, rather than by
     -- every normalization of a certificate containing this predicate.
     let mut constants : Array Name := #[]
     for case in own.cases, index in [0:own.cases.size] do
       let constant := name ++ Name.mkSimple s!"case{index}"
-      defineWithEquation constant (mkApp3 case unitExpr baseExpr nonemptyExpr).headBeta 2
+      defineWithEquation constant (mkApp2 case unitExpr baseExpr).headBeta 2
         (normalize := false)
       constants := constants.push constant
     let predicate ← withLocalDeclD `source (mkConst ``VerexIR.StructHandle) fun source =>
@@ -2223,7 +2206,7 @@ def ensureDataOwn (segments : Array String) (unit : ValidatedUnit) :
         for ((owner, σ), constant) in ((own.carriers.zip own.types).zip constants).reverse do
           let test ← mkEq source (toExpr owner)
           let case := mkAppN (mkConst ``VerexIR.Proofs.Denote.OwnAtArguments)
-            #[unitExpr, baseExpr, nonemptyExpr, ← quoteNTy σ, mkConst constant,
+            #[unitExpr, baseExpr, ← quoteNTy σ, mkConst constant,
               arguments, value]
           selected ← mkAppM ``ite #[test, case, selected]
         mkLambdaFVars #[source, arguments, value] selected
@@ -2336,16 +2319,8 @@ private def logicalValue (τ : NTy) (value : Lean.Expr) : MetaM (Option Lean.Exp
 /-- The clause-level value of a native slot binder with what it holds at its prophecies:
 what `final` reads. -/
 private def logicalFinal (τ : NTy) (value : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  match τ with
-  | .ref _ | .sliceRef _ =>
-      logicalValue τ (← mkAppM ``NTy.viewed #[toExpr true, ← quoteNTy τ, value])
-  | _ =>
-      if τ.refFree then return ← logicalValue τ value
-      -- An aggregate holding references is viewed at the plain layer: its
-      -- certified view keeps them as they are (`NTy.viewed`).
-      let type ← quoteNTy τ
-      logicalValue τ (← mkAppM ``NTy.plainViewed
-        #[toExpr true, type, ← mkAppM ``NTy.forget #[type, value]])
+  if τ.refFree then return ← logicalValue τ value
+  logicalValue τ (← mkAppM ``NTy.viewed #[toExpr true, ← quoteNTy τ, value])
 
 /-- The clause-level value of a local's binder. A shared view of a value holding
 references is read whole, what it holds as current, as a parameter's is. -/
@@ -2364,8 +2339,7 @@ private def logicalLocal (unit : ValidatedUnit) (namespaceId : NamespaceId)
   let referent := seenThrough ns.tables.types.size referent
   let some whole := ntyOf unit namespaceId referent | return ← logicalValue τ value
   unless whole != τ && whole.erase == τ do return ← logicalValue τ value
-  logicalValue whole (← mkAppM ``NTy.plainUnerase
-    #[← quoteNTy whole, ← mkAppM ``NTy.forget #[← quoteNTy τ, value]])
+  logicalValue whole (← mkAppM ``NTy.unerase #[← quoteNTy whole, value])
 
 /-- The locals a pattern binds. -/
 private partial def patternLocals (ns : ValidatedNamespace) (pattern : VerexIR.PatternId) :
@@ -3074,76 +3048,87 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
             match changed.find? (·.1 == localDecl.id.index), row[index] with
             | none, _ => frame := frame.push (← mkEq slots[index]! entrySlots[index]!)
             | some (_, true), .ref referent =>
-                -- The carrier of a mutable reference pairs its plain current
-                -- with its certified prophecy
-                -- (`doc/designs/data-invariants.md`), and the frame
-                -- ties the prophecies.
+                -- The carrier of a mutable reference pairs its current value
+                -- with its prophecy (`doc/designs/data-invariants.md`), and
+                -- the frame ties the prophecies.
                 let referentType ← quoteNTy referent
-                let plain := Contract.plainType carriers referentType
                 let carrier := Contract.carrierType carriers referentType
                 let prophecyOf (slot : Lean.Expr) : MetaM Lean.Expr := do
                   mkAppM ``Option.map
-                    #[mkAppN (mkConst ``Prod.snd [.zero, .zero]) #[plain, carrier], slot]
+                    #[mkAppN (mkConst ``Prod.snd [.zero, .zero]) #[carrier, carrier], slot]
                 frame := frame.push
                   (← mkEq (← prophecyOf slots[index]!) (← prophecyOf entrySlots[index]!))
             -- What an aggregate holds keeps its prophecies alike.
             | some (_, true), τ =>
                 unless τ.refFree do
-                  -- At the plain layer: a certified aggregate's view keeps the
-                  -- references it holds as they are (`NTy.viewed`).
                   let type ← quoteNTy τ
                   let view ← withLocalDeclD `held (Contract.carrierType carriers type) fun held =>
-                    mkLambdaFVars #[held] (mkApp4 (mkConst ``NTy.plainViewed) carriers (toExpr true)
-                      type (mkApp3 (mkConst ``NTy.forget) carriers type held))
+                    mkLambdaFVars #[held] (mkApp4 (mkConst ``NTy.viewed) carriers (toExpr true)
+                      type held)
                   let prophecyOf (slot : Lean.Expr) : MetaM Lean.Expr := do
                     mkAppM ``Option.map #[view, slot]
                   frame := frame.push
                     (← mkEq (← prophecyOf slots[index]!) (← prophecyOf entrySlots[index]!))
             | _, _ => pure ()
-        -- A local the body modifies whose type declares a data invariant the
-        -- carriers do not hold keeps it across the iterations, as a clause
-        -- would state. A carried one needs no clause: the local's carrier
-        -- holds it at every iteration (`markedInvariant`).
+        -- A local the body modifies whose type carries a data invariant keeps
+        -- it across the iterations (`NTy.Holds` for carried invariants, plus
+        -- explicit clauses for declarations `Carriers.own` does not carry).
         let header := (loopHeaderLocals ns root site
           ((Array.range parameterTypes.length).map (⟨·⟩))).getD #[]
-        -- A temporary reference created inside the loop can remain in a
-        -- compiler slot after its loan ends. Havoc must retain that ended
-        -- loan's certificate if the slot is populated; it may be absent on
-        -- the zero-iteration path. These clauses are proved at entry and at
-        -- every iteration, just like the authored loop invariant.
-        for (slot, _) in changed do
-          if header.any (·.index == slot) then continue
-          let some (.ref referent) := row[slot]? | continue
-          if referent.certificateFree then continue
-          let τ ← quoteNTy referent
-          let referenceType := Contract.carrierType carriers (← quoteNTy (.ref referent))
-          let valid ← withLocalDeclD `reference referenceType fun reference => do
-            let current ← mkAppM ``Prod.fst #[reference]
-            let held := mkApp3 (mkConst ``NTy.Holds) carriers τ current
-            mkLambdaFVars #[reference] held
-          frame := frame.push (← mkAppM ``Option.elim
-            #[slots[slot]!, mkConst ``True, valid])
-        -- A slot carrying a data invariant, at its native type, a
+        -- Modified compiler slots not in `header` (which may be `none` on the
+        -- zero-iteration path) and reassigned reference locals whose prophecies
+        -- are not tied by the frame keep `NTy.Holds` when populated.
+        for (slot, through) in changed do
+          let isHeader := header.any (·.index == slot)
+          let some slotTy := row[slot]? | continue
+          if slotTy.invariantFree then continue
+          if !isHeader then
+            match slotTy with
+            | .ref referent =>
+                let τ ← quoteNTy referent
+                let refTy ← quoteNTy (.ref referent)
+                let referenceType := Contract.carrierType carriers refTy
+                let valid ← withLocalDeclD `reference referenceType fun reference => do
+                  let current ← mkAppM ``Prod.fst #[reference]
+                  let heldCurrent := mkApp3 (mkConst ``NTy.Holds) carriers τ current
+                  let clause ← if through then pure heldCurrent else
+                    mkAppM ``And #[heldCurrent, mkApp3 (mkConst ``NTy.Holds) carriers refTy reference]
+                  mkLambdaFVars #[reference] clause
+                frame := frame.push (← mkAppM ``Option.elim
+                  #[slots[slot]!, mkConst ``True, valid])
+            | τ =>
+                let quoted ← quoteNTy τ
+                let slotCarrier := Contract.carrierType carriers quoted
+                let valid ← withLocalDeclD `value slotCarrier fun value =>
+                  mkLambdaFVars #[value] (mkApp3 (mkConst ``NTy.Holds) carriers quoted value)
+                frame := frame.push (← mkAppM ``Option.elim
+                  #[slots[slot]!, mkConst ``True, valid])
+          else if !through then
+            match slotTy with
+            | .ref _ | .sliceRef _ =>
+                let quoted ← quoteNTy slotTy
+                let slotCarrier := Contract.carrierType carriers quoted
+                let valid ← withLocalDeclD `reference slotCarrier fun reference =>
+                  mkLambdaFVars #[reference] (mkApp3 (mkConst ``NTy.Holds) carriers quoted reference)
+                frame := frame.push (← mkAppM ``Option.elim
+                  #[slots[slot]!, mkConst ``True, valid])
+            | _ => pure ()
+        -- A header slot carrying a data invariant, at its native type, a
         -- reference's referent's.
         let dataInvariantSlots := changed.filterMap fun (slot, _) =>
           if header.any (·.index == slot) &&
               (localTypes[slot]?.any (Contract.hasDataInvariant unit ·) ||
-                row[slot]?.any Contract.hasLentCertificate) then
+                row[slot]?.any (!·.invariantFree)) then
             match row[slot]? with
             | some (.sliceRef element) =>
-                if restated (.vector element) || Contract.hasLentCertificate (.vector element) then
+                if restated (.vector element) || !element.invariantFree then
                   some (slot, .vector element)
                 else none
             | some (.ref referent) =>
-                -- The current of a loan straddling the loop is the one value
-                -- whose type does not carry its invariant while lent: the
-                -- loop restates the referent's deep invariant across the
-                -- havoc, established at entry and re-established by the
-                -- iteration's own cuts.
-                if restated referent || !referent.certificateFree then some (slot, referent)
+                if restated referent || !referent.invariantFree then some (slot, referent)
                 else none
             | some τ =>
-                if restated τ || Contract.hasLentCertificate τ then some (slot, τ) else none
+                if restated τ || !τ.invariantFree then some (slot, τ) else none
             | none => none
           else none
         let referenced := block.conditions.foldl (fun found condition =>
@@ -3226,7 +3211,9 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
             for ((τ, binder), index) in (row.toArray.zip binders).zipIdx do
               slotValues := slotValues.push (← match τ, binder with
                 | .ref _, some binder => some <$> mkAppM ``Prod.fst #[binder]
-                | _, _ => pure (locals[index]?.join))
+                | .sliceRef _, _ => pure (locals[index]?.join)
+                | _, some binder => pure (some binder)
+                | _, none => pure none)
             translateLoopInvariants unit namespaceId ns block locals localTypes types
               (declaration.locals.map (·.name)) oldLocals startState
               dataInvariantSlots entryLocals (some initial) (some state) executable

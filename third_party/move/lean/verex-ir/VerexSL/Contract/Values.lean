@@ -212,19 +212,9 @@ def executableUnit (executable : Lean.Expr) : MetaM Lean.Expr := do
     throwError "internal: {executable} is not an executable unit"
   return type.getArg! 0
 
-/-- The unit's inhabitants of certified carriers, from the scope
-(`CarriersNonempty`): the content of the ledger hypothesis that its data
-invariants are satisfiable, which every frame of the unit is built over
-(`Skolems.runtime`, `doc/designs/data-invariants.md`). -/
-def carriersNonemptyOf (unit functions : Lean.Expr) : MetaM Lean.Expr :=
-  synthInstance (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty)
-    (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.runtime) unit functions))
-
-/-- The runtime frame of a unit at its function values, over the
-inhabitants in scope. -/
+/-- The runtime frame of a unit at its function values. -/
 def runtimeFrameOf (unit functions : Lean.Expr) : MetaM Lean.Expr :=
-  return mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) unit functions
-    (← carriersNonemptyOf unit functions)
+  return mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) unit functions
 
 /-- The runtime frame of the unit an executable unit or a model is of. -/
 def executableRuntime (executable : Lean.Expr) : MetaM Lean.Expr := do
@@ -243,16 +233,7 @@ def unitReaderType (unit : ValidatedUnit) (unitExpr functions : Lean.Expr) : Lea
     mkApp2 (mkConst ``VerexIR.Proofs.ModelUnit) unitExpr functions
   else executableType unitExpr
 
-/-- The type of a unit's inhabitants of certified carriers, as a binder of
-a term over a unit variable. -/
-def carriersNonemptyType (unit functions : Lean.Expr) : Lean.Expr :=
-  mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty)
-    (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.runtime) unit functions)
-
-/-- Run `k` over a unit variable and its function values, where `present`.
-A definition reading the unit's storage takes the frame it reads at, which
-carries the unit's inhabitants (`Skolems.runtimeNonempty`), so none is
-bound here. -/
+/-- Run `k` over a unit variable and its function values, where `present`. -/
 def withOptionalUnit {α : Type} (present : Bool)
     (k : Option Lean.Expr → Option Lean.Expr → MetaM α) : MetaM α :=
   if present then
@@ -269,19 +250,6 @@ def withUnitVariable {n : Type → Type} [MonadControlT MetaM n] [Monad n] {α :
   withLocalDecl `unit binderInfo (mkConst ``ValidatedUnit) fun unit =>
     withLocalDecl `functions .instImplicit
       (mkApp (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers) unit) (k unit)
-
-/-- Run `k` over a unit variable, its function values and its inhabitants of
-certified carriers (`CarriersNonempty`, a local instance): the binders of a
-term that builds the unit's runtime frame itself (`Skolems.runtime`), whose
-inhabitants the public theorem's satisfiability hypothesis supplies
-(`doc/designs/data-invariants.md`).  A term over a frame instance
-takes its inhabitants with the frame (`Skolems.runtimeNonempty`) and binds
-none of its own. -/
-def withUnitInhabitants {n : Type → Type} [MonadControlT MetaM n] [Monad n] {α : Type}
-    (binderInfo : BinderInfo) (k : Lean.Expr → Lean.Expr → Lean.Expr → n α) : n α :=
-  withUnitVariable binderInfo fun unit functions =>
-    withLocalDecl `inhabitants .instImplicit (carriersNonemptyType unit functions)
-      (k unit functions)
 
 /-- The invocation meaning a model gives at a frame; none where a contract
 takes an executable unit, whose invocations mean big-step runs. -/
@@ -715,28 +683,33 @@ it: stated before the order is read, as for `orderingVariant`. -/
         (order = .gt ∧ greater = value) := by
   cases order <;> simp [orderingChoice]
 
-/-- The variant a chosen ordering value holds is the chosen variant's.
-Both the interpreter and source clauses observe the certified value's plain
-payload, independently of the concrete runtime frame. -/
-theorem variantPlainName_orderingChoice [VerexIR.Proofs.Denote.Carriers]
+@[vir_denote_norm ↓] theorem eq_orderingChoice_iff {α : Type} (value less equal greater : α)
+    (order : Ordering) :
+    value = orderingChoice less equal greater order ↔
+      (order = .lt ∧ value = less) ∨ (order = .eq ∧ value = equal) ∨
+        (order = .gt ∧ value = greater) := by
+  cases order <;> simp [orderingChoice, eq_comm]
+
+/-- The variant a chosen ordering value holds is the chosen variant's. -/
+theorem variantName_orderingChoice [VerexIR.Proofs.Denote.Carriers]
     (names : List String) (rows : VerexIR.Proofs.Denote.NRows)
-    (less equal greater : VerexIR.Proofs.Denote.variantPlain names rows) (order : Ordering) :
-    VerexIR.Proofs.Denote.variantPlainName names rows (orderingChoice less equal greater order) =
-      orderingChoice (VerexIR.Proofs.Denote.variantPlainName names rows less)
-        (VerexIR.Proofs.Denote.variantPlainName names rows equal)
-        (VerexIR.Proofs.Denote.variantPlainName names rows greater) order := by
+    (less equal greater : VerexIR.Proofs.Denote.variantCarrier names rows) (order : Ordering) :
+    VerexIR.Proofs.Denote.variantName names rows (orderingChoice less equal greater order) =
+      orderingChoice (VerexIR.Proofs.Denote.variantName names rows less)
+        (VerexIR.Proofs.Denote.variantName names rows equal)
+        (VerexIR.Proofs.Denote.variantName names rows greater) order := by
   cases order <;> rfl
 
 /-- Apply the tag observation at the term's carrier family.  The choice is
-matched whatever type it is spelled at: an ordering value is the plain value
-of its enum at the declaration's own spelling (`nativeOrderingValue`), which
-the tag reads at the variants' structural one, and the two are one type. -/
-simproc [vir_denote_norm] variantPlainNameOrderingChoice
-    (@VerexIR.Proofs.Denote.variantPlainName ?carriers _ _ _) := fun e => do
-  let_expr VerexIR.Proofs.Denote.variantPlainName carriers names rows value := e
+matched whatever type it is spelled at: an ordering value is the value of its
+enum at the declaration's own spelling (`nativeOrderingValue`), which the tag
+reads at the variants' structural one, and the two are one type. -/
+simproc [vir_denote_norm] variantNameOrderingChoice
+    (@VerexIR.Proofs.Denote.variantName ?carriers _ _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.variantName carriers names rows value := e
     | return .continue
   let_expr VerexSL.Contract.orderingChoice _ less equal greater order := value | return .continue
-  let proof := mkAppN (mkConst ``VerexSL.Contract.variantPlainName_orderingChoice)
+  let proof := mkAppN (mkConst ``VerexSL.Contract.variantName_orderingChoice)
     #[carriers, names, rows, less, equal, greater, order]
   let some (_, _, chosen) := (← inferType proof).eq? | return .continue
   return .visit { expr := chosen, proof? := some (← mkExpectedTypeHint proof (← mkEq e chosen)) }
@@ -800,24 +773,6 @@ def Context.exprType (context : Context) (id : ExprId) : MetaM VerexIR.Proofs.De
 def carrierType (carriers τ : Lean.Expr) : Lean.Expr :=
   mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers τ
 
-/-- The Lean type of the plain values of a quoted type at a family: what a
-value under a live loan, and the row inside a declared value, inhabit
-(`NTy.plain`, `doc/designs/data-invariants.md`). -/
-def plainType (carriers τ : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ
-
-/-- The plain values of a quoted type at a family in the canonical spelling of
-the plain layer, the worker over the family's plain layer
-(`NTy.plainOf (Carriers.toPlain Θ) τ`). The wrapper (`plainType`) is the same
-type, but a congruence closure unfolds it down to the family's instance
-literal, so a term that names a plain type as an argument — an opaque
-specification function's result type and its inhabitant — is built at the
-worker, where its occurrences in a callee's fact and in a caller's clause
-stay one term. -/
-def plainWorkerType (carriers τ : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plainOf)
-    (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toPlain) carriers) τ
-
 /-- The Lean type of a binder of a specification type: an integer's `Int`, a
 Boolean's `Bool`, a textual scalar's `String`, any other's carrier. -/
 def Context.binderType (context : Context) (typeId : TypeId) : MetaM Lean.Expr := do
@@ -843,13 +798,6 @@ def Domain.binderOfNative (domain : Domain) (value : Lean.Expr) : MetaM Lean.Exp
   | .integer => mkAppM ``VerexIR.SpecInt.val #[value]
   | .boolean | .text | .native => pure value
 
-/-- Whether a native type's plain and certified values are the same: a type
-with no declaration inside it, whose values certify nothing.  What a read of
-an open mutable current may reach. -/
-def certificateFree (carriers τ : Lean.Expr) : MetaM Bool :=
-  withNewMCtxDepth <| isDefEq (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ)
-    (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers τ)
-
 /-- The decided inhabitability of a quoted native type. -/
 def inhabitableProof (τ : Lean.Expr) : MetaM Lean.Expr := do
   let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) τ
@@ -857,53 +805,20 @@ def inhabitableProof (τ : Lean.Expr) : MetaM Lean.Expr := do
     throwError "the native type {τ} has no values"
   mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq inhabitable (mkConst ``Bool.true))
 
-/-- The structural inhabitant at the plain layer. Plain reads carry no
-certificate, so their default depends only on the plain family, not on an
-arbitrary certified inhabitant or the declaration predicates installed in
-the current verification family. Certified reads retain `typedInhabitant`.
--/
-def plainInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
-  return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
+/-- The uninterpreted off-domain specification fallback (`NTy.plainFallback`),
+backed by a proof-irrelevant `Nonempty` witness so it requires no custom
+axioms. -/
+def plainFallbackValue (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
+  return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainFallback)
     carriers τ (← inhabitableProof τ)
 
-/-- The uninterpreted off-domain specification fallback at the plain worker
-layer (`plainFallback`), backed by a proof-irrelevant `Nonempty`
-witness so it requires neither custom axioms nor `CarriersNonempty`. -/
-def plainFallbackValue (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
-  let plain := mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toPlain) carriers
-  let worker := plainWorkerType carriers τ
-  let witness := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitantOf)
-    plain τ (← inhabitableProof τ)
-  return mkApp2 (mkConst ``VerexIR.Proofs.Denote.plainFallback)
-    worker (mkApp2 (mkConst ``Nonempty.intro [1]) worker witness)
-
-/-- The fallback of a native type whose inhabitability evaluates: the
-value a read outside a vector or of an absent resource stands for.
-
-A type that certifies nothing has its values structurally, and its
-inhabitant is the structural one (`NTy.plainInhabitant`): the inhabitants of
-a unit's certified carriers are the content of a hypothesis, which only a
-declaration's invariant makes necessary, and a read of such a type assumes
-nothing (`doc/designs/data-invariants.md`, "Inhabitants, by
-hypothesis").  The library states its own reads of such a type at the
-structural value as well (`TypedMaps.abortsNewFrom_indexed`), so a clause's
-read and a statement of the same read meet; and the walked form of a
-function reading only such types carries no instance.  Where the type
-certifies something the family's inhabitants are read, a frame's from the
-unit's (`Skolems.carriersNonempty`). -/
+/-- The structural inhabitant of a native type whose inhabitability evaluates. -/
 def typedInhabitant? (carriers τ : Lean.Expr) : MetaM (Option Lean.Expr) := do
   let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) τ
   unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do return none
   let proof ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
     (← mkEq inhabitable (mkConst ``Bool.true))
-  if ← certificateFree carriers τ then
-    let structural := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant) carriers τ proof
-    -- The value itself, where the type's own values decide it: a definite
-    -- default has no reason to be stated through the function that computes
-    -- it, and the library's statements spell the value.
-    return some (← withDefault (whnf structural))
-  let nonempty ← synthInstance (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty) carriers)
-  return some (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitant) carriers nonempty τ proof)
+  return some (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainFallback) carriers τ proof)
 
 /-- The inhabitant of a native type, where a construct needs one. -/
 def typedInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
@@ -920,192 +835,10 @@ def clauseOfNative (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
   | .bool => mkEq value (mkConst ``Bool.true)
   | _ => pure value
 
-/-- The sides of the conjunction `stated` that `proof` proves, as `stated`
-spells them.  The sides are never inferred from the proof's own type: the
-type of a certified value's certificate is the carrier's predicate applied
-(`NTy.carrier`), the conjunction it reduces to is not spelled there, and a
-projection whose sides are inferred from such a type is a term the kernel
-refuses.  They come from the type's own statement of its certificate instead
-(`NTy.deepHolds_struct`, `HListPlain.deepHolds_cons`). -/
-def andSides (stated proof : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  let some (left, right) := stated.app2? ``And
-    | throwError "internal: {stated} is not a conjunction"
-  return (mkApp3 (mkConst ``And.left) left right proof,
-    mkApp3 (mkConst ``And.right) left right proof)
-
-/-- A nominal value's plain row or variant value, and its certificate where
-it has one: a value of the type is its plain value under the data invariants
-at every depth (`NTy.carrier`), while the current of a mutable reference is
-plain and open while the loan lives, so it carries none
-(`doc/designs/data-invariants.md`). -/
-def nominalPlain (carriers τ value : Lean.Expr) : MetaM (Lean.Expr × Option Lean.Expr) := do
-  let plain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ
-  if ← withNewMCtxDepth (isDefEq (← inferType value) plain) then return (value, none)
-  let plainValue ← mkAppM ``Subtype.val #[value]
-  let certificate ← mkAppM ``Subtype.property #[value]
-  -- The certificate states the declaration's own clauses of the value's
-  -- encoding and the data invariants inside the value; the second is what a
-  -- read of a part of it takes (`andSides`).
-  let τ ← nativeTypeView τ
-  let equivalence ← if τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 then
-      mkAppOptM ``VerexIR.Proofs.Denote.NTy.deepHolds_struct
-        #[carriers, τ.getArg! 0, τ.getArg! 1, τ.getArg! 2, plainValue]
-    else if τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 then
-      mkAppOptM ``VerexIR.Proofs.Denote.NTy.deepHolds_enum
-        #[carriers, τ.getArg! 0, τ.getArg! 1, τ.getArg! 2, τ.getArg! 3, τ.getArg! 4, plainValue]
-    else throwError "internal: a value of {τ} carries no certificate"
-  let some (_, stated) := (← inferType equivalence).app2? ``Iff
-    | throwError "internal: the certificate of {τ} is not stated as an equivalence"
-  let (_, deep) ← andSides stated (← mkAppM ``Iff.mp #[equivalence, certificate])
-  return (plainValue, some deep)
-
-/-- Whether a clause's value of a native type is the plain value of it: the
-current of a live mutable reference, which is open while the loan lives and
-carries no data invariant.  A type that certifies nothing has one kind of
-value, so nothing is read of the distinction there. -/
-def isPlainValue (carriers τ value : Lean.Expr) : MetaM Bool := do
-  if ← certificateFree carriers τ then return false
-  withNewMCtxDepth <| isDefEq (← inferType value)
-    (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ)
-
-/-- A clause's value as the plain value of its type: itself where the type
-certifies nothing or where it is already the plain current of a live mutable
-reference, and its certificates forgotten otherwise (`NTy.forget`).  What a
-plain position — the row a field update builds, a comparison with a plain
-current — reads of a certified value. -/
-def plainValueOf (carriers τ value : Lean.Expr) : MetaM Lean.Expr := do
-  if ← certificateFree carriers τ then return value
-  if ← isPlainValue carriers τ value then return value
-  return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.forget) #[carriers, τ, value]
-
-mutual
-/-- Whether a native type holds a declared type — a struct or an enum —
-anywhere inside it.
-
-Those are the only types whose values carry a certificate
-(`NTy.deepHolds`), and so the only ones whose plain and certified layers a
-specification has to choose between.  A type parameter's values carry no
-certificate the verifier can state, as a scalar's do not: its lent layer and
-its certified one are two spellings of one reading, and the carrier is the
-spelling every other reading of the clause takes.  A function type's carrier
-is its family's either way (`Carriers.functionCarrier`), so what it mentions
-does not matter (`doc/designs/data-invariants.md`). -/
-partial def holdsDeclared : VerexIR.Proofs.Denote.NTy → Bool
-  | .struct _ _ _ | .enum _ _ _ _ _ => true
-  | .tuple elements => rowHoldsDeclared elements
-  | .vector element => holdsDeclared element
-  | .table key value => holdsDeclared key || holdsDeclared value
-  | .ref referent => holdsDeclared referent
-  | .ghost slot => holdsDeclared slot
-  | .slice element | .array element _ | .sliceRef element => holdsDeclared element
-  | .observed referent => holdsDeclared referent
-  -- A declaration that reaches itself is a declared type, whatever it holds.
-  | .nominal _ _ _ => true
-  | .function _ _ _ => false
-  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
-  | .param _ => false
-
-/-- Whether a row of native types holds a declared type. -/
-partial def rowHoldsDeclared : VerexIR.Proofs.Denote.NRow → Bool
-  | .nil => false
-  | .cons τ rest => holdsDeclared τ || rowHoldsDeclared rest
-end
-
-/-- The Lean type a position a specification names holds its values at: the
-plain layer where the type holds a declared type, whose certificate a clause
-cannot name, and the carrier everywhere else — where the type certifies
-nothing the two layers are one type, and at a type parameter they are two
-spellings of one reading, so the carrier keeps the spelling every other
-reading of the clause takes (`holdsDeclared`, `certificateFree`,
-`namedValueOf`, `doc/designs/data-invariants.md`). -/
-def namedType (carriers : Lean.Expr) (nty : VerexIR.Proofs.Denote.NTy) : MetaM Lean.Expr := do
-  let τ ← quoteNTy nty
-  if holdsDeclared nty then return plainType carriers τ
-  return carrierType carriers τ
-
-/-- A clause's value as the position a specification names holds it
-(`namedType`): itself where that position is the carrier, and its
-certificates forgotten where the position is plain.  A value of a type
-holding no declaration is handed over as it is, never wrapped, so one type
-keeps one spelling. -/
-def namedValueOf (carriers : Lean.Expr) (nty : VerexIR.Proofs.Denote.NTy)
-    (value : Lean.Expr) : MetaM Lean.Expr := do
-  unless holdsDeclared nty do return value
-  plainValueOf carriers (← quoteNTy nty) value
-
-/-- A value at the plain layer of the native type another value inhabits
-the plain layer of: `none` where the two are not the two layers of one
-type, and where they already meet.  The layer of a declared type's value
-is the layer of what it was read out of — a read through a live mutable
-reference is plain as far as it goes (`plainValueOf`) — so two values of
-one type can stand at the two layers, and a position taking both takes
-them at the plain one. -/
-def plainJoin? (certified plain : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let certifiedType ← instantiateMVars (← inferType certified)
-  unless certifiedType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 do return none
-  let carriers := certifiedType.getArg! 0
-  let τ := certifiedType.getArg! 1
-  if ← certificateFree carriers τ then return none
-  unless ← withNewMCtxDepth (isDefEq (← inferType plain) (plainType carriers τ)) do return none
-  return some (← plainValueOf carriers τ certified)
-
-/-- An element at the layer of the vector a position takes it with: forgotten
-where the vector is plain and the element certified (`plainJoin?`). -/
-def elementAtLayerOf (carriers : Lean.Expr) (elementType : VerexIR.Proofs.Denote.NTy)
-    (vector element : Lean.Expr) : MetaM Lean.Expr := do
-  let τ ← quoteNTy elementType
-  if ← certificateFree carriers τ then return element
-  let plainVector := plainType carriers (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) τ)
-  if ← withNewMCtxDepth (isDefEq (← inferType vector) plainVector) then
-    plainValueOf carriers τ element
-  else return element
-
-/-- A vector and an element at one common layer: where either stands at the
-plain layer and the other is certified, the certified side forgets its
-certificates (`plainJoin?`). -/
-def vectorAndElementAtLayer (carriers : Lean.Expr) (elementType : VerexIR.Proofs.Denote.NTy)
-    (vector element : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  let τ ← quoteNTy elementType
-  if ← certificateFree carriers τ then return (vector, element)
-  let vecTy := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) τ
-  let plainVecTy := plainType carriers vecTy
-  let plainElemTy := plainType carriers τ
-  let vectorIsPlain ← withNewMCtxDepth (isDefEq (← inferType vector) plainVecTy)
-  let elemIsPlain ← withNewMCtxDepth (isDefEq (← inferType element) plainElemTy)
-  let vector ← if !vectorIsPlain && elemIsPlain then plainValueOf carriers vecTy vector else pure vector
-  let element ← if vectorIsPlain && !elemIsPlain then plainValueOf carriers τ element else pure element
-  return (vector, element)
-
-/-- A clause's conditional: `ite` on the decided test (`decisionOf`), its
-branches at one layer.  A conditional of a clause joins what each branch
-reads, and a branch reading the plain current of a live mutable reference
-stands at the plain layer of its type while the other stands at the
-carrier: they meet at the plain layer, which the certified branch reaches
-by forgetting its certificates (`plainJoin?`).  Nothing is lost by
-forgetting, and nothing can be gained by certifying — a plain value carries
-no data invariant.  A caller naming the type states where the branches
-stand, and the branches are taken as they are. -/
+/-- A clause's conditional: `ite` on the decided test (`decisionOf`). -/
 def conditional (test thenTerm elseTerm : Lean.Expr) (type? : Option Lean.Expr := none) :
     MetaM Lean.Expr := do
-  let (thenTerm, elseTerm) ← if type?.isSome then pure (thenTerm, elseTerm) else
-    if let some forgotten ← plainJoin? thenTerm elseTerm then pure (forgotten, elseTerm)
-    else if let some forgotten ← plainJoin? elseTerm thenTerm then pure (thenTerm, forgotten)
-    else pure (thenTerm, elseTerm)
   mkAppOptM ``ite #[type?, test, some (← decisionOf test), thenTerm, elseTerm]
-
-/-- A clause's value where a position needs a value of its type.  Reads of
-the plain current of a live mutable reference compose plainly, through a
-struct's fields and a variant's, as far as the plain layer goes; a position
-that needs the value itself — an argument of a specification function, a
-contract typed at the carrier — needs its data invariant, which the current
-does not carry, and `demand` names that position
-(`doc/designs/data-invariants.md`). -/
-def demandCertified (carriers τ value : Lean.Expr) (demand : String) : MetaM Lean.Expr := do
-  if ← isPlainValue carriers τ value then
-    throwError "{demand} needs a value of a declared type, which this one is not: it is read \
-      through a live mutable reference, whose current carries no data invariant until the \
-      mutation ends"
-  return value
 
 /-- A clause value as a native value of a type: an integer's certified value
 (the value a clause reads of one, a literal that fits, otherwise the integer
@@ -1247,67 +980,11 @@ def nativeRowOf? (τ : Lean.Expr) : MetaM (Option Lean.Expr) := do
   else if τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.tuple 1 then some (τ.getArg! 0)
   else none
 
-/-- The components of a plain native row value at a family's carriers
-(`HListPlain`), with the data invariants each satisfies read off the row's:
-a struct's fields are a plain row under the value's certificate
-(`NTy.carrier`), so a field is certified by the part of it that is the
-field's (`doc/designs/data-invariants.md`). -/
-def quotedPlainRowProjections (carriers value : Lean.Expr) (holds : Option Lean.Expr)
-    (types : Array Lean.Expr) : MetaM (Array Lean.Expr) := do
-  let mut rest := value
-  let mut restHolds := holds
-  let mut values := #[]
-  for index in [:types.size] do
-    let tail := (types.extract (index + 1) types.size).foldr
-      (fun ty row => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.cons) ty row)
-      (mkConst ``VerexIR.Proofs.Denote.NRow.nil)
-    -- Infer the pair's type arguments, preserving its nominal descriptor.
-    let component ← mkAppM ``Prod.fst #[rest]
-    match restHolds with
-    | some held =>
-        -- The row's certificate states the field's invariants and the rest
-        -- of the row's, as the row type's own statement spells them
-        -- (`andSides`).
-        let equation ← mkAppOptM ``VerexIR.Proofs.Denote.HListPlain.deepHolds_cons
-          #[carriers, types[index]!, tail, rest]
-        let some (_, _, stated) := (← inferType equation).eq?
-          | throwError "internal: a plain row's certificate is not stated as an equation"
-        let (fieldHolds, tailHolds) ← andSides stated (← mkEqMP equation held)
-        values := values.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.ofDeepHolds)
-          #[carriers, types[index]!, component, fieldHolds])
-        restHolds := some tailHolds
-        -- A field of a plain row is plain, and a read of it composes
-        -- plainly; a certificate is demanded where a position needs one
-        -- (`demandCertified`).
-    | none => values := values.push component
-    rest ← mkAppM ``Prod.snd #[rest]
-  return values
-
 /-- The components of a native struct or tuple value: per component, its
-native type and value.  A tuple's components are its certified row; a
-struct's are its plain row certified by the value's own certificate. -/
+native type and value. -/
 def nativeComponents (carriers τ value : Lean.Expr) : MetaM (Array (Lean.Expr × Lean.Expr)) := do
   let some row ← nativeRowOf? τ | throwError "internal: {τ} is not a row type"
   let types := quotedRowTypes row
-  if (← nativeTypeView τ).isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 then
-    let plainType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ
-    if ← withNewMCtxDepth (isDefEq (← inferType value) plainType) then
-      return types.zip (← quotedPlainRowProjections carriers value none types)
-    let view ← nativeTypeView τ
-    let rowOf (start : Nat) := (types.extract start types.size).foldr
-      (fun ty row => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.cons) ty row)
-      (mkConst ``VerexIR.Proofs.Denote.NRow.nil)
-    let mut values := #[]
-    for index in [:types.size] do
-      let mut position := mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.here)
-        #[rowOf (index + 1), types[index]!]
-      for previous in (List.range index).reverse do
-        position := mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.there)
-          #[rowOf (previous + 1), types[previous]!, types[index]!, position]
-      values := values.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.selectCertified)
-        #[carriers, view.getArg! 0, view.getArg! 1, view.getArg! 2,
-          types[index]!, position, value])
-    return types.zip values
   return types.zip (← quotedRowProjections carriers value types)
 
 /-- The unit, its function values, and the frame of a family's carriers
@@ -1332,12 +1009,8 @@ def typedVariantTest? (carriers τ value : Lean.Expr) (handle : VerexIR.StructHa
   let view ← nativeTypeView τ
   unless view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 && view.getArg! 0 == toExpr handle do
     return none
-  -- A certified enum value is its plain variant value under its
-  -- certificate, and the tag is a property of the plain value
-  -- (`variantPlainName`, `doc/designs/data-invariants.md`).
-  let (plainValue, _) ← nominalPlain carriers τ value
-  let name := mkAppN (mkConst ``VerexIR.Proofs.Denote.variantPlainName)
-    #[carriers, view.getArg! 2, view.getArg! 3, plainValue]
+  let name := mkAppN (mkConst ``VerexIR.Proofs.Denote.variantName)
+    #[carriers, view.getArg! 2, view.getArg! 3, value]
   let tests ← mkListLit (mkConst ``String) (variants.toList.map toExpr)
   return some (mkApp2 (mkConst ``VerexIR.Proofs.Denote.namedIn) name tests)
 
@@ -1348,37 +1021,10 @@ def nativeVariantTest (carriers τ value : Lean.Expr) (handle : VerexIR.StructHa
     | throwError "internal: a variant test of a value whose type {τ} is not the tested enum's"
   mkEq test (mkConst ``Bool.true)
 
-/-- The shared field a selection reads out of a certified enum value,
-certified by the value's own certificate: the plain selection
-(`Choices.select?`) with the data invariants of the field read off the
-value's (`Choices.select?_deepHolds`), so that a clause reads a nominal
-variant field as a certified value (`doc/designs/data-invariants.md`).
--/
-def certifiedSelection (carriers enum names rows fieldType choices value : Lean.Expr) :
-    MetaM Lean.Expr := do
-  let (plainValue, held?) ← nominalPlain carriers enum value
-  let selected := mkAppN (mkConst ``VerexIR.Proofs.Denote.Choices.select?)
-    #[carriers, names, rows, fieldType, choices, plainValue]
-  -- The current of a live mutable reference carries no invariant, so a
-  -- field of it is read plain and reads of it compose plainly; a certificate
-  -- is demanded where a position needs one (`demandCertified`).  A field
-  -- type that certifies nothing has one kind of value, so the plain
-  -- selection is already the certified one and nothing is certified.
-  let some held := held? | return selected
-  if ← certificateFree carriers fieldType then return selected
-  -- A named selection, not a bare `Option.pmap`: the normalizer rewrites
-  -- with its equations instead of taking the map apart
-  -- (`Choices.selectCertified?`).  Its own certificate is the value's.
-  let _ := held
-  let enum ← nativeTypeView enum
-  return mkAppN (mkConst ``VerexIR.Proofs.Denote.Choices.selectCertified?)
-    #[carriers, enum.getArg! 0, enum.getArg! 1, names, rows, enum.getArg! 4,
-      fieldType, choices, value]
-
 /-- A variant field of a native enum value: its variant's field, as the
-program reads it (`Term.payload`), and the field type's inhabitant under a
-variant without it. The field's native type and the read; none where the
-selection does not resolve at the value's type. -/
+program reads it (`Term.payload`), and the uninterpreted off-domain fallback
+(`plainFallbackValue`) under a variant without it. The field's native type
+and the read; none where the selection does not resolve at the value's type. -/
 def typedVariantField? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (String × Nat))
     (carriers τ value : Lean.Expr) :
     MetaM (Option (Lean.Expr × Lean.Expr)) := do
@@ -1391,28 +1037,15 @@ def typedVariantField? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (Stri
     | return none
   let fieldType ← quoteNTy field
   unless field.inhabitable do return none
+  let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) fieldType
+  unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do return none
   let view ← nativeTypeView τ
-  let selected ← certifiedSelection carriers τ (view.getArg! 2) (view.getArg! 3) fieldType
-    (← quoteChoices selection) value
-  -- The read stands at the layer the selection reads, which is the
-  -- selection's own: a certified selection reads the carrier, while the
-  -- plain selection of a value whose current carries no data invariant
-  -- reads the plain field and its structural default
-  -- (`plainInhabitant`, `certifiedSelection`). Where
-  -- the field type certifies nothing the two layers are one type, and the
-  -- carrier is the spelling every other reading of the clause takes, so
-  -- that one type keeps one spelling: only the read the carrier does not
-  -- type is spelled at the plain layer.
-  let selectedType ← inferType selected
-  unless selectedType.isAppOfArity ``Option 1 do
-    throwError "internal: the selection of a variant field of {τ} does not read an option"
+  let selected := mkAppN (mkConst ``VerexIR.Proofs.Denote.Choices.select?)
+    #[carriers, view.getArg! 2, view.getArg! 3, fieldType, ← quoteChoices selection, value]
   let carrier := carrierType carriers fieldType
-  let getD (layer inhabitant : Lean.Expr) : Lean.Expr :=
-    mkAppN (mkConst ``Option.getD [Level.zero]) #[layer, selected, inhabitant]
-  if ← isDefEq carrier selectedType.appArg! then
-    return some (fieldType, getD carrier (← typedInhabitant carriers fieldType))
+  let fallback ← plainFallbackValue carriers fieldType
   return some (fieldType,
-    getD selectedType.appArg! (← plainInhabitant carriers fieldType))
+    mkAppN (mkConst ``Option.getD [Level.zero]) #[carrier, selected, fallback])
 
 /-- The native type of a variant field, where the selection resolves. -/
 def selectedFieldType? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (String × Nat)) :
@@ -1439,8 +1072,8 @@ def typedVariantSelection? (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (
     | return none
   let fieldType ← quoteNTy field
   let view ← nativeTypeView τ
-  return some (fieldType, ← certifiedSelection carriers τ (view.getArg! 2) (view.getArg! 3)
-    fieldType (← quoteChoices selection) value)
+  return some (fieldType, mkAppN (mkConst ``VerexIR.Proofs.Denote.Choices.select?)
+    #[carriers, view.getArg! 2, view.getArg! 3, fieldType, ← quoteChoices selection, value])
 
 /-- A variant field of a native enum value, where the selection resolves. -/
 def nativeVariantField (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (String × Nat))
@@ -1462,37 +1095,8 @@ partial def nativeRow (carriers : Lean.Expr) :
         #[carriers, ← quoteNTy τ, ← quoteRow rest, value, tail]
   | _, _ => throwError "internal: a row of values differs from its row type"
 
-/-- The plain native row of clause values, a nested pair (`HListPlain`),
-each component crossed into the plain layer (`plainOfNative`): what the row
-inside a struct's or a variant's value is, the carrier of a declared type
-being the subtype of its plain row (`NTy.carrier`,
-`doc/designs/data-invariants.md`).  The dual of
-`quotedPlainRowProjections`, which reads such a row back. -/
-partial def plainNativeRow (carriers : Lean.Expr) :
-    VerexIR.Proofs.Denote.NRow → List Lean.Expr → MetaM Lean.Expr
-  | .nil, [] => return mkConst ``Unit.unit
-  | .cons τ rest, operand :: operands => do
-      let quoted ← quoteNTy τ
-      let value ← plainValueOf carriers quoted (← nativeOfClause carriers τ operand)
-      let tail ← plainNativeRow carriers rest operands
-      let tailType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HListPlain) carriers
-        (← quoteRow rest)
-      return mkApp4 (mkConst ``Prod.mk [Level.zero, Level.zero]) (plainType carriers quoted)
-        tailType value tail
-  | _, _ => throwError "internal: a row of plain values differs from its row type"
-
-/-- An equation of two native values of one type, at the layer they are held
-at: of the values themselves where both are of the same layer, and of their
-plain values where one of them is plain — the current of a live loan, or the
-row a specification builds inside a declared value — and the other
-certified.  Nothing is lost by forgetting, which is injective
-(`NTy.forget_injective`), and nothing can be gained by certifying: a plain
-value carries no data invariant, and what owes one is the cut at the
-position that holds it, not the equation
-(`doc/designs/data-invariants.md`). -/
-def equateNative (carriers τ left right : Lean.Expr) : MetaM Lean.Expr := do
-  if (← isPlainValue carriers τ left) || (← isPlainValue carriers τ right) then
-    return ← mkEq (← plainValueOf carriers τ left) (← plainValueOf carriers τ right)
+/-- An equation of two native values of one type. -/
+def equateNative (_carriers _τ left right : Lean.Expr) : MetaM Lean.Expr :=
   mkEq left right
 
 /-- The value of a ghost slot of a value a specification builds:
@@ -1517,25 +1121,19 @@ def ghostValues (carriers : Lean.Expr) (row : VerexIR.Proofs.Denote.NRow) (count
       #[← quoteNTy contents, carrier, mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant]
 
 /-- A value a specification builds of clause operands, as the program builds
-it (`Term.pack`, `Term.variant`), its ghost slots unspecified: its plain row
-or variant value, which is what the carrier of a declared type holds under
-its certificate (`NTy.carrier`).  A specification has no certificate to
-build with — the data invariants of a built value are owed by the cut at the
-position that holds it — so what it states of such a value is the equation
-of the plain values (`equateNative`,
-`doc/designs/data-invariants.md`). -/
+it (`Term.pack`, `Term.variant`), its ghost slots unspecified. -/
 def nativeConstructed (built : VerexIR.Proofs.Denote.NTy) (variant : Option String)
     (carriers : Lean.Expr) (operands : Array Lean.Expr) : MetaM Lean.Expr := do
   let builtType ← quoteNTy built
   match built, variant with
   | .struct _ _ fields, none =>
       let ghosts ← ghostValues carriers fields operands.size
-      plainNativeRow carriers fields (operands.toList ++ ghosts)
+      nativeRow carriers fields (operands.toList ++ ghosts)
   | .enum _ _ names rows _, some name =>
       let some ⟨σs, which⟩ := VerexIR.Proofs.Denote.Which.ofName names rows name
         | throwError "internal: the variant `{name}` is not the enum's"
       let ghosts ← ghostValues carriers σs operands.size
-      let row ← plainNativeRow carriers σs (operands.toList ++ ghosts)
+      let row ← nativeRow carriers σs (operands.toList ++ ghosts)
       let view ← nativeTypeView builtType
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.Which.inject)
         #[carriers, view.getArg! 2, view.getArg! 3, ← quoteRow σs, ← quoteWhich which, row]
@@ -1554,28 +1152,15 @@ def opaqueValue (name : String) (typeArguments : List Lean.Expr) (result inhabit
     (arguments : Array Lean.Expr) (profile : Option VerexIR.Profile := none)
     (argumentTypes : Array (Option Lean.Expr) := #[]) : MetaM Lean.Expr := do
   let typeList ← mkListLit (mkConst ``VerexSL.Contract.SpecTypeArgument) typeArguments
-  -- Specification functions read values at the plain layer, including a
-  -- certified executable value and a value constructed by a specification.
-  let arguments ← arguments.mapM fun value => do
-    let type ← inferType value
-    -- A result is typed at its shape, which is its type's carrier.
-    let type ← if type.isAppOf ``VerexIR.Proofs.Denote.ResultShape.carrier then whnfR type
-      else pure type
-    if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 then
-      plainValueOf (type.getArg! 0) (type.getArg! 1) value
-    else pure value
   -- The declaration owns each argument's type. In particular a struct
   -- constructor has a row-valued expression, but an opaque function takes
-  -- that row at the struct's nominal plain type.
+  -- that row at the struct's nominal carrier type.
   let mut bundle := mkConst ``Unit.unit
   for index in (List.range arguments.size).reverse do
     let value := arguments[index]!
     let type ← match (argumentTypes[index]?.bind id) with
       | some type => pure type
       | none => inferType value
-    -- One spelling of a plain type in the bundle (`plainWorkerType`).
-    let type := if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.plain 2 then
-        plainWorkerType (type.getArg! 0) (type.getArg! 1) else type
     bundle ← mkAppOptM ``Prod.mk #[type, ← inferType bundle, value, bundle]
   let model := specificationModel? profile name
   if let some .serialization := model then
@@ -1595,27 +1180,20 @@ type's carrier. -/
 def nativeArbitrary (carriers : Lean.Expr) (nty : VerexIR.Proofs.Denote.NTy) (name : String)
     (arguments : Array Lean.Expr) : MetaM Lean.Expr := do
   let τ ← quoteNTy nty
-  let inhabitant ← typedInhabitant carriers τ
+  let fallback ← plainFallbackValue carriers τ
   let carrier := carrierType carriers τ
-  opaqueValue name [] carrier (mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant) arguments
+  opaqueValue name [] carrier (mkApp2 (mkConst ``Inhabited.mk [1]) carrier fallback) arguments
 
-/-- The native value a memory slot holds, read at a frame; the type's
-inhabitant where it holds nothing. -/
+/-- The native value a memory slot holds, read at a frame; the uninterpreted
+off-domain fallback (`plainFallbackValue`) where it holds nothing. -/
 def nativeSlot (skolems nativeType _resource slot : Lean.Expr) : MetaM Lean.Expr := do
   let carriers ← frameCarriers skolems
-  let inhabitant ← typedInhabitant carriers nativeType
-  let plain := plainType carriers nativeType
+  let fallback ← plainFallbackValue carriers nativeType
   let frameCarrier := carrierType carriers nativeType
-  let ofPlain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.ofPlain?) carriers nativeType
-  let bound := mkAppN (mkConst ``Option.bind [Level.zero, Level.zero])
-    #[plain, frameCarrier, slot, ofPlain]
-  return mkAppN (mkConst ``Option.getD [Level.zero]) #[frameCarrier, bound, inhabitant]
+  return mkAppN (mkConst ``Option.getD [Level.zero]) #[frameCarrier, slot, fallback]
 
 /-- The value of a three-variant ordering enum at an order, as
-`std::cmp::compare` returns it (`orderingChoice`).  The variants are built
-as a specification builds any value, plain under no certificate
-(`nativeConstructed`), so the choice is a plain value of the enum
-(`doc/designs/data-invariants.md`). -/
+`std::cmp::compare` returns it (`orderingChoice`). -/
 def nativeOrderingValue (carriers : Lean.Expr) (unit : ValidatedUnit) (owner : VerexIR.StructHandle)
     (variants : Array String) (order : Lean.Expr) : MetaM Lean.Expr := do
   let some enum@(.enum _ _ names rows _) := VerexIR.Proofs.Denote.structNTy unit owner
@@ -1633,21 +1211,15 @@ def nativeOrderingValue (carriers : Lean.Expr) (unit : ValidatedUnit) (owner : V
   let #[less, equal, greater] := values
     | throwError "the result of a structural order has three variants"
   return mkAppN (mkConst ``VerexSL.Contract.orderingChoice)
-    #[plainType carriers τ, less, equal, greater, order]
+    #[carrierType carriers τ, less, equal, greater, order]
 
-/-- The structural order of two clause values. An observation containing a
-plain value reads both operands at the plain layer; a comparison of certified
-values reads their carrier. This also permits comparing the current of a live
-loan, without requiring or constructing a certificate for it. -/
+/-- The structural order of two clause values. -/
 def structuralOrderTerm (context : Context) (τ : VerexIR.Proofs.Denote.NTy) (left right : Lean.Expr) :
     MetaM Lean.Expr := do
   let carriers ← context.carriers
   let type ← quoteNTy τ
   let rank := mkApp (mkConst ``VerexIR.SemanticOperations.valueRanks)
     (← quoteValueOrders context.ns.orders)
-  if (← isPlainValue carriers type left) || (← isPlainValue carriers type right) then
-    return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.plainOrder)
-      #[carriers, rank, type, ← plainValueOf carriers type left, ← plainValueOf carriers type right]
   return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.order)
     #[carriers, rank, type, left, right]
 
@@ -1667,15 +1239,9 @@ def nativeFieldUpdate (carriers : Lean.Expr) (built : VerexIR.Proofs.Denote.NTy)
   let some ⟨σ, x⟩ := VerexIR.Proofs.Denote.Var.ofIndex fields index
     | throwError "internal: a field update's field is out of range"
   let replaced ← nativeOfClause carriers σ replacement
-  -- A struct value is its plain row under the data invariants of the whole
-  -- (`NTy.carrier`), so the row a clause builds is plain: a specification
-  -- names a value, and nothing is owed where one is named
-  -- (`doc/designs/data-invariants.md`).
   let fieldType ← quoteNTy σ
-  let (plainBase, _) ← nominalPlain carriers (← quoteNTy built) base
-  return mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.updatePlain)
-    #[carriers, ← quoteRow fields, fieldType, ← quoteVar x,
-      ← plainValueOf carriers fieldType replaced, plainBase]
+  return mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.update)
+    #[carriers, ← quoteRow fields, fieldType, ← quoteVar x, replaced, base]
 
 /-- A native enum value with one field replaced in every variant holding it,
 as the program assigns it (`Choices.update?`); the value itself under a
@@ -1694,31 +1260,18 @@ def nativeVariantFieldUpdate (carriers : Lean.Expr) (built : VerexIR.Proofs.Deno
   let τ ← quoteNTy built
   let replaced ← nativeOfClause carriers field replacement
   let fieldType ← quoteNTy field
-  -- An enum value is its plain variant value under its certificate, and the
-  -- value a clause builds is plain, as a struct's row is.
-  let (plainBase, _) ← nominalPlain carriers τ base
   let view ← nativeTypeView τ
   let updated := mkAppN (mkConst ``VerexIR.Proofs.Denote.Choices.update?)
-    #[carriers, view.getArg! 2, view.getArg! 3, fieldType, ← quoteChoices selection,
-      ← plainValueOf carriers fieldType replaced, plainBase]
-  mkAppOptM ``Option.getD
-    #[mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ, updated, plainBase]
+    #[carriers, view.getArg! 2, view.getArg! 3, fieldType, ← quoteChoices selection, replaced, base]
+  mkAppOptM ``Option.getD #[carrierType carriers τ, updated, base]
 
-/-- A vector built by a clause has plain elements, like a constructed record. -/
+/-- A vector built by a clause from its native elements. -/
 def nativeVectorLiteral (carriers : Lean.Expr) (built : VerexIR.Proofs.Denote.NTy)
-    (elements : Array Lean.Expr) (plain : Bool := true) : MetaM Lean.Expr := do
+    (elements : Array Lean.Expr) : MetaM Lean.Expr := do
   let .vector element := built | throwError "internal: a vector literal of a type that is not a vector"
   let quoted ← quoteNTy element
   let values ← elements.mapM (nativeOfClause carriers element)
-  -- The layer of the literal is the layer of its elements: plain where the
-  -- position is, and plain where an element is — a value a specification
-  -- builds carries no certificate, and a literal cannot hold one element at
-  -- each layer (`equateNative`,
-  -- `doc/designs/data-invariants.md`).
-  let plain := plain || (← values.anyM (isPlainValue carriers quoted ·))
-  let carrier := if plain then plainType carriers quoted else carrierType carriers quoted
-  let values ← values.mapM fun value =>
-    if plain then plainValueOf carriers quoted value else pure value
+  let carrier := carrierType carriers quoted
   let array ← mkArrayLit carrier values.toList
   let bounded ← VerexIR.Proofs.Denote.decidedLemma (← mkAppM ``LT.lt
     #[← mkAppM ``Array.size #[array], mkNatLit (2 ^ 64)])
@@ -1747,16 +1300,7 @@ equality reads them: as values, or, at a type holding a part equality reads
 through its identity, by `NTy.equal` with handles (a table owner by its
 handle, no ghost slot read). -/
 def nativeEquation (carriers τ left right : Lean.Expr) (identity : Bool) : MetaM Lean.Expr := do
-  -- An equation of values is the equation at the layer they are held at
-  -- (`equateNative`).
   unless identity do return ← equateNative carriers τ left right
-  -- A plain current compares with a certified value through the
-  -- certificates the latter forgets: equal plain values are the same value
-  -- of the type (`NTy.forget`, `NTy.plainEqual`).
-  if (← isPlainValue carriers τ left) || (← isPlainValue carriers τ right) then
-    return ← mkEq (mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.plainEqual)
-      #[carriers, mkConst ``Bool.true, τ, ← plainValueOf carriers τ left,
-        ← plainValueOf carriers τ right]) (mkConst ``Bool.true)
   mkEq (mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.equal) #[carriers, mkConst ``Bool.true, τ, left, right])
     (mkConst ``Bool.true)
 
@@ -1807,31 +1351,22 @@ structure TypedTable where
   themselves where both views read values as they are. -/
   map : Lean.Expr
 
-/-- The typed view of a native type's values, where one evaluates.  `plain`
-asks for the view of the type's plain values, which a table inside a mutable
-reference's current holds (`NativeMaps.typedView?`). -/
-def typedViewOf (carriers τ : Lean.Expr) (plain : Bool := false) :
+/-- The typed view of a native type's values, where one evaluates
+(`NativeMaps.typedView?`). -/
+def typedViewOf (carriers τ : Lean.Expr) :
     MetaM VerexIR.Proofs.Denote.NativeMaps.TypedView := do
-  let some view ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers τ plain
+  let some view ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers τ
     | throwError "the map's keys or values of type {τ} have no typed view: the type has no \
         value a specification can stand for"
   pure view
 
 /-- A clause value as the typed value a view holds it as: an integer as
 itself, a value read as it is as its native value, any other value read
-(`NTy.read`).  A plain view holds the plain values of its type, so a clause
-value crosses with its certificates forgotten (`plainValueOf`). A
-nonidentity plain view uses its total reader uniformly: a constructed
-argument's plain row has the same reading as a specification constructor,
-and an opaque certified argument reads back through `NTy.readPlain_forget`. -/
+(`NTy.read`). -/
 def TypedTable.typedOf (view : VerexIR.Proofs.Denote.NativeMaps.TypedView)
     (τ : VerexIR.Proofs.Denote.NTy) (clause : Lean.Expr) : MetaM Lean.Expr := do
   if view.integer then return clause
   let nativeValue ← nativeOfClause view.carriers τ clause
-  if view.plain then
-    let plain ← plainValueOf view.carriers view.type nativeValue
-    if view.identity then return plain
-    return (mkApp view.read plain).headBeta
   if view.identity then return nativeValue
   return (mkApp view.read nativeValue).headBeta
 
@@ -1876,14 +1411,10 @@ def TypedTable.rank (table : TypedTable) (key : Lean.Expr) : MetaM Lean.Expr :=
     #[table.keys.carrier, table.values.carrier, table.keys.decEq, table.map, key]
 
 /-- The order an ordered owner's typed keys compare by: integers by their
-values, values read as they are by the structural order (`NTy.keyOrder`),
-a type parameter's typed values by the family's (`NTy.readOrder`), and the
-plain keys a reference's current holds by the order of their encodings
-(`TypedView.plainKeyOrder`), which is the same order; a parameter's plain
-keys by the family's, as its certified keys are (`NTy.readPlain`). -/
+values, values read as they are by the structural order (`NTy.keyOrder`), and
+a type parameter's typed values by the family's (`NTy.readOrder`). -/
 def TypedTable.keyOrder (table : TypedTable) (rank : Lean.Expr) : MetaM Lean.Expr := do
   if table.keys.integer then return mkConst ``VerexIR.SpecMap.intOrder
-  if table.keys.plain && table.keys.identity then return ← table.keys.plainKeyOrder rank
   if table.keys.identity then
     return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.keyOrder) #[table.keys.carriers, rank,
       table.keys.type]
@@ -1992,13 +1523,6 @@ def nativeOwner? (carriers : Lean.Expr) (owner : VerexIR.Proofs.Denote.NTy) (val
   let fields := quotedRowTypes ((← nativeTypeView ownerType).getArg! 2)
   let some table := fields.back? | return none
   unless table.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 do return none
-  -- An owner is a struct, so its fields are the plain row under its own
-  -- certificate (`nativeComponents`).  An owner that carries no certificate
-  -- is the current of a live mutable reference, whose table holds plain
-  -- entries, and the views read that layer
-  -- (`doc/designs/data-invariants.md`).
-  let (_, owned) ← nominalPlain carriers ownerType value
-  let plain := owned.isNone
   let projections := (← nativeComponents carriers ownerType value).map (·.2)
   -- The fields before the ghost slots: a handle or placeholder, then a
   -- cached length, as a table layout orders them.
@@ -2017,8 +1541,8 @@ def nativeOwner? (carriers : Lean.Expr) (owner : VerexIR.Proofs.Denote.NTy) (val
       if length.isSome then return none
       length := some (index, projections[index]!)
     else return none
-  let keys ← typedViewOf carriers (table.getArg! 0) plain
-  let values ← typedViewOf carriers (table.getArg! 1) plain
+  let keys ← typedViewOf carriers (table.getArg! 0)
+  let values ← typedViewOf carriers (table.getArg! 1)
   -- One spelling of a table's map, its reads identities or not.
   let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries
     keys.read values.read projections.back!
@@ -2054,12 +1578,7 @@ def NativeOwner.tableOf (owner : NativeOwner) (map : Lean.Expr) : MetaM Lean.Exp
   mkAppM ``VerexIR.SpecMap.writeBack #[unread, map]
 
 /-- The owner value with its table holding a typed map, its cached length
-the map's size: what a specification's map update builds.  Its plain row,
-which is what the carrier of the owner's type holds under its certificate
-and what a field update rebuilds (`Var.updatePlain`): a specification has no
-certificate to build with, so what it states of the built owner is the
-equation of the plain values (`equateNative`,
-`doc/designs/data-invariants.md`). -/
+the map's size: what a specification's map update builds. -/
 def NativeOwner.withMap (owner : NativeOwner) (carriers : Lean.Expr) (map : Lean.Expr) :
     MetaM Lean.Expr := do
   let row ← quoteRow owner.fields
@@ -2067,11 +1586,9 @@ def NativeOwner.withMap (owner : NativeOwner) (carriers : Lean.Expr) (map : Lean
     let some ⟨σ, x⟩ := VerexIR.Proofs.Denote.Var.ofIndex owner.fields position
       | throwError "internal: an owner's field is out of range"
     let fieldType ← quoteNTy σ
-    return mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.updatePlain)
-      #[carriers, row, fieldType, ← quoteVar x,
-        ← plainValueOf carriers fieldType replacement, value]
-  let mut value ← replace (← plainValueOf carriers owner.type owner.value) owner.tablePosition
-    (← owner.tableOf map)
+    return mkAppN (mkConst ``VerexIR.Proofs.Denote.Var.update)
+      #[carriers, row, fieldType, ← quoteVar x, replacement, value]
+  let mut value ← replace owner.value owner.tablePosition (← owner.tableOf map)
   if let some (position, _) := owner.length then
     let size ← owner.typed.sizeOf map
     let some (.int width signed) := owner.fields.toList[position]?
@@ -2171,24 +1688,11 @@ def iteratorValiditySlot (context : Context) (ty : IrTy) (enum : VerexIR.Proofs.
   let (_, read) ← nativeVariantField enum choices.toArray carriers (← quoteNTy enum) value
   pure read
 
-/-- A native value as the typed value a view holds it as: an
-integer's value, a value read as it is itself, any other value read
-(`NTy.read`).  A plain view holds the plain values of its type, so the value
-crosses with its certificates forgotten, by its own type: the value's
-position may be typed at a result shape rather than at a carrier, where
-reading the family off the value is not possible: the view's own family and
-type are what the forgetful map is taken at, and they agree with the value's
-by unfolding (`NativeMaps.typedView?`, `plainValueOf`). A nonidentity plain
-view uses its total reader uniformly for constructed and already-plain
-arguments. An opaque certified argument reads back through
-`NTy.readPlain_forget`. -/
+/-- A native value as the typed value a view holds it as: an integer's
+value, a value read as it is itself, any other value read (`NTy.read`). -/
 def TypedTable.typedOfNative (view : VerexIR.Proofs.Denote.NativeMaps.TypedView)
     (nativeValue : Lean.Expr) : MetaM Lean.Expr := do
   if view.integer then return ← mkAppM ``VerexIR.SpecInt.val #[nativeValue]
-  if view.plain then
-    let plain ← plainValueOf view.carriers view.type nativeValue
-    if view.identity then return plain
-    return (mkApp view.read plain).headBeta
   if view.identity then return nativeValue
   return (mkApp view.read nativeValue).headBeta
 

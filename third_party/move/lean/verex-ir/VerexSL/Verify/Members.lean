@@ -65,39 +65,25 @@ def variantComponentNames (unit : ValidatedUnit) (source : VerexIR.StructHandle)
   (fieldNames unit source (some variant) count).map (s!"{base}_{variant}_{·}")
 
 /-- The `rcases` pattern destructuring a value of a type into its scalar
-parts, named from `base`, following the type's carrier. `certified` says
-which carrier the value is of: `NTy.carrier`, where a struct is its plain row
-under the certificate of the data invariants at every depth and a reference
-is its plain current and its certified prophecy, or `NTy.plain`, where a
-struct is the row alone — so everything under a certificate, and a
-reference's current, is plain.
-
-A struct's certificate is named (`base_property`) rather than dropped: it is
-the fact that the value's data invariants hold, which a leaf owing one of
-them reads (`verex_split_hypotheses` applies such a fact, it never cases on
-it). A variant value stays whole, certificate and all: the walk splits it
-where the function matches on it, and a proof per combination of variants is
-exponential in the parameters. -/
-private partial def carrierPatternAt (unit : ValidatedUnit) (certified : Bool) (base : String) :
+parts, named from `base`, following `NTy.carrier`. A struct is the row of its
+fields, and a reference is its current and its prophecy; parameter validity
+(`HList.Holds`) supplies any data invariants separately. A variant value stays
+whole: the walk splits it where the function matches on it, and a proof per
+combination of variants is exponential in the parameters. -/
+private partial def carrierPattern (unit : ValidatedUnit) (base : String) :
     NTy → String
   | .tuple elements =>
-      rowPattern certified (elements.toList.zipIdx.map fun (σ, index) => (σ, s!"{base}_{index}"))
+      rowPattern (elements.toList.zipIdx.map fun (σ, index) => (σ, s!"{base}_{index}"))
   | .struct source _ fields =>
-      let row := rowPattern false (fields.toList.zip (componentNames unit source base fields.length))
-      if certified then s!"⟨{row}, «{base}_property»⟩" else row
-  | .ref referent => s!"⟨{carrierPatternAt unit false base referent}, «{base}_final»⟩"
+      rowPattern (fields.toList.zip (componentNames unit source base fields.length))
+  | .ref referent => s!"⟨{carrierPattern unit base referent}, «{base}_final»⟩"
   -- A binder is written escaped, as a source name may be a Lean keyword.
   | _ => s!"«{base}»"
 where
-  rowPattern (certified : Bool) (parts : List (NTy × String)) : String :=
+  rowPattern (parts : List (NTy × String)) : String :=
     if parts.isEmpty then "_"
     else "⟨" ++ ", ".intercalate (parts.map fun (σ, name) =>
-      carrierPatternAt unit certified name σ) ++ ", _⟩"
-
-/-- The pattern destructuring a certified value, which a parameter and a
-local hold (`NTy.carrier`). -/
-private def carrierPattern (unit : ValidatedUnit) (base : String) (τ : NTy) : String :=
-  carrierPatternAt unit true base τ
+      carrierPattern unit name σ) ++ ", _⟩"
 
 /-- The reference type a type is, if it is one. -/
 private def referenceOf? (unit : ValidatedUnit) (typeId : VerexIR.TypeId) :
@@ -509,17 +495,6 @@ private def isBitVectorCertificate (name : Name) : CommandElabM Bool := do
       | .notTrue => pure false
     catch _ => pure false
 
-/-- Whether a unit's declarations state data invariants its carriers hold
-(`dataOwn`, `ensureDataOwn`). Such a unit has no declared instance of the
-inhabitants of its certified carriers, because a declared invariant may be
-unsatisfiable: its public theorems take the hypothesis that the invariants
-are satisfiable and derive the one instance from it, while a unit without
-them has the trivial instance and assumes nothing
-(`doc/designs/data-invariants.md`, "Inhabitants, by hypothesis"). -/
-def declaresDataInvariants (segments : Array String) (unit : ValidatedUnit) :
-    CommandElabM Bool :=
-  return (← ensureDataOwn segments unit).predicate.isSome
-
 /-- The no-fallback audit of one verified function, including the transitive
 axiom closure. The agreement axiom is the sole project-specific exception,
 explicitly deferred to D4 in `doc/designs/denotation.md`; a function selecting
@@ -636,7 +611,6 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     | throwError m!"unknown function `{function}` in `{namespaceName}`"
   let segments := namespaceName.components.toArray.map (·.getString!)
   let unitDefinition ← ensureUnitInstance segments unit
-  let dataInvariants ← declaresDataInvariants segments unit
   -- The stored invariants a native assumed at a shape is stated over, whose
   -- statement is rebuilt (`shapeHypothesisType`); a native's own is read off
   -- its published contract.
@@ -656,30 +630,14 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
     let unitExpr ← auditedUnit segments unit
     -- The unit's function values: the instance declared with the unit.
     let functions ← functionCarriersOf (mkConst unitDefinition)
-    -- The unit's inhabitants of certified carriers, which every frame of it
-    -- and every contract over it takes: the declared instance where no
-    -- declaration states a data invariant, and otherwise the hypothesis that
-    -- the invariants are satisfiable, which the public theorem binds first
-    -- (`doc/designs/data-invariants.md`).
-    let withInhabitants {α : Type} (k : Array Lean.Expr → Lean.Expr → TermElabM α) :
-        TermElabM α := do
-      unless dataInvariants do
-        return (← k #[] (← Contract.carriersNonemptyOf (mkConst unitDefinition) functions))
-      withLocalDeclD `dataInvariantsSatisfiable
-          (mkApp2 (mkConst ``VerexIR.Proofs.Denote.DataInvariantsSatisfiable) unitExpr functions)
-        fun satisfiable =>
-          k #[satisfiable] (mkApp3
-            (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty.ofSatisfiable) unitExpr functions
-            satisfiable)
     -- The unit's requires meaning, as the generator states it
-    -- (`requiresMeaningTerm`): over the inhabitants the theorem is bound
-    -- over, at the reading of a value no closure site encodes.
-    let requiresMeaningAt (inhabitants : Lean.Expr) : Lean.Expr :=
-      mkApp2 (mkConst (functionRequiresName segments)) inhabitants
+    -- (`requiresMeaningTerm`), at the reading of a value no closure site encodes.
+    let requiresMeaning : Lean.Expr :=
+      mkApp (mkConst (functionRequiresName segments))
         (mkApp2 (mkConst ``VerexIR.Proofs.requiresForeign) unitExpr functions)
     let publicContract := mkConst publicName
     let handle : FunctionHandle := ⟨⟨namespaceIndex⟩, ⟨functionIndex⟩⟩
-    let expected ← withInhabitants fun satisfiableBinders inhabitants =>
+    let expected ←
       withLocalDecl `registry .implicit
         (mkConst ``VerexIR.Validation.SemanticsRegistry) fun registry =>
       withLocalDecl `executable .implicit (Contract.executableType unitExpr) fun executable => do
@@ -689,8 +647,8 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
           some (Contract.executableType unitExpr), some executable]
         let preparation ← mkEq prepared success
         let contractAt (arguments : Array Lean.Expr) :=
-          (mkAppN publicContract (#[unitExpr, functions, inhabitants, executable] ++ arguments ++
-            (if readsRequires then #[requiresMeaningAt inhabitants] else #[]))).headBeta
+          (mkAppN publicContract (#[unitExpr, functions, executable] ++ arguments ++
+            (if readsRequires then #[requiresMeaning] else #[]))).headBeta
         -- A generic function's theorem holds at every instantiation a call
         -- gives it, coherent with the frame its type arguments induce.
         let conclusion ← if isGeneric declaration then
@@ -704,7 +662,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
             withLocalDeclD `frame (mkAppN (mkConst ``FrameOf)
                 #[unitExpr, toExpr handle, toExpr binders, instantiation]) fun frame => do
             let induced := mkApp4 (mkConst ``Skolems.instantiate) unitExpr functions θ
-              (mkApp3 (mkConst ``Skolems.runtime) unitExpr functions inhabitants)
+              (mkApp2 (mkConst ``Skolems.runtime) unitExpr functions)
             withLocalDeclD `coherent (mkAppN (mkConst ``Coherent)
                 #[unitExpr, functions, induced, toExpr handle, instantiation]) fun coherent => do
             let conclusion ← mkForallFVars #[instantiation, frame, coherent]
@@ -721,7 +679,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
         let natives := ((nativeDependencies.getState env).find? base).getD #[]
         let hypotheses ← natives.mapM fun (nativeHandle, nativeName) =>
           nativeHypothesisType unit segments stored nativeName nativeHandle executable functions
-            (requiresMeaningAt inhabitants)
+            requiresMeaning
         -- Then the assumed steps of the lemmas it applies.
         let trusted := ((lemmaTrustDependencies.getState env).find? base).getD #[]
         let hypotheses := hypotheses ++ trusted.map mkConst
@@ -770,7 +728,7 @@ def requireNativeArtifacts (base : Name) (bitVectors : Bool) (model : Bool := fa
               assume (index + 1) (bound.push hypothesis)
           else
             mkForallFVars #[registry, executable]
-              (← mkArrow preparation (← mkForallFVars (satisfiableBinders ++ bound) conclusion))
+              (← mkArrow preparation (← mkForallFVars bound conclusion))
         assume 0 #[]
     certificateTypesMatch publicInfo.type expected
   unless valid do
@@ -1108,47 +1066,6 @@ def unitTermOf (segments : Array String) (unit : ValidatedUnit) : CommandElabM T
 /-- The binder of a model's theorem holding the meaning of invoking a
 function value at every family (`doc/designs/ghost-fields.md`). -/
 def invokeIdent : Ident := mkIdent `verexInvoke
-
-/-- The instance binder an artifact of a unit whose declarations state a
-data invariant takes first: the inhabitants of its certified carriers, which
-every frame of the unit is built over (`Skolems.runtime`).  Named, so that
-an artifact applied to another's is applied to the very instance its theorem
-is bound over: a generic member's theorem also has a frame in scope, whose
-own inhabitants instance resolution may pick
-(`Skolems.runtimeCarriersNonempty`), and the two must not be mixed
-(`doc/designs/data-invariants.md`, "Inhabitants, by hypothesis"). -/
-def inhabitantsIdent : Ident := mkIdent `verexInhabitants
-
-/-- How the artifacts of a unit name the inhabitants of its certified
-carriers.
-
-Where no declaration of the unit states a data invariant they are declared
-as an instance of it (`ensureCarriersNonempty`), a closed constant every
-statement about the unit resolves to, and no artifact binds them: the frames
-and the carriers such a function's goals carry are closed terms, so a
-function of such a unit pays nothing for carriers and the walk's size stays
-proportional to what the function uses.
-
-Where a declaration states one the instance is withheld, because the
-invariant may be unsatisfiable, and every artifact binds them, named rather
-than resolved (`inhabitantsIdent`). -/
-structure Inhabitants where
-  /-- The binder an artifact takes, where the instance is withheld. -/
-  binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
-  /-- The arguments an application of such an artifact passes, in the
-  binders' order: empty where nothing is bound. -/
-  arguments : Array Term := #[]
-
-/-- The inhabitants of a unit's certified carriers as its artifacts name
-them, from whether its declarations state a data invariant
-(`declaresDataInvariants`). -/
-def inhabitantsOf (unitTerm : Term) (dataInvariants : Bool) : CommandElabM Inhabitants := do
-  unless dataInvariants do return {}
-  return {
-    binders := #[← `(bracketedBinder|
-      [$inhabitantsIdent : VerexIR.Proofs.Denote.CarriersNonempty
-        (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm)])]
-    arguments := #[inhabitantsIdent] }
 
 /-- What a contract reading the unit takes in a theorem: the executable
 unit, or, in a unit verified through its model, the model of the executable
@@ -1600,8 +1517,8 @@ private def lemmaTheoremCommand (unit : ValidatedUnit)
     match type with
     | .inl scalar => `(bracketedBinder| ($name : $(← lemmaTypeSyntax scalar)))
     | .inr nty =>
-        -- A native parameter at the layer a named position holds it at,
-        -- behind a reducible constant the binder spells (`namedType`).
+        -- A native parameter at its carrier type, behind a reducible constant
+        -- the binder spells (`carrierType`).
         let typeName := Name.str names.requires.getPrefix s!"lemmaParameter_{index}"
         unless (← getEnv).contains typeName do
           liftTermElabM do
@@ -1610,7 +1527,7 @@ private def lemmaTheoremCommand (unit : ValidatedUnit)
                   (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Skolems) unitExpr functions)
                 fun frame => do
                   mkLambdaFVars #[unitExpr, functions, frame]
-                    (← Contract.namedType (← Contract.frameCarriers frame) nty)
+                    (Contract.carrierType (← Contract.frameCarriers frame) (← quoteNTy nty))
             let type ← inferType value
             addDecl <| .defnDecl
               { name := typeName, levelParams := [], type, value, hints := .abbrev, safety := .safe }
@@ -2319,14 +2236,10 @@ private def modelInvokeBinders (segments : Array String) (unit : ValidatedUnit) 
     -- `row{k}` names the row quoted `k`-th, not the row of site `k`.
     let siteRow := rootIdent (functionValuesName segments ++ Name.mkSimple s!"siteRow{index}")
     let binderName := mkIdent (Name.mkSimple s!"invokeRoutes_{name}_{index}")
-    -- The family holds a site's captures plain, while the weave composes the
-    -- certified ones: the binder is quantified at the certified row and the
-    -- constructor reads the row that forgets (`HList.forget`), as every
-    -- other site statement does.
     routing := routing.push (← `(bracketedBinder| ($binderName :
       ∀ (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $siteRow) args,
         $invokeIdent $runtimeFrame _ _ $shape
-            ($ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $siteRow captures)) args =
+            ($ctor captures) args =
           $(cycleSelf name)
             (@VerexIR.Proofs.Denote.Weave.compose $unitTerm _ $runtimeFrame _ _ _ $weave
               captures args))))
@@ -2396,18 +2309,12 @@ private def nativePair (handleTerm : Term) (calleeKey : String) : CommandElabM T
   `(term| PProd.mk $handleTerm (PProd.mk $(Syntax.mkStrLit calleeKey)
     @$(mkIdent (Name.mkSimple s!"native_{calleeKey}"))))
 
-/-- A callee known by its theorem, at the inhabitants of the unit's certified
-carriers the caller's own theorem is bound over (`Inhabitants`): where the
-unit's declarations state a data invariant the callee's theorem takes them
-first, as every artifact of the unit does, and they are named rather than
-resolved because a generic member's theorem has a frame in scope whose own
-inhabitants resolution could pick instead
-(`Skolems.runtimeCarriersNonempty`); where none does, the unit's declared
-instance is the only one and nothing is passed. -/
-private def theoremPair (handleTerm : Term) (calleeKey : String) (theoremName : Name)
-    (inhabitants : Array Term) : CommandElabM Term := do
+/-- A callee known by its theorem, applied to the caller's prepared executable
+and recorded dependencies. -/
+private def theoremPair (handleTerm : Term) (calleeKey : String) (theoremName : Name) :
+    CommandElabM Term := do
   let mut arguments : Array Term := #[
-    ← `(term| _), ← `(term| _), ← `(term| prepared)] ++ inhabitants
+    ← `(term| _), ← `(term| _), ← `(term| prepared)]
   -- Bind recorded proof dependencies at the producer. The solver retains
   -- direct callee hypotheses as implementation details, which ordinary
   -- assumption search deliberately skips. A verified callee must therefore
@@ -2574,11 +2481,6 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
     (worklist : Array FunctionHandle) (found : Callees m.unit) : CommandElabM (Callees m.unit) := do
   let { reference, segments, function, namespaceName, handle, model, generic, .. } := m
   let unit := m.unit
-  -- What a callee's theorem takes for the inhabitants of the unit's
-  -- certified carriers: the caller's own binder, or nothing where the unit
-  -- declares the instance.
-  let inhabitants ←
-    (·.arguments) <$> inhabitantsOf m.unitTerm (← declaresDataInvariants segments unit)
   let targetsOfClosures := closureTargets unit
   let mut calleePairs := found.calleePairs
   let mut modelMembers := found.modelMembers
@@ -2718,7 +2620,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
       let (natives', assumptionDeps', trustDeps', transferDeps') ←
         addTheoremDependencies theoremName natives assumptionDeps trustDeps transferDeps
       natives := natives'; assumptionDeps := assumptionDeps'; trustDeps := trustDeps'; transferDeps := transferDeps'
-      calleePairs := calleePairs.push (← theoremPair handleTerm calleeKey theoremName inhabitants)
+      calleePairs := calleePairs.push (← theoremPair handleTerm calleeKey theoremName)
       contracts := contracts.push (callee, typedContractName segments calleeKey)
     else if throughContract then
       throwErrorAt reference m!"`{function}` calls `{calleeKey}`, whose verification depends \
@@ -2759,7 +2661,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
           addTheoremDependencies theoremName natives assumptionDeps trustDeps transferDeps
         natives := natives'; assumptionDeps := assumptionDeps'; trustDeps := trustDeps'; transferDeps := transferDeps'
         behaviorPairs := behaviorPairs.push
-          (← theoremPair handleTerm calleeKey theoremName inhabitants)
+          (← theoremPair handleTerm calleeKey theoremName)
         behaviorTargets := behaviorTargets.push callee
   -- Each call of a native with shapes stands by the shape it matches.
   let mut bodies : Array (NamespaceId × VerexIR.FunctionDecl VerexIR.Validation.FunctionBody ×
@@ -2843,7 +2745,7 @@ private def collectCallees (m : Member) (members : Array FunctionHandle)
       addTheoremDependencies theoremName natives assumptionDeps trustDeps transferDeps
     natives := natives'; assumptionDeps := assumptionDeps'; trustDeps := trustDeps'; transferDeps := transferDeps'
     behaviorPairs := behaviorPairs.push
-      (← theoremPair (← handleSyntax target) targetKey theoremName inhabitants)
+      (← theoremPair (← handleSyntax target) targetKey theoremName)
     behaviorTargets := behaviorTargets.push target
   return {
     visited := visited
@@ -2872,11 +2774,6 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
     (verifyOpaque : FunctionHandle → TypeArgs → Function m.unit → String → CommandElabM Name) : CommandElabM (Callees m.unit) := do
   let { reference, segments, function, generic, .. } := m
   let unit := m.unit
-  -- What a callee's theorem takes for the inhabitants of the unit's certified
-  -- carriers, as in `collectCallees`: the caller's own binder, or nothing
-  -- where the unit declares the instance.
-  let inhabitants ←
-    (·.arguments) <$> inhabitantsOf m.unitTerm (← declaresDataInvariants segments unit)
   let mut callees := found
   let mut pending := m.compiled.body.rowCalls (atRowCall unit) #[]
   for (_, _, _, inlined) in callees.inlined do
@@ -2920,7 +2817,7 @@ private def collectInstances (m : Member) (members : Array FunctionHandle)
       callees := { callees with
         instances := callees.instances.push (callee, calleeDeclaration, θ, compiled)
         calleePairs := callees.calleePairs.push (← theoremPair (← handleSyntax callee)
-          calleeKey theoremName inhabitants) }
+          calleeKey theoremName) }
       continue
     callees := { callees with
       instances := callees.instances.push (callee, calleeDeclaration, θ, compiled)
@@ -3395,16 +3292,10 @@ private def sharedMeanings (m : Member) (routed : Array (FunctionHandle × Strin
   if routed.isEmpty then return (meanings, 0)
   let { artifacts, unitTerm, generic, model, .. } := m
   let name := artifacts ++ `routedMeanings
-  -- The unit's inhabitants of certified carriers come first where it binds
-  -- them: every frame of it is built over them (`Skolems.runtime`), and a
-  -- unit whose data invariants `own` carries takes them from the public
-  -- theorem's satisfiability hypothesis (`Inhabitants`).
-  let inhabitants ← inhabitantsOf unitTerm (← declaresDataInvariants m.segments m.unit)
   let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
-      pure (inhabitants.binders ++
-        #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
-          ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})])
-    else pure inhabitants.binders
+      pure #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
+        ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})]
+    else pure #[]
   let mut cost := 0
   unless (← getEnv).contains name do
     let budget := (heartbeatBudget? m.declaration).getD (verex.verifyHeartbeats.get (← getOptions))
@@ -3419,12 +3310,12 @@ private def sharedMeanings (m : Member) (routed : Array (FunctionHandle × Strin
     cost := (← IO.getNumHeartbeats) - started
     stageLog s!"{m.function}: routed meanings {cost / 1000}k"
   -- One argument per binder of the definition, in its order: the executable
-  -- unit, the inhabitants of its certified carriers, the family and its
-  -- instantiation where it is generic, then the invoked meanings and the
-  -- members it routes (`verex_value_at%` applies, it does not elaborate).
+  -- unit, the family and its instantiation where it is generic, then the
+  -- invoked meanings and the members it routes (`verex_value_at%` applies, it
+  -- does not elaborate).
   let familyArguments : Array Term ← if generic then
-      pure (inhabitants.arguments ++ #[← `(term| Θ), ← `(term| typeInstantiation)])
-    else pure inhabitants.arguments
+      pure #[← `(term| Θ), ← `(term| typeInstantiation)]
+    else pure #[]
   let invokeArguments : Array Term ← if model then
       pure #[invokeIdent, mkIdent `verexInvokeDefined, mkIdent `verexInvokeCoherent]
     else pure #[]
@@ -3774,10 +3665,10 @@ private def solverTactics (m : Member) (owners : Owners m.unit) (loopPairs calle
 /-- The introduction of the typed theorem's goal: a loop invariant reading
 `old` needs the function's start, recorded as a hypothesis the solver finds
 (so does a loop keeping the stored resources' invariants). The hypotheses it
-names are `assumed` and `permitted`, the spelling the proof shares. -/
+names are `validArgs`, `assumed`, and `permitted`, the spelling the proof shares. -/
 private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
     (pattern : TSyntax `rcasesPat)
-    (assumed permitted : Ident) : CommandElabM (TSyntax `tactic) := do
+    (validArgs assumed permitted : Ident) : CommandElabM (TSyntax `tactic) := do
   let { ns, declaration, handle, handleTerm, .. } := m
   let unit := m.unit
   let compiled := m.compiled
@@ -3796,32 +3687,24 @@ private def introductionTactic (m : Member) (stored : Contract.StoredInvariants)
   let steps := m.script?.any (·.steps)
   let arguments := mkIdent `verexArguments
   let withResult := m.script?.any fun script => readsResult script.tactic.raw
-  -- A parameter's certificate, which the pattern leaves spelled, folded to
-  -- the value's one fact where the pattern makes it: every other producer
-  -- states it inside a goal the walk normalizes
-  -- (`verex_fold_certificates`, `doc/plan/one-spelling.md`, D1).
-  let fold ← `(tactic| all_goals verex_fold_certificates)
   if readsStart then
     let destructure ← if steps then scopedArguments unit ns declaration compiled.params withResult
       else `(tactic| rcases $arguments:ident with $pattern:rcasesPat)
     let introduce ← `(tactic|
-      (intro $arguments:ident initialState $assumed:ident $permitted:ident
+      (intro $arguments:ident initialState $validArgs:ident $assumed:ident $permitted:ident
        have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments
          initialState
-       $destructure:tactic
-       $fold:tactic))
+       $destructure:tactic))
     if steps then `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
     else pure introduce
   else if steps then
     let introduce ← `(tactic|
       (intro $arguments:ident
        $(← scopedArguments unit ns declaration compiled.params withResult):tactic
-       all_goals intro initialState $assumed:ident $permitted:ident
-       $fold:tactic))
+       all_goals intro initialState $validArgs:ident $assumed:ident $permitted:ident))
     `(tactic| ($introduce:tactic; all_goals verex_scope_state initialState))
   else `(tactic|
-    (rintro $pattern:rcasesPat initialState $assumed:ident $permitted:ident
-     $fold:tactic))
+    (rintro $pattern:rcasesPat initialState $validArgs:ident $assumed:ident $permitted:ident))
 
 /-- What a theorem assuming typing knows of its unit: global memory typed by
 its resource types, which the leaves keep, and, where the unit's readings
@@ -3863,44 +3746,6 @@ private def proofTactics (script? : Option AuthoredScript)
       tactic ← `(tactic| open $(mkIdent `VerexIR):ident in $tactic:tactic)
       pure (← `(tactic| skip), tactic)
   | none => pure (solveTactic, ← `(tactic| skip))
-
-/-- The ledger hypothesis of a unit whose declarations state data invariants
-`own` carries, as the public theorems of such a unit take it, and the
-inhabitants of its certified carriers it gives.  The public theorems are the
-only place it is bound: every other artifact of the unit takes the
-inhabitants as an instance binder and is applied under whichever instance its
-caller fixed, so that a callee's artifact is usable from a caller that has
-only the instance (`doc/designs/data-invariants.md`, "Inhabitants, by
-hypothesis"). -/
-structure Satisfiability where
-  /-- The hypothesis' binder, where the unit has one. -/
-  binders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) := #[]
-  /-- The inhabitants, as the arguments of an artifact that binds them
-  positionally: built from the hypothesis where there is one, and empty
-  where the unit declares the instance, which such an artifact resolves
-  rather than binds (`Inhabitants`). -/
-  arguments : Array Term := #[]
-  /-- Wrap a statement or a proof in the one instance the hypothesis gives:
-  two instances in scope would let a statement and its proof pick different
-  inhabitants. -/
-  atInhabitants : Term → CommandElabM Term
-
-/-- How a member's theorems take the inhabitants of the unit's certified
-carriers: from the satisfiability of its data invariants where its
-declarations state any, and from the declared instance otherwise. -/
-def satisfiabilityOf (unitTerm : Term) (dataInvariants : Bool) :
-    CommandElabM Satisfiability := do
-  unless dataInvariants do return { atInhabitants := pure }
-  let hypothesis := mkIdent `dataInvariantsSatisfiable
-  let inhabitants ← `(term|
-    VerexIR.Proofs.Denote.CarriersNonempty.ofSatisfiable $hypothesis)
-  return {
-    binders := #[← `(bracketedBinder|
-      ($hypothesis : VerexIR.Proofs.Denote.DataInvariantsSatisfiable $unitTerm))]
-    arguments := #[inhabitants]
-    atInhabitants := fun statement => `(term| letI := $inhabitants
-      $statement) }
-
 
 /-- Prove an opaque adapter's contract independently at its concrete reading.
 The caller receives only this checked contract theorem, never its body. Richer
@@ -3945,9 +3790,10 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
     #[← `(term| typeInstantiation)]
   let (nativeBinders, _, _, _, assumesTyping) ← theoremHypotheses m #[] #[] #[] #[]
   let pattern ← argumentPattern unit declaration compiled.params
+  let validArgs := mkIdent `validArgs
   let assumed := mkIdent `assumed
   let permitted := mkIdent `permitted
-  let introduction ← introductionTactic m stored pattern assumed permitted
+  let introduction ← introductionTactic m stored pattern validArgs assumed permitted
   let unitFact ← unitFactTactic m assumesTyping
   let (solve, _) ← liftTermElabM <| solverTactics m #[(handle, ns, declaration, compiled)] #[] #[] #[] #[] #[]
   let scopedEntry ← if compiled.scopedMethods.isEmpty then `(tactic| skip) else `(tactic| (
@@ -4007,17 +3853,17 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
           (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $exitSite $mutables $shape)
           else VerexIR.Proofs.Spec.stuck) _
       $unitFact:tactic
-      apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro)
+      apply VerexIR.Proofs.satisfies_of_wp_valid
       $introduction:tactic
       all_goals
         (simp only [$body:ident, $row:ident, $params:ident, $locals:ident,
           $shape:ident, $mutables:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
           List.all_nil, $(rootIdent contractName):ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe] at $assumed:ident $permitted:ident ⊢
+          String.reduceNe] at $validArgs:ident $assumed:ident $permitted:ident ⊢
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
          all_goals $scopedEntry:tactic
-         all_goals verex_normalize at $permitted:ident ⊢
+         all_goals verex_normalize at $validArgs:ident $permitted:ident ⊢
          all_goals $solve:tactic))
   let before := countErrors (← get).messages
   elabCommand command
@@ -4056,17 +3902,11 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
 semantics satisfies its contract, and so does its run, at every
 instantiation coherent with the frame its type arguments induce for a
 generic function. Their proofs elaborate in tasks (`proofTasks`), which the
-target's conclusion waits for.
-
-The typed theorem threads the inhabitants as an instance binder, as every
-artifact does; only the runtime theorem binds the satisfiability hypothesis
-of a unit stating data invariants, and `satisfiable` fixes the one instance
-its statement and its proof read. -/
+target's conclusion waits for. -/
 private def transportCommands (m : Member) (runtimeFrame instantiation contract : Term)
     (familyBinders frameBinders nativeBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder))
     (frameArgs nativeArgs : Array Term) (atRuntime : Term → CommandElabM Term)
     (compiledIdent compiledEqIdent publicContract paramsTerm shapeTerm : Term)
-    (satisfiable : Satisfiability)
     (typedVerified : Name) : CommandElabM (TSyntax `command × TSyntax `command) := do
   let { segments, function, declaration, generic, unitDefinition, unitTerm, handleTerm, .. } := m
   let unit := m.unit
@@ -4089,38 +3929,34 @@ private def transportCommands (m : Member) (runtimeFrame instantiation contract 
       exact @VerexIR.Proofs.Denote.satisfies_propheticMeaning _ _ executable $frame
         $instantiation $handleTerm $compiledIdent compiledAt _
         ($(mkIdent typedVerified) prepared $frameArgs* $nativeArgs*))
-  let satisfiableBinders := satisfiable.binders
   let verifiedCommand ← if isGeneric declaration then
       -- A generic function's runs are at the instantiations calls give it:
       -- its theorem holds at every one coherent with the frame its type
       -- arguments induce.
       let publicContract ← atUnit segments unit (contractName segments function) publicContract
         none #[← `(term| θ), ← `(term| typeInstantiation)]
-      -- The frame of the binders, which the statement's instance does not
-      -- reach: the same inhabitants, named where the hypothesis is.
-      let publicFrame ← satisfiable.atInhabitants runtimeFrame
-      let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $publicFrame))
+      let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $runtimeFrame))
       let dropBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
         if declaration.profile == .rust then
           pure #[← `(bracketedBinder|
             (trivialDrops : VerexIR.Proofs.Denote.DroppedTypeArgumentsTrivial
               $unitTerm $handleTerm θ))]
         else pure #[]
-      let statement ← satisfiable.atInhabitants (← `(term|
+      let statement ← `(term|
         VerexIR.Proofs.SatisfiesFunctionAt executable $handleTerm typeInstantiation
-          $publicContract))
-      let proof ← satisfiable.atInhabitants (← `(term|
+          $publicContract)
+      let proof ← `(term|
         VerexIR.Proofs.Denote.satisfies_generic_at executable globalsPreserved failuresIntegral $handleTerm θ
           free typeInstantiation $paramsTerm $shapeTerm _ coherent
           (@$(mkIdent (typedSemanticsVerifiedName segments function)) _ _ prepared
-            $(satisfiable.arguments)* $induced
-            typeInstantiation $frameArgs* $nativeArgs*)))
+            $induced
+            typeInstantiation $frameArgs* $nativeArgs*))
       `(command|
         theorem $(mkIdent (verifiedName segments function))
             {registry : VerexIR.Validation.SemanticsRegistry}
             {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
             (prepared : VerexIR.Validation.prepareExecution registry
-              $(mkIdent unitDefinition) = .ok executable) $satisfiableBinders*
+              $(mkIdent unitDefinition) = .ok executable)
             (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
             (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
             $nativeBinders* (θ : VerexIR.Proofs.Denote.TypeArgs) (free : θ.1.refFree = true)
@@ -4132,19 +3968,19 @@ private def transportCommands (m : Member) (runtimeFrame instantiation contract 
           $proof)
     else
       let publicContract ← atUnit segments unit (contractName segments function) publicContract
-      let statement ← satisfiable.atInhabitants (← `(term|
-        VerexIR.Proofs.SatisfiesFunction executable $handleTerm $publicContract))
-      let proof ← satisfiable.atInhabitants (← `(term|
+      let statement ← `(term|
+        VerexIR.Proofs.SatisfiesFunction executable $handleTerm $publicContract)
+      let proof ← `(term|
         VerexIR.Proofs.Denote.satisfies_prophetic executable globalsPreserved failuresIntegral $handleTerm
           $paramsTerm $shapeTerm
           _
-          ($(mkIdent (typedSemanticsVerifiedName segments function)) prepared $nativeArgs*)))
+          ($(mkIdent (typedSemanticsVerifiedName segments function)) prepared $nativeArgs*))
       `(command|
         theorem $(mkIdent (verifiedName segments function))
             {registry : VerexIR.Validation.SemanticsRegistry}
             {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
             (prepared : VerexIR.Validation.prepareExecution registry
-              $(mkIdent unitDefinition) = .ok executable) $satisfiableBinders*
+              $(mkIdent unitDefinition) = .ok executable)
             (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
             (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
             $nativeBinders* :
@@ -4291,16 +4127,6 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let budget := Syntax.mkNumLit (toString budgetValue)
   let leafBudget := Syntax.mkNumLit (toString
     ((leafHeartbeatBudget? declaration).getD (verex.leafHeartbeats.get (← getOptions))))
-  -- The unit's inhabitants of certified carriers come first where it binds
-  -- them: every frame of it is built over them (`Skolems.runtime`), and a
-  -- unit whose data invariants `own` carries takes them from the public
-  -- theorem's satisfiability hypothesis, while one without them resolves
-  -- the declared instance (`Inhabitants`).
-  let inhabitants ← inhabitantsOf unitTerm dataOwn.predicate.isSome
-  -- Where the unit's declarations state data invariants, the public theorems
-  -- take the hypothesis that they are satisfiable in place of the instance
-  -- binder, and derive the one instance in their statements.
-  let satisfiable ← satisfiabilityOf unitTerm dataOwn.predicate.isSome
   let genericBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
       pure #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
         ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})]
@@ -4309,7 +4135,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       pure #[← `(bracketedBinder| (frame : VerexIR.Proofs.Denote.FrameOf $unitTerm
         $handleTerm $(← bindersTerm binders) typeInstantiation))]
     else pure #[]
-  let familyBinders := inhabitants.binders ++ genericBinders ++ frameBinders
+  let familyBinders := genericBinders ++ frameBinders
   let frameArgs : Array Term ← if framed then pure #[← `(term| frame)] else pure #[]
   let instantiation ← if generic then `(term| typeInstantiation) else `(term| #[])
   let contract ← atUnit segments unit (typedContractName segments function) typedContract none
@@ -4386,9 +4212,10 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   -- The hypotheses the introduction names and the proof below uses share
   -- one spelling across the two quotations.
   stageLog s!"{function}: solver tactics"
+  let validArgs := mkIdent `validArgs
   let permitted := mkIdent `permitted
   let assumed := mkIdent `assumed
-  let introduction ← introductionTactic m stored pattern assumed permitted
+  let introduction ← introductionTactic m stored pattern validArgs assumed permitted
   let unitFact ← unitFactTactic m assumesTyping
   stageLog s!"{function}: unit facts"
   let (automaticTactic, scriptTactic) ← liftTermElabM <| proofTactics script? opens solveTactic obligationsTactic
@@ -4518,7 +4345,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
           let (semanticsCommand, verifiedCommand) ← transportCommands m runtimeFrame instantiation
             contract familyBinders frameBinders (nativeBinders ++ assumptionBinders) frameArgs
             (nativeArgs ++ assumedArgs) atRuntime compiledIdent compiledEqIdent publicContract
-            paramsTerm shapeTerm satisfiable typedVerified
+            paramsTerm shapeTerm typedVerified
           let before := countErrors (← get).messages
           let ((), transports) ← proofTasks <| Perf.withPhase .verification <|
             Perf.measure s!"{namespaceName}::{function} transport" (base ++ `verified) do
@@ -4545,7 +4372,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
         verex_timed "setup unit fact" $unitFact:tactic
         $assumptionsTactic:tactic
         verex_timed "setup wp"
-          (apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro))
+          (apply VerexIR.Proofs.satisfies_of_wp_valid)
         $markReturns:tactic
         verex_timed "setup introduction" $introduction:tactic
         all_goals
@@ -4553,12 +4380,12 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
           $shapeTerm:ident, $mutablesTerm:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
           List.all_nil, $typedContract:ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe, $memberSignatures,*] at $assumed:ident $permitted:ident ⊢)
+          String.reduceNe, $memberSignatures,*] at $validArgs:ident $assumed:ident $permitted:ident ⊢)
          -- The function assumes its preconditions; their markers locate
          -- them for its callers only.
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
          all_goals $scopedEntry:tactic
-         all_goals verex_timed "setup normalize" (verex_normalize at $permitted:ident ⊢)
+         all_goals verex_timed "setup normalize" (verex_normalize at $validArgs:ident $permitted:ident ⊢)
          all_goals $automaticTactic:tactic)
         -- A variant the setup refutes leaves the script no goal.
         all_goals $scriptTactic:tactic)
@@ -4609,7 +4436,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
     let (semanticsCommand, verifiedCommand) ← transportCommands m runtimeFrame instantiation
       contract familyBinders frameBinders (nativeBinders ++ assumptionBinders) frameArgs
       (nativeArgs ++ assumedArgs) atRuntime
-      compiledIdent compiledEqIdent publicContract paramsTerm shapeTerm satisfiable typedVerified
+      compiledIdent compiledEqIdent publicContract paramsTerm shapeTerm typedVerified
     let errorsBefore := countErrors (← get).messages
     let ((), transports) ← proofTasks <| Perf.withPhase .verification <|
       Perf.measure s!"{namespaceName}::{function} transport" (base ++ `verified) do
@@ -4856,13 +4683,6 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
   let unitDefinition ← ensureUnitInstance segments unit
   let unitTerm ← unitTermOf segments unit
   discard <| ensureUnitDefinitions segments unit
-  -- The unit's inhabitants of certified carriers: the declared instance, or,
-  -- where its declarations state data invariants, the hypothesis that they
-  -- are satisfiable, which each member's public theorems bind
-  -- (`doc/designs/data-invariants.md`).
-  let dataInvariants ← declaresDataInvariants segments unit
-  let satisfiable ← satisfiabilityOf unitTerm dataInvariants
-  let inhabitants ← inhabitantsOf unitTerm dataInvariants
   let isGenericMember (member : FunctionHandle) := (declarationOf? unit member).any isGeneric
   let memberBinders (member : FunctionHandle) := ((declarationOf? unit member).map fun declaration =>
     declaration.signature.generics.toList.map (·.kind)).getD []
@@ -4961,7 +4781,7 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
           let typedVerified := mkIdent (typedVerifiedName segments name)
           let proof ← if family then
               `(term| fun family instantiation => @$typedVerified _ _ prepared
-                $(inhabitants.arguments)* family instantiation
+                family instantiation
                 $(memberArgs memberNatives selfArguments)*)
             else `(term| $typedVerified prepared $(memberArgs memberNatives selfArguments)*)
           `(Lean.Parser.Term.matchAltExpr| | $index => $proof)
@@ -4972,14 +4792,11 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
         let typedContract := rootIdent (typedContractName segments name)
         let generic := isGenericMember member
         -- A generic member's theorem holds at every family and instantiation;
-        -- any other at the runtime family.  The unit's inhabitants come
-        -- first where it binds them (`Inhabitants`).
-        let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) :=
-          inhabitants.binders
-        let familyBinders ← if generic then
-            pure (familyBinders ++ #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
-              ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})])
-          else pure familyBinders
+        -- any other at the runtime family.
+        let familyBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ← if generic then
+            pure #[← `(bracketedBinder| {Θ : VerexIR.Proofs.Denote.Skolems $unitTerm}),
+              ← `(bracketedBinder| {typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId)})]
+          else pure #[]
         let instantiation ← if generic then `(term| typeInstantiation) else `(term| #[])
         let runtimeFrame ← `(term| ($(mkCIdent ``VerexIR.Proofs.Denote.Skolems.runtime) $unitTerm))
         let contract ← atUnit segments unit (typedContractName segments name) typedContract none
@@ -5022,36 +4839,32 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
             exact $cycleProof)
         let semanticsCommand := semanticsTheorem
         let memberNativeArgs := nativeArgs (natives, assumptionDeps, trustDeps, transferDeps)
-        let satisfiableBinders := satisfiable.binders
         let verifiedCommand ← if isGenericMember member then
             let publicContract ← atUnit segments unit (contractName segments name)
               (rootIdent (contractName segments name)) none
               #[← `(term| θ), ← `(term| typeInstantiation)]
-            -- The frame of the binders, which the statement's instance does
-            -- not reach: the same inhabitants, named where the hypothesis is.
-            let publicFrame ← satisfiable.atInhabitants runtimeFrame
-            let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $publicFrame))
+            let induced ← `(term| (VerexIR.Proofs.Denote.Skolems.instantiate θ $runtimeFrame))
             let dropBinders : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
               if (declarationOf? unit member).any (·.profile == .rust) then
                 pure #[← `(bracketedBinder|
                   (trivialDrops : VerexIR.Proofs.Denote.DroppedTypeArgumentsTrivial
                     $unitTerm $handleTerm θ))]
               else pure #[]
-            let statement ← satisfiable.atInhabitants (← `(term|
+            let statement ← `(term|
               VerexIR.Proofs.SatisfiesFunctionAt executable $handleTerm typeInstantiation
-                $publicContract))
-            let proof ← satisfiable.atInhabitants (← `(term|
+                $publicContract)
+            let proof ← `(term|
               VerexIR.Proofs.Denote.satisfies_generic_at executable globalsPreserved failuresIntegral $handleTerm θ
                 free typeInstantiation $params $shape _ coherent
                 (@$(mkIdent (typedSemanticsVerifiedName segments name)) _ _ prepared
-                  $(satisfiable.arguments)* $induced
-                  typeInstantiation $memberNativeArgs*)))
+                  $induced
+                  typeInstantiation $memberNativeArgs*))
             `(command|
               theorem $(mkIdent (verifiedName segments name))
                   {registry : VerexIR.Validation.SemanticsRegistry}
                   {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
                   (prepared : VerexIR.Validation.prepareExecution registry
-                    $(mkIdent unitDefinition) = .ok executable) $satisfiableBinders*
+                    $(mkIdent unitDefinition) = .ok executable)
                   (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
                   (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
                   $nativeBinders* (θ : VerexIR.Proofs.Denote.TypeArgs) (free : θ.1.refFree = true)
@@ -5064,21 +4877,21 @@ private def verifyCycle (reference : Syntax) (segments : Array String)
                   $statement :=
                 $proof)
           else
-            let statement ← satisfiable.atInhabitants (← `(term|
+            let statement ← `(term|
               VerexIR.Proofs.SatisfiesFunction executable $handleTerm
                 $(← atUnit segments unit (contractName segments name)
-                  (rootIdent (contractName segments name)))))
-            let proof ← satisfiable.atInhabitants (← `(term|
+                  (rootIdent (contractName segments name))))
+            let proof ← `(term|
               VerexIR.Proofs.Denote.satisfies_prophetic executable globalsPreserved failuresIntegral $handleTerm
                 $params $shape _
                 ($(mkIdent (typedSemanticsVerifiedName segments name)) prepared
-                  $memberNativeArgs*)))
+                  $memberNativeArgs*))
             `(command|
               theorem $(mkIdent (verifiedName segments name))
                   {registry : VerexIR.Validation.SemanticsRegistry}
                   {executable : VerexIR.Validation.ExecutableUnit $unitTerm}
                   (prepared : VerexIR.Validation.prepareExecution registry
-                    $(mkIdent unitDefinition) = .ok executable) $satisfiableBinders*
+                    $(mkIdent unitDefinition) = .ok executable)
                   (globalsPreserved : VerexIR.Proofs.Denote.GlobalsPreserved executable)
                   (failuresIntegral : VerexIR.Proofs.Denote.FailuresIntegral executable)
                   $nativeBinders* :

@@ -6325,6 +6325,71 @@ theorem NTy.Holds.vector_set {τ : NTy} {vector : (NTy.vector τ).carrier}
   (NTy.holds_vector τ _).mpr
     (array_holds_set! (fun _ m => held.of_mem m) index valueHeld)
 
+theorem NTy.Holds.arraySlice {τ : NTy} {length : Nat} {array : (NTy.array τ length).carrier}
+    (held : NTy.Holds (.array τ length) array) :
+    NTy.Holds (.slice τ) array.vector :=
+  ⟨held.deepHolds⟩
+
+theorem NTy.Holds.of_arrayOf_slice {τ : NTy} {length : Nat} {vector : (NTy.slice τ).carrier}
+    (held : NTy.Holds (.slice τ) vector) (sized : vector.values.size = length) :
+    NTy.Holds (.array τ length) ⟨vector, sized⟩ :=
+  ⟨held.deepHolds⟩
+
+theorem NTy.Holds.sliceFinal {τ : NTy} {reference : (NTy.sliceRef τ).carrier}
+    (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.slice τ) reference.finalVector :=
+  ⟨held.deepHolds.2⟩
+
+theorem NTy.Holds.sliceCurrentArray {τ : NTy} {reference : (NTy.sliceRef τ).carrier}
+    (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.array τ reference.extent) reference.current :=
+  ⟨held.deepHolds.1⟩
+
+theorem NTy.Holds.sliceFinalArray {τ : NTy} {reference : (NTy.sliceRef τ).carrier}
+    (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.array τ reference.extent) reference.final :=
+  ⟨held.deepHolds.2⟩
+
+theorem NTy.Holds.array_set {τ : NTy} {length : Nat} {array : (NTy.array τ length).carrier}
+    (held : NTy.Holds (.array τ length) array) (index : Nat) {value : τ.carrier}
+    (valueHeld : τ.Holds value) (sized : (array.vector.set index value).values.size = length) :
+    NTy.Holds (.array τ length) ⟨array.vector.set index value, sized⟩ :=
+  (held.arrayVector.vector_set index valueHeld).of_arrayOf sized
+
+theorem NTy.Holds.slice_set {τ : NTy} {slice : (NTy.slice τ).carrier}
+    (held : NTy.Holds (.slice τ) slice) (index : Nat) {value : τ.carrier}
+    (valueHeld : τ.Holds value) :
+    NTy.Holds (.slice τ) (slice.set index value) :=
+  NTy.Holds.slice_iff_vector.mpr ((NTy.Holds.slice_iff_vector.mp held).vector_set index valueHeld)
+
+theorem NTy.Holds.sliceRef_withCurrent {τ : NTy} {reference : (NTy.sliceRef τ).carrier}
+    (held : NTy.Holds (.sliceRef τ) reference)
+    {current : SpecArray τ.carrier reference.extent}
+    (currentHeld : NTy.Holds (.slice τ) current.vector) :
+    NTy.Holds (.sliceRef τ) (reference.withCurrent current) :=
+  ⟨⟨currentHeld.deepHolds, held.deepHolds.2⟩⟩
+
+theorem NTy.Holds.sliceRef_withCurrent_of_array {τ : NTy} {reference : (NTy.sliceRef τ).carrier}
+    (held : NTy.Holds (.sliceRef τ) reference)
+    {current : (NTy.array τ reference.extent).carrier}
+    (currentHeld : NTy.Holds (.array τ reference.extent) current) :
+    NTy.Holds (.sliceRef τ) (reference.withCurrent current) :=
+  ⟨⟨currentHeld.deepHolds, held.deepHolds.2⟩⟩
+
+theorem NTy.Holds.sliceRef_ofArrays {τ : NTy} {extent : Nat}
+    {current final : (NTy.array τ extent).carrier}
+    (currentHeld : NTy.Holds (.array τ extent) current)
+    (finalHeld : NTy.Holds (.array τ extent) final) :
+    NTy.Holds (.sliceRef τ) (SpecSliceRef.ofArrays current final) :=
+  ⟨⟨currentHeld.deepHolds, finalHeld.deepHolds⟩⟩
+
+theorem NTy.Holds.sliceRef_ofArrays_of_slice {τ : NTy} {extent : Nat}
+    {current final : SpecArray τ.carrier extent}
+    (currentHeld : NTy.Holds (.slice τ) current.vector)
+    (finalHeld : NTy.Holds (.slice τ) final.vector) :
+    NTy.Holds (.sliceRef τ) (SpecSliceRef.ofArrays current final) :=
+  ⟨⟨currentHeld.deepHolds, finalHeld.deepHolds⟩⟩
+
 theorem NTy.Holds.of_concat {τ : NTy} {left right result : (NTy.vector τ).carrier}
     (leftHeld : NTy.Holds (.vector τ) left) (rightHeld : NTy.Holds (.vector τ) right)
     (built : SpecVector.ofArray? (left.values ++ right.values) = some result) :
@@ -8916,7 +8981,7 @@ and structural-zero equations. -/
 noncomputable opaque plainFallback (result : Type) (inhabited : Nonempty result) : result :=
   Classical.choice inhabited
 
-/-- Uninterpreted off-domain specification fallback at a carrier family (`U5`).
+/-- Uninterpreted off-domain specification fallback at a carrier family.
 An `abbrev` so that `NTy.plainFallback` at two definitionally equal carriers
 reduces to `@plainFallback α _` and agrees definitionally by proof irrelevance
 of `Nonempty α`. -/

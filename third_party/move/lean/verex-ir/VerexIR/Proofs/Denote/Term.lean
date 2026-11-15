@@ -95,8 +95,8 @@ theorem wp_checking_holds {τ : NTy} (value : τ.carrier) (ensures : Unit → St
   wp_checking value ensures aborts initial
 
 /-- What a checking step checks, which the report names: a value made,
-a value written into an owner or the current at a loan's death, or
-a value copied out of an open current
+a value written into an owner or the current at a loan's death,
+a value copied out of an open current, or a resource published to storage
 (`doc/designs/data-invariants.md`). -/
 inductive CertifyKind where
   | construction
@@ -111,6 +111,9 @@ inductive CertifyKind where
   (`Term.assumeCurrent`), so the caller owes them here
   (`doc/designs/data-invariants.md`, "A call boundary"). -/
   | handOver
+  /-- Where a resource is published or a ghost resource is written to global
+  storage (`Term.globalPublish`, `Term.ghostStore`). -/
+  | publish
   deriving DecidableEq, Repr, Inhabited
 
 /-- `checking` at the site the obligation is reported at, with what the
@@ -4676,15 +4679,17 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
             match meanings.read τ arguments (κ.storageKey k) memory with
             | some _ => abortAt site (Failure.ofInts .abort #[])
             | none =>
-                Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
-                  fun _ => Spec.pure (.value () env)
+                Spec.bind (checkingAt site .publish τ v) fun _ =>
+                  Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
+                    fun _ => Spec.pure (.value () env)
   | _, _, @Term.ghostStore _ _ _ κ τ site arguments key value, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
         Flow.bind (value.denoteIn meanings env) fun v env =>
         Flow.bind (anchorAt site env) fun _ env =>
           Spec.bind Spec.get fun memory =>
-            Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
-              fun _ => Spec.pure (.value () env)
+            Spec.bind (checkingAt site .publish τ v) fun _ =>
+              Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
+                fun _ => Spec.pure (.value () env)
   | _, τ, @Term.globalTake _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
       Flow.bind (anchorAt site env) fun _ env =>
@@ -5573,6 +5578,194 @@ theorem wp_anchorAt {ρ : ResultShape} {Γ : NRow} (site : Nat) (entry : HEnv Γ
   unfold anchorAt
   exact (wp_pure _ _ _ _).mpr continues
 
+/-- Fixed-extent array-slice borrow as an equivalence: under a resolved place
+`current`, checking `.handOver` when the path dereferences, every chosen final
+array and rebuilt owner satisfying `NTy.Holds` and `path.set?` establishes the
+postcondition on `SpecSliceRef.ofArrays current final` (`no_index` lets the
+discrimination tree match after `NTy.carrier` reduces at concrete types). -/
+theorem wp_borrowArraySliceAt {ρ : ResultShape} {Γ : NRow} {τ σ : NTy} {length : Nat}
+    (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.array σ length)) (env : HEnv Γ)
+    (ensures : Flow ρ Γ (NTy.sliceRef σ).carrier → State → Prop)
+    (aborts : Failure → Prop) (initial : State) :
+    @wp State Failure (Flow ρ Γ (SpecSliceRef (no_index σ.carrier)))
+      (borrowArraySliceAt site mismatch x path env) ensures aborts initial ↔
+      match x.get env with
+      | some value => match path.get? env value with
+        | some current =>
+            let post := fun state =>
+              ∀ (final : SpecArray σ.carrier length) (rebuilt : τ.carrier),
+                Prophecy x path (SpecSliceRef.ofArrays current final, rebuilt) →
+                  NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays current final) →
+                    NTy.Holds τ rebuilt →
+                      path.set? env final value = some rebuilt →
+                        ensures (.value (SpecSliceRef.ofArrays current final) (x.set rebuilt env))
+                          state
+            if path.hasDeref then
+              wp (checkingAt site .handOver (.array σ length) current)
+                (fun _ state => post state) aborts initial
+            else post initial
+        | none => wp (mismatchOutcome mismatch) ensures aborts initial
+      | none => True := by
+  unfold borrowArraySliceAt
+  cases x.get env with
+  | none => simp [wp_bottom]
+  | some value =>
+    dsimp only
+    cases path.get? env value with
+    | none => rfl
+    | some current =>
+      dsimp only
+      have hbody : ∀ state,
+          wp (Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+              Spec.bind (Spec.assume (NTy.Holds (.sliceRef σ) chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+                  ∃ final : SpecArray σ.carrier length,
+                    chosen.1 = SpecSliceRef.ofArrays current final ∧
+                      path.set? env final value = some chosen.2)) fun _ =>
+                Spec.pure (.value chosen.1 (x.set chosen.2 env))) ensures aborts state ↔
+            ∀ (final : SpecArray σ.carrier length) (rebuilt : τ.carrier),
+              Prophecy x path (SpecSliceRef.ofArrays current final, rebuilt) →
+                NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays current final) →
+                  NTy.Holds τ rebuilt →
+                    path.set? env final value = some rebuilt →
+                      ensures (.value (SpecSliceRef.ofArrays current final) (x.set rebuilt env))
+                        state := by
+        intro state
+        simp only [wp_bind, wp_prophecyOf, wp_assume, wp_pure]
+        constructor
+        · intro h final rebuilt hProph hSlice hOwner hSet
+          exact h (SpecSliceRef.ofArrays current final, rebuilt) hProph
+            ⟨hSlice, hOwner, final, rfl, hSet⟩
+        · rintro h ⟨chosenSlice, rebuilt⟩ hProph ⟨hSlice, hOwner, final, rfl, hSet⟩
+          exact h final rebuilt hProph hSlice hOwner hSet
+      cases path.hasDeref <;> simp [wp_bind, wp_checkingAt, hbody]
+
+/-- Fixed-extent vector-slice borrow as an equivalence: under a resolved place
+`current`, checking `.handOver` when the path dereferences, every chosen final
+array and rebuilt owner satisfying `NTy.Holds` and `path.set?` establishes the
+postcondition on `SpecSliceRef.ofArrays ⟨current, rfl⟩ final`. -/
+theorem wp_borrowVectorSliceAt {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
+    (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.vector σ)) (env : HEnv Γ)
+    (ensures : Flow ρ Γ (NTy.sliceRef σ).carrier → State → Prop)
+    (aborts : Failure → Prop) (initial : State) :
+    @wp State Failure (Flow ρ Γ (SpecSliceRef (no_index σ.carrier)))
+      (borrowVectorSliceAt site mismatch x path env) ensures aborts initial ↔
+      match x.get env with
+      | some value => match path.get? env value with
+        | some current =>
+            let post := fun state =>
+              ∀ (final : SpecArray σ.carrier current.values.size) (rebuilt : τ.carrier),
+                Prophecy x path (SpecSliceRef.ofArrays ⟨current, rfl⟩ final, rebuilt) →
+                  NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays ⟨current, rfl⟩ final) →
+                    NTy.Holds τ rebuilt →
+                      path.set? env final.vector value = some rebuilt →
+                        ensures
+                          (.value (SpecSliceRef.ofArrays ⟨current, rfl⟩ final) (x.set rebuilt env))
+                          state
+            if path.hasDeref then
+              wp (checkingAt site .handOver (.vector σ) current)
+                (fun _ state => post state) aborts initial
+            else post initial
+        | none => wp (mismatchOutcome mismatch) ensures aborts initial
+      | none => True := by
+  unfold borrowVectorSliceAt
+  cases x.get env with
+  | none => simp [wp_bottom]
+  | some value =>
+    dsimp only
+    cases path.get? env value with
+    | none => rfl
+    | some current =>
+      dsimp only
+      have hbody : ∀ state,
+          wp (Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+              Spec.bind (Spec.assume (NTy.Holds (.sliceRef σ) chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+                  ∃ final : SpecArray σ.carrier current.values.size,
+                    chosen.1 = SpecSliceRef.ofArrays ⟨current, rfl⟩ final ∧
+                      path.set? env final.vector value = some chosen.2)) fun _ =>
+                Spec.pure (.value chosen.1 (x.set chosen.2 env))) ensures aborts state ↔
+            ∀ (final : SpecArray σ.carrier current.values.size) (rebuilt : τ.carrier),
+              Prophecy x path (SpecSliceRef.ofArrays ⟨current, rfl⟩ final, rebuilt) →
+                NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays ⟨current, rfl⟩ final) →
+                  NTy.Holds τ rebuilt →
+                    path.set? env final.vector value = some rebuilt →
+                      ensures
+                        (.value (SpecSliceRef.ofArrays ⟨current, rfl⟩ final) (x.set rebuilt env))
+                        state := by
+        intro state
+        simp only [wp_bind, wp_prophecyOf, wp_assume, wp_pure]
+        constructor
+        · intro h final rebuilt hProph hSlice hOwner hSet
+          exact h (SpecSliceRef.ofArrays ⟨current, rfl⟩ final, rebuilt) hProph
+            ⟨hSlice, hOwner, final, rfl, hSet⟩
+        · rintro h ⟨chosenSlice, rebuilt⟩ hProph ⟨hSlice, hOwner, final, rfl, hSet⟩
+          exact h final rebuilt hProph hSlice hOwner hSet
+      cases path.hasDeref <;> simp [wp_bind, wp_checkingAt, hbody]
+
+/-- Fixed-extent slice reborrow as an equivalence: under a resolved slice
+reference `current`, checking `.handOver` when the path dereferences, every
+chosen final array and rebuilt owner satisfying `NTy.Holds` and `path.set?`
+establishes the postcondition on `SpecSliceRef.ofArrays current.current final`. -/
+theorem wp_reborrowSliceAt {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
+    (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) (env : HEnv Γ)
+    (ensures : Flow ρ Γ (NTy.sliceRef σ).carrier → State → Prop)
+    (aborts : Failure → Prop) (initial : State) :
+    @wp State Failure (Flow ρ Γ (SpecSliceRef (no_index σ.carrier)))
+      (reborrowSliceAt site mismatch x path env) ensures aborts initial ↔
+      match x.get env with
+      | some value => match path.get? env value with
+        | some current =>
+            let post := fun state =>
+              ∀ (final : SpecArray σ.carrier current.extent) (rebuilt : τ.carrier),
+                Prophecy x path (SpecSliceRef.ofArrays current.current final, rebuilt) →
+                  NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays current.current final) →
+                    NTy.Holds τ rebuilt →
+                      path.set? env (current.withCurrent final) value = some rebuilt →
+                        ensures
+                          (.value (SpecSliceRef.ofArrays current.current final) (x.set rebuilt env))
+                          state
+            if path.hasDeref then
+              wp (checkingAt site .handOver (.slice σ) current.currentVector)
+                (fun _ state => post state) aborts initial
+            else post initial
+        | none => wp (mismatchOutcome mismatch) ensures aborts initial
+      | none => True := by
+  unfold reborrowSliceAt
+  cases x.get env with
+  | none => simp [wp_bottom]
+  | some value =>
+    dsimp only
+    cases path.get? env value with
+    | none => rfl
+    | some current =>
+      dsimp only
+      have hbody : ∀ state,
+          wp (Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+              Spec.bind (Spec.assume (NTy.Holds (.sliceRef σ) chosen.1 ∧ NTy.Holds τ chosen.2 ∧
+                  ∃ final : SpecArray σ.carrier current.extent,
+                    chosen.1 = SpecSliceRef.ofArrays current.current final ∧
+                      path.set? env (current.withCurrent final) value = some chosen.2)) fun _ =>
+                Spec.pure (.value chosen.1 (x.set chosen.2 env))) ensures aborts state ↔
+            ∀ (final : SpecArray σ.carrier current.extent) (rebuilt : τ.carrier),
+              Prophecy x path (SpecSliceRef.ofArrays current.current final, rebuilt) →
+                NTy.Holds (.sliceRef σ) (SpecSliceRef.ofArrays current.current final) →
+                  NTy.Holds τ rebuilt →
+                    path.set? env (current.withCurrent final) value = some rebuilt →
+                      ensures
+                        (.value (SpecSliceRef.ofArrays current.current final) (x.set rebuilt env))
+                        state := by
+        intro state
+        simp only [wp_bind, wp_prophecyOf, wp_assume, wp_pure]
+        constructor
+        · intro h final rebuilt hProph hSlice hOwner hSet
+          exact h (SpecSliceRef.ofArrays current.current final, rebuilt) hProph
+            ⟨hSlice, hOwner, final, rfl, hSet⟩
+        · rintro h ⟨chosenSlice, rebuilt⟩ hProph ⟨hSlice, hOwner, final, rfl, hSet⟩
+          exact h final rebuilt hProph hSlice hOwner hSet
+      cases path.hasDeref <;> simp [wp_bind, wp_checkingAt, hbody]
+
 @[simp] theorem finish_value {Γ : NRow} (site : Nat) (mutables : Mutables Γ)
     (shape : ResultShape) (value : shape.bodyType.carrier) (env : HEnv Γ) :
     shape.finish (State := State) site mutables (.value value env) =
@@ -5641,7 +5834,7 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Term.denoteIn Args.de
   Proj.hasDeref Proj.hasDeref_nil Proj.hasDeref_deref
   NTy.invariantFree NRow.invariantFree NRows.invariantFree
   checkingAt_unit checkingAt_bool checkingAt_int checkingAt_num checkingAt_address checkingAt_signer checkingAt_string checkingAt_bytes checkingAt_char checkingAt_function
-  borrowArraySliceAt borrowVectorSliceAt reborrowSliceAt takeSliceAtValue resolveSliceAtValue
+  wp_borrowArraySliceAt wp_borrowVectorSliceAt wp_reborrowSliceAt takeSliceAtValue resolveSliceAtValue
   Choices.update?_nil Choices.update?_cons PlaceIndex.resolve?_literal
   PlaceIndex.resolve?_slot PlaceIndex.resolve?_fromEnd HEnv.slotInt?_int_zero HEnv.slotInt?_succ
   HList.toListOf_zero HList.toListOf_succ Var.update_here Var.update_there

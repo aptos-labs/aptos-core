@@ -203,7 +203,7 @@ holes repaired. Read at the revision:
 | Moving a slice out (`takeSliceAtValue`) | chooses a certified `cleared` owner and equates `path.set? (ofArrays final final) value` with `forget cleared`, without checking the computed cleared owner | **repair (`U6`):** rebuilds the cleared owner concretely, checks it at the owner's type before the update, and installs it |
 | A slice reference's resolution (`Mutables.resolve` at `.sliceAt`, `SliceLender.resolve`, `resolveSliceAt`) | assumes `reference.current = reference.final` and checks nothing; carries no lender provenance for an enclosing owner | **repair (`U6`):** checks `reference.currentVector` unconditionally before the settlement equation (`Mutables.resolve` at `.sliceAt` has no path, and `SliceLender.resolve` checks `currentVector` first), and carries slice lender provenance (`SliceLender`) so any enclosing local/candidate owner rebuilt with the settled slice is checked before assuming `current = final` |
 | A copy out of an open current (`Term.deref`, `Term.observe`, `Term.readPlace`) | certifies the copy | checks it |
-| A write of storage | owes by typing | section 7 |
+| A publish or a ghost store (`Term.globalPublish`, `Term.ghostStore`) | owes by typing | restates the value's fact as a check before the write; section 7 |
 
 All settlement and slice repairs above are made on the present tree with
 `certifyingAt` before the representation changes (section 8). Apart from those
@@ -423,8 +423,21 @@ flat form per element; their representation is specified with the rest.
 
 - A read gives a plain value and, where the read succeeds, its fact by a
   theorem (`Skolems.holds_plainAt`). An absent entry or a default gets none.
-- A write stores a value under its fact. The producer before it supplies the
-  fact.
+- A write stores a value under its fact. The producer before it has
+  established the fact, and a publish or a ghost store (`Term.globalPublish`,
+  `Term.ghostStore`) restates it as a step of its own before the write
+  (`checkingAt`, with a kind that names the publish). In a valid program the
+  step closes from the fact in hand; a value that reaches the write without
+  its fact fails there, so the branch of `Skolems.writePlain` for a value
+  that does not hold is never selected by a successful checked write. The
+  step is erased at a type without invariants.
+- **Open, to be measured:** whether the restated step costs anything. It
+  should not, since the solver's write rule needs the same fact. The targets
+  that publish (`bench::storage::publish`, `GenericStorage`'s
+  `publish_generic` and `publish_u64`, the source controls of the publish and
+  of the ghost store) are compared on trees that differ in the step alone,
+  before G2b. The storage targets of `DenotePerformance` read and borrow only;
+  they are the control that the other paths did not move.
 - **A mutable global borrow installs its prophecy in memory at once**
   (`Term.globalBorrow`: it reads the stored value, chooses a prophecy, writes
   it, and returns the old value as the current). The prophecy is chosen among
@@ -452,9 +465,11 @@ part of the implementation:
   `verex_memory_aliases`, `closeFrameWrites` and `verex_stored_reads` in
   `Solve/Decide.lean`, each restated over the folded interface;
 - a folded rule for a successful write that takes a proof already in hand, so
-  that the classical test inside `writePlain` is never split. A symbolic write
-  that reaches rewriting without its fact is a defect upstream (a lost join
-  premise, a model's result without validity) and is reported as one;
+  that the classical test inside `writePlain` is never split. At a publish or
+  a ghost store the proof is the one the restated check leaves in the context;
+  at a global borrow it is the prophecy's assumption. A value without its fact
+  (a lost join premise, a model's result without validity) stops at the check,
+  with the invariant named;
 - the fact of a write is kept or cached, not opened again at each read that
   crosses it. A read across a write of a **distinct** resource needs no fact
   (`Skolems.plainAt_writePlain_other`).

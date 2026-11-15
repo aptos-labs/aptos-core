@@ -78,6 +78,30 @@ theorem concrete_call_marker {unit : VerexIR.Validation.ValidatedUnit} [Function
 section Markers
 variable [C : Carriers] {State : Type}
 
+-- Negative control first: `ghostAt` checks `checking τ value`, so a chosen ghost
+-- value violating `NTy.Holds` fails `wp` even under trivial postconditions.
+theorem generic_ghost_invalid (value : NTy.carrier (.param 0))
+    (broken : ¬ NTy.Holds (.param 0) value) (initial : State) :
+    ¬ wp (@ghostAt C State .none .nil (.param 0) 13 (fun _ => some value) ())
+      (fun _ _ => True) (fun _ => True) initial := by
+  unfold ghostAt
+  rw [wp_bind, wp_certifyState]
+  rintro ⟨_, hget⟩
+  rw [wp_bind, wp_get, wp_bind, wp_choose] at hget
+  have hval := hget value
+  rw [wp_bind, wp_assume] at hval
+  have hcheck := hval rfl
+  rw [wp_bind, wp_checkingAt] at hcheck
+  exact broken hcheck.1
+
+theorem generic_ghost (value : NTy.carrier (.param 0))
+    (holds : NTy.Holds (.param 0) value) (initial : State) :
+    wp (@ghostAt C State .none .nil (.param 0) 13 (fun _ => some value) ())
+      (fun result final => result = Flow.value value () ∧ final = initial)
+      (fun _ => False) initial := by
+  verex_obligations []
+  all_goals verex_solve
+
 theorem generic_assertion (initial : State) :
     wp (@assertAt C State .none .nil 11 ())
       (fun result final => result = Flow.value () () ∧ final = initial)
@@ -92,13 +116,6 @@ theorem generic_memory (initial : State) :
       (fun _ => False) initial := by
   verex_obligations [(12, handle,
     fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True)]
-  all_goals verex_solve
-
-theorem generic_ghost (value : NTy.carrier (.param 0)) (initial : State) :
-    wp (@ghostAt C State .none .nil (.param 0) 13 (fun _ => some value) ())
-      (fun result final => result = Flow.value value () ∧ final = initial)
-      (fun _ => False) initial := by
-  verex_obligations []
   all_goals verex_solve
 
 theorem generic_construction (value : NTy.carrier (.param 0)) (initial : State) :
@@ -119,8 +136,8 @@ theorem generic_mutation_end (initial : State) :
 end Markers
 
 theorem given_certification (G : GivenFrame) (State : Type)
-    (value : @NTy.plain G.toCarriers (.param 0)) (initial : State) :
-    wp (@certifyingAt G.toCarriers State 16 .copyOut (.param 0) value)
+    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    wp (@checkingAt G.toCarriers State 16 .copyOut (.param 0) value)
       (fun _ final => final = initial) (fun _ => False) initial := by
   verex_obligations []
   all_goals verex_solve
@@ -136,22 +153,29 @@ theorem given_unroll (G : GivenFrame) (State : Type) (unit : VerexIR.Validation.
 
 open Lean Elab Command in
 run_cmd do
-  for (name, rule) in [(``given_loop, ``wp_loopAt), (``concrete_loop, ``wp_loopAt),
-      (``concrete_call_marker, ``wp_callAt_checked),
-      (``generic_assertion, ``wp_assertAt), (``generic_memory, ``wp_memoryWrittenAt),
-      (``generic_memory, ``wp_anchorAt), (``generic_ghost, ``wp_ghostAt),
-      (``generic_construction, ``wp_constructedAt), (``generic_mutation_end, ``wp_mutationEndAt),
-      (``given_certification, ``wp_certifyingAt_intro_holds), (``given_unroll, ``wp_loopAt_unroll),
-      (``given_unroll, ``wp_loopUnroll_step)] do
+  for (name, rules) in [
+      (``given_loop, #[``wp_loopAt]),
+      (``concrete_loop, #[``wp_loopAt]),
+      (``concrete_call_marker, #[``wp_callAt_checked]),
+      (``generic_assertion, #[``wp_assertAt]),
+      (``generic_memory, #[``wp_memoryWrittenAt]),
+      (``generic_memory, #[``wp_anchorAt]),
+      (``generic_ghost, #[``wp_ghostAt]),
+      (``generic_construction, #[``wp_constructedAt]),
+      (``generic_mutation_end, #[``wp_mutationEndAt]),
+      (``given_certification, #[`VerexIR.Proofs.Denote.wp_checkingAt_intro,
+        `VerexIR.Proofs.Denote.wp_checkingAt_intro_holds]),
+      (``given_unroll, #[``wp_loopAt_unroll]),
+      (``given_unroll, #[``wp_loopUnroll_step])] do
     let .thmInfo theoremInfo ← getConstInfo name | throwError "expected theorem"
-    unless (theoremInfo.value.find? (fun expression => expression.isConstOf rule)).isSome do
-      throwError "{name} did not exercise the walker rule {rule}"
+    unless (theoremInfo.value.find? (fun expression => rules.any expression.isConstOf)).isSome do
+      throwError "{name} did not exercise any expected walker rule in {rules}"
 
 open Lean Elab Command in
 run_cmd do
-  for name in [``given_identity, ``given_loop, ``concrete_loop, ``concrete_call_marker,
-      ``generic_assertion, ``generic_memory, ``generic_ghost, ``generic_construction,
-      ``generic_mutation_end, ``given_certification, ``given_unroll] do
+  for name in [``generic_ghost_invalid, ``given_identity, ``given_loop, ``concrete_loop,
+      ``concrete_call_marker, ``generic_assertion, ``generic_memory, ``generic_ghost,
+      ``generic_construction, ``generic_mutation_end, ``given_certification, ``given_unroll] do
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do
       throwError "unexpected axioms in {name}: {axioms}"

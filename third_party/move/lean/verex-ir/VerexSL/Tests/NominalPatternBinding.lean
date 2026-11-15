@@ -10,15 +10,24 @@ private def wildcardPatterns (context : NRow) : (row : NRow) → Pats context ro
   | .cons _ rest => .cons .wildcard (wildcardPatterns context rest)
 
 -- Pattern matching observes one nominal layer, including at symbolic
--- families and nested generic fields. The resulting equation is checked.
+-- families and nested generic fields, while leaving unknown types unchanged.
 run_cmd do
   let some unit := registeredUnit? (← getEnv) `«0x42».nominal_quotation
     | throwError "missing nominal pattern fixture"
   let name ← ensureUnitDefinition #["0x42", "nominal_quotation"] unit
   liftTermElabM <| withNominalUnit name do
-    let certified ← Simp.SimprocsArray.add #[] ``nominalPatternBinding false
-    let plain ← Simp.SimprocsArray.add #[] ``nominalPlainPatternBinding false
+    let procs ← Simp.SimprocsArray.add #[] ``nominalPatternBinding false
     let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
+    withLocalDeclD `family (mkConst ``Carriers) fun family =>
+      withLocalDeclD `unknown (mkConst ``NTy) fun unknown =>
+        withLocalDeclD `pattern (mkApp2 (mkConst ``Pat) (mkConst ``NRow.nil) unknown) fun pattern =>
+          withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) family unknown) fun value =>
+            withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family (mkConst ``NRow.nil)) fun locals => do
+              let call := mkAppN (mkConst ``Pat.bindValue)
+                #[family, mkConst ``NRow.nil, unknown, pattern, value, locals]
+              let (result, _) ← simp call context procs
+              unless result.expr == call do
+                throwError "nominal pattern binding unfolded an unknown type: {result.expr}"
     for index in [0, 5] do
       let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing pattern schema"
       let owner ← quoteNTy schema
@@ -37,19 +46,11 @@ run_cmd do
       for pattern in patterns do
         withLocalDeclD `family (mkConst ``Carriers) fun family =>
           withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family (mkConst ``NRow.nil)) fun locals => do
-            for (operation, procs, certifiedValue) in
-                [(``Pat.bindValue, certified, true), (``Pat.bindPlain, plain, false)] do
-              let carrier := mkApp2 (mkConst (if certifiedValue then ``NTy.carrier else ``NTy.plain))
-                family owner
-              withLocalDeclD `value carrier fun value => do
-                let initialArgs := #[family, mkConst ``NRow.nil, owner, pattern, value]
-                let check (call : Lean.Expr) : MetaM Unit := do
-                  let (result, _) ← simp call context procs
-                  if result.expr == call then throwError "named pattern did not select its binding equation"
-                  let some proof := result.proof? | throwError "pattern binding has no equation"
-                  unless ← isTypeCorrect proof do throwError "pattern binding equation is ill typed"
-                if certifiedValue then
-                  check (mkAppN (mkConst operation) (initialArgs.push locals))
-                else
-                  withLocalDeclD `holds (mkApp3 (mkConst ``NTy.deepHolds) family owner value) fun holds =>
-                    check (mkAppN (mkConst operation) (initialArgs ++ #[holds, locals]))
+            let carrier := mkApp2 (mkConst ``NTy.carrier) family owner
+            withLocalDeclD `value carrier fun value => do
+              let call := mkAppN (mkConst ``Pat.bindValue)
+                #[family, mkConst ``NRow.nil, owner, pattern, value, locals]
+              let (result, _) ← simp call context procs
+              if result.expr == call then throwError "named pattern did not select its binding equation"
+              let some proof := result.proof? | throwError "pattern binding has no equation"
+              unless ← isTypeCorrect proof do throwError "pattern binding equation is ill typed"

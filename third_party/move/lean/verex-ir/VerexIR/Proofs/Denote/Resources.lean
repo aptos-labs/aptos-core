@@ -292,9 +292,10 @@ def Skolems.toRuntimeSlot (τ : NTy) : (value : Option τ.carrier) →
 
 open Classical in
 /-- A write into a frame's resource, total by a classical test of the
-fact: the read-over-write law takes the fact as a side condition, and the
-unheld branch is unreachable from the walk, whose written value comes from a
-binder or a checking cut. -/
+fact: the read-over-write law takes the fact as a side condition, and in the
+denotation the written value's fact is supplied by the step's check
+(`Term.globalPublish`, `Term.ghostStore`) or assumption (`Term.globalBorrow`),
+while deleting writes (`Term.globalTake`) need none. -/
 noncomputable def Skolems.writePlain (τ : NTy) (arguments : NRow) (key : StorageKey)
     (value : Option τ.carrier) (memory : Memory unit) : Memory unit :=
   if holds : Option.elim value True (NTy.Holds τ) then

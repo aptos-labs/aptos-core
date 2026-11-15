@@ -250,7 +250,7 @@ example (α : Type) : ∀ r : VerexIR.SpecInt (.bits 64) false,
 
 -- A callee-spelled bound and a caller-spelled literal share one scalar size.
 
-example [outer : Carriers] [CarriersNonempty outer] :
+example [outer : Carriers] :
     ∀ r : VerexIR.SpecInt (.bits 64) false,
     Obligation "probe" 0 0 (0 ≤ r.val ∧ r.val ≤
       ((@Array.size
@@ -258,7 +258,7 @@ example [outer : Carriers] [CarriersNonempty outer] :
         (([] : List (@NTy.carrier outer (.param 0))).toArray)) : Int)) → r.val = 0 := by
   verex_call_result_cases
 
-example [outer : Carriers] [CarriersNonempty outer] (r : VerexIR.SpecInt (.bits 64) false)
+example [outer : Carriers] (r : VerexIR.SpecInt (.bits 64) false)
     (first _second : r.val ≤
       ((@Array.size
         (@NTy.carrier (Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer) (.param 0))

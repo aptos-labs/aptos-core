@@ -373,13 +373,12 @@ verex module 0x42::quicksort where
   /-- The generated definition of `count` counts over its vector's values. -/
   theorem count_cnt {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
       [Θ : VerexIR.Proofs.Denote.Carriers]
-      [VerexIR.Proofs.Denote.CarriersNonempty Θ]
       (types : Nat → VerexIR.Proofs.Denote.NTy)
       (v : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier)
       (x : (VerexIR.Proofs.Denote.NTy.param 0).carrier) :
       ∀ (k : Nat) (lo hi : Int), (hi - lo).toNat = k →
         count.at_T0.spec u Θ types (v, x, lo, hi, ()) =
-          cnt (VerexIR.Proofs.Denote.NTy.inhabitant (.param 0) rfl) v.values x lo hi := by
+          cnt (VerexIR.Proofs.Denote.NTy.plainFallback (.param 0) rfl) v.values x lo hi := by
     intro k
     induction k using Nat.strongRecOn with
     | _ k ih =>
@@ -393,12 +392,11 @@ verex module 0x42::quicksort where
   /-- The same, at any bundle: the form `simp` rewrites by. -/
   theorem count_eq {u : VerexIR.Validation.ValidatedUnit} [VerexIR.Proofs.Denote.FunctionCarriers u]
       [Θ : VerexIR.Proofs.Denote.Carriers]
-      [VerexIR.Proofs.Denote.CarriersNonempty Θ]
       (types : Nat → VerexIR.Proofs.Denote.NTy)
       (bundle : (VerexIR.Proofs.Denote.NTy.param 0).vector.carrier ×
         (VerexIR.Proofs.Denote.NTy.param 0).carrier × Int × Int × Unit) :
       count.at_T0.spec u Θ types bundle =
-        cnt (VerexIR.Proofs.Denote.NTy.inhabitant (.param 0) rfl)
+        cnt (VerexIR.Proofs.Denote.NTy.plainFallback (.param 0) rfl)
           bundle.1.values bundle.2.1 bundle.2.2.1 bundle.2.2.2.1 := by
     obtain ⟨v, x, lo, hi, ⟨⟩⟩ := bundle
     exact count_cnt types v x _ lo hi rfl

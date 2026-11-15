@@ -551,21 +551,6 @@ example {unit : VerexIR.Validation.ValidatedUnit}
   trivial
 end
 
--- Normalization keeps a forgotten vector whole for certification and equality;
--- elementwise forgetting is exposed only when an operation reads its entries.
-section
-open VerexIR.Proofs VerexIR.Proofs.Denote
-variable {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
-example (site : Nat) (τ : NTy) (value : VerexIR.SpecVector τ.carrier) :
-    certifyingAt (State := Memory unit) site .copyOut (.vector τ) (NTy.forget (.vector τ) value) =
-      Spec.pure value := by
-  simp only [vir_denote, vir_denote_norm]
-
-example (τ : NTy) (left right : VerexIR.SpecVector τ.carrier)
-    (equal : NTy.forget (.vector τ) left = NTy.forget (.vector τ) right) : left = right := by
-  simpa only [vir_denote, vir_denote_norm] using equal
-end
-
 -- A pass that deliberately skips a premise must not cache it as normalized.
 -- The next pass still needs to expose its conjunction before assumption.
 example (p : Prop) (_held : True ∧ p) : p := by

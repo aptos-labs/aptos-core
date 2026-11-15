@@ -37,13 +37,10 @@ run_meta do
 run_meta do
   withLocalDeclD `given (mkConst ``GivenFrame) fun given => do
     let carriers := mkApp (mkConst ``GivenFrame.toCarriers) given
-    withLocalDecl `nonempty .instImplicit
-        (mkApp (mkConst ``CarriersNonempty) carriers) fun _ => do
-      let type := mkApp (mkConst ``NTy.param) (mkNatLit 0)
-      for plain in [false, true] do
-        let some view ← NativeMaps.typedView? carriers type plain
-          | throwError "missing given parameter map view"
-        unless view.identity && view.read.isLambda && view.unread == view.read do
-          throwError "given parameter map view retained a conversion"
-        unless ← isTypeCorrect view.read do
-          throwError "given parameter identity read is not well typed"
+    let type := mkApp (mkConst ``NTy.param) (mkNatLit 0)
+    let some view ← NativeMaps.typedView? carriers type
+      | throwError "missing given parameter map view"
+    unless view.identity && view.read.isLambda && view.unread == view.read do
+      throwError "given parameter map view retained a conversion"
+    unless ← isTypeCorrect view.read do
+      throwError "given parameter identity read is not well typed"

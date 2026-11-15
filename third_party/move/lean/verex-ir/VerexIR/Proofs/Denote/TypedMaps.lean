@@ -43,24 +43,24 @@ theorem duplicate_indices_map {α β : Type} (f : α → β) (xs : Array α) (ab
     simpa [hi, hj] using eq
 
 /-- A value of a two-variant enum not of one variant is of the other: what a
-proof's step reads `x != End` as, `x is Some`.  The observation is of the
-plain value a certified enum carries (`NTy.carrier`), as every variant
-observation is. -/
+proof's step reads `x != End` as, `x is Some`. -/
 @[vir_denote_spec]
-theorem variantPlainName_ne_first [Carriers] {first second : String} {fields others : NRow}
-    (distinct : first ≠ second) (value : variantPlain [first, second] (.cons fields (.cons others .nil))) :
-    ¬variantPlainName [first, second] (.cons fields (.cons others .nil)) value = first ↔
-      variantPlainName [first, second] (.cons fields (.cons others .nil)) value = second := by
+theorem variantName_ne_first [Carriers] {first second : String} {fields others : NRow}
+    (distinct : first ≠ second)
+    (value : variantCarrier [first, second] (.cons fields (.cons others .nil))) :
+    ¬variantName [first, second] (.cons fields (.cons others .nil)) value = first ↔
+      variantName [first, second] (.cons fields (.cons others .nil)) value = second := by
   match value with
   | .inl _ => show ¬first = first ↔ first = second; exact ⟨fun h => absurd rfl h, fun h => absurd h distinct⟩
   | .inr (.inl _) => show ¬second = first ↔ second = second; exact ⟨fun _ => rfl, fun _ => Ne.symm distinct⟩
   | .inr (.inr empty) => nomatch empty
 
 @[vir_denote_spec]
-theorem variantPlainName_ne_second [Carriers] {first second : String} {fields others : NRow}
-    (distinct : first ≠ second) (value : variantPlain [first, second] (.cons fields (.cons others .nil))) :
-    ¬variantPlainName [first, second] (.cons fields (.cons others .nil)) value = second ↔
-      variantPlainName [first, second] (.cons fields (.cons others .nil)) value = first := by
+theorem variantName_ne_second [Carriers] {first second : String} {fields others : NRow}
+    (distinct : first ≠ second)
+    (value : variantCarrier [first, second] (.cons fields (.cons others .nil))) :
+    ¬variantName [first, second] (.cons fields (.cons others .nil)) value = second ↔
+      variantName [first, second] (.cons fields (.cons others .nil)) value = first := by
   match value with
   | .inl _ => show ¬first = second ↔ first = first; exact ⟨fun _ => rfl, fun _ => distinct⟩
   | .inr (.inl _) => show ¬second = second ↔ second = first; exact ⟨fun h => absurd rfl h, fun h => absurd h.symm distinct⟩
@@ -75,10 +75,10 @@ theorem Option.elim_eq_iff {α β : Sort _} (option : _root_.Option α) (none : 
     option.elim none some = value ↔ (option = .none ∧ none = value) ∨ ∃ a, option = .some a ∧ some a = value := by
   cases option <;> simp
 
-/-- Adding entries from lists of certified integer keys aborts as the
-specification states it (`doc/designs/proof-language.md`, "Normal-form
-fixes"): two indices whose keys are equal, or lists of unequal lengths,
-at any off-domain fallback `absent`. -/
+/-- Adding entries from lists of integer keys aborts as the specification
+states it (`doc/designs/proof-language.md`, "Normal-form fixes"): two indices
+whose keys are equal, or lists of unequal lengths, at any off-domain fallback
+`absent`. -/
 theorem abortsNewFrom_indexed_of {n : Nat} {signed : Bool} {β : Type}
     {absent : SpecInt (.bits (n + 1)) signed} (g : β → Int)
     (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
@@ -96,41 +96,29 @@ theorem abortsNewFrom_indexed_of {n : Nat} {signed : Bool} {β : Type}
     · exact Or.inr duplicate
     · exact Or.inl (by omega)
 
-/-- `abortsNewFrom_indexed_of` at the structural integer default a clause's
-vector read emits before the switch. -/
+/-- `abortsNewFrom_indexed_of` at the uninterpreted specification fallback
+(`plainFallback`). -/
 @[vir_denote_spec]
 theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → Int)
     (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
     SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
       (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
-        (xs[i.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val =
-          (xs[j.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val) ∨
-      ¬(xs.size : Int) = ys.size :=
-  abortsNewFrom_indexed_of g xs ys
-
-/-- Prepared instantiation of `abortsNewFrom_indexed_of` at the uninterpreted
-specification fallback (`plainFallback`). -/
-theorem abortsNewFrom_indexed_plainFallback {n : Nat} {signed : Bool} {β : Type} (g : β → Int)
-    (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
-    SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
-      (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
         (xs[i.toNat]?.getD
-          (NTy.plainFallbackOf Carriers.ground.toPlain (.int (n + 1) signed) rfl)).val =
+          (@NTy.plainFallback Carriers.ground (.int (n + 1) signed) rfl)).val =
           (xs[j.toNat]?.getD
-            (NTy.plainFallbackOf Carriers.ground.toPlain (.int (n + 1) signed) rfl)).val) ∨
+            (@NTy.plainFallback Carriers.ground (.int (n + 1) signed) rfl)).val) ∨
       ¬(xs.size : Int) = ys.size :=
   abortsNewFrom_indexed_of g xs ys
 
 /-- A value of a two-variant enum named by its second variant is that
-variant's payload, as a plain row: a field of a certified enum is plain,
-and its own invariant is a projection of the enum value's. -/
-theorem variantPlain.second_of_name {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
-    [Skolems unit]
+variant's payload row. -/
+theorem variantCarrier.second_of_name [Carriers]
     (first second : String) (distinct : first ≠ second)
-    {leading trailing : NRow} {value : variantPlain [first, second] (.cons leading (.cons trailing .nil))}
-    (named : variantPlainName [first, second] (.cons leading (.cons trailing .nil)) value = second) :
-    ∃ payload : HListPlain trailing,
-      value = @Sum.inr (HListPlain leading) (variantPlain [second] (.cons trailing .nil)) (.inl payload) := by
+    {leading trailing : NRow}
+    {value : variantCarrier [first, second] (.cons leading (.cons trailing .nil))}
+    (named : variantName [first, second] (.cons leading (.cons trailing .nil)) value = second) :
+    ∃ payload : HList trailing,
+      value = @Sum.inr (HList leading) (variantCarrier [second] (.cons trailing .nil)) (.inl payload) := by
   rcases value with payload | payload | empty
   · exact absurd named distinct
   · exact ⟨payload, rfl⟩

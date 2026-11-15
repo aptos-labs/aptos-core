@@ -1730,17 +1730,19 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
     FramedAt executable parameters shared shape frame function :=
   fun free => by simp [references] at free
 
-/-- The first static method dictionary's checked contract: every invocation
-is defined, cannot panic, and preserves global memory. Mutable receiver state
-remains in the arguments' prophecies; it is not required to stay unchanged.
-Concrete dictionaries discharge this obligation using their target's theorem. -/
+/-- A static method dictionary's checked contract: at valid arguments, every
+invocation is defined, cannot panic, preserves global memory, and establishes
+result validity (`shape.Holds`). Mutable receiver state remains in the
+arguments' prophecies; it is not required to stay unchanged. Concrete
+dictionaries discharge this obligation using their target's theorem. -/
 def MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
   ∀ (args : HList parameters) (initial : Memory unit),
+    HList.Holds parameters args →
     wp (closureMeaning executable parameters shared shape function args)
-      (fun _ final => final = initial) (fun _ => False) initial
+      (fun result final => final = initial ∧ shape.Holds result) (fun _ => False) initial
 
 theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Θ : Skolems unit]
@@ -1752,12 +1754,21 @@ theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers u
       (shape.functionOfSkolem θ parameters shared function)) :
     @MethodContract unit _ executable (Skolems.instantiate θ Θ)
       parameters shared shape function := by
-  intro args initial
+  intro args initial validArgs
   rw [closureMeaning_instantiate executable θ free parameters shared shape function args]
-  simpa only [wp_bind, wp_pure] using checked (HList.ofSkolem θ parameters args) initial
+  simp only [wp_bind, wp_pure]
+  have safe := checked (HList.ofSkolem θ parameters args) initial
+    ((HList.holds_ofSkolem_iff θ parameters args).mpr validArgs)
+  refine ⟨fun result final run => ?_, safe.2.1, safe.2.2⟩
+  obtain ⟨rfl, validResult⟩ := safe.1 result final run
+  refine ⟨rfl, ?_⟩
+  cases shape with
+  | none => trivial
+  | one τ => exact (NTy.holds_toSkolem_iff θ τ result).mpr validResult
 
 /-- Use a checked dictionary without assuming reference-free arguments. The
-success hypothesis retains the entire receiver transition in `EnsuresOf`. -/
+success hypothesis retains result validity and the entire receiver transition
+in `EnsuresOf`. -/
 theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Skolems unit]
     {parameters : NRow} {shared : Sharing} {shape : ResultShape}
@@ -1765,15 +1776,16 @@ theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
     (checked : MethodContract executable parameters shared shape function)
     (args : HList parameters) {initial : Memory unit}
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    (validArgs : HList.Holds parameters args)
     (returns : ∀ result,
+      shape.Holds result →
       EnsuresOf (closureMeaning executable) parameters shared shape function args result initial initial →
       ensures result initial) :
     wp (closureMeaning executable parameters shared shape function args) ensures aborts initial := by
-  have safe := checked args initial
+  have safe := checked args initial validArgs
   refine ⟨fun result final run => ?_, fun error run => False.elim (safe.2.1 error run), safe.2.2⟩
-  have same := safe.1 result final run
-  subst final
-  exact returns result run
+  obtain ⟨rfl, validResult⟩ := safe.1 result final run
+  exact returns result validResult run
 
 /-- A literal closure keeps a frame where every run of its target from
 typed memory, at any arguments, keeps it: the frame its body establishes,

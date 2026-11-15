@@ -25,16 +25,6 @@ verex module 0x42::generic_certificate_frames where
 
 /--
 info: `read` uses concrete verification: Given interpretation does not yet support storage interpretation
----
-error: the specification clause `ensures result > 0` is not established
----
-error: verex verification failed: the automatic verification of `read` failed; provide a proof in the module:
-  verify read by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 -/
 #guard_msgs in
 verify 0x42::generic_certificate_frames::read

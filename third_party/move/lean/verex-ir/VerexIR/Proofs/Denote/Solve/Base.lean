@@ -41,24 +41,500 @@ open Lean Elab Tactic Meta
 
 deriving instance ToExpr for Sharing
 
+private theorem congrArg2 {α β γ : Sort _} (f : α → β → γ) {a₁ a₂ : α} {b₁ b₂ : β}
+    (ha : a₁ = a₂) (hb : b₁ = b₂) : f a₁ b₁ = f a₂ b₂ := by
+  subst ha; subst hb; rfl
+
+private theorem heq_unary {α₁ α₂ : Type} {F : Type → Type} {G : Type → Type}
+    (f : ∀ {α : Type}, F α → G α) {c₁ : F α₁} {c₂ : F α₂}
+    (hα : α₁ = α₂) (hc : HEq c₁ c₂) : HEq (f c₁) (f c₂) := by
+  subst hα; cases hc; exact HEq.rfl
+
+private theorem heq_binary {α₁ α₂ β₁ β₂ : Type}
+    {F₁ : Type → Type} {F₂ : Type → Type} {G : Type → Type → Type}
+    (f : ∀ {α β : Type}, F₁ α → F₂ β → G α β)
+    {c₁ : F₁ α₁} {c₂ : F₁ α₂} {d₁ : F₂ β₁} {d₂ : F₂ β₂}
+    (hα : α₁ = α₂) (hβ : β₁ = β₂) (hc : HEq c₁ c₂) (hd : HEq d₁ d₂) :
+    HEq (f c₁ d₁) (f c₂ d₂) := by
+  subst hα; subst hβ; cases hc; cases hd; exact HEq.rfl
+
+private theorem heq_dep_unary {S : Type _} {s₁ s₂ : S}
+    {A : S → Type _} {C : S → Type _}
+    (f : ∀ (s : S), A s → C s)
+    {a₁ : A s₁} {a₂ : A s₂}
+    (hs : s₁ = s₂) (ha : HEq a₁ a₂) :
+    HEq (f s₁ a₁) (f s₂ a₂) := by
+  subst hs; cases ha; exact HEq.rfl
+
+private theorem codec_heq {V₁ V₂ : Type} {c₁ : Codec V₁ RuntimeValue} {c₂ : Codec V₂ RuntimeValue}
+    (hV : V₁ = V₂) (henc : HEq c₁.encode c₂.encode) (hdec : HEq c₁.decode? c₂.decode?) :
+    HEq c₁ c₂ := by
+  cases c₁; cases c₂; dsimp at henc hdec
+  subst hV; cases henc; cases hdec; exact HEq.rfl
+
+theorem FunctionCarriers.eq_with_own {unit : Validation.ValidatedUnit}
+    (functions base : FunctionCarriers unit)
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals) :
+    functions = { base with own := functions.own } := by
+  cases functions; cases base
+  dsimp at sameCarrier sameFunctions sameNominals
+  subst sameCarrier; cases sameFunctions; subst sameNominals
+  congr <;> exact Subsingleton.elim _ _
+
+mutual
+theorem NTy.carrier_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (τ : NTy) → @NTy.carrier { Φ with own := newOwn } τ = @NTy.carrier Φ τ
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .param _ | .function _ _ _ => rfl
+  | .tuple row | .struct _ _ row => HList.carrier_with_own Φ newOwn row
+  | .enum _ _ names rows _ => variantCarrier.carrier_with_own Φ newOwn names rows
+  | .slice e | .vector e => congrArg SpecVector (NTy.carrier_with_own Φ newOwn e)
+  | .array e n => congrArg (fun α => SpecArray α n) (NTy.carrier_with_own Φ newOwn e)
+  | .table k v => congrArg SpecEntries (congrArg2 Prod (NTy.carrier_with_own Φ newOwn k) (NTy.carrier_with_own Φ newOwn v))
+  | .ghost s | .observed s => NTy.carrier_with_own Φ newOwn s
+  | .sliceRef e => congrArg SpecSliceRef (NTy.carrier_with_own Φ newOwn e)
+  | .ref r => congrArg2 Prod (NTy.carrier_with_own Φ newOwn r) (NTy.carrier_with_own Φ newOwn r)
+  | .nominal src args prod => congrArg (Φ.nominals.nominal src prod) (NRow.sorts_with_own Φ newOwn args)
+
+theorem HList.carrier_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (row : NRow) → @HList { Φ with own := newOwn } row = @HList Φ row
+  | .nil => rfl
+  | .cons τ rest => congrArg2 Prod (NTy.carrier_with_own Φ newOwn τ) (HList.carrier_with_own Φ newOwn rest)
+
+theorem variantCarrier.carrier_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (names : List String) → (rows : NRows) →
+    @variantCarrier { Φ with own := newOwn } names rows = @variantCarrier Φ names rows
+  | _, .nil => rfl
+  | [], .cons _ _ => rfl
+  | _ :: ns, .cons r rest => congrArg2 Sum (HList.carrier_with_own Φ newOwn r) (variantCarrier.carrier_with_own Φ newOwn ns rest)
+
+theorem NRow.sorts_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (row : NRow) → @NRow.sorts { Φ with own := newOwn } row = @NRow.sorts Φ row
+  | .nil => rfl
+  | .cons τ rest => congrArg2 List.cons (NTy.carrier_with_own Φ newOwn τ) (NRow.sorts_with_own Φ newOwn rest)
+end
+
+mutual
+theorem NTy.codec_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (τ : NTy) → HEq (@NTy.codec { Φ with own := newOwn } τ) (@NTy.codec Φ τ)
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .param _ | .function _ _ _ => HEq.rfl
+  | .tuple elements =>
+      heq_unary (F := (Codec · (List RuntimeValue))) (G := (Codec · RuntimeValue))
+        (fun c => Codec.tuple c)
+        (HList.carrier_with_own Φ newOwn elements) (rowCodec_heq_with_own Φ newOwn elements)
+  | .struct src _ fields =>
+      heq_unary (F := (Codec · (List RuntimeValue))) (G := (Codec · RuntimeValue))
+        (fun c => Codec.nominalRow src none c)
+        (HList.carrier_with_own Φ newOwn fields) (rowCodec_heq_with_own Φ newOwn fields)
+  | .enum src _ names rows dist =>
+      variantCodec_heq_with_own Φ newOwn src names rows dist
+  | .slice e | .vector e =>
+      heq_unary (F := (Codec · RuntimeValue)) (G := fun α => Codec (SpecVector α) RuntimeValue)
+        (fun c => Codec.boundedVector c)
+        (NTy.carrier_with_own Φ newOwn e) (NTy.codec_heq_with_own Φ newOwn e)
+  | .array e n =>
+      heq_unary (F := (Codec · RuntimeValue)) (G := fun α => Codec (SpecArray α n) RuntimeValue)
+        (fun c => Codec.array c n)
+        (NTy.carrier_with_own Φ newOwn e) (NTy.codec_heq_with_own Φ newOwn e)
+  | .table k v =>
+      heq_binary (F₁ := (Codec · RuntimeValue)) (F₂ := (Codec · RuntimeValue))
+        (G := fun α β => Codec (SpecEntries (α × β)) RuntimeValue)
+        (fun ck cv => Codec.entries ck cv)
+        (NTy.carrier_with_own Φ newOwn k) (NTy.carrier_with_own Φ newOwn v)
+        (NTy.codec_heq_with_own Φ newOwn k) (NTy.codec_heq_with_own Φ newOwn v)
+  | .ghost s =>
+      heq_unary (F := (Codec · RuntimeValue)) (G := (Codec · RuntimeValue))
+        (fun c => Codec.ghost c)
+        (NTy.carrier_with_own Φ newOwn s) (NTy.codec_heq_with_own Φ newOwn s)
+  | .observed s => NTy.codec_heq_with_own Φ newOwn s
+  | .sliceRef e =>
+      heq_unary (F := (Codec · RuntimeValue)) (G := fun α => Codec (SpecSliceRef α) RuntimeValue)
+        (fun c => Codec.sliceRef c)
+        (NTy.carrier_with_own Φ newOwn e) (NTy.codec_heq_with_own Φ newOwn e)
+  | .ref r =>
+      heq_unary (F := (Codec · RuntimeValue)) (G := fun α => Codec (α × α) RuntimeValue)
+        (fun c => Codec.prophecyPair c)
+        (NTy.carrier_with_own Φ newOwn r) (NTy.codec_heq_with_own Φ newOwn r)
+  | .nominal src args prod => by
+      dsimp only [NTy.codec, Carriers.nominalCodec]
+      exact heq_dep_unary (S := List Type) (A := SortCodecs)
+        (C := fun s => Codec (Φ.nominals.nominal src prod s) RuntimeValue)
+        (fun s sc => @Carriers.nominalCodec Φ src prod s sc)
+        (NRow.sorts_with_own Φ newOwn args) (sortCodecs_heq_with_own Φ newOwn args)
+
+theorem rowCodec_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (row : NRow) → HEq (@rowCodec { Φ with own := newOwn } row) (@rowCodec Φ row)
+  | .nil => HEq.rfl
+  | .cons τ rest =>
+      heq_binary (F₁ := (Codec · RuntimeValue)) (F₂ := (Codec · (List RuntimeValue)))
+        (G := fun α β => Codec (α × β) (List RuntimeValue))
+        (fun ch ct => Codec.tupleCons ch ct)
+        (NTy.carrier_with_own Φ newOwn τ) (HList.carrier_with_own Φ newOwn rest)
+        (NTy.codec_heq_with_own Φ newOwn τ) (rowCodec_heq_with_own Φ newOwn rest)
+
+theorem sortCodecs_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
+    (row : NRow) → HEq (@NRow.sortCodecs { Φ with own := newOwn } row) (@NRow.sortCodecs Φ row)
+  | .nil => HEq.rfl
+  | .cons τ rest => by
+      dsimp only [NRow.sortCodecs]
+      have hc := NTy.carrier_with_own Φ newOwn τ
+      have hs := NRow.sorts_with_own Φ newOwn rest
+      have hd := NTy.codec_heq_with_own Φ newOwn τ
+      have hsd := sortCodecs_heq_with_own Φ newOwn rest
+      exact (show ∀ {A₁ A₂ : Type} {S₁ S₂ : List Type} (c₁ : Codec A₁ RuntimeValue) (c₂ : Codec A₂ RuntimeValue)
+          (sc₁ : SortCodecs S₁) (sc₂ : SortCodecs S₂),
+          A₁ = A₂ → S₁ = S₂ → HEq c₁ c₂ → HEq sc₁ sc₂ →
+          HEq ((c₁, sc₁) : Codec A₁ RuntimeValue × SortCodecs S₁) ((c₂, sc₂) : Codec A₂ RuntimeValue × SortCodecs S₂) from
+        fun _ _ _ _ hA hS hc hsc => by subst hA; subst hS; cases hc; cases hsc; exact HEq.rfl)
+        _ _ _ _ hc hs hd hsd
+
+theorem variantCodec_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop)
+    (src : StructHandle) : (names : List String) → (rows : NRows) → (dist : names.Nodup) →
+    HEq (@variantCodec { Φ with own := newOwn } src names rows (@rowCodecs { Φ with own := newOwn } rows) dist)
+      (@variantCodec Φ src names rows (@rowCodecs Φ rows) dist)
+  | [], .nil, _ => by dsimp only [variantCodec]; exact HEq.rfl
+  | _ :: _, .nil, _ => by dsimp only [variantCodec]; exact HEq.rfl
+  | [], .cons _ _, _ =>
+      codec_heq rfl
+        (by dsimp only [variantCodec, variantEncode]; exact HEq.rfl)
+        (by dsimp only [variantCodec, variantDecode?]; exact HEq.rfl)
+  | name :: ns, .cons fields rest, dist => by
+      have hc := HList.carrier_with_own Φ newOwn fields
+      have hv := variantCarrier.carrier_with_own Φ newOwn ns rest
+      have hd := rowCodec_heq_with_own Φ newOwn fields
+      have hih := variantCodec_heq_with_own Φ newOwn src ns rest (List.nodup_cons.mp dist).2
+      have hencRec : HEq (@variantEncode { Φ with own := newOwn } src ns rest (@rowCodecs { Φ with own := newOwn } rest))
+          (@variantEncode Φ src ns rest (@rowCodecs Φ rest)) :=
+        (show ∀ {V₁ V₂ : Type} (c₁ : Codec V₁ RuntimeValue) (c₂ : Codec V₂ RuntimeValue),
+            V₁ = V₂ → HEq c₁ c₂ → HEq c₁.encode c₂.encode from
+          fun _ _ hV hc => by subst hV; cases hc; exact HEq.rfl) _ _ hv hih
+      have hdecRec : HEq (@variantDecode? { Φ with own := newOwn } src ns rest (@rowCodecs { Φ with own := newOwn } rest))
+          (@variantDecode? Φ src ns rest (@rowCodecs Φ rest)) :=
+        (show ∀ {V₁ V₂ : Type} (c₁ : Codec V₁ RuntimeValue) (c₂ : Codec V₂ RuntimeValue),
+            V₁ = V₂ → HEq c₁ c₂ → HEq c₁.decode? c₂.decode? from
+          fun _ _ hV hc => by subst hV; cases hc; exact HEq.rfl) _ _ hv hih
+      refine codec_heq (congrArg2 Sum hc hv) ?_ ?_
+      · dsimp only [variantCodec, variantEncode, rowCodecs]
+        exact (show ∀ {A₁ A₂ V₁ V₂ : Type}
+            (cf₁ : Codec A₁ (List RuntimeValue)) (cf₂ : Codec A₂ (List RuntimeValue))
+            (e₁ : V₁ → RuntimeValue) (e₂ : V₂ → RuntimeValue),
+            A₁ = A₂ → V₁ = V₂ → HEq cf₁ cf₂ → HEq e₁ e₂ →
+            HEq (fun value : A₁ ⊕ V₁ => Sum.elim (fun f => (Codec.nominalRow src (some name) cf₁).encode f) (fun l => e₁ l) value)
+                (fun value : A₂ ⊕ V₂ => Sum.elim (fun f => (Codec.nominalRow src (some name) cf₂).encode f) (fun l => e₂ l) value) from
+          fun _ _ _ _ hA hV hcf he => by subst hA; subst hV; cases hcf; cases he; exact HEq.rfl)
+          _ _ _ _ hc hv hd hencRec
+      · dsimp only [variantCodec, variantDecode?, rowCodecs]
+        exact (show ∀ {A₁ A₂ V₁ V₂ : Type}
+            (cf₁ : Codec A₁ (List RuntimeValue)) (cf₂ : Codec A₂ (List RuntimeValue))
+            (d₁ : RuntimeValue → Option V₁) (d₂ : RuntimeValue → Option V₂),
+            A₁ = A₂ → V₁ = V₂ → HEq cf₁ cf₂ → HEq d₁ d₂ →
+            HEq (fun runtime : RuntimeValue => match runtime with
+                  | .nominal actualSource (some actualVariant) _ =>
+                      if actualSource = src ∧ actualVariant = name then
+                        Option.map (@Sum.inl A₁ V₁) ((Codec.nominalRow src (some name) cf₁).decode? runtime)
+                      else Option.map (@Sum.inr A₁ V₁) (d₁ runtime)
+                  | _ => (none : Option (A₁ ⊕ V₁)))
+                (fun runtime : RuntimeValue => match runtime with
+                  | .nominal actualSource (some actualVariant) _ =>
+                      if actualSource = src ∧ actualVariant = name then
+                        Option.map (@Sum.inl A₂ V₂) ((Codec.nominalRow src (some name) cf₂).decode? runtime)
+                      else Option.map (@Sum.inr A₂ V₂) (d₂ runtime)
+                  | _ => (none : Option (A₂ ⊕ V₂))) from
+          fun _ _ _ _ hA hV hcf hd => by subst hA; subst hV; cases hcf; cases hd; exact HEq.rfl)
+          _ _ _ _ hc hv hd hdecRec
+end
+
+theorem NTy.encode_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop)
+    (τ : NTy) (v : @NTy.carrier { Φ with own := newOwn } τ) :
+    @NTy.encode Φ τ (cast (NTy.carrier_with_own Φ newOwn τ) v) =
+      @NTy.encode { Φ with own := newOwn } τ v := by
+  dsimp only [NTy.encode]
+  exact (show ∀ {A₁ A₂ : Type} (c₁ : Codec A₁ RuntimeValue) (c₂ : Codec A₂ RuntimeValue)
+      (hA : A₁ = A₂) (hc : HEq c₁ c₂) (v : A₁), c₂.encode (cast hA v) = c₁.encode v from
+    fun _ _ hA hc v => by subst hA; cases hc; rfl)
+    _ _ (NTy.carrier_with_own Φ newOwn τ) (NTy.codec_heq_with_own Φ newOwn τ) v
+
+theorem Skolems.resolve_atArguments {unit : Validation.ValidatedUnit}
+    {functions : FunctionCarriers unit}
+    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
+    τ.subst (params.map Θ.resolve) = Θ.resolve τ := by
+  letI := functions
+  rw [Θ.resolve_eq_type τ]
+  refine NTy.subst_eq_substWith _ _ params.length (fun index below => ?_) τ bounded
+  simpa only [Nat.zero_add, Skolems.type] using
+    NRow.getD_map_params Θ.resolve params 0 own index below (.param index)
+
+private theorem runtimeCarrier_with_own {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals) (ρ : NTy) :
+    @NTy.carrier (@Carriers.runtime unit functions) ρ =
+      @NTy.carrier (@Carriers.runtime unit base) ρ := by
+  rw [FunctionCarriers.eq_with_own functions base sameCarrier sameFunctions sameNominals]
+  exact NTy.carrier_with_own (@Carriers.runtime unit base) functions.own ρ
+
+private theorem runtimeEncode_eq_of_eq {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    {ownFn : StructHandle → NRow → RuntimeValue → Prop}
+    (hf : functions = { base with own := ownFn }) (ρ : NTy)
+    (h : @NTy.carrier (@Carriers.runtime unit functions) ρ =
+      @NTy.carrier (@Carriers.runtime unit base) ρ)
+    (v : @NTy.carrier (@Carriers.runtime unit functions) ρ) :
+    @NTy.encode (@Carriers.runtime unit base) ρ (cast h v) =
+      @NTy.encode (@Carriers.runtime unit functions) ρ v := by
+  subst hf
+  exact NTy.encode_with_own (@Carriers.runtime unit base) ownFn ρ v
+
+private theorem runtimeEncode_with_own {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals) (ρ : NTy)
+    (v : @NTy.carrier (@Carriers.runtime unit functions) ρ) :
+    @NTy.encode (@Carriers.runtime unit base) ρ
+        (cast (runtimeCarrier_with_own sameCarrier sameFunctions sameNominals ρ) v) =
+      @NTy.encode (@Carriers.runtime unit functions) ρ v :=
+  runtimeEncode_eq_of_eq
+    (FunctionCarriers.eq_with_own functions base sameCarrier sameFunctions sameNominals)
+    ρ _ v
+
+theorem Skolems.runtimeCarrierEq {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals)
+    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
+    @NTy.carrier (@Carriers.runtime unit functions) (Θ.resolve τ) =
+      @NTy.carrier (@Carriers.runtime unit base) (τ.subst (params.map Θ.resolve)) :=
+  (runtimeCarrier_with_own sameCarrier sameFunctions sameNominals (Θ.resolve τ)).trans
+    (congrArg (@NTy.carrier (@Carriers.runtime unit base))
+      (Skolems.resolve_atArguments Θ own bounded).symm)
+
+noncomputable def Skolems.reframeAtBase {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals)
+    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true)
+    (inhabitable : (params.map Θ.resolve).inhabitable = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.carrier (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ :=
+  (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).ofRuntime τ
+    (cast (Skolems.runtimeCarrierEq sameCarrier sameFunctions sameNominals Θ own bounded)
+      (@Skolems.toRuntime unit functions Θ τ value))
+
+@[vir_denote_norm] theorem Skolems.encode_reframeAtBase {unit : Validation.ValidatedUnit}
+    {functions base : FunctionCarriers unit}
+    (sameCarrier : functions.carrier = base.carrier)
+    (sameFunctions : HEq functions.functions base.functions)
+    (sameNominals : functions.nominals = base.nominals)
+    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true)
+    (inhabitable : (params.map Θ.resolve).inhabitable = true)
+    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.carrier Θ.toCarriers τ) :
+    @NTy.encode (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
+        (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value) =
+      @NTy.encode Θ.toCarriers τ value := by
+  unfold Skolems.reframeAtBase
+  let target := Skolems.atArguments unit base (params.map Θ.resolve) inhabitable
+  rw [← @Skolems.encode_toRuntime unit base target τ,
+    @Skolems.toRuntime_ofRuntime unit base target τ]
+  change @NTy.encode (@Carriers.runtime unit base) (τ.subst (params.map Θ.resolve))
+      (cast (Skolems.runtimeCarrierEq sameCarrier sameFunctions sameNominals Θ own bounded)
+        (@Skolems.toRuntime unit functions Θ τ value)) =
+    @NTy.encode Θ.toCarriers τ value
+  have hres := (Skolems.resolve_atArguments Θ own bounded).symm
+  have hsplit : cast (Skolems.runtimeCarrierEq sameCarrier sameFunctions sameNominals Θ own bounded)
+        (@Skolems.toRuntime unit functions Θ τ value) =
+      cast (congrArg (@NTy.carrier (@Carriers.runtime unit base)) hres)
+        (cast (runtimeCarrier_with_own sameCarrier sameFunctions sameNominals (Θ.resolve τ))
+          (@Skolems.toRuntime unit functions Θ τ value)) := by
+    simp [cast_cast]
+  rw [hsplit, NTy.encode_castCarrier hres,
+    runtimeEncode_with_own sameCarrier sameFunctions sameNominals (Θ.resolve τ)]
+  exact @Skolems.encode_toRuntime unit functions Θ τ value
+
+theorem skolems_mem_isSome_of_plainAt_eq_some {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {v : @NTy.carrier Θ.toCarriers τ}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = some v) :
+    (memory (Skolems.resource (Θ := Θ) τ arguments) key).isSome = true := by
+  rw [← Skolems.isSome_plainAt (Θ := Θ) τ arguments key memory, h]
+  rfl
+
+theorem skolems_mem_eq_none_of_plainAt_eq_none {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = none) :
+    memory (Skolems.resource (Θ := Θ) τ arguments) key = none := by
+  unfold Skolems.plainAt at h
+  cases hm : memory (Skolems.resource (Θ := Θ) τ arguments) key with
+  | none => rfl
+  | some stored => simp [hm] at h
+
+private def argumentSkolemsFrame? : Nat → Lean.Expr → MetaM (Option Lean.Expr)
+  | 0, _ => return none
+  | fuel + 1, frame => do
+    let .const name _ := frame.getAppFn | return none
+    if name == ``Skolems.runtime || name == ``Skolems.instantiate then return some frame
+    let some unfolded ← withReducible (unfoldDefinition? frame) | return none
+    argumentSkolemsFrame? fuel unfolded
+
+private partial def dsimpArgumentWithExpr (e : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  unless e.isAppOfArity ``NTy.argumentWith 2 do return none
+  let types := e.getArg! 0
+  let τ := e.getArg! 1
+  if types.isAppOfArity ``Skolems.argument 3 then
+    let tArgs := types.getAppArgs
+    if let some frame ← argumentSkolemsFrame? 4 tArgs[2]! then
+      let fArgs := frame.getAppArgs
+      if frame.getAppFn.isConstOf ``Skolems.runtime && fArgs.size == 2 &&
+          fArgs[0]! == tArgs[0]! && fArgs[1]! == tArgs[1]! then
+        if ← withDefault (withNewMCtxDepth (isDefEq e τ)) then
+          return some τ
+      if frame.getAppFn.isConstOf ``Skolems.instantiate && fArgs.size == 4 &&
+          fArgs[0]! == tArgs[0]! && fArgs[1]! == tArgs[1]! &&
+          τ.isAppOfArity ``NTy.param 1 then
+        let idx := τ.getArg! 0
+        let substEntry ← whnfR (mkApp2 (mkConst ``NRow.argument)
+          (mkProj ``Subtype 0 fArgs[2]!) idx)
+        let outerArg := mkApp3 (mkConst ``Skolems.argument) tArgs[0]! tArgs[1]! fArgs[3]!
+        let next := mkApp2 (mkConst ``NTy.argumentWith) outerArg substEntry
+        if ← withDefault (withNewMCtxDepth (isDefEq e next)) then
+          return (← dsimpArgumentWithExpr next).orElse fun _ => some next
+  if !τ.hasFVar && !τ.hasMVar && !τ.isAppOf ``NTy.param then
+    if ← withDefault (withNewMCtxDepth (isDefEq e τ)) then
+      return some τ
+  return none
+
+private partial def dsimpResourceRow (row : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  unless row.isAppOfArity ``NRow.cons 2 do return none
+  let head := row.getArg! 0
+  let tail := row.getArg! 1
+  let head? ← dsimpArgumentWithExpr head
+  let tail? ← dsimpResourceRow tail
+  if head?.isNone && tail?.isNone then return none
+  return some (mkApp2 (mkConst ``NRow.cons) (head?.getD head) (tail?.getD tail))
+
+open Lean Meta Simp in
+dsimproc [simp, vir_denote, vir_denote_norm, vir_transport] resourceTypeArguments
+    (ResourceType.mk _ _ _) := fun e => do
+  unless e.isAppOfArity ``ResourceType.mk 3 do return .continue
+  let some args' ← dsimpResourceRow (e.getArg! 1) | return .continue
+  return .done (mkApp3 (mkConst ``ResourceType.mk) (e.getArg! 0) args' (e.getArg! 2))
+
+theorem Skolems.writePlain_none_same_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) {r : ResourceType} {k : StorageKey}
+    (sameRes : r = Skolems.resource (Θ := Θ) τ arguments) (sameKey : k = key) :
+    (Skolems.writePlain (Θ := Θ) τ arguments key none memory) r k = none := by
+  subst sameRes; cases sameKey
+  rw [Skolems.writePlain_of_holds τ arguments key none memory trivial, Memory.set_same, if_pos rfl]
+  rfl
+
+open Lean Meta Simp in
+simproc [vir_denote, vir_denote_norm] reduceWritePlainNoneSame
+    ((@VerexIR.Proofs.Denote.Skolems.writePlain _ ?functions ?frame _ _ _ _ _) _ _) := fun e => do
+  unless e.getAppNumArgs == 10 && e.getAppFn.isConstOf ``Skolems.writePlain do
+    return .continue
+  let args := e.getAppArgs
+  let (unit, functions, frame, τ, arguments, key, value, memory, otherRes, otherKey) :=
+    (args[0]!, args[1]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, args[7]!, args[8]!, args[9]!)
+  unless value.consumeMData.isAppOfArity ``Option.none 1 do return .continue
+  let writeRes := mkApp5 (mkConst ``Skolems.resource) unit functions frame τ arguments
+  unless ← withDefault (withNewMCtxDepth (isDefEq otherRes writeRes <&&> isDefEq otherKey key)) do
+    return .continue
+  let sameRes ← mkExpectedTypeHint (← mkEqRefl otherRes) (← mkEq otherRes writeRes)
+  let sameKey ← mkExpectedTypeHint (← mkEqRefl otherKey) (← mkEq otherKey key)
+  let carrierTy := mkApp3 (mkConst ``ResourceType.carrier) unit functions otherRes
+  let rhs := mkApp (mkConst ``Option.none [Level.zero]) carrierTy
+  let proof := mkAppN (mkConst ``Skolems.writePlain_none_same_of_eq)
+    #[unit, functions, frame, τ, arguments, key, memory, otherRes, otherKey, sameRes, sameKey]
+  let targetEq ← mkEq e rhs
+  unless ← withDefault (withNewMCtxDepth (isDefEq (← inferType proof) targetEq)) do
+    return .continue
+  return .done { expr := rhs, proof? := some (← mkExpectedTypeHint proof targetEq) }
+
+theorem Skolems.resource_eq_substWith_type {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] (Θ : Skolems unit) (τ : NTy) (arguments : NRow) :
+    Skolems.resource (Θ := Θ) τ arguments =
+      { type := τ.substWith Θ.type
+        arguments := arguments.map (NTy.argumentWith Θ.argument)
+        kind := .value } := by
+  unfold Skolems.resource
+  rw [Θ.resolve_eq_type]
+
+theorem skolems_mem_isSome_of_plainAt_eq_some_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {v : @NTy.carrier Θ.toCarriers τ}
+    {r : ResourceType} {k : StorageKey}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = some v)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    (memory r k).isSome = true := by
+  subst sameRes; subst sameKey
+  exact skolems_mem_isSome_of_plainAt_eq_some h
+
+theorem skolems_mem_ne_none_of_plainAt_eq_some_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {v : @NTy.carrier Θ.toCarriers τ}
+    {r : ResourceType} {k : StorageKey}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = some v)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    memory r k ≠ none := by
+  subst sameRes; subst sameKey
+  have hsome := skolems_mem_isSome_of_plainAt_eq_some h
+  intro hm; simp [hm] at hsome
+
+theorem skolems_none_ne_mem_of_plainAt_eq_some_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {v : @NTy.carrier Θ.toCarriers τ}
+    {r : ResourceType} {k : StorageKey}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = some v)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    none ≠ memory r k :=
+  fun hm => skolems_mem_ne_none_of_plainAt_eq_some_of_eq h sameRes sameKey hm.symm
+
+theorem skolems_mem_beq_none_eq_false_of_plainAt_eq_some_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {v : @NTy.carrier Θ.toCarriers τ}
+    {r : ResourceType} {k : StorageKey} [BEq (ResourceType.carrier unit r)]
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = some v)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    (memory r k == none) = false := by
+  cases hm : memory r k with
+  | none => exact absurd hm (skolems_mem_ne_none_of_plainAt_eq_some_of_eq h sameRes sameKey)
+  | some _ => rfl
+
+theorem skolems_mem_eq_none_of_plainAt_eq_none_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {r : ResourceType} {k : StorageKey}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = none)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    memory r k = none := by
+  subst sameRes; subst sameKey
+  exact skolems_mem_eq_none_of_plainAt_eq_none h
+
+theorem skolems_mem_isSome_eq_false_of_plainAt_eq_none_of_eq {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] {Θ : Skolems unit} {τ : NTy} {arguments : NRow}
+    {key : StorageKey} {memory : Memory unit} {r : ResourceType} {k : StorageKey}
+    (h : Skolems.plainAt (Θ := Θ) τ arguments key memory = none)
+    (sameRes : Skolems.resource (Θ := Θ) τ arguments = r) (sameKey : key = k) :
+    (memory r k).isSome = false := by
+  rw [skolems_mem_eq_none_of_plainAt_eq_none_of_eq h sameRes sameKey]
+  rfl
+
 /-- Run a tactic on the main goal alone, the other goals kept after those it
 leaves: Verex's tactics act on the main goal. Without goals it runs on none,
 where a tactic such as `done` succeeds. -/
 def focusGoal (x : TacticM α) : TacticM α := do
   if (← getUnsolvedGoals).isEmpty then x else focus x
-
-/-- A transport of a value between an induced family and its outer family,
-applied: the transports take the outer family's inhabitants as well
-(`Carriers.instantiate`), which are synthesized here.  None where the
-family has none, so that no step builds a transport it cannot type. -/
-def transportAt? (transport : Name) (outer : Lean.Expr) (arguments : Array Lean.Expr) :
-    MetaM (Option Lean.Expr) := do
-  let nonempty? ← (try
-      pure (some (← synthInstance
-        (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty) outer)))
-    catch _ => pure none)
-  let some nonempty := nonempty? | return none
-  return some (mkAppN (mkConst transport) (#[outer, nonempty] ++ arguments))
 
 /-- A row's inhabitability built entry by entry: a type parameter's
 resolution by the frame's law (`Skolems.type_inhabitable`), a resolution of
@@ -84,10 +560,8 @@ partial def rowInhabitableEntries? (row : Lean.Expr) : MetaM (Option Lean.Expr) 
             (mkConst ``Bool.true)) | pure none
         let some held ← decided resolvedType | pure none
         let resolvedArgs := resolved.getAppArgs
-        let nonempty := mkApp2 (mkConst ``Skolems.runtimeNonempty) resolvedArgs[0]! resolvedArgs[1]!
         let itself := mkAppN (mkConst ``Skolems.resolve_paramFree)
-          #[resolvedArgs[0]!, resolvedArgs[1]!, mkApp nonempty resolvedArgs[2]!, resolvedArgs[2]!,
-            resolvedType, free]
+          #[resolvedArgs[0]!, resolvedArgs[1]!, resolvedArgs[2]!, resolvedType, free]
         pure (some (← mkEqTrans (← mkCongrArg (mkConst ``NTy.inhabitable) itself) held))
     else decided τ
   let some head := head? | return none
@@ -102,7 +576,7 @@ parameter's resolution from the frame's own law that it resolves every
 parameter to an inhabitable type (`Skolems.type_inhabitable`, which is what
 `NRow.inhabitable_map_resolve` proves of a whole row).  None where an entry
 is neither, so that no step builds a statement it cannot type. -/
-def rowInhabitable? (row : Lean.Expr) : TacticM (Option Lean.Expr) := do
+def rowInhabitable? (row : Lean.Expr) : MetaM (Option Lean.Expr) := do
   let wanted ← mkEq (mkApp (mkConst ``NRow.inhabitable) row) (mkConst ``Bool.true)
   -- A ground row is decided.  A decision over a row with a frame's
   -- resolution in it must not be taken: `Skolems.resolve` reduces for the
@@ -114,11 +588,14 @@ def rowInhabitable? (row : Lean.Expr) : TacticM (Option Lean.Expr) := do
     if ← isTypeCorrect built then return some built
   let held ← mkFreshExprSyntheticOpaqueMVar wanted
   let proved ← (try
-      let remaining ← Lean.Elab.Tactic.run held.mvarId! (evalTactic (← `(tactic|
-        simp only [VerexIR.Proofs.Denote.NRow.map, VerexIR.Proofs.Denote.NRow.inhabitable,
-          Bool.and_eq_true, VerexIR.Proofs.Denote.Skolems.type_inhabitable, and_true, true_and,
-          VerexIR.Proofs.Denote.NRow.inhabitable_nil])))
-      pure remaining.isEmpty
+      let lemmas : SimpTheorems ← [``VerexIR.Proofs.Denote.NRow.map,
+          ``VerexIR.Proofs.Denote.NRow.inhabitable].foldlM (·.addDeclToUnfold ·) {}
+      let lemmas ← [``Bool.and_eq_true, ``VerexIR.Proofs.Denote.Skolems.type_inhabitable,
+          ``and_true, ``true_and, ``VerexIR.Proofs.Denote.NRow.inhabitable_nil,
+          ``eq_self].foldlM (·.addConst ·) lemmas
+      let ctx ← Simp.mkContext { failIfUnchanged := false } #[lemmas] (← getSimpCongrTheorems)
+      let (result, _) ← simpGoal held.mvarId! ctx #[] none
+      pure result.isNone
     catch _ => pure false)
   if proved then return some (← instantiateMVars held) else return none
 
@@ -130,94 +607,6 @@ never makes a step silently skip its goal. -/
 def siteOf? (site : Lean.Expr) : MetaM (Option Nat) := do
   if let some value ← (evalNat site).run then return some value
   (evalNat (← withTransparency .all (whnf site))).run
-
-/-- What a type spells of a lent value: its family, its payload, and
-whether the spelling is the worker over a plain family
-(`NTy.plainOf (Carriers.toPlain Θ) τ`) rather than the wrapper
-(`NTy.plain Θ τ`).  A binder's type shows the worker wherever it was built
-by unfolding the wrapper, and the two are the same type, so every matcher
-reads a lent type through this and rebuilds in the worker's spelling
-(`PlainSpelling.tyConst`, `PlainSpelling.rowConst`,
-`PlainSpelling.variantConst` over `PlainSpelling.plainFamily`), which is
-the one canonical spelling of the plain layer.
-
-The worker is canonical because it is the spelling a congruence closure
-keeps.  The wrapper's heads are reducible, so a closure that normalizes at
-reducible transparency unfolds them and goes on to unfold the plain family
-itself into its instance literal; the worker's heads are not, so the term
-it internalizes is the term the goal states.  A value read once at each
-spelling therefore enters the closure as unrelated terms, and no equation
-of the leaf relates them. -/
-inductive PlainPayload where
-  /-- One value of a type. -/
-  | ty (τ : Lean.Expr)
-  /-- A row of values. -/
-  | row (row : Lean.Expr)
-  /-- A value of one of the named variants. -/
-  | variant (names rows : Lean.Expr)
-
-/-- A lent type's spelling (`PlainPayload`). -/
-structure PlainSpelling where
-  /-- The family the spelling names: a `Carriers` for a wrapper, the plain
-  family itself for a worker. -/
-  family : Lean.Expr
-  /-- Whether the spelling is the worker's. -/
-  worker : Bool
-  /-- What the type spells. -/
-  payload : PlainPayload
-
-/-- The lent spelling of a type, wrapper or worker alike. -/
-def plainSpelling? (type : Lean.Expr) : Option PlainSpelling :=
-  let type := type.consumeMData
-  if type.isAppOfArity ``NTy.plain 2 then
-    some ⟨type.getArg! 0, false, .ty (type.getArg! 1)⟩
-  else if type.isAppOfArity ``NTy.plainOf 2 then
-    some ⟨type.getArg! 0, true, .ty (type.getArg! 1)⟩
-  else if type.isAppOfArity ``HListPlain 2 then
-    some ⟨type.getArg! 0, false, .row (type.getArg! 1)⟩
-  else if type.isAppOfArity ``HListPlainOf 2 then
-    some ⟨type.getArg! 0, true, .row (type.getArg! 1)⟩
-  else if type.isAppOfArity ``variantPlain 3 then
-    some ⟨type.getArg! 0, false, .variant (type.getArg! 1) (type.getArg! 2)⟩
-  else if type.isAppOfArity ``variantPlainOf 3 then
-    some ⟨type.getArg! 0, true, .variant (type.getArg! 1) (type.getArg! 2)⟩
-  else none
-
-/-- The family of certified values a spelling's lent layer is that of: a
-wrapper's own family, and the family a worker's plain family is the lent
-layer of.  `none` where the worker's plain family is not one
-(`Carriers.toPlain`), which the operations over certified values need. -/
-def PlainSpelling.carriers? (spelling : PlainSpelling) : Option Lean.Expr :=
-  if !spelling.worker then some spelling.family
-  else if spelling.family.isAppOfArity ``Carriers.toPlain 1 then some spelling.family.appArg!
-  else none
-
-/-- The plain family a spelling is rebuilt over: the worker's own, and a
-wrapper's family at its lent layer (`Carriers.toPlain`). -/
-def PlainSpelling.plainFamily (spelling : PlainSpelling) : Lean.Expr :=
-  if spelling.worker then spelling.family
-  else mkApp (mkConst ``Carriers.toPlain) spelling.family
-
-/-- The name one lent value's type is rebuilt under. -/
-def PlainSpelling.tyConst : Name := ``NTy.plainOf
-
-/-- The name a lent row's type is rebuilt under. -/
-def PlainSpelling.rowConst : Name := ``HListPlainOf
-
-/-- The name a lent variant value's type is rebuilt under. -/
-def PlainSpelling.variantConst : Name := ``variantPlainOf
-
-/-- One lent value's type in the canonical spelling. -/
-def PlainSpelling.tyOf (spelling : PlainSpelling) (τ : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst PlainSpelling.tyConst) spelling.plainFamily τ
-
-/-- A lent row's type in the canonical spelling. -/
-def PlainSpelling.rowOf (spelling : PlainSpelling) (row : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst PlainSpelling.rowConst) spelling.plainFamily row
-
-/-- A lent variant value's type in the canonical spelling. -/
-def PlainSpelling.variantOf (spelling : PlainSpelling) (names rows : Lean.Expr) : Lean.Expr :=
-  mkApp3 (mkConst PlainSpelling.variantConst) spelling.plainFamily names rows
 
 /-- A closed decidable proposition proved by evaluation, as an auxiliary
 theorem: the proof is a constant of the proposition's type, type-correct at
@@ -511,6 +900,7 @@ inductive Provenance where
   | assertion
   | mutationEnd
   | construction
+  | publish
   /-- A value copied out of the open current of a mutable reference, which
   is certified at the copy (`doc/designs/data-invariants.md`). -/
   | copyOut
@@ -1651,6 +2041,7 @@ def Provenance.describe : Provenance → String
   | .assertion => "an in-body assertion"
   | .mutationEnd => "a data invariant where a mutation ends"
   | .construction => "a data invariant where a value is constructed"
+  | .publish => "a data invariant where a resource is published"
   | .copyOut =>
       "a data invariant where a value is copied out of a mutable reference"
   | .handOver => "a data invariant where a mutable reference is passed to a call"
@@ -2888,6 +3279,123 @@ def isStorageReadLHS (lhs : Lean.Expr) : MetaM Bool := do
   unless head.isFVar && lhs.getAppNumArgs == 2 do return false
   return (← whnfR (← inferType head)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2
 
+private def plainAtSubstResource (args : Array Lean.Expr) : Lean.Expr × Lean.Expr :=
+  let θType := mkApp3 (mkConst ``Skolems.type) args[0]! args[1]! args[2]!
+  let substTy := mkApp2 (mkConst ``NTy.substWith) θType args[3]!
+  let argFn := mkApp (mkConst ``NTy.argumentWith)
+    (mkApp3 (mkConst ``Skolems.argument) args[0]! args[1]! args[2]!)
+  let mappedArgs := mkApp2 (mkConst ``NRow.map) argFn args[4]!
+  let substRes := mkApp3 (mkConst ``ResourceType.mk) substTy mappedArgs (mkConst ``ResourceKind.value)
+  let substProof := mkAppN (mkConst ``Skolems.resource_eq_substWith_type) (args.extract 0 5)
+  (substRes, substProof)
+
+/-- Whether two storage read expressions (`memory r k` or `Skolems.plainAt τ args k memory`)
+address the same memory state, resource type, and key. -/
+def sameStorageRead (a b : Lean.Expr) : MetaM Bool := do
+  let a := a.consumeMData
+  let b := b.consumeMData
+  if a.getAppFn == b.getAppFn && a.getAppNumArgs == b.getAppNumArgs then
+    return ← withNewMCtxDepth (withDefault (isDefEq a b))
+  let matchPlainRaw (plain raw : Lean.Expr) : MetaM Bool := do
+    unless plain.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 &&
+        raw.getAppNumArgs == 2 do return false
+    let pArgs := plain.getAppArgs
+    unless pArgs[6]!.consumeMData == raw.getAppFn.consumeMData do return false
+    let rawRes := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.resource) (pArgs.extract 0 5)
+    let (substRes, _) := plainAtSubstResource pArgs
+    withNewMCtxDepth <| withDefault do
+      unless ← isDefEq (raw.getArg! 1) pArgs[5]! do return false
+      return (← isDefEq (raw.getArg! 0) rawRes) || (← isDefEq (raw.getArg! 0) substRes)
+  if ← matchPlainRaw a b then return true
+  matchPlainRaw b a
+
+private def matchingPlainAtSlots (args : Array Lean.Expr) (siteExprs : Array Lean.Expr) :
+    MetaM (Array (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr)) := do
+  let mem := args[6]!.consumeMData
+  let key := args[5]!
+  let rawRes := mkAppN (mkConst ``Skolems.resource) (args.extract 0 5)
+  let reflRes ← mkEqRefl rawRes
+  let reflKey ← mkEqRefl key
+  let (substRes, substProof) := plainAtSubstResource args
+  let rec visit (e : Lean.Expr) :
+      StateRefT (Std.HashSet Lean.Expr × Array (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr))
+        MetaM Unit := do
+    if (← get).1.contains e then return
+    modify fun (seen, acc) => (seen.insert e, acc)
+    if e.getAppFn.consumeMData == mem && e.getAppNumArgs == 2 && !e.hasLooseBVars then
+      let r' := e.getArg! 0
+      let k' := e.getArg! 1
+      let already := (← get).2.any fun (r0, k0, _, _) => r0 == r' && k0 == k'
+      unless already do
+        let matched? ← (try withDefault do
+          unless ← withNewMCtxDepth (isDefEq key k') do return none
+          let sameKey ← mkExpectedTypeHint reflKey (← mkEq key k')
+          if ← withNewMCtxDepth (isDefEq rawRes r') then
+            let sameRes ← mkExpectedTypeHint reflRes (← mkEq rawRes r')
+            return some (r', k', sameRes, sameKey)
+          if ← withNewMCtxDepth (isDefEq substRes r') then
+            let sameRes ← mkExpectedTypeHint substProof (← mkEq rawRes r')
+            return some (r', k', sameRes, sameKey)
+          return none
+        catch _ => pure none)
+        if let some entry := matched? then
+          modify fun (seen, acc) => (seen, acc.push entry)
+    match e with
+    | .app f a => visit f; visit a
+    | .lam _ d b _ | .forallE _ d b _ => visit d; visit b
+    | .letE _ t v b _ => visit t; visit v; visit b
+    | .mdata _ b | .proj _ _ b => visit b
+    | _ => pure ()
+  let (_, (_, found)) ← (do for expr in siteExprs do visit expr).run ({}, #[])
+  return if found.isEmpty then #[(rawRes, key, reflRes, reflKey)] else found
+
+/-- Derive the raw memory existence or absence rewrites (`(mem r k).isSome`,
+`mem r k ≠ none`, `(mem r k == none) = false`, or `mem r k = none`) implied by
+a plain storage read hypothesis `h : Skolems.plainAt τ args k mem = some v`
+(or `= none`) at each matching `(r, k)` spelling in `siteExprs`. -/
+private def plainAtMemoryRewrites (fvarId : FVarId) (siteExprs : Array Lean.Expr) :
+    MetaM (Array Lean.Expr) := do
+  let ty ← instantiateMVars (← fvarId.getType)
+  let some (_, lhs, rhs) := ty.consumeMData.eq? | return #[]
+  let lhs := lhs.consumeMData
+  let rhs := rhs.consumeMData
+  unless lhs.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 do return #[]
+  let args := lhs.getAppArgs
+  let slots ← matchingPlainAtSlots args siteExprs
+  let out ← (try withDefault do
+    let mut acc : Array Lean.Expr := #[]
+    let readCarriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers)
+      args[0]! args[1]! args[2]!
+    let carrierTy := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) readCarriers args[3]!
+    if rhs.isAppOfArity ``Option.some 2 then
+      let v := rhs.getArg! 1
+      let eqExp ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy v)
+      let hTyped ← mkExpectedTypeHint (.fvar fvarId) eqExp
+      for (r, k, sameRes, sameKey) in slots do
+        acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_mem_isSome_of_plainAt_eq_some_of_eq)
+          (args ++ #[v, r, k, hTyped, sameRes, sameKey]))
+        acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_mem_ne_none_of_plainAt_eq_some_of_eq)
+          (args ++ #[v, r, k, hTyped, sameRes, sameKey]))
+        acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_none_ne_mem_of_plainAt_eq_some_of_eq)
+          (args ++ #[v, r, k, hTyped, sameRes, sameKey]))
+        let carrierForR := mkApp3 (mkConst ``ResourceType.carrier) args[0]! args[1]! r
+        let beqTy := mkApp (mkConst ``BEq [Level.zero]) carrierForR
+        let beqInst? ← try synthInstance? beqTy catch _ => pure none
+        if let some beqInst := beqInst? then
+          acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_mem_beq_none_eq_false_of_plainAt_eq_some_of_eq)
+            (args ++ #[v, r, k, beqInst, hTyped, sameRes, sameKey]))
+    else if rhs.isAppOfArity ``Option.none 1 then
+      let eqExp ← mkEq lhs (mkApp (mkConst ``Option.none [Level.zero]) carrierTy)
+      let hTyped ← mkExpectedTypeHint (.fvar fvarId) eqExp
+      for (r, k, sameRes, sameKey) in slots do
+        acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_mem_isSome_eq_false_of_plainAt_eq_none_of_eq)
+          (args ++ #[r, k, hTyped, sameRes, sameKey]))
+        acc := acc.push (mkAppN (mkConst ``VerexIR.Proofs.Denote.skolems_mem_eq_none_of_plainAt_eq_none_of_eq)
+          (args ++ #[r, k, hTyped, sameRes, sameKey]))
+    pure acc
+  catch _ => pure #[])
+  return out
+
 /-- Whether a term reads the slot a hypothesis equates (`memory r k` or
 `Skolems.plainAt ... m`), up to unfolding at reducible transparency: a clause
 and the program spell a resource type with different proofs of its
@@ -2897,6 +3405,15 @@ private def mentionsRead (lhs : Lean.Expr) (e : Lean.Expr) : MetaM Bool := do
   let lhs := lhs.consumeMData
   let lhsFn := lhs.getAppFn
   let lhsArity := lhs.getAppNumArgs
+  let plainMem? : Option (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) :=
+    if lhs.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 then
+      let lhsArgs := lhs.getAppArgs
+      let (substRes, _) := plainAtSubstResource lhsArgs
+      some (lhsArgs[6]!.consumeMData,
+        mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.resource) (lhsArgs.extract 0 5),
+        substRes,
+        lhsArgs[5]!)
+    else none
   let rec visit (e : Lean.Expr) : StateRefT (Std.HashSet Lean.Expr) MetaM Bool := do
     if (← get).contains e then return false
     if e.getAppFn == lhsFn && e.getAppNumArgs == lhsArity && !e.hasLooseBVars then
@@ -2907,6 +3424,18 @@ private def mentionsRead (lhs : Lean.Expr) (e : Lean.Expr) : MetaM Bool := do
       if stateMatches then
         if e == lhs then return true
         if ← withReducible (isDefEq e lhs) then return true
+    if let some (mem, rawResource, substRes, key) := plainMem? then
+      if e.getAppFn.consumeMData == mem && e.getAppNumArgs == 2 && !e.hasLooseBVars then
+        let keyMatches ←
+          if ← withReducible (withNewMCtxDepth (isDefEq (e.getArg! 1) key)) then pure true
+          else withDefault (withNewMCtxDepth (isDefEq (e.getArg! 1) key))
+        if keyMatches then
+          if ← withReducible (withNewMCtxDepth (isDefEq (e.getArg! 0) rawResource)) then
+            return true
+          if ← withDefault (withNewMCtxDepth (isDefEq (e.getArg! 0) rawResource)) then
+            return true
+          if ← withDefault (withNewMCtxDepth (isDefEq (e.getArg! 0) substRes)) then
+            return true
     let found ← match e with
       | .app f a => visit f <||> visit a
       | .lam _ d b _ | .forallE _ d b _ => visit d <||> visit b
@@ -2933,7 +3462,7 @@ read meets the program's before the arithmetic is normalized. -/
 elab "verex_memory_reads" : tactic => focusGoal do
   if (← getGoals).isEmpty then return
   let goal ← getMainGoal
-  let reads ← goal.withContext do
+  let (reads, target) ← goal.withContext do
     let target ← instantiateMVars (← goal.getType)
     let mut found : Array FVarId := #[]
     for decl in ← getLCtx do
@@ -2943,11 +3472,17 @@ elab "verex_memory_reads" : tactic => focusGoal do
       unless ← isStorageReadLHS lhs do continue
       unless ← mentionsReadCached lhs target do continue
       found := found.push decl.fvarId
-    pure found
+    pure (found, target)
   if reads.isEmpty then throwError "the goal reads no memory the leaf fixes"
   let lemmas ← goal.withContext do
-    reads.mapM fun fvarId => do
-      `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax (.fvar fvarId)):term)
+    let mut out : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) := #[]
+    for fvarId in reads do
+      out := out.push
+        (← `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax (.fvar fvarId)):term))
+      for derived in ← plainAtMemoryRewrites fvarId #[target] do
+        out := out.push
+          (← `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax derived):term))
+    pure out
   evalTactic (← `(tactic| simp only [$lemmas,*, vir_denote_norm]))
 
 /-- The heartbeats a leaf's attempt at an arbitrary instance may spend. The
@@ -3202,7 +3737,7 @@ def abstractRuntimeFrames (goal : MVarId) : MetaM MVarId := do
     let mut terms := #[← instantiateMVars (← goal.getType)]
     for decl in ← getLCtx do
       unless decl.isImplementationDetail do terms := terms.push (← instantiateMVars decl.type)
-    return sitesWhere (fun e => e.isAppOfArity ``Skolems.runtime 3 &&
+    return sitesWhere (fun e => e.isAppOfArity ``Skolems.runtime 2 &&
       !e.hasMVar && !e.hasLooseBVars) terms
   let mut goal := goal
   for frame in frames do
@@ -3331,9 +3866,8 @@ def literalValue? (e : Lean.Expr) : MetaM (Option LiteralValue) := do
     captured := closure.getArg! 6, captures := e.appArg!, closed }
 
 /-- The unit constant of the base frame (`Skolems.runtime` at a unit
-constant), if a frame is it: `Skolems.runtime` takes the unit and the two
-instances the family and its inhabitants give, so an applied base frame
-carries three arguments.
+constant), if a frame is it: `Skolems.runtime` takes the unit and its
+function carriers instance, so an applied base frame carries two arguments.
 
 The steps gated on this read a term at the base frame: `constructSite` and
 `siteOfConstruct?` read a construction there as the site's constructor, and
@@ -3341,7 +3875,7 @@ The steps gated on this read a term at the base frame: `constructSite` and
 having moved it already. -/
 def baseFrameUnit? (frame : Lean.Expr) : Option Name :=
   let frame := frame.consumeMData
-  if frame.isAppOfArity ``Skolems.runtime 3 then (frame.getArg! 0).constName? else none
+  if frame.isAppOfArity ``Skolems.runtime 2 then (frame.getArg! 0).constName? else none
 
 /-- Whether two applications of one constant have defeq arguments, compared
 one by one: a mismatch does not unfold the constant, which over a unit's
@@ -3395,41 +3929,6 @@ def rewriteByEquation? (rule : Name) (e : Lean.Expr) : MetaM (Option Simp.Step) 
     | return none
   return some (.visit { expr := ← unfoldLiterals rhs, proof? := some proof })
 
-/-- The certified captures a site's statements are quantified at, read from
-the plain row a value holds: the row under exactly one `HList.forget` layer
-where the value spells it, and otherwise the row whose forgetting the plain
-row is, found by `isDefEq` at default transparency — a plain value of a
-certificate-free type is the certified value itself, and a certified
-value's plain reading is its `.val`.  `none` where no row of the site's own
-forgets to it, so that no step states a site's equation of captures it
-cannot name.
-
-Built at the row type by `HList.nil` and `HList.cons`, not as the unit and
-the pair they unfold to: `HList` is deliberately not reducible, so a bare
-pair is type-correct only where it unfolds, and a step whose result a
-tactic reads again is checked without unfolding it. -/
-partial def certifiedCaptures? (family row plain : Lean.Expr) : MetaM (Option Lean.Expr) :=
-  withDefault do
-    if plain.isAppOfArity ``HList.forget 3 then
-      if ← isDefEq (plain.getArg! 1) row then return some (plain.getArg! 2)
-    let row ← whnfR row
-    if row.isAppOfArity ``NRow.nil 0 then
-      return some (← mkAppOptM ``HList.nil #[some family])
-    unless row.isAppOfArity ``NRow.cons 2 do return none
-    let (τ, rest) := (row.getArg! 0, row.getArg! 1)
-    -- An entry: the certified value the plain one forgets, by `isDefEq` at
-    -- the entry itself, so that the equation compares two values of the
-    -- type and never a projection of a row yet to be found.
-    let entry ← mkFreshExprMVar (mkApp2 (mkConst ``NTy.carrier) family τ)
-    let head ← mkAppOptM ``Prod.fst #[none, none, plain]
-    unless ← isDefEq (mkApp3 (mkConst ``NTy.forget) family τ entry) head do return none
-    let entry ← instantiateMVars entry
-    if entry.hasExprMVar then return none
-    let some tail ← certifiedCaptures? family rest (← mkAppOptM ``Prod.snd #[none, none, plain])
-      | return none
-    return some (← mkAppOptM ``HList.cons
-      #[some family, some τ, some rest, some entry, some tail])
-
 open Lean Meta Simp in
 /-- A construction at the base frame of a closure site's key is the site's
 constructor (the generated `construct` equations). -/
@@ -3461,17 +3960,7 @@ simproc [vir_denote, vir_denote_norm] requiresOfConstruct
 
 open Lean Meta Simp in
 /-- Invoking a closure site's constructor at the base frame is calling its
-target on the woven arguments (the generated `invoke` equations).
-
-The equation is stated of the captures under one `HList.forget` layer, as a
-site's statements are quantified at their certified row.  A value whose
-captures the normal forms collapsed to the plain row no longer spells that
-forgetting, and matching the equation would have to invert `HList.forget`,
-which is not a pattern: the certified row is recovered from the plain one
-and the value respelled at it (`certifiedCaptures?`), as a site's requires
-arm recovers it (`siteRequiresArm?`).  The respelling is definitional, so
-the equation's proof states the rewriting of the value as it stands.
-Declines where no row of the site's own forgets to the value's. -/
+target on the woven arguments (the generated `invoke` equations). -/
 simproc [vir_denote, vir_denote_norm] invokeSite
     (@closureMeaning _ ?functions _ ?frame _ _ _ _ _) := fun e => do
   unless e.getAppNumArgs == 9 do return .continue
@@ -3479,31 +3968,7 @@ simproc [vir_denote, vir_denote_norm] invokeSite
   let .const constructor _ := function.getAppFn | return .continue
   let some entry := siteEquationsAt? (← getEnv) constructor | return .continue
   let some invoke := entry.invoke | return .continue
-  let mut subject := e
-  if function.getAppNumArgs == 1 &&
-      !function.appArg!.consumeMData.isAppOfArity ``HList.forget 3 then
-    -- The row the equation is stated at, read from its own statement: a
-    -- site's captured row is closed there, while the family is the one the
-    -- meaning is taken at, which is the family the captures live at.
-    let (_, _, body) ← forallMetaTelescope (← inferType (mkConst invoke))
-    let some (_, left, _) := (← whnfR body).eq? | return .continue
-    unless left.getAppNumArgs == 9 do return .continue
-    let stated := (left.getArg! 7).consumeMData
-    unless stated.getAppNumArgs == 1 do return .continue
-    let forgotten := stated.appArg!.consumeMData
-    unless forgotten.isAppOfArity ``HList.forget 3 do return .continue
-    -- The row with its generated literal unfolded: a row named by a
-    -- constant makes the forgetting type-correct only where that constant
-    -- unfolds, and the value the step builds is read again at the
-    -- transparency a tactic checks it at.
-    let row ← unfoldLiterals (← instantiateMVars (forgotten.getArg! 1))
-    if row.hasExprMVar then return .continue
-    let family := mkAppN (mkConst ``Skolems.toCarriers)
-      #[e.getArg! 0, e.getArg! 1, e.getArg! 3]
-    let some recovered ← certifiedCaptures? family row function.appArg! | return .continue
-    subject := mkAppN e.getAppFn ((e.getAppArgs).set! 7 (mkApp function.getAppFn
-      (← mkAppOptM ``HList.forget #[some family, some row, some recovered])))
-  let some (.visit result) ← rewriteByEquation? invoke subject | return .continue
+  let some (.visit result) ← rewriteByEquation? invoke e | return .continue
   -- The arm, marked for the invocation's site (`dispatchKnownInvocation`).
   let some proof := result.proof? | return .continue
   -- `closureMeaning`'s unit and function values lead its arguments; the
@@ -4439,12 +4904,6 @@ private def componentNames (goal : MVarId) (fvarId : FVarId) :
       return (goal, #[{ varNames := [base, Name.mkSimple s!"{base}_final"] }])
     let some next ← unfoldDefinition? unfolded | break
     unfolded ← whnfCore next
-  -- A struct's or a variant's carrier is its row under the data invariants
-  -- (`NTy.carrier`): the row keeps the local's name, and the certificate is
-  -- a proposition no proof reads by name.
-  if (← whnfD type).isAppOfArity ``Subtype 2 then
-    return (goal, #[{ varNames := [base.appendIndexAfter index,
-      Name.mkSimple s!"{base.appendIndexAfter index}_invariant"] }])
   let .app (.app (.const ``Prod _) head) tail ← whnfD type | return (goal, #[])
   let head ← instantiateMVars head
   let isMap := (head.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 &&
@@ -4471,10 +4930,10 @@ partial def tableViewOwner? (value : Lean.Expr) : Option FVarId :=
   match value with
   | .fvar owner => some owner
   | .proj source _ parent =>
-      if source == ``Prod || source == ``Subtype then tableViewOwner? parent else none
+      if source == ``Prod then tableViewOwner? parent else none
   | _ =>
-      if value.isAppOfArity ``Prod.fst 3 || value.isAppOfArity ``Prod.snd 3 ||
-          value.isAppOfArity ``Subtype.val 3 then tableViewOwner? (value.getArg! 2)
+      if value.isAppOfArity ``Prod.fst 3 || value.isAppOfArity ``Prod.snd 3 then
+        tableViewOwner? (value.getArg! 2)
       else none
 
 /-- The carrier a map value reads. -/
@@ -4703,14 +5162,20 @@ def oldUserName (name : Name) : MetaM Name := do
 /-- A nominal row's reframing observes its structural operation, while
 its surrounding encodings keep their original nominal owner. The theorem
 and the restated theorem type must convert at this construction boundary. -/
-def nominalPlainReframeEquation (equation type : Lean.Expr) : MetaM Lean.Expr := do
+def nominalReframeEquation (equation type : Lean.Expr) : MetaM Lean.Expr := do
   unless isNominalType (← getEnv) type do return equation
   let view ← nativeTypeView type
   unless view.isAppOfArity ``NTy.struct 3 || view.isAppOfArity ``NTy.enum 5 do return equation
   let statement ← instantiateMVars (← inferType equation)
+  let replaceType (e : Lean.Expr) : Lean.Expr :=
+    e.replace fun sub => if sub == type then some view else none
   let canonical := statement.replace fun term =>
-    if term.isAppOfArity ``Skolems.plainReframe 9 && term.getArg! 6 == type then
-      some (mkAppN term.getAppFn (term.getAppArgs.set! 6 view))
+    if term.isAppOfArity ``Skolems.reframe 8 && term.getArg! 5 == type then
+      let args := term.getAppArgs
+      some (mkAppN term.getAppFn ((args.set! 5 view).set! 6 (replaceType args[6]!)))
+    else if term.isAppOfArity ``Skolems.reframeAtBase 13 && term.getArg! 10 == type then
+      let args := term.getAppArgs
+      some (mkAppN term.getAppFn ((args.set! 10 view).set! 11 (replaceType args[11]!)))
     else none
   if canonical == statement then return equation
   unless ← withNewMCtxDepth (withDefault (isDefEq statement canonical)) do return equation
@@ -4718,19 +5183,22 @@ def nominalPlainReframeEquation (equation type : Lean.Expr) : MetaM Lean.Expr :=
 
 /-- A hypothesis stating a declaration's data invariant of an encoding at
 the leaf's frame, unsealed: the row moved to the frame the declaration's
-type arguments induce (`Skolems.plainEncode_plainReframe`), the premises
-derived as the owed direction derives them (`rowInhabitable?`), and the
-statement read as the declaration's clauses of the row
-(`OwnAtArguments.plainEncode`).  None where the hypothesis states no
+type arguments induce (`Skolems.encode_reframeAtBase`,
+`Skolems.encode_reframe`), the premises derived as the owed direction derives
+them (`rowInhabitable?`), and the statement read as the declaration's clauses
+of the row (`OwnAtArguments.encode`).  None where the hypothesis states no
 declaration's invariant at a leaf frame, or a premise is not decided. -/
 private def unsealedOwn? (type hypothesis : Lean.Expr) : TacticM (Option Lean.Expr) := do
   let args := type.getAppArgs
-  unless args.size == 7 do return none
-  let value := args[6]!.consumeMData
-  unless value.isAppOfArity ``VerexIR.Proofs.Denote.NTy.plainEncode 3 do return none
+  unless args.size == 6 do return none
+  let value := args[5]!.consumeMData
+  unless value.isAppOfArity ``VerexIR.Proofs.Denote.NTy.encode 3 do return none
   let carriers := (value.getArg! 0).consumeMData
   unless carriers.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 do return none
+  let unit := carriers.getArg! 0
+  let functions := carriers.getArg! 1
   let frame := (carriers.getArg! 2).consumeMData
+  let base := args[1]!
   let σ := (value.getArg! 1).consumeMData
   let view ← nativeTypeView σ
   unless view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 ||
@@ -4740,22 +5208,56 @@ private def unsealedOwn? (type hypothesis : Lean.Expr) : TacticM (Option Lean.Ex
   let some own ← decidedFrameFree? (← mkEq
       (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.isParamsFrom) (mkNatLit 0) params)
       (mkConst ``Bool.true)) | return none
-  let some nonempty ← synthInstance? (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty)
-      (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.runtime)
-        (carriers.getArg! 0) (carriers.getArg! 1))) | return none
-  let reframing := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.plainEncode_plainReframe)
-    #[carriers.getArg! 0, carriers.getArg! 1, nonempty, frame, params, own, σ]
-  let some bounded ← decidedFrameFree? (← whnf (← inferType reframing)).bindingDomain!
-    | return none
-  let equation ← nominalPlainReframeEquation (mkApp2 reframing bounded (value.getArg! 2)) σ
+  let some inhabitable ← rowInhabitable? args[4]! | return none
+  let mappedParams := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.map)
+    (mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.resolve) unit functions frame) params
+  let functionsCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.carrier)
+    unit functions
+  let baseCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.carrier)
+    unit base
+  let functionsFunctions := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.functions)
+    unit functions
+  let baseFunctions := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.functions)
+    unit base
+  let functionsNominals := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.nominals)
+    unit functions
+  let baseNominals := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.nominals)
+    unit base
+  let sameCarrierType ← mkEq functionsCarrier baseCarrier
+  let sameFunctionsType ← mkHEq functionsFunctions baseFunctions
+  let sameNominalsType ← mkEq functionsNominals baseNominals
+  let reflFunctions ← mkHEqRefl baseFunctions
+  let equation? ←
+    if (← isDefEq args[4]! mappedParams) &&
+        (← isDefEq functionsCarrier baseCarrier) &&
+        (← isDefEq (← inferType reflFunctions) sameFunctionsType) &&
+        (← isDefEq functionsNominals baseNominals) then
+      let sameCarrier ← mkExpectedTypeHint (← mkEqRefl baseCarrier) sameCarrierType
+      let sameFunctions ← mkExpectedTypeHint reflFunctions sameFunctionsType
+      let sameNominals ← mkExpectedTypeHint (← mkEqRefl baseNominals) sameNominalsType
+      let reframing := mkAppN
+        (mkConst ``VerexIR.Proofs.Denote.Skolems.encode_reframeAtBase)
+        #[unit, functions, base, sameCarrier, sameFunctions, sameNominals,
+          frame, params, own, inhabitable, σ]
+      match ← decidedFrameFree? (← whnf (← inferType reframing)).bindingDomain! with
+      | some bounded =>
+          some <$> nominalReframeEquation (mkApp2 reframing bounded (value.getArg! 2)) σ
+      | none => pure none
+    else
+      let reframing := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.encode_reframe)
+        #[unit, functions, frame, params, own, σ]
+      match ← decidedFrameFree? (← whnf (← inferType reframing)).bindingDomain! with
+      | some bounded =>
+          some <$> nominalReframeEquation (mkApp2 reframing bounded (value.getArg! 2)) σ
+      | none => pure none
+  let some equation := equation? | return none
   let some (_, reframed, _) := (← instantiateMVars (← inferType equation)).eq?
     | return none
-  let motive ← withLocalDeclD `value (← inferType args[6]!) fun v =>
-    mkLambdaFVars #[v] (mkAppN type.getAppFn (args.set! 6 v))
+  let motive ← withLocalDeclD `value (← inferType args[5]!) fun v =>
+    mkLambdaFVars #[v] (mkAppN type.getAppFn (args.set! 5 v))
   let moved ← mkEqMP (← mkCongrArg motive (← mkEqSymm equation)) hypothesis
-  let some inhabitable ← rowInhabitable? args[5]! | return none
-  let equivalence := mkAppN (mkConst ``VerexIR.Proofs.Denote.OwnAtArguments.plainEncode)
-    (args.extract 0 6 ++ #[inhabitable, reframed.getArg! 2])
+  let equivalence := mkAppN (mkConst ``VerexIR.Proofs.Denote.OwnAtArguments.encode)
+    (args.extract 0 5 ++ #[inhabitable, reframed.getArg! 2])
   let unsealed ← mkAppM ``Iff.mp #[equivalence, moved]
   return some (← instantiateMVars unsealed)
 
@@ -4796,10 +5298,10 @@ ownership facts and compound certified reads use this producer, including
 its transport through the unit's nominal argument frame. -/
 private def decodedOwnFact? (type proof : Lean.Expr) :
     TacticM (Option (Lean.Expr × Lean.Expr)) := do
-  unless type.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 7 ||
+  unless type.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 6 ||
       type.isAppOfArity ``Carriers.own 4 do return none
   let row := type.appArg!.consumeMData
-  unless row.isAppOfArity ``VerexIR.Proofs.Denote.NTy.plainEncode 3 do return none
+  unless row.isAppOfArity ``VerexIR.Proofs.Denote.NTy.encode 3 do return none
   let family := row.getArg! 0
   let σ := row.getArg! 1
   let value := row.getArg! 2
@@ -4807,14 +5309,22 @@ private def decodedOwnFact? (type proof : Lean.Expr) :
   -- ground instantiation, and from the frame's law where the frame
   -- resolves them, which is how a read of a stored value at a generic
   -- frame reaches its own certificate (`rowInhabitable?`).
-  let codec := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plainCodec) family σ
-  let applied ← (try
+  let canDirectDecode ← do
+    let f := family.consumeMData
+    if type.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 6 &&
+        f.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 &&
+        (f.getArg! 2).consumeMData.isFVar then
+      pure ((← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.paramFree) σ)).isConstOf ``Bool.true)
+    else
+      pure true
+  let applied ← if canDirectDecode then (try
+      let codec := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.codec) family σ
       let some (predicate, statement) ← decodedOwnPredicate? proof type | return none
       let decoded ← mkAppM ``VerexIR.Proofs.Codec.decode_encode #[codec, value]
       let applied ← mkAppM' (← mkExpectedTypeHint predicate statement) #[value, decoded]
       let statement ← inferType applied
       pure (some (applied, statement))
-    catch _ => pure none)
+    catch _ => pure none) else pure none
   let applied ← match applied with
     | some applied => pure (some applied)
     | none => do
@@ -4901,7 +5411,7 @@ split the context does not decide is the path's to take and not a leaf's.
 Taken this way rather than by generalizing the option, whose readers are
 under the dependent binder a continuation takes and so follow no
 generalization. -/
-private def readingsAtValue? (observe : MVarId → Lean.Expr → MetaM MVarId)
+private def readingsAtValue?
     (goal : MVarId) (readings : Array (Array Lean.Expr)) :
     TacticM (Option MVarId) := do
   let option_ := readings[0]![2]!
@@ -4935,7 +5445,6 @@ private def readingsAtValue? (observe : MVarId → Lean.Expr → MetaM MVarId)
           #[arguments[0]!, arguments[1]!, option_, empty.fields[0]!, arguments[3]!, arguments[4]!]
       rewritten empty.mvarId equations #[empty.fields[0]!.fvarId!]
     if let some emptyGoal := emptyGoal then
-      let emptyGoal ← observe emptyGoal empty.fields[0]!
       -- Whether the context refutes the empty case is a side decision: the
       -- split is this leaf's to take only where the context already decides
       -- the option, and a refutation the context states costs a few hundred
@@ -4974,10 +5483,7 @@ private def readingsAtValue? (observe : MVarId → Lean.Expr → MetaM MVarId)
         mkAppN (mkConst ``withSome_of_some)
           #[arguments[0]!, arguments[1]!, option_, value.fields[0]!, equation,
             arguments[3]!, arguments[4]!]).push equation
-      let next ← rewritten value.mvarId equations #[equation.fvarId!]
-      match next with
-      | some next => return some (← observe next equation)
-      | none => return none
+      rewritten value.mvarId equations #[equation.fvarId!]
     pure valueGoal
   match split with
   | some next => return next
@@ -5030,7 +5536,7 @@ def observedOwnInstances (tried : Array (Lean.Expr × Lean.Expr)) :
     if invariant.isImplementationDetail then continue
     let type ← instantiateMVars invariant.type
     unless type.isForall &&
-        type.getForallBody.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 7 do continue
+        type.getForallBody.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 6 do continue
     for observation in context do
       if observation.isImplementationDetail || observation.fvarId == invariant.fvarId then continue
       let observed ← instantiateMVars observation.type
@@ -5039,7 +5545,7 @@ def observedOwnInstances (tried : Array (Lean.Expr × Lean.Expr)) :
       let saved ← saveState
       let proof? ← (try
           let (arguments, _, body) ← forallMetaTelescope type
-          unless body.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 7 do
+          unless body.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 6 do
             throwError "not a data invariant"
           let mut props := #[]
           for argument in arguments do
@@ -5089,7 +5595,7 @@ asserts defined into its value, every equivalence with a constant side
 into what it states of the other, and every reading of an option the
 context decides but does not spell into the reading at its value, so that
 a leaf is over scalars. -/
-def splitHypotheses (observe : MVarId → Lean.Expr → MetaM MVarId) : TacticM Unit := focusGoal do
+def splitHypotheses : TacticM Unit := focusGoal do
   if (← getGoals).isEmpty then return
   let mut goal ← getMainGoal
   -- An existential eliminates into a proposition only; a data goal keeps it.
@@ -5333,11 +5839,6 @@ def splitHypotheses (observe : MVarId → Lean.Expr → MetaM MVarId) : TacticM 
       match subgoals with
       | #[subgoal] =>
           goal ← canonicalCaseEquations previous subgoal.mvarId
-          -- Case elimination produces fresh component facts, including a
-          -- certified vector lookup exposed from an existential/conjunction.
-          for field in subgoal.fields do
-            if field.isFVar && (← goal.withContext getLCtx).contains field.fvarId! then
-              goal ← observe goal field
           progress := true
       | _ => break
     else
@@ -5409,15 +5910,13 @@ def splitHypotheses (observe : MVarId → Lean.Expr → MetaM MVarId) : TacticM 
           for option_ in readings.map (·[2]!) do
             if read.contains option_ then continue
             read := read.push option_
-            if let some next ← readingsAtValue? observe goal (readings.filter (·[2]! == option_)) then
+            if let some next ← readingsAtValue? goal (readings.filter (·[2]! == option_)) then
               goal := next
               progress := true
               break
   replaceMainGoal [← nameFacts (← nameWrittenMaps (← restoreShadowed (← symmetricDisequalities goal)))]
 
--- Base supports structural splitting without a native family observer.
--- The normal form installs its canonical producer at the same tactic.
-elab "verex_split_hypotheses" : tactic => splitHypotheses (fun goal _ => pure goal)
+elab "verex_split_hypotheses" : tactic => splitHypotheses
 
 /-- For every subterm of `e` with a free variable, whether it mentions a
 local satisfying `p`, and whether it mentions another one. -/
@@ -5495,8 +5994,7 @@ private partial def detachProofs (goal : MVarId) (equation : FVarId) (x : FVarId
 pairs, unit. -/
 private def nativeConstructor (value : Lean.Expr) : Bool :=
   match value.getAppFn.constName? with
-  | some ``Sum.inl | some ``Sum.inr | some ``Prod.mk | some ``Unit.unit | some ``PUnit.unit
-  | some ``Subtype.mk | some ``VerexIR.Proofs.Denote.NTy.ofDeepHolds => true
+  | some ``Sum.inl | some ``Sum.inr | some ``Prod.mk | some ``Unit.unit | some ``PUnit.unit => true
   | _ => false
 
 /-- An equation fixing a local's native value to a constructor. -/
@@ -5509,36 +6007,6 @@ def fixesLocal (type : Lean.Expr) : Bool :=
       fixes lhs rhs || fixes rhs lhs
   | none => false
 
-/-! An equation to a caller's lent value in the callee's view is stated in
-the caller's view, as one of a certified value is (`NTy.eq_toSkolem_iff`):
-the current of a mutable reference and a struct's row cross a call so. -/
-
-section PlainTransportEquations
-variable [Θ : Carriers] [Ξ : @CarriersNonempty Θ]
-
-theorem NTy.plainEq_toSkolem_iff (θ : TypeArgs) (τ : NTy)
-    (value : @NTy.plain (Carriers.instantiate θ Θ) τ) (caller : (τ.subst θ.1).plain) :
-    value = NTy.plainToSkolem θ τ caller ↔ NTy.plainOfSkolem θ τ value = caller :=
-  ⟨fun same => same ▸ NTy.plainOfSkolem_toSkolem θ τ caller,
-    fun same => same ▸ (NTy.plainToSkolem_ofSkolem θ τ value).symm⟩
-
-theorem HListPlain.eq_toSkolem_iff (θ : TypeArgs) (row : NRow)
-    (values : @HListPlain (Carriers.instantiate θ Θ) row)
-    (caller : HListPlain (NRow.subst θ.1 row)) :
-    values = HListPlain.toSkolem θ row caller ↔ HListPlain.ofSkolem θ row values = caller :=
-  ⟨fun same => same ▸ HListPlain.ofSkolem_toSkolem θ row caller,
-    fun same => same ▸ (HListPlain.toSkolem_ofSkolem θ row values).symm⟩
-
-theorem variantPlain.eq_toSkolem_iff (θ : TypeArgs) (names : List String) (rows : NRows)
-    (value : @variantPlain (Carriers.instantiate θ Θ) names rows)
-    (caller : variantPlain names (NRows.subst θ.1 rows)) :
-    value = variantPlain.toSkolem θ names rows caller ↔
-      variantPlain.ofSkolem θ names rows value = caller :=
-  ⟨fun same => same ▸ variantPlain.ofSkolem_toSkolem θ names rows caller,
-    fun same => same ▸ (variantPlain.toSkolem_ofSkolem θ names rows value).symm⟩
-
-end PlainTransportEquations
-
 /-- An equation to a caller's value in a generic callee's view,
 `x = toSkolem θ τ v`, restated in the caller's view, `ofSkolem θ τ x = v`
 (`NTy.eq_toSkolem_iff`), where the caller's value is a local to substitute.
@@ -5547,24 +6015,14 @@ transport's family matches, so the rule is applied to its arguments. -/
 private def transportEquation? (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
   let rule? (side : Lean.Expr) : Option (Name × Array Lean.Expr) :=
     match side.getAppFn.constName?, side.getAppArgs with
-    | some ``VerexIR.Proofs.Denote.NTy.toSkolem, #[family, nonempty, θ, τ, v] =>
-        some (``VerexIR.Proofs.Denote.NTy.eq_toSkolem_iff, #[family, nonempty, θ, τ, v])
-    | some ``VerexIR.Proofs.Denote.HList.toSkolem, #[family, nonempty, θ, row, v] =>
-        some (``VerexIR.Proofs.Denote.HList.eq_toSkolem_iff, #[family, nonempty, θ, row, v])
+    | some ``VerexIR.Proofs.Denote.NTy.toSkolem, #[family, θ, τ, v] =>
+        some (``VerexIR.Proofs.Denote.NTy.eq_toSkolem_iff, #[family, θ, τ, v])
+    | some ``VerexIR.Proofs.Denote.HList.toSkolem, #[family, θ, row, v] =>
+        some (``VerexIR.Proofs.Denote.HList.eq_toSkolem_iff, #[family, θ, row, v])
     | some ``VerexIR.Proofs.Denote.variantCarrier.toSkolem,
-        #[family, nonempty, θ, names, rows, v] =>
+        #[family, θ, names, rows, v] =>
         some (``VerexIR.Proofs.Denote.variantCarrier.eq_toSkolem_iff,
-          #[family, nonempty, θ, names, rows, v])
-    -- The lent transports: a reference's current and a struct's row cross a
-    -- call as a certified value does.
-    | some ``VerexIR.Proofs.Denote.NTy.plainToSkolem, #[family, nonempty, θ, τ, v] =>
-        some (``VerexIR.Proofs.Denote.NTy.plainEq_toSkolem_iff, #[family, nonempty, θ, τ, v])
-    | some ``VerexIR.Proofs.Denote.HListPlain.toSkolem, #[family, nonempty, θ, row, v] =>
-        some (``VerexIR.Proofs.Denote.HListPlain.eq_toSkolem_iff, #[family, nonempty, θ, row, v])
-    | some ``VerexIR.Proofs.Denote.variantPlain.toSkolem,
-        #[family, nonempty, θ, names, rows, v] =>
-        some (``VerexIR.Proofs.Denote.variantPlain.eq_toSkolem_iff,
-          #[family, nonempty, θ, names, rows, v])
+          #[family, θ, names, rows, v])
     | _, _ => none
   for decl in ← getLCtx do
     if decl.isImplementationDetail then continue
@@ -5953,9 +6411,7 @@ private def variantNames? (type : Lean.Expr) : MetaM (Option (List String)) := d
         nativeTypeView (unfolded.getArg! 1)
       else pure unfolded
     let names? :=
-      if unfolded.isAppOfArity ``VerexIR.Proofs.Denote.variantCarrier 3 ||
-          unfolded.isAppOfArity ``VerexIR.Proofs.Denote.variantPlain 3 ||
-          unfolded.isAppOfArity ``VerexIR.Proofs.Denote.variantPlainOf 3 then
+      if unfolded.isAppOfArity ``VerexIR.Proofs.Denote.variantCarrier 3 then
         some (unfolded.getArg! 1)
       else if unfolded.isAppOfArity ``VerexIR.Proofs.Denote.NTy.carrier 2 &&
           native.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 then
@@ -6075,16 +6531,16 @@ def foldCertificates (goal : MVarId) : MetaM MVarId := do
           let arguments := type.getAppArgs
           pure (some (mkAppN (mkConst ``NTy.Holds) arguments,
             mkAppN (mkConst ``NTy.Holds.intro) (arguments.push decl.toExpr)))
-        else if type.isAppOfArity ``HListPlain.deepHolds 3 then
+        else if type.isAppOfArity ``HList.deepHolds 3 then
           let arguments := type.getAppArgs
-          pure (some (mkAppN (mkConst ``HListPlain.Holds) arguments,
+          pure (some (mkAppN (mkConst ``HList.Holds) arguments,
             ← mkAppM ``Iff.mpr
-              #[mkAppN (mkConst ``HListPlain.holds_iff) arguments, decl.toExpr]))
-        else if type.isAppOfArity ``variantPlain.deepHolds 4 then
+              #[mkAppN (mkConst ``HList.holds_iff) arguments, decl.toExpr]))
+        else if type.isAppOfArity ``variantCarrier.deepHolds 4 then
           let arguments := type.getAppArgs
-          pure (some (mkAppN (mkConst ``variantPlain.Holds) arguments,
+          pure (some (mkAppN (mkConst ``variantCarrier.Holds) arguments,
             ← mkAppM ``Iff.mpr
-              #[mkAppN (mkConst ``variantPlain.holds_iff) arguments, decl.toExpr]))
+              #[mkAppN (mkConst ``variantCarrier.holds_iff) arguments, decl.toExpr]))
         else pure none
       let some (folded, proof) := folded? | continue
       folds := folds.push (decl.fvarId, decl.userName, folded, proof)
@@ -6104,11 +6560,605 @@ elab "verex_fold_certificates" : tactic => focusGoal do
   if (← getGoals).isEmpty then return
   replaceMainGoal [← foldCertificates (← getMainGoal)]
 
+/-- Close `NTy.Holds carriers τ value` in O(1) when stated by a local hypothesis
+(`findHoldsHypothesis?`). -/
+def trivialHoldsProof? (carriers τ value : Lean.Expr) : MetaM (Option Lean.Expr) :=
+  findHoldsHypothesis? (mkApp3 (mkConst ``NTy.Holds) carriers τ value)
+
+private theorem holds_vector_of_slice [Carriers] (τ : NTy)
+    (vector : (NTy.slice τ).carrier) (held : NTy.Holds (.slice τ) vector) :
+    NTy.Holds (.vector τ) vector :=
+  NTy.Holds.slice_iff_vector.mp held
+
+private theorem holds_slice_of_vector [Carriers] (τ : NTy)
+    (vector : (NTy.vector τ).carrier) (held : NTy.Holds (.vector τ) vector) :
+    NTy.Holds (.slice τ) vector :=
+  NTy.Holds.slice_iff_vector.mpr held
+
+private theorem holds_array_of_vector_carrier [Carriers] (τ : NTy) (length : Nat)
+    (array : (NTy.array τ length).carrier) (held : NTy.Holds (.vector τ) array.vector) :
+    NTy.Holds (.array τ length) array :=
+  ⟨held.deepHolds⟩
+
+private theorem holds_vector_of_sliceCurrent [Carriers] (τ : NTy)
+    (reference : (NTy.sliceRef τ).carrier) (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.vector τ) reference.currentVector :=
+  NTy.Holds.slice_iff_vector.mp held.sliceCurrent
+
+private theorem holds_vector_of_sliceFinal [Carriers] (τ : NTy)
+    (reference : (NTy.sliceRef τ).carrier) (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.vector τ) reference.finalVector :=
+  NTy.Holds.slice_iff_vector.mp held.sliceFinal
+
+private theorem holds_sliceRef_withCurrent_final [Carriers] (τ : NTy)
+    (reference : (NTy.sliceRef τ).carrier)
+    (current : VerexIR.SpecArray τ.carrier reference.extent)
+    (finalHeld : NTy.Holds (.slice τ) reference.finalVector)
+    (currentHeld : NTy.Holds (.slice τ) current.vector) :
+    NTy.Holds (.sliceRef τ) (reference.withCurrent current) :=
+  ⟨currentHeld.deepHolds, finalHeld.deepHolds⟩
+
+private theorem holds_vector_set_overwrite [Carriers] (τ : NTy)
+    (vector : (NTy.vector τ).carrier) (firstIndex secondIndex : Nat)
+    (sameIndex : firstIndex = secondIndex) (first second : τ.carrier)
+    (held : NTy.Holds (.vector τ) (vector.set secondIndex second)) :
+    NTy.Holds (.vector τ) ((vector.set firstIndex first).set secondIndex second) := by
+  subst sameIndex
+  have same : (vector.set firstIndex first).set firstIndex second =
+      vector.set firstIndex second := by
+    apply VerexIR.SpecVector.ext
+    simp only [VerexIR.SpecVector.values_set, Array.set!_eq_setIfInBounds]
+    by_cases h : firstIndex < vector.values.size
+    · apply Array.ext
+      · simp
+      · intro k hk1 hk2
+        have hk : k < vector.values.size := by simpa using hk2
+        simp only [Array.getElem_setIfInBounds, hk, Array.size_setIfInBounds]
+        split <;> rfl
+    · simp [Array.setIfInBounds, h]
+  exact same ▸ held
+
+/-- Evaluate a syntactic `Nat` literal expression when concrete. -/
+private partial def evalNatExpr? (e : Lean.Expr) : Option Nat :=
+  let e := e.consumeMData
+  match e with
+  | .lit (.natVal n) => some n
+  | .const ``Nat.zero _ => some 0
+  | _ =>
+      if e.isAppOfArity ``OfNat.ofNat 3 then
+        match (e.getArg! 1).consumeMData with
+        | .lit (.natVal n) => some n
+        | _ => none
+      else if e.isAppOfArity ``Nat.succ 1 then
+        (evalNatExpr? (e.getArg! 0)).map (· + 1)
+      else none
+
+/-- Peel literal pair projections `(a, b).1` and `(a, b).2`. -/
+private partial def peelPairProj (e : Lean.Expr) : Lean.Expr :=
+  let e := e.consumeMData.headBeta
+  match e with
+  | .proj ``Prod 0 pair =>
+      let pair := pair.consumeMData.headBeta
+      if pair.isAppOfArity ``Prod.mk 4 then peelPairProj (pair.getArg! 2) else e
+  | .proj ``Prod 1 pair =>
+      let pair := pair.consumeMData.headBeta
+      if pair.isAppOfArity ``Prod.mk 4 then peelPairProj (pair.getArg! 3) else e
+  | _ =>
+      if e.isAppOfArity ``Prod.fst 3 then
+        let pair := (e.getArg! 2).consumeMData.headBeta
+        if pair.isAppOfArity ``Prod.mk 4 then peelPairProj (pair.getArg! 2) else e
+      else if e.isAppOfArity ``Prod.snd 3 then
+        let pair := (e.getArg! 2).consumeMData.headBeta
+        if pair.isAppOfArity ``Prod.mk 4 then peelPairProj (pair.getArg! 3) else e
+      else e
+
+/-- Peel definitionally transparent `SpecArray.vector ⟨v, _⟩` and literal pair projections. -/
+private partial def peelSpecVectorExpr (e : Lean.Expr) : Lean.Expr :=
+  let e := peelPairProj e
+  if e.isAppOfArity ``VerexIR.SpecArray.vector 3 then
+    let arr := peelPairProj (e.getArg! 2)
+    if arr.isAppOfArity ``VerexIR.SpecArray.mk 4 then
+      peelSpecVectorExpr (arr.getArg! 2)
+    else e
+  else match e with
+    | .proj ``VerexIR.SpecArray 0 arr =>
+        let arr := peelPairProj arr
+        if arr.isAppOfArity ``VerexIR.SpecArray.mk 4 then
+          peelSpecVectorExpr (arr.getArg! 2)
+        else e
+    | _ => e
+
+/-- Extract the `SpecVector` view of a `SpecArray` expression. -/
+private def specVectorOfArrayExpr (carrierTy lenExpr arrExpr : Lean.Expr) : Lean.Expr :=
+  let arr := peelPairProj arrExpr
+  if arr.isAppOfArity ``VerexIR.SpecArray.mk 4 then
+    peelSpecVectorExpr (arr.getArg! 2)
+  else
+    peelSpecVectorExpr (mkApp3 (mkConst ``VerexIR.SpecArray.vector) carrierTy lenExpr arr)
+
+/-- Extract the `currentVector` view of a `SpecSliceRef` expression. -/
+private def sliceCurrentVectorExpr (carrierTy refExpr : Lean.Expr) : Lean.Expr :=
+  let ref := peelPairProj refExpr
+  if ref.isAppOfArity ``VerexIR.SpecSliceRef.withCurrent 3 then
+    let base := ref.getArg! 1
+    let ext := mkApp2 (mkConst ``VerexIR.SpecSliceRef.extent) (ref.getArg! 0) base
+    specVectorOfArrayExpr (ref.getArg! 0) ext (ref.getArg! 2)
+  else if ref.isAppOfArity ``VerexIR.SpecSliceRef.ofArrays 4 then
+    specVectorOfArrayExpr (ref.getArg! 0) (ref.getArg! 1) (ref.getArg! 2)
+  else
+    peelSpecVectorExpr (mkApp2 (mkConst ``VerexIR.SpecSliceRef.currentVector) carrierTy ref)
+
+/-- Extract the `finalVector` view of a `SpecSliceRef` expression, peeling outer `withCurrent`s. -/
+private def sliceFinalVectorExpr (carrierTy refExpr : Lean.Expr) : Lean.Expr := Id.run do
+  let mut cur := peelPairProj refExpr
+  for _ in [:8] do
+    if cur.isAppOfArity ``VerexIR.SpecSliceRef.withCurrent 3 then
+      cur := peelPairProj (cur.getArg! 1)
+    else
+      break
+  if cur.isAppOfArity ``VerexIR.SpecSliceRef.ofArrays 4 then
+    return specVectorOfArrayExpr (cur.getArg! 0) (cur.getArg! 1) (cur.getArg! 3)
+  return peelSpecVectorExpr (mkApp2 (mkConst ``VerexIR.SpecSliceRef.finalVector) carrierTy cur)
+
+/-- Underlying unwritten `SpecVector` at the base of nested `SpecVector.set`s. -/
+private partial def rootWrittenVector (e : Lean.Expr) : Lean.Expr :=
+  let e := peelSpecVectorExpr e
+  if e.isAppOfArity ``VerexIR.SpecVector.set 4 then
+    rootWrittenVector (e.getArg! 1)
+  else e
+
+/-- Peel `Array.setIfInBounds` and `Array.set!` wrappers from an `Array` expression. -/
+private partial def rootArrayExpr (e : Lean.Expr) : Lean.Expr :=
+  let e := peelPairProj e
+  if e.isAppOfArity ``Array.setIfInBounds 4 then
+    rootArrayExpr (e.getArg! 1)
+  else if e.isAppOfArity ``Array.set! 4 then
+    rootArrayExpr (e.getArg! 1)
+  else if e.isAppOfArity ``Array.set! 5 then
+    rootArrayExpr (e.getArg! 1)
+  else e
+
+/-- Extract `v` from `SpecVector.values _ v` or its structure projection. -/
+private def specVectorOfValues? (arr : Lean.Expr) : Option Lean.Expr :=
+  let arr := peelPairProj arr
+  if arr.isAppOfArity ``VerexIR.SpecVector.values 2 then
+    some (arr.getArg! 1)
+  else match arr with
+    | .proj ``VerexIR.SpecVector 0 v | .proj ``Subtype 0 v => some v
+    | _ => none
+
+/-- Extract `(arr, len)` from `SpecArray.vector _ len arr` or its structure projection. -/
+private def specArrayOfVector? (vec : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let vec := peelPairProj vec
+  if vec.isAppOfArity ``VerexIR.SpecArray.vector 3 then
+    return some (peelPairProj (vec.getArg! 2), vec.getArg! 1)
+  match vec with
+  | .proj ``VerexIR.SpecArray 0 arr =>
+      let arr := peelPairProj arr
+      let arrTy := (← instantiateMVars (← inferType arr)).consumeMData
+      if arrTy.isAppOfArity ``VerexIR.SpecArray 2 then
+        return some (arr, arrTy.getArg! 1)
+      let arrTyWhnf ← (try whnfD arrTy catch _ => pure arrTy)
+      if arrTyWhnf.isAppOfArity ``VerexIR.SpecArray 2 then
+        return some (arr, arrTyWhnf.getArg! 1)
+      return none
+  | _ => return none
+
+/-- Extract `ref` from `SpecSliceRef.current _ ref` or its structure projection. -/
+private def sliceRefOfCurrentArray? (arr : Lean.Expr) : Option Lean.Expr :=
+  let arr := peelPairProj arr
+  if arr.isAppOfArity ``VerexIR.SpecSliceRef.current 2 then
+    some (peelPairProj (arr.getArg! 1))
+  else match arr with
+    | .proj ``VerexIR.SpecSliceRef 1 ref => some (peelPairProj ref)
+    | _ => none
+
+/-- Extract `ref` from `SpecSliceRef.final _ ref` or its structure projection. -/
+private def sliceRefOfFinalArray? (arr : Lean.Expr) : Option Lean.Expr :=
+  let arr := peelPairProj arr
+  if arr.isAppOfArity ``VerexIR.SpecSliceRef.final 2 then
+    some (peelPairProj (arr.getArg! 1))
+  else match arr with
+    | .proj ``VerexIR.SpecSliceRef 2 ref => some (peelPairProj ref)
+    | _ => none
+
+/-- Extract `ref` when `vec` is `ref.currentVector`, `ref.finalVector`, or `ref.current.vector`. -/
+private def sliceRefOfVector? (vec : Lean.Expr) : Option Lean.Expr :=
+  let vec := peelPairProj vec
+  if vec.isAppOfArity ``VerexIR.SpecSliceRef.currentVector 2 ||
+      vec.isAppOfArity ``VerexIR.SpecSliceRef.finalVector 2 then
+    some (peelPairProj (vec.getArg! 1))
+  else if vec.isAppOfArity ``VerexIR.SpecArray.vector 3 then
+    let arr := vec.getArg! 2
+    (sliceRefOfCurrentArray? arr).orElse fun () => sliceRefOfFinalArray? arr
+  else match vec with
+    | .proj ``VerexIR.SpecArray 0 arr =>
+        (sliceRefOfCurrentArray? arr).orElse fun () => sliceRefOfFinalArray? arr
+    | _ => none
+
+/-- Strip an `Int` cast `(↑n : Int)` back to `n : Nat`, or a non-negative `OfNat` literal. -/
+private def natExprOfIntExpr? (e : Lean.Expr) : Option Lean.Expr :=
+  let e := e.consumeMData
+  if e.isAppOfArity ``Nat.cast 3 then
+    some (e.getArg! 2)
+  else if e.isAppOfArity ``OfNat.ofNat 3 then
+    match (e.getArg! 1).consumeMData with
+    | .lit (.natVal n) => some (mkNatLit n)
+    | _ => none
+  else none
+
+/-- Check whether `hi` denotes the length of `rootVec` (`rootVec.values.size`,
+`r.extent`, or `len` of `SpecArray _ len`). -/
+private def matchesRootSize (rootVec hi : Lean.Expr) : MetaM Bool := do
+  let hi := peelPairProj hi
+  if hi.isAppOfArity ``Array.size 2 then
+    if let some v := specVectorOfValues? (rootArrayExpr (hi.getArg! 1)) then
+      let rv := rootWrittenVector v
+      if rv == rootVec || (← withNewMCtxDepth (isDefEq rv rootVec)) then
+        return true
+  if let some ref := sliceRefOfVector? rootVec then
+    let ext? : Option Lean.Expr :=
+      if hi.isAppOfArity ``VerexIR.SpecSliceRef.extent 2 then some (peelPairProj (hi.getArg! 1))
+      else match hi with
+        | .proj ``VerexIR.SpecSliceRef 0 r => some (peelPairProj r)
+        | _ => none
+    if let some r := ext? then
+      if r == ref || (← withNewMCtxDepth (isDefEq r ref)) then
+        return true
+  if let some (_, len) ← specArrayOfVector? rootVec then
+    if hi == len || (← withNewMCtxDepth (isDefEq hi len)) then
+      return true
+  return false
+
+/-- Check whether the local context or fixed-array type witnesses `index < baseVec.values.size`
+(from a `Proj.set?` `getElem? = some _` lookup, a fixed `SpecArray` bound, or an in-bounds `<`). -/
+private partial def hasInBoundsWriteWitness (baseVec index : Lean.Expr) : MetaM Bool := do
+  let rootVec := rootWrittenVector baseVec
+  let index := index.consumeMData
+  if let some k := evalNatExpr? index then
+    if let some (_, lenExpr) ← specArrayOfVector? rootVec then
+      if let some len := evalNatExpr? lenExpr then
+        return decide (k < len)
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail || decl.hasValue then continue
+    let raw := decl.type.consumeMData
+    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+    if ← checkHyp ty rootVec index then
+      return true
+  return false
+where
+  checkHyp (ty rootVec index : Lean.Expr) : MetaM Bool := do
+    let ty := ty.consumeMData
+    if ty.isAppOfArity ``And 2 then
+      if ← checkHyp (ty.getArg! 0) rootVec index then return true
+      return ← checkHyp (ty.getArg! 1) rootVec index
+    if ty.isAppOfArity ``Eq 3 then
+      let lhs := (ty.getArg! 1).consumeMData
+      let rhs := (ty.getArg! 2).consumeMData
+      let lookup? :=
+        if rhs.isAppOfArity ``Option.some 2 && lhs.isAppOfArity ``GetElem?.getElem? 7 then some lhs
+        else if lhs.isAppOfArity ``Option.some 2 && rhs.isAppOfArity ``GetElem?.getElem? 7 then some rhs
+        else none
+      if let some lookup := lookup? then
+        let idx := (lookup.getArg! 6).consumeMData
+        if idx == index || (← withNewMCtxDepth (isDefEq idx index)) then
+          if let some v := specVectorOfValues? (rootArrayExpr (lookup.getArg! 5)) then
+            let rv := rootWrittenVector v
+            if rv == rootVec || (← withNewMCtxDepth (isDefEq rv rootVec)) then
+              return true
+    let ltPair? : Option (Lean.Expr × Lean.Expr) :=
+      if ty.isAppOfArity ``LT.lt 4 then some (ty.getArg! 2, ty.getArg! 3)
+      else if ty.isAppOfArity ``GT.gt 4 then some (ty.getArg! 3, ty.getArg! 2)
+      else none
+    if let some (loRaw, hiRaw) := ltPair? then
+      let lo := (natExprOfIntExpr? loRaw).getD loRaw.consumeMData
+      let hi := (natExprOfIntExpr? hiRaw).getD hiRaw.consumeMData
+      let loMatches ←
+        if let (some k1, some k2) := (evalNatExpr? lo, evalNatExpr? index) then
+          pure (k1 == k2)
+        else if index.isAppOfArity ``Int.toNat 1 then
+          let inner := (index.getArg! 0).consumeMData
+          if inner.isAppOfArity ``VerexIR.SpecInt.val 3 &&
+              (inner.getArg! 1).consumeMData.isConstOf ``Bool.false then
+            pure (loRaw.consumeMData == inner || (← withNewMCtxDepth (isDefEq loRaw inner)))
+          else
+            pure (lo == index || (← withNewMCtxDepth (isDefEq lo index)))
+        else
+          pure (lo == index || (← withNewMCtxDepth (isDefEq lo index)))
+      if loMatches then
+        if ← matchesRootSize rootVec hi then
+          return true
+    return false
+
+/-- Look up a whole-container proof of `NTy.Holds carriers (.vector elemTy) vec` from the
+local context, either directly or through non-nominal `.slice`, `.array`, or `.sliceRef`
+(`currentVector` / `finalVector`) hypotheses whose underlying `SpecVector` matches `vec`. -/
+private partial def directVectorHoldsProof? (carriers elemTy vec : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
+  let targetVec := peelSpecVectorExpr vec
+  if let some p ← trivialHoldsProof? carriers (mkApp (mkConst ``NTy.vector) elemTy) targetVec then
+    return some p
+  if let some p ← trivialHoldsProof? carriers (mkApp (mkConst ``NTy.slice) elemTy) targetVec then
+    return some (mkApp4 (mkConst ``holds_vector_of_slice) carriers elemTy targetVec p)
+  let env ← getEnv
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail || decl.hasValue then continue
+    let raw := decl.type.consumeMData
+    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+    unless ty.isAppOfArity ``NTy.Holds 3 do continue
+    let hCarriers := ty.getArg! 0
+    let hTy := ty.getArg! 1
+    let hVal := ty.getArg! 2
+    if isNominalType env hTy then continue
+    let sameCarriers ←
+      if hCarriers == carriers then pure true
+      else withReducible (withNewMCtxDepth (isDefEq hCarriers carriers))
+    unless sameCarriers do continue
+    let viewTy ← (try nativeTypeView hTy catch _ => pure hTy)
+    if viewTy.isAppOfArity ``NTy.vector 1 then
+      let eTy := viewTy.getArg! 0
+      if eTy == elemTy || (← withReducible (withNewMCtxDepth (isDefEq eTy elemTy))) then
+        let candVec := peelSpecVectorExpr hVal
+        if candVec == targetVec || (← withNewMCtxDepth (isDefEq candVec targetVec)) then
+          return some decl.toExpr
+    else if viewTy.isAppOfArity ``NTy.slice 1 then
+      let eTy := viewTy.getArg! 0
+      if eTy == elemTy || (← withReducible (withNewMCtxDepth (isDefEq eTy elemTy))) then
+        let candVec := peelSpecVectorExpr hVal
+        if candVec == targetVec || (← withNewMCtxDepth (isDefEq candVec targetVec)) then
+          return some (mkApp4 (mkConst ``holds_vector_of_slice) carriers elemTy hVal decl.toExpr)
+    else if viewTy.isAppOfArity ``NTy.array 2 then
+      let eTy := viewTy.getArg! 0
+      let lenExpr := viewTy.getArg! 1
+      if eTy == elemTy || (← withReducible (withNewMCtxDepth (isDefEq eTy elemTy))) then
+        let candVec := specVectorOfArrayExpr carrierTy lenExpr hVal
+        if candVec == targetVec || (← withNewMCtxDepth (isDefEq candVec targetVec)) then
+          return some (mkApp5 (mkConst ``NTy.Holds.arrayVector) carriers elemTy lenExpr hVal decl.toExpr)
+    else if viewTy.isAppOfArity ``NTy.sliceRef 1 then
+      let eTy := viewTy.getArg! 0
+      if eTy == elemTy || (← withReducible (withNewMCtxDepth (isDefEq eTy elemTy))) then
+        let curCand := sliceCurrentVectorExpr carrierTy hVal
+        if curCand == targetVec || (← withNewMCtxDepth (isDefEq curCand targetVec)) then
+          return some (mkApp4 (mkConst ``holds_vector_of_sliceCurrent) carriers elemTy hVal decl.toExpr)
+        let finCand := sliceFinalVectorExpr carrierTy hVal
+        if finCand == targetVec || (← withNewMCtxDepth (isDefEq finCand targetVec)) then
+          return some (mkApp4 (mkConst ``holds_vector_of_sliceFinal) carriers elemTy hVal decl.toExpr)
+  return none
+
+/-- Look up `NTy.Holds carriers (.slice elemTy) ref.finalVector` for a `withCurrent` chain. -/
+private def sliceRefFinalProof? (carriers elemTy ref : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
+  let sliceTy := mkApp (mkConst ``NTy.slice) elemTy
+  let sliceRefTy := mkApp (mkConst ``NTy.sliceRef) elemTy
+  let mut cur := peelPairProj ref
+  for _ in [:8] do
+    if let some p ← trivialHoldsProof? carriers sliceRefTy cur then
+      return some (mkApp4 (mkConst ``NTy.Holds.sliceFinal) carriers elemTy cur p)
+    if cur.isAppOfArity ``VerexIR.SpecSliceRef.withCurrent 3 then
+      cur := peelPairProj (cur.getArg! 1)
+    else
+      break
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+  let finalVec := mkApp2 (mkConst ``VerexIR.SpecSliceRef.finalVector) carrierTy cur
+  if let some p ← trivialHoldsProof? carriers sliceTy finalVec then
+    return some p
+  if let some vecProof ← directVectorHoldsProof? carriers elemTy finalVec then
+    return some (mkApp4 (mkConst ``holds_slice_of_vector) carriers elemTy finalVec vecProof)
+  return none
+
+/-- Construct a proof of `i1 = i2` if definitionally equal or witnessed in `getLCtx`. -/
+private def sameIndexProof? (i1 i2 : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let i1 := i1.consumeMData
+  let i2 := i2.consumeMData
+  if i1 == i2 then
+    return some (← mkEqRefl i1)
+  if ← withNewMCtxDepth (isDefEq i1 i2) then
+    return ← (try some <$> mkExpectedTypeHint (← mkEqRefl i1) (← mkEq i1 i2) catch _ => pure none)
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail || decl.hasValue then continue
+    let raw := decl.type.consumeMData
+    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+    unless ty.isAppOfArity ``Eq 3 do continue
+    let lhs := (ty.getArg! 1).consumeMData
+    let rhs := (ty.getArg! 2).consumeMData
+    if (lhs == i1 || (← withNewMCtxDepth (isDefEq lhs i1))) &&
+        (rhs == i2 || (← withNewMCtxDepth (isDefEq rhs i2))) then
+      return ← (try some <$> mkExpectedTypeHint decl.toExpr (← mkEq i1 i2) catch _ => pure none)
+    if (lhs == i2 || (← withNewMCtxDepth (isDefEq lhs i2))) &&
+        (rhs == i1 || (← withNewMCtxDepth (isDefEq rhs i1))) then
+      return ← (try some <$> mkExpectedTypeHint (← mkEqSymm decl.toExpr) (← mkEq i1 i2) catch _ => pure none)
+  return none
+
+/-- Resolve a non-empty `SpecVector.set` write (including same-index overwrites and
+chained element writes) to a proof of `NTy.Holds carriers (.vector elemTy) writtenVec`
+plus the ordered list of element `NTy.Holds` subgoals. Restores state and returns `none`
+unless every step has an in-bounds witness and the base container's fact is in hand. -/
+private partial def resolveWrittenVector? (carriers elemTy writtenVec : Lean.Expr) :
+    MetaM (Option (Lean.Expr × List MVarId)) := do
+  let peeled := peelSpecVectorExpr writtenVec
+  unless peeled.isAppOfArity ``VerexIR.SpecVector.set 4 do return none
+  let saved ← saveState
+  match ← go peeled with
+  | some res => return some res
+  | none =>
+      saved.restore
+      return none
+where
+  go (curVec : Lean.Expr) : MetaM (Option (Lean.Expr × List MVarId)) := do
+    let curVec := peelSpecVectorExpr curVec
+    unless curVec.isAppOfArity ``VerexIR.SpecVector.set 4 do return none
+    let baseVec := curVec.getArg! 1
+    let idx := curVec.getArg! 2
+    let elem := curVec.getArg! 3
+    let basePeeled := peelSpecVectorExpr baseVec
+    if basePeeled.isAppOfArity ``VerexIR.SpecVector.set 4 then
+      if (← directVectorHoldsProof? carriers elemTy baseVec).isNone then
+        let innerVec := basePeeled.getArg! 1
+        let innerIdx := basePeeled.getArg! 2
+        let innerElem := basePeeled.getArg! 3
+        if let some eqIdx ← sameIndexProof? innerIdx idx then
+          let carrierTy := curVec.getArg! 0
+          let collapsed := mkApp4 (mkConst ``VerexIR.SpecVector.set) carrierTy innerVec idx elem
+          let some (collapsedProof, subgoals) ← go collapsed | return none
+          let proof := mkAppN (mkConst ``holds_vector_set_overwrite)
+            #[carriers, elemTy, innerVec, innerIdx, idx, eqIdx, innerElem, elem, collapsedProof]
+          return some (proof, subgoals)
+    unless ← hasInBoundsWriteWitness baseVec idx do
+      return none
+    let (baseProof, prevGoals) ← match ← directVectorHoldsProof? carriers elemTy baseVec with
+      | some p => pure (p, [])
+      | none =>
+          unless basePeeled.isAppOfArity ``VerexIR.SpecVector.set 4 do return none
+          let some res ← go basePeeled | return none
+          pure res
+    let elemGoalType := mkApp3 (mkConst ``NTy.Holds) carriers elemTy elem
+    let elemMVar ← mkFreshExprMVar (some elemGoalType) .syntheticOpaque
+    let proof := mkAppN (mkConst ``NTy.Holds.vector_set)
+      #[carriers, elemTy, baseVec, baseProof, idx, elem, elemMVar]
+    return some (proof, prevGoals ++ [elemMVar.mvarId!])
+
+/-- Select and apply whole-container bridges and the written-container preservation
+rule on non-nominal `.vector`, `.slice`, `.array`, and `.sliceRef` goals.
+Whole-container bridges run first so an already-certified container closes in O(1).
+Write preservation is selected only when the old container's fact is in hand and the
+write has in-bounds provenance; once selected, there is no fallback to elementwise opening. -/
+private def writtenContainerHolds? (goal : MVarId) (carriers view value : Lean.Expr) :
+    MetaM (Option (List MVarId)) := goal.withContext do
+  let valuePeeled := peelPairProj value
+  if view.isAppOfArity ``NTy.vector 1 then
+    let elemTy := view.getArg! 0
+    if let some wholeProof ← directVectorHoldsProof? carriers elemTy valuePeeled then
+      let saved ← saveState
+      if ← isDefEq (← goal.getType) (← inferType wholeProof) then
+        goal.assign wholeProof
+        return some []
+      saved.restore
+    let some (vecProof, subgoals) ← resolveWrittenVector? carriers elemTy valuePeeled | return none
+    let saved ← saveState
+    if ← isDefEq (← goal.getType) (← inferType vecProof) then
+      goal.assign vecProof
+      return some subgoals
+    saved.restore
+    return none
+  if view.isAppOfArity ``NTy.slice 1 then
+    let elemTy := view.getArg! 0
+    let peeledVec := peelSpecVectorExpr valuePeeled
+    if let some wholeProof ← directVectorHoldsProof? carriers elemTy peeledVec then
+      let sliceProof := mkApp4 (mkConst ``holds_slice_of_vector) carriers elemTy peeledVec wholeProof
+      let saved ← saveState
+      if ← isDefEq (← goal.getType) (← inferType sliceProof) then
+        goal.assign sliceProof
+        return some []
+      saved.restore
+    let some (vecProof, subgoals) ← resolveWrittenVector? carriers elemTy peeledVec | return none
+    let sliceProof := mkApp4 (mkConst ``holds_slice_of_vector) carriers elemTy peeledVec vecProof
+    let saved ← saveState
+    if ← isDefEq (← goal.getType) (← inferType sliceProof) then
+      goal.assign sliceProof
+      return some subgoals
+    saved.restore
+    return none
+  if view.isAppOfArity ``NTy.array 2 then
+    let elemTy := view.getArg! 0
+    let len := view.getArg! 1
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+    let arrVec :=
+      if valuePeeled.isAppOfArity ``VerexIR.SpecArray.mk 4 then valuePeeled.getArg! 2
+      else mkApp3 (mkConst ``VerexIR.SpecArray.vector) carrierTy len valuePeeled
+    if let some wholeProof ← directVectorHoldsProof? carriers elemTy arrVec then
+      let arrProof :=
+        if valuePeeled.isAppOfArity ``VerexIR.SpecArray.mk 4 then
+          mkAppN (mkConst ``NTy.Holds.of_arrayOf)
+            #[carriers, elemTy, len, valuePeeled.getArg! 2, wholeProof, valuePeeled.getArg! 3]
+        else
+          mkApp5 (mkConst ``holds_array_of_vector_carrier) carriers elemTy len valuePeeled wholeProof
+      let saved ← saveState
+      if ← isDefEq (← goal.getType) (← inferType arrProof) then
+        goal.assign arrProof
+        return some []
+      saved.restore
+    unless valuePeeled.isAppOfArity ``VerexIR.SpecArray.mk 4 do return none
+    let innerVec := valuePeeled.getArg! 2
+    let sized := valuePeeled.getArg! 3
+    let some (vecProof, subgoals) ← resolveWrittenVector? carriers elemTy innerVec | return none
+    let arrProof := mkAppN (mkConst ``NTy.Holds.of_arrayOf)
+      #[carriers, elemTy, len, innerVec, vecProof, sized]
+    let saved ← saveState
+    if ← isDefEq (← goal.getType) (← inferType arrProof) then
+      goal.assign arrProof
+      return some subgoals
+    saved.restore
+    return none
+  if view.isAppOfArity ``NTy.sliceRef 1 then
+    let elemTy := view.getArg! 0
+    let sliceTy := mkApp (mkConst ``NTy.slice) elemTy
+    if valuePeeled.isAppOfArity ``VerexIR.SpecSliceRef.withCurrent 3 then
+      let ref := valuePeeled.getArg! 1
+      let current := valuePeeled.getArg! 2
+      let some finalProof ← sliceRefFinalProof? carriers elemTy ref | return none
+      let currentPeeled := peelPairProj current
+      let currentVec :=
+        if currentPeeled.isAppOfArity ``VerexIR.SpecArray.mk 4 then
+          currentPeeled.getArg! 2
+        else
+          mkApp3 (mkConst ``VerexIR.SpecArray.vector)
+            (valuePeeled.getArg! 0)
+            (mkApp2 (mkConst ``VerexIR.SpecSliceRef.extent) (valuePeeled.getArg! 0) ref)
+            current
+      let curGoalType := mkApp3 (mkConst ``NTy.Holds) carriers sliceTy currentVec
+      let saved ← saveState
+      let curMVar ← mkFreshExprMVar (some curGoalType) .syntheticOpaque
+      let refProof := mkAppN (mkConst ``holds_sliceRef_withCurrent_final)
+        #[carriers, elemTy, ref, current, finalProof, curMVar]
+      if ← isDefEq (← goal.getType) (← inferType refProof) then
+        goal.assign refProof
+        return some [curMVar.mvarId!]
+      saved.restore
+      return none
+    if valuePeeled.isAppOfArity ``VerexIR.SpecSliceRef.ofArrays 4 then
+      let carrierTy := valuePeeled.getArg! 0
+      let extent := valuePeeled.getArg! 1
+      let current := peelPairProj (valuePeeled.getArg! 2)
+      let final := peelPairProj (valuePeeled.getArg! 3)
+      let curVec :=
+        if current.isAppOfArity ``VerexIR.SpecArray.mk 4 then current.getArg! 2
+        else mkApp3 (mkConst ``VerexIR.SpecArray.vector) carrierTy extent current
+      let finVec :=
+        if final.isAppOfArity ``VerexIR.SpecArray.mk 4 then final.getArg! 2
+        else mkApp3 (mkConst ``VerexIR.SpecArray.vector) carrierTy extent final
+      let curWhole? ← directVectorHoldsProof? carriers elemTy curVec
+      let finWhole? ← directVectorHoldsProof? carriers elemTy finVec
+      let curIsSet := (peelSpecVectorExpr curVec).isAppOfArity ``VerexIR.SpecVector.set 4
+      let finIsSet := (peelSpecVectorExpr finVec).isAppOfArity ``VerexIR.SpecVector.set 4
+      unless curWhole?.isSome || finWhole?.isSome || curIsSet || finIsSet do return none
+      let saved ← saveState
+      let curGoal ← match curWhole? with
+        | some vecProof =>
+            pure (mkApp4 (mkConst ``holds_slice_of_vector) carriers elemTy curVec vecProof, [])
+        | none =>
+            let m ← mkFreshExprMVar (some (mkApp3 (mkConst ``NTy.Holds) carriers sliceTy curVec)) .syntheticOpaque
+            pure (m, [m.mvarId!])
+      let finGoal ← match finWhole? with
+        | some vecProof =>
+            pure (mkApp4 (mkConst ``holds_slice_of_vector) carriers elemTy finVec vecProof, [])
+        | none =>
+            let m ← mkFreshExprMVar (some (mkApp3 (mkConst ``NTy.Holds) carriers sliceTy finVec)) .syntheticOpaque
+            pure (m, [m.mvarId!])
+      let refProof := mkAppN (mkConst ``NTy.Holds.sliceRef_ofArrays_of_slice)
+        #[carriers, elemTy, extent, valuePeeled.getArg! 2, valuePeeled.getArg! 3, curGoal.1, finGoal.1]
+      if ← isDefEq (← goal.getType) (← inferType refProof) then
+        goal.assign refProof
+        return some (curGoal.2 ++ finGoal.2)
+      saved.restore
+      return none
+  return none
+
 /-- A goal stating a value's fact, opened: closed by the fact the context
 states of that value, else read to the parts the fact is of — a
 declaration's clauses and its fields' facts (`NTy.holds_struct`), a
 container's elementwise statement (`NTy.holds_vector`), nothing at a type
-that carries no certificate (`NTy.holds_of_certificateFree`).  The goal's
+that states no invariant (`NTy.holds_of_invariantFree`).  The goal's
 own consumer of the fold, as the opener of `assertCertifiedClauses` is the
 hypotheses' (`doc/plan/one-spelling.md`, D1).  A goal that is no fact, and
 one at a type the opener does not read, is returned as it is. -/
@@ -6121,15 +7171,14 @@ partial def openHoldsGoal (goal : MVarId) : MetaM (List MVarId) := goal.withCont
     if let some proof ← trivialHoldsProof? carriers τ value then
       goal.assign proof
       return []
-    if ← isCertificateFreeNTy τ then
-      let free := mkApp (mkConst ``NTy.certificateFree) τ
+    if ← isInvariantFreeNTy τ then
+      let free := mkApp (mkConst ``NTy.invariantFree) τ
       let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
         (← mkEq free (mkConst ``Bool.true))
-      goal.assign (mkAppN (mkConst ``NTy.holds_of_certificateFree) #[carriers, τ, decided, value])
+      goal.assign (mkAppN (mkConst ``NTy.holds_of_invariantFree) #[carriers, τ, decided, value])
       return []
     -- The code as a constructor: a registered declaration's descriptor
-    -- through its view, and every other definition by reduction, which is
-    -- how a certified value's own clauses are read (`certifiedClauses?`).
+    -- through its view, and every other definition by reduction.
     let declared := isNominalType (← getEnv) τ
     let view ← (try nativeTypeView τ catch _ => pure τ)
     let view ← if view.getAppFn.isConst &&
@@ -6139,6 +7188,15 @@ partial def openHoldsGoal (goal : MVarId) : MetaM (List MVarId) := goal.withCont
           view.isAppOfArity ``NTy.sliceRef 1) then
         (try whnfD view catch _ => pure view)
       else pure view
+    -- Whole-container projections and in-bounds element writes on non-nominal
+    -- containers (`writtenContainerHolds?`): selected only when the base
+    -- container's fact and write provenance are in hand, with no fallback.
+    if !declared then
+      if let some writtenGoals ← writtenContainerHolds? goal carriers view value then
+        let mut found := []
+        for next in writtenGoals do
+          found := found ++ (← openHoldsGoal next)
+        return found
     let equivalence? : Option Name :=
       if view.isAppOfArity ``NTy.struct 3 then some ``NTy.holds_struct
       else if view.isAppOfArity ``NTy.enum 5 then some ``NTy.holds_enum
@@ -6172,7 +7230,7 @@ partial def openHoldsGoal (goal : MVarId) : MetaM (List MVarId) := goal.withCont
     return found
   -- A row of facts, and the conjunction a reading left: split, and open each
   -- component's own fact.  No other goal is reduced here.
-  unless target.isAppOfArity ``HListPlain.Holds 3 || target.isAppOfArity ``variantPlain.Holds 4 ||
+  unless target.isAppOfArity ``HList.Holds 3 || target.isAppOfArity ``variantCarrier.Holds 4 ||
       target.isAppOfArity ``And 2 do
     return [goal]
   let reduced ← (try whnfD target catch _ => pure target)
@@ -6277,10 +7335,8 @@ parameters; the parts named from the local (`alternativeNames`,
 private partial def destructureCarrier (goal : MVarId) (value : FVarId) :
     MetaM (Array MVarId) := goal.withContext do
   let type ← whnfD (← instantiateMVars (← value.getType))
-  -- A struct's or a variant's value is its row under a certificate
-  -- (`NTy.carrier`): splitting it exposes the row, which splits on.
   unless type.isAppOf ``Sum || type.isAppOf ``Prod || type.isAppOf ``PUnit ||
-      type.isAppOf ``Empty || type.isAppOfArity ``Subtype 2 do
+      type.isAppOf ``Empty do
     return #[goal]
   let (goal, names) ← if type.isAppOf ``Sum then pure (goal, ← alternativeNames value)
     else componentNames goal value
@@ -6303,10 +7359,7 @@ partial def destructureOuterVariant (goal : MVarId) (value : FVarId)
   let type ← whnfD (← instantiateMVars (← value.getType))
   let variant := type.isAppOf ``Sum
   if variant && row then return #[goal]
-  -- A certificate stands between an enum's value and its variants
-  -- (`NTy.carrier`); splitting it is not entering a row.
-  let certified := type.isAppOfArity ``Subtype 2
-  unless variant || certified || type.isAppOf ``Prod || type.isAppOf ``PUnit ||
+  unless variant || type.isAppOf ``Prod || type.isAppOf ``PUnit ||
       type.isAppOf ``Empty do
     return #[goal]
   let (goal, names) ← if variant then pure (goal, ← alternativeNames value)
@@ -6317,25 +7370,17 @@ partial def destructureOuterVariant (goal : MVarId) (value : FVarId)
     for field in case.fields do
       let .fvar part := field | continue
       let name ← case.mvarId.withContext part.getUserName
-      let inRow := if certified then row
-        else row || !variant || case.ctorName == some ``Sum.inl
+      let inRow := row || !variant || case.ctorName == some ``Sum.inl
       goals ← goals.flatMapM fun goal => do
         let some part ← fieldOf? goal part name | return #[goal]
         destructureOuterVariant goal part inRow
     return found ++ (← goals.mapM foldCertificates)
 
 /-- Whether a term reads which variant a value holds: its name or a
-payload projection, at the certified layer and at the plain layer, whose
-spellings read a variant where the certified layer's do
-(`reduceVariantComputations`, `variantRedex`).  A value of a declaration's
-type is certified and its variants are the plain layer's
-(`NTy.carrier`), so a leaf observes both. -/
+payload projection (`reduceVariantComputations`, `variantRedex`). -/
 private def variantReading (e : Lean.Expr) : Bool :=
   e.isAppOf ``VerexIR.Proofs.Denote.variantName ||
-    e.isAppOf ``VerexIR.Proofs.Denote.variantPlainName ||
-    e.isAppOf ``VerexIR.Proofs.Denote.variantPlainNameOf ||
-    e.isAppOf ``VerexIR.Proofs.Denote.Which.project? ||
-    e.isAppOf ``VerexIR.Proofs.Denote.Which.projectCertified?
+    e.isAppOf ``VerexIR.Proofs.Denote.Which.project?
 
 /-- The value a reading of a variant reads (`variantReading`, a selection
 of a variant's field), where the reading is applied to all its arguments:
@@ -6343,10 +7388,7 @@ its last one.  `none` where the term is not such a reading, a partial
 application among them, whose last argument is not the value read. -/
 private def variantReadingSubject? (e : Lean.Expr) : Option Lean.Expr :=
   if e.isAppOfArity ``VerexIR.Proofs.Denote.variantName 4 ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.variantPlainName 4 ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.variantPlainNameOf 4 ||
       e.isAppOfArity ``VerexIR.Proofs.Denote.Which.project? 6 ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.Which.projectCertified? 9 ||
       e.isAppOfArity ``VerexIR.Proofs.Denote.Choices.select? 6 then
     some e.appArg!
   else none
@@ -6354,9 +7396,7 @@ private def variantReadingSubject? (e : Lean.Expr) : Option Lean.Expr :=
 /-- The reading of a variant's name alone (`variantReading`), without a
 payload projection. -/
 private def variantTagReading (e : Lean.Expr) : Bool :=
-  e.isAppOf ``VerexIR.Proofs.Denote.variantName ||
-    e.isAppOf ``VerexIR.Proofs.Denote.variantPlainName ||
-    e.isAppOf ``VerexIR.Proofs.Denote.variantPlainNameOf
+  e.isAppOf ``VerexIR.Proofs.Denote.variantName
 
 /-- An observed tag test (`variantName x = "V"`, or a Boolean test of
 it), without a payload observation or a quantified consequence. These
@@ -6446,15 +7486,14 @@ private def constrainedRow? (goal : MVarId) (parameters : FVarIdSet) :
       if term.isAppOfArity ``Prod.fst 3 || term.isAppOfArity ``Prod.snd 3 then
         owner? term.appArg! fuel
       else
-        guard (term.isAppOfArity ``Subtype.val 3)
-        let .fvar id := term.appArg! | none
+        let .fvar id := term.consumeMData | none
         some id
   (← getLCtx).findDeclM? fun decl => do
     if decl.isImplementationDetail then return none
     let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | return none
     for (side, other) in #[(lhs, rhs), (rhs, lhs)] do
       let field := side.isAppOfArity ``Prod.fst 3 || side.isAppOfArity ``Prod.snd 3
-      unless field || side.isAppOfArity ``Subtype.val 3 do continue
+      unless field do continue
       let some owner := owner? side 64 | continue
       if parameters.contains owner || other.containsFVar owner then continue
       let type ← instantiateMVars (← owner.getType)
@@ -6598,14 +7637,7 @@ def testedIn (expression : Lean.Expr) (found : Array FVarId) : MetaM (Array FVar
   let result ← IO.mkRef found
   expression.forEach fun e => do
     if let some subject := variantReadingSubject? e then
-      -- A certified ADT's tag is read from its plain value. The case split
-      -- belongs to the owning local, not to a second value behind `.val`.
-      let subject := subject.consumeMData
-      let owner := if subject.isAppOfArity ``Subtype.val 3 then subject.appArg!.consumeMData
-        else match subject with
-          | .proj ``Subtype 0 value => value.consumeMData
-          | _ => subject
-      if let .fvar x := owner then
+      if let .fvar x := subject.consumeMData then
         result.modify fun found => if found.contains x then found else found.push x
   result.get
 
@@ -6711,26 +7743,19 @@ definition, whatever the spelling of the type indices. -/
 def reduceVariantComputations (e : Lean.Expr) : MetaM Lean.Expr :=
   let constructor (e : Lean.Expr) : Bool :=
     e.isAppOf ``Sum.inl || e.isAppOf ``Sum.inr || e.isAppOf ``Prod.mk || e.isConstOf ``PUnit.unit ||
-      e.isAppOf ``Subtype.mk || e.isAppOf ``VerexIR.Proofs.Denote.NTy.ofDeepHolds ||
       e.isAppOf ``Option.some || e.isAppOf ``Option.none
-  -- A reading's worker and the elimination it steps to belong to the list
-  -- beside the reading itself: one step of `variantPlainName` is its worker
-  -- `variantPlainNameOf`, and one step of that is `Sum.elim` at the value,
-  -- so a list holding only the reading leaves the computation stuck one
-  -- step short of its name.
+  -- The elimination a reading steps to (`Sum.elim`) belongs to the list
+  -- beside the reading itself, so a step never stops short of its name.
   let computation (e : Lean.Expr) : Bool := e.isApp &&
     (e.isAppOf ``VerexIR.Proofs.Denote.variantName ||
-      e.isAppOf ``VerexIR.Proofs.Denote.variantPlainName ||
-      e.isAppOf ``VerexIR.Proofs.Denote.variantPlainNameOf ||
       e.isAppOf ``VerexIR.Proofs.Denote.Which.project? ||
-      e.isAppOf ``VerexIR.Proofs.Denote.Which.projectCertified? ||
       e.isAppOf ``VerexIR.Proofs.Denote.Choices.select? || e.isAppOf ``VerexIR.Proofs.Denote.Var.select ||
-      e.isAppOf ``VerexIR.Proofs.Denote.Var.selectPlain ||
       e.isAppOf ``VerexIR.Proofs.Denote.variantPayload || e.isAppOfArity ``Option.map 4 ||
       e.isAppOfArity ``Option.getD 3 || e.isAppOfArity ``Option.bind 4 ||
       e.isAppOfArity ``Prod.fst 3 || e.isAppOfArity ``Prod.snd 3 ||
-      e.isAppOfArity ``Subtype.val 3 || e.isAppOfArity ``Sum.elim 6 ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.withSome 5)
+      e.isAppOfArity ``Sum.elim 6 ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.withSome 5 ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.variantCarrier.Holds 4)
   -- One unfolding, its matches on constructors reduced: a step of the
   -- definition, as its equations state it, never a match left stuck.
   let step (sub : Lean.Expr) : MetaM (Option Lean.Expr) := do
@@ -6768,9 +7793,6 @@ partial def decidedEquality (a b : Lean.Expr) : Option Bool :=
         if (name == ``Sum.inl || name == ``Sum.inr) && e.getAppNumArgs == 3 then some (name, fields 1)
         else if name == ``Option.some && e.getAppNumArgs == 2 then some (name, fields 1)
         else if name == ``Prod.mk && e.getAppNumArgs == 4 then some (name, fields 2)
-        -- A certified value: its row, the certificate being a proposition
-        -- no shaping reads (`NTy.carrier`).
-        else if name == ``Subtype.mk && e.getAppNumArgs == 4 then some (name, fields 1)
         else if (name == ``Option.none && e.getAppNumArgs == 1) || name == ``PUnit.unit ||
           name == ``Bool.true || name == ``Bool.false then some (name, #[])
         else none
@@ -6863,22 +7885,17 @@ of a constructor, or an equation of two constructors or two literals. -/
 def variantRedex (e : Lean.Expr) : Bool :=
   let constructor (e : Lean.Expr) : Bool :=
     e.isAppOf ``Sum.inl || e.isAppOf ``Sum.inr || e.isAppOf ``Prod.mk || e.isConstOf ``PUnit.unit ||
-      e.isAppOf ``Subtype.mk || e.isAppOf ``VerexIR.Proofs.Denote.NTy.ofDeepHolds ||
       e.isAppOf ``Option.some || e.isAppOf ``Option.none
   let literal (e : Lean.Expr) : Bool := e.isLit
   (e.find? fun sub =>
     (match sub with | .proj _ _ value => constructor value | _ => false) ||
     (sub.isAppOfArity ``VerexIR.Proofs.Denote.withSome 5 && constructor (sub.getArg! 2)) ||
     ((sub.isAppOf ``VerexIR.Proofs.Denote.variantName ||
-        sub.isAppOf ``VerexIR.Proofs.Denote.variantPlainName ||
-        sub.isAppOf ``VerexIR.Proofs.Denote.variantPlainNameOf ||
       sub.isAppOf ``VerexIR.Proofs.Denote.Which.project? ||
-      sub.isAppOf ``VerexIR.Proofs.Denote.Which.projectCertified? ||
       sub.isAppOf ``VerexIR.Proofs.Denote.Choices.select? ||
       sub.isAppOf ``VerexIR.Proofs.Denote.Var.select ||
-      sub.isAppOf ``VerexIR.Proofs.Denote.Var.selectPlain ||
       sub.isAppOf ``VerexIR.Proofs.Denote.variantPayload ||
-      sub.isAppOfArity ``Subtype.val 3) && sub.isApp && constructor sub.appArg!) ||
+      sub.isAppOf ``VerexIR.Proofs.Denote.variantCarrier.Holds) && sub.isApp && constructor sub.appArg!) ||
     (sub.isAppOfArity ``Eq 3 &&
       ((constructor (sub.getArg! 1) && constructor (sub.getArg! 2)) ||
         (literal (sub.getArg! 1) && literal (sub.getArg! 2))))).isSome
@@ -7014,7 +8031,6 @@ private def survivingCases (type : Lean.Expr) (observations : Array Lean.Expr) :
 /-- Whether a term is a constructor of a variant, option, pair or unit. -/
 private def variantConstructor (e : Lean.Expr) : Bool :=
   e.isAppOf ``Sum.inl || e.isAppOf ``Sum.inr || e.isAppOf ``Prod.mk || e.isConstOf ``PUnit.unit ||
-      e.isAppOf ``Subtype.mk || e.isAppOf ``VerexIR.Proofs.Denote.NTy.ofDeepHolds ||
     e.isAppOf ``Option.some || e.isAppOf ``Option.none
 
 /-- The value tested by a tag test or payload projection, other than a local
@@ -7401,7 +8417,6 @@ private def contextDependentTerm (e : Lean.Expr) : Bool :=
   match e.getAppFn with
   | .const name _ =>
       contextDependentHeadName name ||
-        (name == ``VerexIR.Proofs.Denote.NTy.ofPlain? && e.getAppNumArgs == 3) ||
         (name == ``VerexIR.Proofs.Denote.Skolems.writePlain &&
           (e.getAppNumArgs == 9 || e.getAppNumArgs == 10 ||
             (e.getAppNumArgs == 8 &&
@@ -7827,15 +8842,6 @@ def givenOperationProjection? (e : Lean.Expr) : Option Lean.Expr := Id.run do
   let some head := e.getAppFn.constName? | return none
   let args := e.getAppArgs
   let some family := args[0]? | return none
-  if head == ``Carriers.toPlain then
-    unless family.isAppOfArity ``GivenFrame.toCarriers 1 ||
-        family.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.clauseScaffold 1 do return none
-    let mut frame := family.appArg!
-    while frame.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.withDeclarations 2 do
-      frame := frame.getArg! 0
-    let original := mkApp (mkConst ``Carriers.toPlain) (mkApp (mkConst ``GivenFrame.toCarriers) frame)
-    if original == e then return none
-    return some original
   unless #[``Carriers.carrier, ``Carriers.codec, ``Carriers.orders].contains head do return none
   let mut frame ← if family.isAppOfArity ``GivenFrame.toCarriers 1 ||
       family.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.clauseScaffold 1 then
@@ -7848,6 +8854,39 @@ def givenOperationProjection? (e : Lean.Expr) : Option Lean.Expr := Id.run do
     frame := frame.getArg! 0
   let original := mkApp (mkConst ``GivenFrame.operations) frame
   return some (mkAppN e.getAppFn (args.set! 0 original))
+
+/-- Carrier, codec, and fallback operations read no declaration predicate, so
+a Given frame's scaffold and declaration-installed views convert to its base
+carrier family wherever the type arguments are spelled. -/
+def givenCarrierViewProjection? (e : Lean.Expr)
+    (converts : Lean.Expr → Lean.Expr → MetaM Bool) : MetaM (Option Lean.Expr) := do
+  if e.hasLooseBVars then return none
+  let some head := e.getAppFn.constName? | return none
+  let typed ← match head with
+    | ``NTy.carrier | ``NRow.sorts | ``HList | ``HEnv | ``ResultShape.carrier
+    | ``NTy.codec | ``NTy.encode | ``rowCodec | ``NRow.sortCodecs | ``HList.encode =>
+        pure 2
+    | ``variantCarrier | ``NTy.plainFallback | ``NTy.inhabitant | ``NTy.inhabitantOf
+    | ``HList.inhabitant | ``NTy.nonempty_of_inhabitable =>
+        pure 3
+    | ``variantCarrier.inhabitant => pure 4
+    | _ => return none
+  let args := e.getAppArgs
+  unless args.size ≥ typed do return none
+  let family := args[0]!.consumeMData
+  let mut frame ← if family.isAppOfArity ``GivenFrame.toCarriers 1 ||
+      family.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.clauseScaffold 1 then
+        pure family.appArg!.consumeMData
+      else return none
+  while frame.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.withDeclarations 2 do
+    frame := (frame.getArg! 0).consumeMData
+  let original := mkApp (mkConst ``GivenFrame.toCarriers) frame
+  if original == family then return none
+  let rebuiltArgs := args.set! 0 original
+  let prefixOld := mkAppN e.getAppFn (args.extract 0 typed)
+  let prefixNew := mkAppN e.getAppFn (rebuiltArgs.extract 0 typed)
+  unless ← converts prefixOld prefixNew do return none
+  return some (mkAppN e.getAppFn rebuiltArgs)
 
 /-- A fresh expression and all its annotations cross the representation boundary
 atomically. Reuse the transform cache across simp callbacks, and leave held caller
@@ -7862,10 +8901,10 @@ def canonicalEmission (held : Std.HashSet Lean.Expr) (fixed : Option FixedPoints
   -- have unique IDs and unresolved expressions never enter this cache.
   let conversions ← IO.mkRef ({} : Std.HashMap (ExprStructEq × ExprStructEq) Bool)
   let converts (a b : Lean.Expr) : MetaM Bool := do
-    if a.hasMVar || b.hasMVar then return ← isDefEq a b
+    if a.hasMVar || b.hasMVar then return ← withNewMCtxDepth (isDefEq a b)
     let key := ({ val := a : ExprStructEq }, { val := b : ExprStructEq })
     if let some result := (← conversions.get)[key]? then return result
-    let result ← isDefEq a b
+    let result ← withNewMCtxDepth (isDefEq a b)
     conversions.modify (·.insert key result)
     return result
   let instances ← getLocalInstances
@@ -7893,6 +8932,13 @@ def canonicalEmission (held : Std.HashSet Lean.Expr) (fixed : Option FixedPoints
             return .visit canonical
           if let some canonical := givenOperationProjection? term then
             return .visit canonical
+          if let some canonical ← withReader
+              (fun ctx : Meta.Context => { ctx with localInstances := instances })
+              (givenCarrierViewProjection? term converts) then
+            let allowed := (collectFVars {} term).fvarIds
+            if (collectFVars {} canonical).fvarIds.all fun id =>
+                allowed.contains id || outer.contains id then
+              return .visit canonical
           -- Expose just a literal row spine; nominal type descriptors remain
           -- named. This also reaches rows carried in implicit parent types.
           if term.isAppOfArity ``NRow.replicate 2 &&
@@ -7908,10 +8954,15 @@ def canonicalEmission (held : Std.HashSet Lean.Expr) (fixed : Option FixedPoints
               let allowed := (collectFVars {} term).fvarIds
               unless (collectFVars {} rebuilt).fvarIds.all fun id =>
                   allowed.contains id || outer.contains id do return .done term
-              if rebuilt != term then return .visit rebuilt
+              if rebuilt != term then
+                unless ← withReader (fun ctx : Meta.Context => { ctx with localInstances := instances })
+                    (converts term rebuilt <&&> isTypeCorrect rebuilt) do return .done term
+                return .visit rebuilt
               return .done term
           | step => return step)
         (skipConstInApp := true)
+      if result != e then
+        unless ← isTypeCorrect result do return e
       -- Metavariable assignments can change a conversion decision. Opened
       -- locals have unique IDs; synthesis uses only the captured outer scope.
       unless e.hasMVar || result.hasMVar do cache.set updated
@@ -8166,7 +9217,6 @@ leaf normalization. Hypotheses a previous pass left normal are skipped. -/
 elab "verex_normalize_families" : tactic => withMainContext do
   discard <| normalizeUncached (← targetState).familyNormalHypotheses 1
     (← `(tactic| simp only [variantCarrier.ofSkolem, HList.ofSkolem, NTy.ofSkolem,
-      variantPlain.ofSkolem, HListPlain.ofSkolem, NTy.plainOfSkolem,
       variantName, vir_denote_norm]))
     none
 
@@ -8226,11 +9276,29 @@ elab "verex_normalize_hypotheses" : tactic => normalizeContext false
 
 private theorem Skolems.holds_getD_plainAt {unit : Validation.ValidatedUnit}
     [FunctionCarriers unit] [Skolems unit] (τ : NTy) (arguments : NRow)
-    (key : StorageKey) (memory : Memory unit) (fallback : τ.carrier) :
-    NTy.Holds τ ((Skolems.plainAt τ arguments key memory).getD (NTy.forget τ fallback)) := by
+    (key : StorageKey) (memory : Memory unit) (fallback : τ.carrier)
+    (fallbackHolds : NTy.Holds τ fallback) :
+    NTy.Holds τ ((Skolems.plainAt τ arguments key memory).getD fallback) := by
   cases h : Skolems.plainAt τ arguments key memory with
-  | none => exact NTy.holds_forget τ fallback
+  | none => exact fallbackHolds
   | some v => exact Skolems.holds_plainAt τ arguments key memory h
+
+private theorem Skolems.holds_getD_plainAt_of_isSome {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Skolems unit] (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) (fallback : τ.carrier)
+    (present : (Skolems.plainAt τ arguments key memory).isSome = true) :
+    NTy.Holds τ ((Skolems.plainAt τ arguments key memory).getD fallback) := by
+  cases h : Skolems.plainAt τ arguments key memory with
+  | none => rw [h] at present; cases present
+  | some v => exact Skolems.holds_plainAt τ arguments key memory h
+
+private theorem Skolems.holds_getD_plainAt_of_memory_isSome {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Skolems unit] (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) (fallback : τ.carrier)
+    (present : (memory (Skolems.resource τ arguments) key).isSome = true) :
+    NTy.Holds τ ((Skolems.plainAt τ arguments key memory).getD fallback) :=
+  Skolems.holds_getD_plainAt_of_isSome τ arguments key memory fallback
+    ((Skolems.isSome_plainAt τ arguments key memory).trans present)
 
 private partial def observedPlainSlotReads (env : Environment) (term : Lean.Expr)
     (found : Array Lean.Expr) : Array Lean.Expr :=
@@ -8238,8 +9306,6 @@ private partial def observedPlainSlotReads (env : Environment) (term : Lean.Expr
     unless !term.hasLooseBVars && term.isAppOfArity ``Option.getD 3 do return false
     let opt := (term.getArg! 1).consumeMData
     unless opt.isAppOfArity ``Skolems.plainAt 7 do return false
-    let fb := (term.getArg! 2).consumeMData
-    unless fb.isAppOfArity ``Subtype.val 3 || fb.isAppOfArity ``NTy.forget 3 do return false
     let unit := (opt.getArg! 0).consumeMData
     match unit.constName? with
     | some (.str path "unit") => return env.contains (.str path "dataOwn")
@@ -8252,54 +9318,6 @@ private partial def observedPlainSlotReads (env : Environment) (term : Lean.Expr
       observedPlainSlotReads env b (observedPlainSlotReads env v (observedPlainSlotReads env t found))
   | .mdata _ b | .proj _ _ b => observedPlainSlotReads env b found
   | _ => found
-
-/-- Values read from runtime storage or a typed map carry their declaration's
-certificate even when the read is a compound expression. Collect the reads
-without unfolding their definitions or inspecting constructed certificates.
-A value under a binder is skipped unless closed in the leaf's context. -/
-private partial def observedCertifiedValues (term : Lean.Expr) (found : Array Lean.Expr) :
-    Array Lean.Expr :=
-  let slotRead := term.isAppOfArity ``Option.getD 3 &&
-    (term.getArg! 1).isAppOfArity ``Option.bind 4 &&
-    ((term.getArg! 1).getArg! 3).isAppOfArity ``NTy.ofPlain? 2
-  let read := term.isAppOfArity ``Skolems.ofRuntime 5 ||
-    term.isAppOfArity ``NTy.ofDeepHolds 4 ||
-    slotRead ||
-    term.isAppOfArity ``VerexIR.SpecMap.valueAt 6 ||
-    term.isAppOfArity ``VerexIR.SpecMap.keyAt 5
-  let found :=
-    if read && !term.hasLooseBVars && !found.any (· == term) then found.push term
-    else found
-  match term with
-  | .app f a => observedCertifiedValues a (observedCertifiedValues f found)
-  | .lam _ d b _ | .forallE _ d b _ => observedCertifiedValues b (observedCertifiedValues d found)
-  | .letE _ t v b _ => observedCertifiedValues b (observedCertifiedValues v (observedCertifiedValues t found))
-  | .mdata _ b => observedCertifiedValues b found
-  | .proj _ _ b => observedCertifiedValues b found
-  | _ => found
-
-open Lean Meta in
-/-- Observe an ordinary nominal descriptor only at the certificate boundary.
-The descriptor remains named in the value's type and in surrounding goals. -/
-private def nominalCertificateView? (type : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
-  let_expr NTy.carrier carriers type := type | return none
-  unless isNominalType (← getEnv) type do return none
-  let view ← nativeTypeView type
-  unless view.isAppOfArity ``NTy.struct 3 || view.isAppOfArity ``NTy.enum 5 do return none
-  return some (carriers, view)
-
-private theorem structOwnCertificate [Carriers] (source : StructHandle)
-    (arguments fields : NRow) (value : (NTy.struct source arguments fields).carrier) :
-    Carriers.own source arguments
-      (NTy.plainEncode (.struct source arguments fields) value.val) :=
-  ((NTy.deepHolds_struct source arguments fields value.val).mp value.property).1
-
-private theorem enumOwnCertificate [Carriers] (source : StructHandle) (arguments : NRow)
-    (names : List String) (rows : NRows) (distinct : names.Nodup)
-    (value : (NTy.enum source arguments names rows distinct).carrier) :
-    Carriers.own source arguments
-      (NTy.plainEncode (.enum source arguments names rows distinct) value.val) :=
-  ((NTy.deepHolds_enum source arguments names rows distinct value.val).mp value.property).1
 
 private inductive CertificateOwn where
   | trivial
@@ -8349,83 +9367,6 @@ private def certificateOwnClauses? (type proof : Lean.Expr) : TacticM (Option Le
     | .clauses fact => some fact
     | .trivial | .undecoded => none
 
-/-- A declaration's data invariant of a certified value, as a fact: a value
-of a declaration's type carries the invariant in its certificate, and a read
-owes nothing and assumes nothing beyond it
-(`doc/designs/data-invariants.md`).
-
-The fact is the declaration's clauses of the value's row, not the
-certificate itself: `NTy.deepHolds_struct_val` states that a certified
-value's row satisfies the invariant, so a bare `.property` normalizes to
-`True` and says nothing.  The `own` conjunct of the certificate is unfolded
-to the clauses by the route the owed direction takes
-(`verex_own_encoded`): the unit's `own` selects the declaration by its
-handle (`<path>.dataOwn`), and the selected predicate of an encoding
-(`OwnAtArguments`) is applied to the arguments' inhabitability and to the
-decoding of the row's own encoding, which leaves the named clauses
-(`<path>.dataOwn.case{i}`) applied to the plain row.  None where the type
-is not a declaration's, where the arguments are not known inhabitable, or
-where the unit states no invariant — there the selection leaves `True` and
-the fact would say nothing. -/
-def certifiedClauses? (value : Lean.Expr) : TacticM (Option Lean.Expr) := do
-  let type ← whnfR (← inferType value)
-  if let some (carriers, view) ← nominalCertificateView? type then
-    let proof ← withDefault <| mkAppOptM
-      (if view.isAppOfArity ``NTy.struct 3 then ``structOwnCertificate else ``enumOwnCertificate)
-      ((#[carriers] ++ view.getAppArgs ++ #[value]).map some)
-    return ← certificateOwnClauses? (← inferType proof) proof
-  let_expr Subtype α predicate := type | return none
-  -- The certificate's statement at a fresh row, as the carrier spells it:
-  -- `NTy.carrier` at a declaration is its row under `NTy.deepHolds` of the
-  -- declaration's type, and unfolding that would lose the type the clauses
-  -- belong to.
-  let stated ← withLocalDeclD `row α fun row => do
-    return (predicate.beta #[row]).abstract #[row]
-  let_expr NTy.deepHolds _ σ _ := stated | return none
-  let σ ← whnfD σ
-  unless σ.isAppOfArity ``NTy.struct 3 || σ.isAppOfArity ``NTy.enum 5 do return none
-  let certificate ← mkAppOptM ``Subtype.property #[α, predicate, value]
-  -- The invariants of a declaration's value are its `own` of the row's
-  -- encoding and its fields' own: the first conjunct is the declaration's.
-  let certified ← whnfD (← inferType certificate)
-  let_expr And ownStated _ := certified | return none
-  let own ← mkAppM ``And.left #[← mkExpectedTypeHint certificate certified]
-  -- A compound read exposes the same owned encoding as a local fact.
-  -- The shared producer checks the application to its row and decoding.
-  return ← certificateOwnClauses? ownStated own
-
-/-- A nominal certificate also certifies the plain fields recursively.  These
-facts belong to the value's current frame, independently of the transport
-needed to read the declaration's own predicate. -/
-def certifiedFields? (value : Lean.Expr) : TacticM (Option Lean.Expr) := do
-  let type ← whnfR (← inferType value)
-  if let some (carriers, view) ← nominalCertificateView? type then
-    let isStruct := view.isAppOfArity ``NTy.struct 3
-    let free := if isStruct then
-        mkApp (mkConst ``NRow.certificateFree) (view.getArg! 2)
-      else mkApp (mkConst ``NRows.certificateFree) (view.getArg! 3)
-    if (← whnfD free).isConstOf ``Bool.true then return none
-    return some (← withDefault <| mkAppOptM
-      (if isStruct then ``NTy.fieldsHold else ``NTy.variantHolds)
-      ((#[carriers] ++ view.getAppArgs ++ #[value]).map some))
-  let_expr Subtype α predicate := type | return none
-  let stated ← withLocalDeclD `row α fun row => do
-    return (predicate.beta #[row]).abstract #[row]
-  let_expr NTy.deepHolds _ σ _ := stated | return none
-  let σ ← whnfD σ
-  unless σ.isAppOfArity ``NTy.struct 3 || σ.isAppOfArity ``NTy.enum 5 do return none
-  -- These fields carry no further invariant when their row is certificate-free.
-  -- Keep unknown rows and every nominal/parameter field for the recursive reader.
-  let free := if σ.isAppOfArity ``NTy.struct 3 then
-      mkApp (mkConst ``NRow.certificateFree) (σ.getArg! 2)
-    else mkApp (mkConst ``NRows.certificateFree) (σ.getArg! 3)
-  if (← whnfD free).isConstOf ``Bool.true then return none
-  let certificate ← mkAppOptM ``Subtype.property #[α, predicate, value]
-  let certified ← whnfD (← inferType certificate)
-  let_expr And _ _ := certified | return none
-  return some (← mkAppM ``And.right
-    #[← mkExpectedTypeHint certificate certified])
-
 /-- A value's fact read to the parts it is of: the declaration's own
 clauses, and the facts of its fields or of its variant's row as a second
 conjunct, which the opener pushes back on its worklist
@@ -8449,8 +9390,8 @@ private def retainedCertificateClauses? (type proof : Lean.Expr) :
     | .trivial => pure none
     | .undecoded => pure (some own)
   let free := if isStruct then
-      mkApp (mkConst ``NRow.certificateFree) (view.getArg! 2)
-    else mkApp (mkConst ``NRows.certificateFree) (view.getArg! 3)
+      mkApp (mkConst ``NRow.invariantFree) (view.getArg! 2)
+    else mkApp (mkConst ``NRows.invariantFree) (view.getArg! 3)
   let fields? ← if (← whnfD free).isConstOf ``Bool.true then
       pure none
     else
@@ -8459,7 +9400,7 @@ private def retainedCertificateClauses? (type proof : Lean.Expr) :
 
 /-- A row of facts split into one fact per component: the form the fold
 recurses to, so that a slot's certificate is its own fact
-(`HListPlain.Holds`).  A conjunct that is no fact of a value is returned as
+(`HList.Holds`).  A conjunct that is no fact of a value is returned as
 it stands, and an empty row gives nothing. -/
 private partial def rowFacts (proof : Lean.Expr) :
     MetaM (Array (Lean.Expr × Lean.Expr)) := do
@@ -8494,14 +9435,24 @@ private partial def rowFacts (proof : Lean.Expr) :
   return (← rowFacts (← mkAppM ``And.left #[hinted])) ++
     (← rowFacts (← mkAppM ``And.right #[hinted]))
 
+private def mentionsSpecMapRead (e : Lean.Expr) : Bool :=
+  (e.find? fun sub =>
+    sub.isConstOf ``VerexIR.SpecMap.valueAt ||
+    sub.isConstOf ``VerexIR.SpecMap.keyAt ||
+    sub.isConstOf ``VerexIR.SpecMap.get?).isSome
+
 /-- The facts a value's one fact is of, at an observed read or membership of a
-container (`NTy.Holds.of_getElem?`, `NTy.Holds.of_mem`): the element the context
-reads at a position or quantifies over, as the certificate of the container
-gives it.  A container's fact is never opened whole: it is instantiated where
-the leaf reads it (`doc/plan/one-spelling.md`, D1). -/
-private def observedElementFacts (carriers τ container proof : Lean.Expr) : MetaM (Array Lean.Expr) := do
+container (`NTy.Holds.of_getElem?`, `NTy.Holds.of_mem`,
+`NTy.Holds.of_specMap_valueAt`, `NTy.Holds.of_specMap_keyAt`,
+`NTy.Holds.of_specMap_get?`): the element the context reads at a position or
+quantifies over, as the certificate of the container gives it.  A container's
+fact is never opened whole: it is instantiated where the leaf reads it
+(`doc/plan/one-spelling.md`, D1). -/
+private def observedElementFacts (carriers τ container proof : Lean.Expr)
+    (target? : Option Lean.Expr := none) : MetaM (Array Lean.Expr) := do
   let view ← (try nativeTypeView τ catch _ => pure τ)
   let isSliceRef := view.isAppOfArity ``NTy.sliceRef 1
+  let isTable := view.isAppOfArity ``NTy.table 2
   let (readings, memReadings, projDepth) : Array (Name × Nat) × Array (Name × Nat) × Nat :=
     if view.isAppOfArity ``NTy.vector 1 then
       (#[(``NTy.Holds.of_getElem?, 2)], #[(``NTy.Holds.of_mem, 2)], 1)
@@ -8509,7 +9460,7 @@ private def observedElementFacts (carriers τ container proof : Lean.Expr) : Met
       (#[(``NTy.Holds.of_getElem?_slice, 2)], #[(``NTy.Holds.of_mem_slice, 2)], 1)
     else if view.isAppOfArity ``NTy.array 2 then
       (#[(``NTy.Holds.of_getElem?_array, 3)], #[(``NTy.Holds.of_mem_array, 3)], 2)
-    else if view.isAppOfArity ``NTy.table 2 then
+    else if isTable then
       (#[(``NTy.Holds.of_getElem?_table_key, 3), (``NTy.Holds.of_getElem?_table_value, 3)],
        #[(``NTy.Holds.of_mem_table_key, 3), (``NTy.Holds.of_mem_table_value, 3)], 1)
     else if isSliceRef then
@@ -8537,7 +9488,8 @@ private def observedElementFacts (carriers τ container proof : Lean.Expr) : Met
     else pure false
     return (ok, mid?)
   let mut found := #[]
-  for decl in ← getLCtx do
+  let lctx ← getLCtx
+  for decl in lctx do
     if decl.isImplementationDetail then continue
     let type := (← instantiateMVars decl.type).consumeMData
     if type.isAppOfArity ``Membership.mem 5 then
@@ -8568,9 +9520,8 @@ private def observedElementFacts (carriers τ container proof : Lean.Expr) : Met
     unless lookup.isAppOfArity ``GetElem?.getElem? 7 do continue
     unless read.consumeMData.isAppOfArity ``Option.some 2 do continue
     -- Match the container expression at reducible transparency before running
-    -- default-transparency unification in `mkAppOptM`: otherwise a certified
-    -- lookup `((ofDeepHolds c _).values)[i]? = some e` tries to unify
-    -- `NTy.carrier` with `NTy.plain` and unfolds the unit's declarations.
+    -- default-transparency unification in `mkAppOptM`, avoiding unfolding the
+    -- unit's declarations on non-matching element lookups.
     let (targetMatches, mid?) ← matchesCollection (lookup.getArg! 5)
     unless targetMatches do continue
     let activeReadings :=
@@ -8592,16 +9543,207 @@ private def observedElementFacts (carriers τ container proof : Lean.Expr) : Met
         pure fact)
       let some fact := fact? | continue
       found := found.push fact
+  if isTable then
+    let κ := view.getArg! 0
+    let ν := view.getArg! 1
+    let matchesTableEntries (entries : Lean.Expr) : MetaM Bool := do
+      let entries := entries.consumeMData
+      if entries == container then return true
+      if ← withReducible (withNewMCtxDepth (isDefEq entries container)) then return true
+      let owner := tableViewOwner? container
+      if owner.isSome && tableViewOwner? entries == owner then
+        return ← withDefault (withNewMCtxDepth (isDefEq entries container))
+      return false
+    -- Resolve `map` to `(ofEntriesExpr, optional eqProof : map = ofEntriesExpr)` when `map`
+    -- is `SpecMap.ofEntries ... entries` for `container` (directly or via a local alias).
+    let resolveMapOfEntries? (map : Lean.Expr) : MetaM (Option (Lean.Expr × Option Lean.Expr)) := do
+      let map := map.consumeMData
+      if map.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 then
+        if ← matchesTableEntries (map.getArg! 6) then return some (map, none)
+        return none
+      let .fvar m := map | return none
+      if let some decl := lctx.find? m then
+        if let some val := decl.value? then
+          let val := (← instantiateMVars val).consumeMData
+          if val.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 then
+            if ← matchesTableEntries (val.getArg! 6) then return some (val, none)
+      for decl in lctx do
+        if decl.isImplementationDetail then continue
+        let some (_, lhs, rhs) := (← instantiateMVars decl.type).consumeMData.eq? | continue
+        let lhs := lhs.consumeMData
+        let rhs := rhs.consumeMData
+        if lhs == map && rhs.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 then
+          if ← matchesTableEntries (rhs.getArg! 6) then return some (rhs, some decl.toExpr)
+        if rhs == map && lhs.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 then
+          if ← matchesTableEntries (lhs.getArg! 6) then
+            return some (lhs, some (← mkEqSymm decl.toExpr))
+      return none
+    let viewsCache ← IO.mkRef (none : Option (NativeMaps.TypedView × NativeMaps.TypedView × Lean.Expr × Lean.Expr))
+    let getViewsAndHolds? : MetaM (Option (NativeMaps.TypedView × NativeMaps.TypedView × Lean.Expr × Lean.Expr)) := do
+      if let some cached ← viewsCache.get then return some cached
+      let some keys ← NativeMaps.typedView? carriers κ | return none
+      let some values ← NativeMaps.typedView? carriers ν | return none
+      let viewHoldsProof (v : NativeMaps.TypedView) : MetaM Lean.Expr := do
+        let dom := mkApp2 (mkConst ``NTy.carrier) v.carriers v.type
+        withLocalDeclD `x dom fun x => do
+          let hxTy := mkApp3 (mkConst ``NTy.Holds) v.carriers v.type x
+          withLocalDeclD `hx hxTy fun hx => do
+            if v.identity then
+              mkLambdaFVars #[x, hx] hx
+            else
+              let rb ← v.readBack
+              let eq := mkApp rb x
+              let motive ← withLocalDeclD `y dom fun y =>
+                mkLambdaFVars #[y] (mkApp3 (mkConst ``NTy.Holds) v.carriers v.type y)
+              let transported ← mkEqMPR (← mkCongrArg motive eq) hx
+              mkLambdaFVars #[x, hx] transported
+      let kh ← viewHoldsProof keys
+      let vh ← viewHoldsProof values
+      let result := (keys, values, kh, vh)
+      viewsCache.set (some result)
+      return some result
+    let buildEntriesHold? (map ofEntriesExpr : Lean.Expr) (eqProof? : Option Lean.Expr) :
+        MetaM (Option (NativeMaps.TypedView × NativeMaps.TypedView × Lean.Expr)) := do
+      let some (keys, values, kh, vh) ← getViewsAndHolds? | return none
+      let tableProof ← if view == τ then pure proof
+        else withDefault (mkExpectedTypeHint proof (mkApp3 (mkConst ``NTy.Holds) carriers view container))
+      let eh? ← observing? (withNewMCtxDepth (withDefault do
+        let eh ← mkAppOptM ``VerexIR.SpecMap.entries_hold_ofEntries
+          #[some carriers, some (ofEntriesExpr.getArg! 2), some (ofEntriesExpr.getArg! 3),
+            some κ, some ν, some (ofEntriesExpr.getArg! 4), some (ofEntriesExpr.getArg! 5),
+            some keys.unread, some values.unread, some (ofEntriesExpr.getArg! 6),
+            some tableProof, some kh, some vh]
+        let eh ← match eqProof? with
+          | none => pure eh
+          | some eqMap =>
+              let motive ← withLocalDeclD `m (← inferType map) fun m =>
+                mkLambdaFVars #[m] (mkAppN (mkConst ``VerexIR.SpecMap.EntriesHold)
+                  #[carriers, ofEntriesExpr.getArg! 2, ofEntriesExpr.getArg! 3,
+                    κ, ν, keys.unread, values.unread, m])
+              mkEqMPR (← mkCongrArg motive eqMap) eh
+        let eh ← instantiateMVars eh
+        if eh.hasExprMVar then failure
+        pure eh))
+      let some eh := eh? | return none
+      return some (keys, values, eh)
+    let dischargePresent? (K V decEq map key : Lean.Expr) : MetaM (Option Lean.Expr) := do
+      let presentType ← mkEq (mkAppN (mkConst ``VerexIR.SpecMap.hasKey) #[K, V, decEq, map, key])
+        (mkConst ``Bool.true)
+      if let some p ← boundedContextDischarge lctx presentType (collectFVars {} presentType).fvarSet then
+        return some p
+      let key := key.consumeMData
+      for decl in lctx do
+        if decl.isImplementationDetail then continue
+        let ty := (← instantiateMVars decl.type).consumeMData
+        let some (_, lhs, rhs) := ty.eq? | continue
+        unless rhs.consumeMData.isConstOf ``Bool.true do continue
+        let lhs := lhs.consumeMData
+        unless lhs.isAppOfArity ``VerexIR.SpecMap.hasKey 5 do continue
+        let lhsKey := (lhs.getArg! 4).consumeMData
+        let keyMatches ←
+          if lhsKey == key then pure true
+          else withReducible (withNewMCtxDepth (isDefEq lhsKey key))
+        unless keyMatches do continue
+        if let some _ ← resolveMapOfEntries? (lhs.getArg! 3) then
+          if ← withNewMCtxDepth (withDefault (isDefEq ty presentType)) then
+            return some (← withDefault (mkExpectedTypeHint decl.toExpr presentType))
+      return none
+    let seenReads ← IO.mkRef (#[] : Array Lean.Expr)
+    let emitted ← IO.mkRef found
+    let pushCheckedFact (elemView : NativeMaps.TypedView) (elemExpr rawFact : Lean.Expr) : MetaM Unit := do
+      let fact? ← observing? (withNewMCtxDepth (withDefault do
+        let expectedElem := if elemView.identity then elemExpr else elemView.unread.beta #[elemExpr]
+        let expectedTy := mkApp3 (mkConst ``NTy.Holds) elemView.carriers elemView.type expectedElem
+        let fact ← mkExpectedTypeHint rawFact expectedTy
+        let fact ← instantiateMVars fact
+        if fact.hasExprMVar then failure
+        unless ← isTypeCorrect fact do failure
+        pure fact))
+      if let some fact := fact? then
+        emitted.modify (·.push fact)
+    let inspectTerm (root : Lean.Expr) : MetaM Unit := do
+      if !mentionsSpecMapRead root then return
+      let terms ← IO.mkRef (#[] : Array Lean.Expr)
+      root.forEach fun sub => do
+        if sub.hasLooseBVars then return
+        let sub := sub.consumeMData
+        if sub.isAppOfArity ``VerexIR.SpecMap.valueAt 6 ||
+            sub.isAppOfArity ``VerexIR.SpecMap.keyAt 5 then
+          terms.modify fun acc => if acc.any (· == sub) then acc else acc.push sub
+      for sub in ← terms.get do
+        if (← seenReads.get).any (· == sub) then continue
+        if sub.isAppOfArity ``VerexIR.SpecMap.valueAt 6 then
+          let args := sub.getAppArgs
+          let (K, V, decEq, inhV, map, key) := (args[0]!, args[1]!, args[2]!, args[3]!, args[4]!, args[5]!)
+          let some (ofEntriesExpr, eqProof?) ← resolveMapOfEntries? map | continue
+          seenReads.modify (·.push sub)
+          let some present ← dischargePresent? K V decEq map key | continue
+          let some (keys, values, eh) ← buildEntriesHold? map ofEntriesExpr eqProof? | continue
+          let rawFact? ← observing? (withNewMCtxDepth (withDefault do
+            mkAppOptM ``VerexIR.Proofs.Denote.NTy.Holds.of_specMap_valueAt
+              #[some carriers, some K, some V, some decEq, some inhV,
+                some κ, some ν, some keys.unread, some values.unread, some map,
+                some eh, some key, some present]))
+          if let some rawFact := rawFact? then
+            pushCheckedFact values sub rawFact
+        else if sub.isAppOfArity ``VerexIR.SpecMap.keyAt 5 then
+          let args := sub.getAppArgs
+          let (K, V, inhK, map, index) := (args[0]!, args[1]!, args[2]!, args[3]!, args[4]!)
+          let some (ofEntriesExpr, eqProof?) ← resolveMapOfEntries? map | continue
+          seenReads.modify (·.push sub)
+          let zero := mkIntLit 0
+          let lowType ← mkAppM ``LE.le #[zero, index]
+          let sizeExpr := mkApp3 (mkConst ``VerexIR.SpecMap.size) K V map
+          let highType ← mkAppM ``LT.lt #[index, sizeExpr]
+          let some low ← boundedContextDischarge lctx lowType (collectFVars {} lowType).fvarSet | continue
+          let some high ← boundedContextDischarge lctx highType (collectFVars {} highType).fvarSet | continue
+          let some (keys, values, eh) ← buildEntriesHold? map ofEntriesExpr eqProof? | continue
+          let rawFact? ← observing? (withNewMCtxDepth (withDefault do
+            mkAppOptM ``VerexIR.Proofs.Denote.NTy.Holds.of_specMap_keyAt
+              #[some carriers, some K, some V, some inhK,
+                some κ, some ν, some keys.unread, some values.unread, some map,
+                some eh, some index, some low, some high]))
+          if let some rawFact := rawFact? then
+            pushCheckedFact keys sub rawFact
+    for decl in lctx do
+      if decl.isImplementationDetail then continue
+      let type := (← instantiateMVars decl.type).consumeMData
+      if let some (_, lhs, rhs) := type.eq? then
+        let lhs := lhs.consumeMData
+        let rhs := rhs.consumeMData
+        let getEq? : Option (Lean.Expr × Lean.Expr × Bool) :=
+          if lhs.isAppOfArity ``VerexIR.SpecMap.get? 5 && rhs.isAppOfArity ``Option.some 2 then
+            some (lhs, rhs.getArg! 1, false)
+          else if rhs.isAppOfArity ``VerexIR.SpecMap.get? 5 && lhs.isAppOfArity ``Option.some 2 then
+            some (rhs, lhs.getArg! 1, true)
+          else none
+        if let some (lookup, elemVal, symm) := getEq? then
+          let args := lookup.getAppArgs
+          let (K, V, decEq, map, key) := (args[0]!, args[1]!, args[2]!, args[3]!, args[4]!)
+          if let some (ofEntriesExpr, eqProof?) ← resolveMapOfEntries? map then
+            if let some (keys, values, eh) ← buildEntriesHold? map ofEntriesExpr eqProof? then
+              let foundProof ← if symm then mkEqSymm decl.toExpr else pure decl.toExpr
+              let rawFact? ← observing? (withNewMCtxDepth (withDefault do
+                mkAppOptM ``VerexIR.Proofs.Denote.NTy.Holds.of_specMap_get?
+                  #[some carriers, some K, some V, some decEq,
+                    some κ, some ν, some keys.unread, some values.unread, some map,
+                    some eh, some key, some elemVal, some foundProof]))
+              if let some rawFact := rawFact? then
+                pushCheckedFact values elemVal rawFact
+      if ← isProp type then
+        inspectTerm type
+    if let some target := target? then
+      inspectTerm target
+    found ← emitted.get
   return found
 
-/-- The declaration clauses of every certified value the leaf names
-(`certifiedClauses?`), asserted as facts: its locals, and the compound storage
-reads in the goal and facts (`observedCertifiedValues`). A value whose
-declaration states no invariant contributes nothing: the selection leaves `True` there and the
-step declines, so a unit without data invariants gains no hypothesis.  Each
-fact asserted is normalized where it stands, so that the deciders read it in
-the form they read every other fact; the normalization visits the new facts
-alone, and none is asserted where the unit states no invariant.
+/-- The declaration clauses of every `NTy.Holds`, storage read, and selected
+ownership fact in the leaf's context, asserted as facts. A type whose
+declaration states no invariant contributes nothing: the selection leaves `True`
+there and the step declines, so a unit without data invariants gains no
+hypothesis. Each fact asserted is normalized where it stands, so that the
+deciders read it in the form they read every other fact; the normalization
+visits the new facts alone.
 
 A value's fact is opened here and nowhere else, to a fixpoint: a hypothesis
 `NTy.Holds` is read to the declaration's clauses and to the facts of its
@@ -8612,21 +9754,6 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
     (introduced : Option (Array Lean.Expr) := none) : TacticM Unit := focusGoal do
   if (← getGoals).isEmpty then return
   let goal ← getMainGoal
-  let values ← goal.withContext do
-    if let some values := introduced then
-      return ← values.filterM fun value => return !(← isProp (← inferType value))
-    let mut found := #[]
-    for decl in ← getLCtx do
-      if decl.isImplementationDetail || decl.isLet then continue
-      if ← isProp decl.type then continue
-      found := found.push decl.toExpr
-    -- Compound reads carry certificates too, even before they receive a local name.
-    found := observedCertifiedValues (← instantiateMVars (← goal.getType)) found
-    for decl in ← getLCtx do
-      if decl.isImplementationDetail then continue
-      unless ← isProp decl.type do continue
-      found := observedCertifiedValues (← instantiateMVars decl.type) found
-    return found
   -- Every fact is found before any is asserted.  The reduction of a
   -- certificate reads the goal the step was entered with, and an assert
   -- replaces that goal, so a fact looked for after one was asserted would be
@@ -8653,15 +9780,51 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
           plainSlots := observedPlainSlotReads env (← instantiateMVars decl.type) plainSlots
       for slotTerm in plainSlots do
         let opt := (slotTerm.getArg! 1).consumeMData
-        let fallback := (slotTerm.getArg! 2).consumeMData.appArg!
+        let fallback := slotTerm.getArg! 2
         let args := opt.getAppArgs
+        let τ := args[3]!
         let readCarriers := mkApp3 (mkConst ``Skolems.toCarriers) args[0]! args[1]! args[2]!
-        let holdsExpected := mkApp3 (mkConst ``NTy.Holds) readCarriers args[3]! slotTerm
-        if let some holdsTyped ← (try
-            withDefault do
-              let rawHolds := mkAppN (mkConst ``Skolems.holds_getD_plainAt) (args.push fallback)
-              pure (some (← mkExpectedTypeHint rawHolds holdsExpected))
-          catch _ => pure none) then
+        let holdsExpected := mkApp3 (mkConst ``NTy.Holds) readCarriers τ slotTerm
+        let holdsTyped? ← try
+          let fallbackExpected := mkApp3 (mkConst ``NTy.Holds) readCarriers τ fallback
+          let mut rawHolds? : Option Lean.Expr := none
+          if let some fbHolds ← findHoldsHypothesis? fallbackExpected then
+            rawHolds? := some (mkAppN (mkConst ``Skolems.holds_getD_plainAt)
+              (args ++ #[fallback, fbHolds]))
+          else if ← isInvariantFreeNTy τ then
+            let free := mkApp (mkConst ``NTy.invariantFree) τ
+            let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+              (← mkEq free (mkConst ``Bool.true))
+            let fbHolds := mkAppN (mkConst ``NTy.holds_of_invariantFree)
+              #[readCarriers, τ, decided, fallback]
+            rawHolds? := some (mkAppN (mkConst ``Skolems.holds_getD_plainAt)
+              (args ++ #[fallback, fbHolds]))
+          else
+            let slotIsSome ← mkEq (← mkAppM ``Option.isSome #[opt]) (mkConst ``Bool.true)
+            let memResource := mkAppN (mkConst ``Skolems.resource) (args.extract 0 5)
+            let memSlot := mkApp2 args[6]! memResource args[5]!
+            let memIsSome ← mkEq (← mkAppM ``Option.isSome #[memSlot]) (mkConst ``Bool.true)
+            for decl in ← getLCtx do
+              if decl.isAuxDecl then continue
+              let raw := decl.type.consumeMData
+              let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+              unless ty.isAppOfArity ``Eq 3 &&
+                  (ty.getArg! 1).consumeMData.isAppOfArity ``Option.isSome 2 do continue
+              if ← withReducible (withNewMCtxDepth (isDefEq ty memIsSome)) then
+                let present ← mkExpectedTypeHint decl.toExpr memIsSome
+                rawHolds? := some (mkAppN (mkConst ``Skolems.holds_getD_plainAt_of_memory_isSome)
+                  (args ++ #[fallback, present]))
+                break
+              if ← withReducible (withNewMCtxDepth (isDefEq ty slotIsSome)) then
+                let present ← mkExpectedTypeHint decl.toExpr slotIsSome
+                rawHolds? := some (mkAppN (mkConst ``Skolems.holds_getD_plainAt_of_isSome)
+                  (args ++ #[fallback, present]))
+                break
+          match rawHolds? with
+          | some rawHolds => withDefault (some <$> mkExpectedTypeHint rawHolds holdsExpected)
+          | none => pure none
+        catch _ => pure none
+        if let some holdsTyped := holdsTyped? then
           pending.modify (·.push (none, holdsTyped, holdsExpected))
     for decl in ← getLCtx do
       if decl.isImplementationDetail || decl.isLet then continue
@@ -8674,43 +9837,38 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
         let rhs := rhs.consumeMData
         if rhs.isAppOfArity ``Option.some 2 then
           let rhsVal := (rhs.getArg! 1).consumeMData
-          let alreadyCertified :=
-            (rhsVal.isAppOfArity ``Subtype.val 3 && rhsVal.appArg!.consumeMData.isFVar) ||
-            (rhsVal.isAppOfArity ``NTy.forget 3 && rhsVal.appArg!.consumeMData.isFVar)
           if lhs.isAppOfArity ``Skolems.plainAt 7 then
-            unless alreadyCertified do
-              let holds? ← try
-                withDefault do
-                  let args := lhs.getAppArgs
-                  let readCarriers := mkApp3 (mkConst ``Skolems.toCarriers) args[0]! args[1]! args[2]!
-                  let plainTy := mkApp2 (mkConst ``NTy.plain) readCarriers args[3]!
-                  let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) plainTy rhsVal)
-                  let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
-                  let h := mkAppN (mkConst ``Skolems.holds_plainAt) (args ++ #[rhsVal, eqTyped])
-                  let holdsExpected := mkApp3 (mkConst ``NTy.Holds) readCarriers args[3]! rhsVal
-                  pure (some (← mkExpectedTypeHint h holdsExpected))
-              catch _ => pure none
-              if let some holds := holds? then
-                let holdsType := (← instantiateMVars (← inferType holds)).consumeMData
-                if holdsType.isAppOfArity ``NTy.Holds 3 then
-                  pending.modify (·.push (none, holds, holdsType))
+            let holds? ← try
+              withDefault do
+                let args := lhs.getAppArgs
+                let readCarriers := mkApp3 (mkConst ``Skolems.toCarriers) args[0]! args[1]! args[2]!
+                let carrierTy := mkApp2 (mkConst ``NTy.carrier) readCarriers args[3]!
+                let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy rhsVal)
+                let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
+                let h := mkAppN (mkConst ``Skolems.holds_plainAt) (args ++ #[rhsVal, eqTyped])
+                let holdsExpected := mkApp3 (mkConst ``NTy.Holds) readCarriers args[3]! rhsVal
+                pure (some (← mkExpectedTypeHint h holdsExpected))
+            catch _ => pure none
+            if let some holds := holds? then
+              let holdsType := (← instantiateMVars (← inferType holds)).consumeMData
+              if holdsType.isAppOfArity ``NTy.Holds 3 then
+                pending.modify (·.push (none, holds, holdsType))
             continue
           if lhs.isAppOfArity ``InterpreterOps.read 8 then
-            unless alreadyCertified do
-              let holds? ← try
-                withDefault do
-                  let args := lhs.getAppArgs
-                  let plainTy := mkApp2 (mkConst ``NTy.plain) args[1]! args[4]!
-                  let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) plainTy rhsVal)
-                  let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
-                  let h := mkAppN (mkConst ``InterpreterOps.read_holds) (args ++ #[rhsVal, eqTyped])
-                  let holdsExpected := mkApp3 (mkConst ``NTy.Holds) args[1]! args[4]! rhsVal
-                  pure (some (← mkExpectedTypeHint h holdsExpected))
-              catch _ => pure none
-              if let some holds := holds? then
-                let holdsType := (← instantiateMVars (← inferType holds)).consumeMData
-                if holdsType.isAppOfArity ``NTy.Holds 3 then
-                  pending.modify (·.push (none, holds, holdsType))
+            let holds? ← try
+              withDefault do
+                let args := lhs.getAppArgs
+                let carrierTy := mkApp2 (mkConst ``NTy.carrier) args[1]! args[4]!
+                let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy rhsVal)
+                let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
+                let h := mkAppN (mkConst ``InterpreterOps.read_holds) (args ++ #[rhsVal, eqTyped])
+                let holdsExpected := mkApp3 (mkConst ``NTy.Holds) args[1]! args[4]! rhsVal
+                pure (some (← mkExpectedTypeHint h holdsExpected))
+            catch _ => pure none
+            if let some holds := holds? then
+              let holdsType := (← instantiateMVars (← inferType holds)).consumeMData
+              if holdsType.isAppOfArity ``NTy.Holds 3 then
+                pending.modify (·.push (none, holds, holdsType))
             continue
       let some (statement, proof) ← selectedOwnClauses? canonicalize type decl.toExpr | continue
       if statement == type || statement.isTrue then continue
@@ -8730,48 +9888,23 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
         -- Redundancy is optional: compare only through reducible wrappers.
         -- Opening nominal predicates here repeatedly unfolds unrelated
         -- definitions before the leaf can use its already-stated facts.
-        if (← (← stated.get).anyM fun other => withReducible (isDefEq other statement)) then return
+        let stripObligation (e : Lean.Expr) : Lean.Expr :=
+          let e := e.consumeMData
+          if e.isAppOfArity ``VerexIR.Proofs.Obligation 4 then e.getArg! 3 else e
+        let bareStatement := stripObligation statement
+        if (← (← stated.get).anyM fun other =>
+            withReducible (isDefEq (stripObligation other) bareStatement)) then return
         -- The step is taken at the entry of each path, so a fact the
         -- context already states is not stated twice.
         if ← (← getLCtx).anyM fun decl => do
             if decl.isImplementationDetail then return false
-            withNewMCtxDepth (withReducible (isDefEq decl.type statement)) then
+            withNewMCtxDepth (withReducible (isDefEq (stripObligation decl.type) bareStatement)) then
           return
         stated.modify (·.push statement)
         if verex.solverDebug.get (← getOptions) then
           IO.println s!"    certified clauses: {((toString (← ppExpr statement)).replace "\n" " ").take 400}"
         found.modify (·.push (source?, statement, ← mkExpectedTypeHint clauses statement))
     catch _ => pure ()
-  -- A whole certified value: its own clauses by its certificate, and its
-  -- fields' facts on the worklist, so that a nested declaration is opened.
-  for value in values do
-    let own ← (try goal.withContext (certifiedClauses? value)
-      catch _ => pure none)
-    let fields ← (try goal.withContext (certifiedFields? value)
-      catch _ => pure none)
-    if let some fields := fields then
-      let folded? ← (try goal.withContext do
-          let type ← instantiateMVars (← inferType fields)
-          if type.isAppOfArity ``HListPlain.deepHolds 3 then
-            pure (some (← mkAppM ``Iff.mpr
-              #[mkAppN (mkConst ``HListPlain.holds_iff) type.getAppArgs, fields]))
-          else if type.isAppOfArity ``variantPlain.deepHolds 4 then
-            pure (some (← mkAppM ``Iff.mpr
-              #[mkAppN (mkConst ``variantPlain.holds_iff) type.getAppArgs, fields]))
-          else pure none
-        catch _ => pure none)
-      if let some folded := folded? then
-        let components ← (try goal.withContext (rowFacts folded) catch _ => pure #[])
-        for (proof, type) in components do
-          pending.modify (·.push (none, proof, type))
-    if let some clauses := own then recordClauses none clauses
-    if verex.solverDebug.get (← getOptions) then
-      if own.isNone then
-        goal.withContext do
-          let type ← instantiateMVars (← inferType value)
-          if (← nominalCertificateView? (← whnfR type)).isSome then
-            IO.println s!"    no clauses of a certified value: \
-              {((toString (← ppExpr value)).replace "\n" " ").take 160}"
   -- The worklist, to a fixpoint: a fact is read to the clauses of its
   -- declaration and to the facts of its fields, each proposition once.
   let mut round := 0
@@ -8816,13 +9949,15 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
           -- reads the context states, and stays whole for the others.
           if source?.isNone then
             let keepWhole ← (try
-                goal.withContext (return !(← isCertificateFreeNTy (prop.getArg! 1)))
+                goal.withContext (return !(← isInvariantFreeNTy (prop.getArg! 1)))
               catch _ => pure false)
             if keepWhole then
               recordClauses none proof
           let elements ← (try
-              goal.withContext
-                (observedElementFacts (prop.getArg! 0) (prop.getArg! 1) (prop.getArg! 2) proof)
+              goal.withContext do
+                let target ← instantiateMVars (← goal.getType)
+                observedElementFacts (prop.getArg! 0) (prop.getArg! 1) (prop.getArg! 2) proof
+                  (some target)
             catch _ => pure (#[] : Array Lean.Expr))
           for fact in elements do
             let factType ← (try
@@ -8852,8 +9987,8 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
         let type ← instantiateMVars decl.type
-        if type.isAppOfArity ``NTy.deepHolds 3 || type.isAppOfArity ``HListPlain.deepHolds 3 ||
-            type.isAppOfArity ``variantPlain.deepHolds 4 then
+        if type.isAppOfArity ``NTy.deepHolds 3 || type.isAppOfArity ``HList.deepHolds 3 ||
+            type.isAppOfArity ``variantCarrier.deepHolds 4 then
           IO.println s!"    unfolded certificate at a leaf: {decl.userName}"
   let facts ← asserted.get
   unless facts.isEmpty do
@@ -8873,22 +10008,23 @@ def assertObservedElementClauses (canonicalize : Lean.Expr → MetaM Lean.Expr) 
     TacticM Unit := focusGoal do
   if (← getGoals).isEmpty then return
   let goal ← getMainGoal
-  let (containers, hasElementRead) ← goal.withContext do
+  let (containers, hasElementRead, target) ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
     let mut containers : Array (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr) := #[]
-    let mut hasRead := false
+    let mut hasRead := mentionsSpecMapRead target
     for decl in ← getLCtx do
       if decl.isImplementationDetail || decl.isLet then continue
       let type := (← instantiateMVars decl.type).consumeMData
       if type.isAppOfArity ``NTy.Holds 3 then
         containers := containers.push (type.getArg! 0, type.getArg! 1, type.getArg! 2, decl.toExpr)
       else if !hasRead then
-        if type.isAppOfArity ``Membership.mem 5 then
+        if type.isAppOfArity ``Membership.mem 5 || mentionsSpecMapRead type then
           hasRead := true
         else if let some (_, lookup, read) := type.eq? then
           if lookup.consumeMData.isAppOfArity ``GetElem?.getElem? 7 &&
               read.consumeMData.isAppOfArity ``Option.some 2 then
             hasRead := true
-    return (containers, hasRead)
+    return (containers, hasRead, target)
   if containers.isEmpty || !hasElementRead then return
   let stated ← IO.mkRef (#[] : Array Lean.Expr)
   let found ← IO.mkRef (#[] : Array (Lean.Expr × Lean.Expr))
@@ -8911,7 +10047,7 @@ def assertObservedElementClauses (canonicalize : Lean.Expr → MetaM Lean.Expr) 
     catch _ => pure ()
   for (carriers, τ, container, proof) in containers do
     let elements ← (try
-        goal.withContext (observedElementFacts carriers τ container proof)
+        goal.withContext (observedElementFacts carriers τ container proof (some target))
       catch _ => pure (#[] : Array Lean.Expr))
     for fact in elements do
       let components ← (try goal.withContext (rowFacts fact) catch _ => pure #[])
@@ -8948,13 +10084,15 @@ def assertObservedElementClauses (canonicalize : Lean.Expr → MetaM Lean.Expr) 
                 recordClauses fieldProof
       | none =>
           let keepWhole ← (try
-              goal.withContext (return !(← isCertificateFreeNTy (prop.getArg! 1)))
+              goal.withContext (return !(← isInvariantFreeNTy (prop.getArg! 1)))
             catch _ => pure false)
           if keepWhole then
             recordClauses proof
           let elements ← (try
-              goal.withContext
-                (observedElementFacts (prop.getArg! 0) (prop.getArg! 1) (prop.getArg! 2) proof)
+              goal.withContext do
+                let target ← instantiateMVars (← goal.getType)
+                observedElementFacts (prop.getArg! 0) (prop.getArg! 1) (prop.getArg! 2) proof
+                  (some target)
             catch _ => pure (#[] : Array Lean.Expr))
           for fact in elements do
             let components ← (try goal.withContext (rowFacts fact) catch _ => pure #[])
@@ -8983,12 +10121,15 @@ def assertObservedElementClauses (canonicalize : Lean.Expr → MetaM Lean.Expr) 
 @[inherit_doc assertObservedElementClauses]
 syntax "verex_observed_elements" : tactic
 
+syntax "verex_context_memory_reads" : tactic
 
 /-- The role predicates of the context read in their specification forms
 (`vir_denote_spec`), then the normal form of what changed. Only the goal and
 the facts that mention a predicate the set reads are rewritten; the
 hypotheses already normal are cached and skipped. -/
 elab "verex_spec_forms" : tactic => focusGoal do
+  if (← getGoals).isEmpty then return
+  try evalTactic (← `(tactic| verex_context_memory_reads)) catch _ => pure ()
   if (← getGoals).isEmpty then return
   let some extension ← getSimpExtension? `vir_denote_spec | return
   let theorems ← extension.getTheorems
@@ -9027,7 +10168,6 @@ elab "verex_normalize_dependent" : tactic => withMainContext do
   let independent ← goal.getNondepPropHyps
   let { ctx, simprocs, .. } ← mkSimpContext (← `(tactic| simp only [
     variantCarrier.ofSkolem, HList.ofSkolem, NTy.ofSkolem,
-    variantPlain.ofSkolem, HListPlain.ofSkolem, NTy.plainOfSkolem,
     variantName, vir_denote_norm])) (eraseLocal := false)
   let mut hypotheses : Array Hypothesis := #[]
   for decl in ← getLCtx do
@@ -9142,34 +10282,6 @@ private def mapDefinitions (goal : MVarId) : MetaM (Array FVarId) := goal.withCo
     if rhs.containsFVar owner then return found
     return found.push decl.fvarId
 
-/-- Recover a plain table from its typed map only under its actual
-certificate. The total plain decoder is not injective outside this boundary. -/
-private def plainTableWriteBack? (carrier : FVarId) (definition : FVarId)
-    (rhs : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
-  let type ← instantiateMVars (← carrier.getType)
-  let some spelling := plainSpelling? type | return none
-  let .ty table := spelling.payload | return none
-  let some carriers := spelling.carriers? | return none
-  let_expr NTy.table key value := ← whnfD table | return none
-  let raw := mkFVar carrier
-  -- The table's fact as the leaf holds it, folded (`NTy.Holds`), and the
-  -- certificate the write-back's law takes, its projection.
-  let certificate := mkApp3 (mkConst ``NTy.Holds) carriers table raw
-  let some found ← findHoldsHypothesis? certificate | return none
-  let held := mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers table raw found
-  let inhabitable (τ : Lean.Expr) : MetaM Lean.Expr := do
-    let target ← mkEq (mkApp (mkConst ``NTy.inhabitable) τ) (mkConst ``Bool.true)
-    let proof ← mkEqRefl (mkConst ``Bool.true)
-    unless ← withDefault (withNewMCtxDepth (isDefEq (← inferType proof) target)) do failure
-    mkExpectedTypeHint proof target
-  observing? <| withTransparency .default do
-    let nonempty ← synthInstance (mkApp (mkConst ``CarriersNonempty) carriers)
-    let proof ← mkAppOptM ``VerexIR.SpecMap.eq_forget_writeBack_of_ofEntries_readPlain
-      #[some carriers, some nonempty, some key, some value, some (← inhabitable key),
-        some (← inhabitable value), some raw, some held, some rhs, some (mkFVar definition)]
-    let written ← inferType proof
-    return (written, proof)
-
 /-- The carrier a typed map's definition determines, substituted: a table is
 its typed map written back (`SpecMap.eq_writeBack_of_ofEntries`), so
 `SpecMap.ofEntries key value x = e` gives `x = writeBack unread e`, the
@@ -9182,8 +10294,6 @@ def writeBackCarrier (goal : MVarId) (definition : FVarId) (hide : Bool := false
   let some (written, proof) ← goal.withContext do
       let some (_, lhs, rhs) := (← instantiateMVars (← definition.getType)).eq? | return none
       let some carrier := typedMap? lhs | return none
-      if let some written ← plainTableWriteBack? carrier definition rhs then
-        return some written
       let_expr VerexIR.Proofs.Denote.NTy.carrier carriers table :=
         (← instantiateMVars (← carrier.getType)).consumeMData | return none
       -- A generic callee's table at the call's type arguments.
@@ -9237,34 +10347,62 @@ elab "verex_subst_maps" : tactic => focusGoal do
 with those reads, as `verex_memory_reads` does for the goal: a fact
 the contract states over memory then speaks of the value the program read,
 such as the variant a precondition fixes. -/
-elab "verex_context_memory_reads" : tactic => focusGoal do
+elab_rules : tactic
+  | `(tactic| verex_context_memory_reads) => focusGoal do
   if (← getGoals).isEmpty then return
   let goal ← getMainGoal
-  let (reads, targets) ← goal.withContext do
-    let mut reads : Array (FVarId × Lean.Expr) := #[]
+  let (reads, targets, targetTypes) ← goal.withContext do
+    let mut reads : Array (FVarId × Lean.Expr × Lean.Expr) := #[]
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let ty ← instantiateMVars decl.type
-      let some (_, lhs, _) := ty.eq? | continue
+      let some (_, lhs, rhs) := ty.eq? | continue
       if ← isStorageReadLHS lhs then
-        reads := reads.push (decl.fvarId, lhs)
-    if reads.isEmpty then return (#[], #[])
+        reads := reads.push (decl.fvarId, lhs, rhs.consumeMData)
+    if reads.isEmpty then return (#[], #[], #[])
     let mut targets := #[]
+    let mut targetTypes := #[]
     for decl in ← getLCtx do
-      if decl.isImplementationDetail || reads.any (·.1 == decl.fvarId) then continue
+      if decl.isImplementationDetail then continue
       let ty ← instantiateMVars decl.type
       unless ← isProp ty do continue
-      if ← reads.anyM fun (_, lhs) => mentionsReadCached lhs ty then
+      if let some (_, ownLhs, ownRhs) := reads.find? (·.1 == decl.fvarId) then
+        if ownLhs.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 then
+          continue
+        if ← reads.anyM fun (rid, lhs, rhs) =>
+            if rid == decl.fvarId || rhs.getAppFn == ownRhs.getAppFn then pure false
+            else mentionsReadCached lhs ty then
+          targets := targets.push decl.fvarId
+          targetTypes := targetTypes.push ty
+      else if ← reads.anyM fun (_, lhs, _) => mentionsReadCached lhs ty then
         targets := targets.push decl.fvarId
-    return (reads.map (·.1), targets)
+        targetTypes := targetTypes.push ty
+    return (reads.map (·.1), targets, targetTypes)
   if targets.isEmpty then throwError "no hypothesis reads memory the leaf fixes"
+  let activeReads := reads.filter (!targets.contains ·)
+  if activeReads.isEmpty then throwError "no hypothesis reads memory the leaf fixes"
   -- The leaves restate one context and its reads: a hypothesis rewritten
   -- by the same reads before is taken from `readForms`, as is one the
   -- rewriting already left alone.
-  let readTypes ← goal.withContext do reads.mapM fun read => do instantiateMVars (← read.getType)
+  let readTypes ← goal.withContext do activeReads.mapM fun read => do instantiateMVars (← read.getType)
   let scope (type : Lean.Expr) : Lean.Expr := readTypes.foldl mkAnd type
   let next ← goal.withContext do
-    let (ctx, simprocs, _) ← rulesSimpContext (← `(tactic| simp only [vir_denote_norm])) reads
+    let hasPlainAt ← activeReads.anyM fun fvarId => do
+      let some (_, lhs, _) := (← instantiateMVars (← fvarId.getType)).eq? | return false
+      return lhs.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7
+    let call ← if hasPlainAt then
+        let mut derivedLemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) := #[]
+        for fvarId in activeReads do
+          for derived in ← plainAtMemoryRewrites fvarId targetTypes do
+            derivedLemmas := derivedLemmas.push
+              (← `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax derived):term))
+        if derivedLemmas.isEmpty then
+          `(tactic| simp only [vir_denote_norm])
+        else
+          `(tactic| simp only [$derivedLemmas,*, vir_denote_norm])
+      else
+        `(tactic| simp only [vir_denote_norm])
+    let (ctx, simprocs, _) ← rulesSimpContext call activeReads
     simpGoalRecorded (← targetState).readForms goal ctx simprocs Simp.dischargeDefault? false
       targets scope (resultsNormal := true)
   match next with
@@ -9288,18 +10426,9 @@ elab "verex_unfold_head" : tactic => do
 
 /-- The reading a unit's requires meaning takes of a closure site's value,
 in place of the meaning: the meaning unfolded at the value, whose arm
-quantifies over the certified captures the value's plain row forgets.  A
-value whose captures the normal forms collapsed to a plain row no longer
-spells that forgetting, so its generated equation (`requires…`) does not
-state it and the arm is reached by unfolding the meaning instead; a row
-still spelling it is read by the equation.
-
-The arm holds of every certified row forgetting to the value's, and a row
-is determined by its forgetting (`HList.forget_injective`), so the binder
-and its premise are introduced and the row substituted.  Where the
-forgetting collapsed to the row itself the premise is already the row's own
-equation, which substitutes as it is.  `none` where the goal states no
-reading of a site's value. -/
+quantifies over the captures equated to the value's row. The binder and its
+premise are introduced and the row substituted. `none` where the goal states
+no reading of a site's value. -/
 def siteRequiresArm? (goal : MVarId) : MetaM (Option MVarId) := do
   let saved ← saveState
   let armed ← (observing? do
@@ -9318,20 +10447,7 @@ def siteRequiresArm? (goal : MVarId) : MetaM (Option MVarId) := do
       unfolded.replaceTargetDefEq arm
     let (_, introduced) ← armed.intro1P
     let (premise, introduced) ← introduced.intro1P
-    -- The premise as the row's own equation, where the forgetting collapsed.
-    if let some substituted ← observing? (Lean.Meta.subst introduced premise) then return substituted
-    introduced.withContext do
-      let type ← instantiateMVars (← premise.getType)
-      let some (_, forgotten, plain) := type.eq? | failure
-      unless forgotten.isAppOfArity ``HList.forget 3 do failure
-      let (family, row) := (forgotten.getArg! 0, forgotten.getArg! 1)
-      let some certified ← certifiedCaptures? family row plain | failure
-      let stated ← mkEq forgotten (mkApp3 (mkConst ``HList.forget) family row certified)
-      let determined ← mkAppOptM ``HList.forget_injective
-        #[some family, some row, none, none, some (← mkExpectedTypeHint (.fvar premise) stated)]
-      let asserted ← introduced.assert `capturedEq (← inferType determined) determined
-      let (equation, asserted) ← asserted.intro1P
-      Lean.Meta.subst asserted equation)
+    Lean.Meta.subst introduced premise)
   match armed with
   | some armed => return some armed
   | none => saved.restore; return none

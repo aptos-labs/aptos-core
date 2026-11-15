@@ -222,16 +222,16 @@ def callCheckedGoal? (goal : MVarId) : MetaM (Option (Lean.Expr × Lean.Expr)) :
     unless target.isAppOfArity ``VerexIR.Proofs.Denote.CallChecked 2 do return none
     return some (target.getArg! 0, target.getArg! 1)
 
-/-- A certifying step at the head of the goal: the site it is reported at,
-what it certifies, and the arguments the cut takes in the order
-`wp_certifyingAt_intro` reads them (`certifyingAt`). -/
-def certifyingGoal? (goal : MVarId) :
+/-- A checking step at the head of the goal: the site it is reported at,
+what it checks, and the arguments the cut takes in the order
+`wp_checkingAt_intro_holds` reads them (`checkingAt`). -/
+def checkingGoal? (goal : MVarId) :
     MetaM (Option (Nat × Lean.Expr × Array Lean.Expr)) :=
   goal.withContext do
     let target ← instantiateMVars (← goal.getType)
     unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
     let action := target.getArg! 3
-    unless action.isAppOfArity ``VerexIR.Proofs.Denote.certifyingAt 6 do return none
+    unless action.isAppOfArity ``VerexIR.Proofs.Denote.checkingAt 6 do return none
     let some site ← siteOf? (action.getArg! 2) | return none
     return some (site, action.getArg! 3,
       action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
@@ -257,6 +257,19 @@ def ghostWriteGoal? (goal : MVarId) : MetaM (Option (Nat × Array Lean.Expr)) :=
     unless action.isAppOfArity ``VerexIR.Proofs.Denote.ghostAt 8 do return none
     let some site ← siteOf? (action.getArg! 5) | return none
     return some (site, action.getAppArgs ++ #[target.getArg! 4, target.getArg! 5, target.getArg! 6])
+
+/-- A ghost write at an invariant-free type as a direct cut, erasing the
+construction check inside `wp_ghostAt`. -/
+theorem wp_ghostAt_invariantFree [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ : NTy}
+    (free : τ.invariantFree = true) (site : Nat)
+    (chosen : State → Option τ.carrier) (entry : HEnv Γ)
+    (ensures : Flow ρ Γ τ.carrier → State → Prop) (aborts : Failure → Prop)
+    (initial : State) (defined : (chosen initial).isSome)
+    (continues : ∀ value, chosen initial = some value → ensures (.value value entry) initial) :
+    wp (ghostAt site chosen entry) ensures aborts initial :=
+  wp_ghostAt site chosen entry ensures aborts initial defined fun value hChosen => by
+    rw [checkingAt_of_invariantFree site .construction τ free value]
+    exact (wp_pure _ _ _ _).mpr (continues value hChosen)
 
 /-- The state anchor a goal's weakest precondition is over, if any: its
 site, and the arguments of `wp_anchorAt`. -/
@@ -323,7 +336,7 @@ reading, which would leave each case stating the computation the split has
 just consumed: a leaf cannot read that statement without taking the
 computation again, while the option's pattern is what the normal forms
 decide and what a context fixing the value refutes.  A chain of readings
-(`Choices.selectCertified?`) is split one reading at a time: the branch past
+(`Choices.select?`) is split one reading at a time: the branch past
 the reading split here is the next reading, whose own match this rule takes
 again, so that every case states one projection's pattern.  `none` where the
 discriminant reads no option, or already reads a pattern. -/
@@ -1156,7 +1169,7 @@ private def entriesView? (statement : Lean.Expr) : MetaM (Option EntriesView) :=
 spell, recursively, with a component of two equal sides dropped.
 
 The projections are built from the sides, never from the row's type.  A
-projection of a row spelled at its own type (`HList row`, `HListPlain row`)
+projection of a row spelled at its own type (`HList row`)
 is type-correct only where that type unfolds to a product, which needs
 default transparency, and simp declines to work on a goal holding such a
 term at all — that is why the splitter of the normal form
@@ -1254,64 +1267,8 @@ private def readEntryValues (goal : MVarId) : TacticM MVarId := do
       current ← rewriteRead current component
   return current
 
-/-- A certified value whose forgetting is a lent value is that value
-certified: its certificate the one the value satisfies. -/
-theorem NTy.eq_ofDeepHolds_of_forget_eq [Carriers] {τ : NTy} {certified : τ.carrier}
-    {value : τ.plain} (equal : τ.forget certified = value) (holds : τ.deepHolds value) :
-    certified = τ.ofDeepHolds value holds := by
-  subst equal
-  exact (NTy.ofDeepHolds_forget τ certified).symm
-
-/-- The certificate a lent value satisfies where a certified value forgets
-to it. -/
-theorem NTy.deepHolds_of_forget_eq [Carriers] {τ : NTy} {certified : τ.carrier}
-    {value : τ.plain} (equal : τ.forget certified = value) : τ.deepHolds value :=
-  equal ▸ τ.deepHolds_forget certified
-
-/-- An entry-value equation of a certified argument and the lent value a
-clause names (`NTy.forget τ a = v`), as the argument certified at that value
-(`NTy.eq_ofDeepHolds_of_forget_eq`): the clause names values and no
-certificate, so the value is the argument's only spelling the leaf reads,
-and the call that passed the argument spells it the same way
-(`Term.certifying`).  The certificate is a local of its own, so the
-argument substitutes away.  `none` where the equation is not of that
-shape. -/
-private def certifiedComponent? (goal : MVarId) (component : FVarId) (name : Name) :
-    MetaM (Option (MVarId × FVarId)) := goal.withContext do
-  let type ← instantiateMVars (← component.getType)
-  let some (_, lhs, rhs) := type.eq? | return none
-  let (lhs, rhs) := (lhs.consumeMData, rhs.consumeMData)
-  let (equation, forgotten, value) ←
-    if lhs.isAppOfArity ``NTy.forget 3 && !rhs.isAppOfArity ``NTy.forget 3 then
-      pure (Lean.Expr.fvar component, lhs, rhs)
-    else if rhs.isAppOfArity ``NTy.forget 3 && !lhs.isAppOfArity ``NTy.forget 3 then
-      pure (← mkEqSymm (.fvar component), rhs, lhs)
-    else return none
-  let certified := forgotten.getArg! 2
-  unless certified.isFVar do return none
-  if value.containsFVar certified.fvarId! then return none
-  -- The family's carriers as the equation spells them: a frame's are no
-  -- instance the leaf could synthesize.
-  let (carriers, τ) := (forgotten.getArg! 0, forgotten.getArg! 1)
-  -- The value's fact as a leaf holds it, folded, and the certificate the
-  -- equation names, its projection (`doc/plan/one-spelling.md`, D1).
-  let holds := mkAppN (mkConst ``NTy.Holds.intro)
-    #[carriers, τ, value,
-      mkAppN (mkConst ``NTy.deepHolds_of_forget_eq) #[carriers, τ, certified, value, equation]]
-  let holdsType := mkApp3 (mkConst ``NTy.Holds) carriers τ value
-  let (holdsVar, goal) ← (← goal.assert (name.appendAfter "Holds") holdsType holds).intro1P
-  goal.withContext do
-  let certificate := mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers τ value (.fvar holdsVar)
-  let proof := mkAppN (mkConst ``NTy.eq_ofDeepHolds_of_forget_eq)
-    #[carriers, τ, certified, value, equation, certificate]
-  let equalType ← mkEq certified
-    (mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value certificate)
-  let (equal, goal) ← (← goal.assert name equalType proof).intro1P
-  let goal ← goal.clear component
-  return some (goal, equal)
-
 /-- The constructor a type a unit declares unfolds to: a type named by a
-constant, which the equations of `NTy.settle` and `NTy.forget` do not match.
+constant, which the equations of `NTy.settle` do not match.
 `none` where the type is spelled as a constructor or is no constant. -/
 private def declaredType? (τ : Lean.Expr) : MetaM (Option Name) := do
   let τ := τ.consumeMData
@@ -1323,16 +1280,16 @@ private def declaredType? (τ : Lean.Expr) : MetaM (Option Name) := do
 
 open Lean Meta Simp in
 /-- The settling of an argument of a type a unit declares (a type named by a
-constant, not spelled as a constructor), as its forgetting: settling is
-forgetting at every type but a mutable reference's (`NTy.settle`), and a
-declared type is not one, so the equation reads the argument's certified
-value at its own type and not the unfolded cases of `NTy.settle`. -/
+constant, not spelled as a constructor), as the value itself: settling leaves
+every non-reference type unchanged (`NTy.settle`), and a declared type is not
+one, so the equation reads the argument's value at its own type and not the
+unfolded cases of `NTy.settle`. -/
 dsimproc_decl settleDeclared (@NTy.settle ?carriers _ _) := fun e => do
   unless e.isAppOfArity ``NTy.settle 3 do return .continue
   let some name ← declaredType? (e.getArg! 1) | return .continue
-  unless [``NTy.struct, ``NTy.enum, ``NTy.tuple, ``NTy.vector, ``NTy.table].contains name do
+  unless [``NTy.struct, ``NTy.enum, ``NTy.tuple, ``NTy.vector, ``NTy.table, ``NTy.nominal].contains name do
     return .continue
-  return .visit (mkApp3 (mkConst ``NTy.forget) (e.getArg! 0) (e.getArg! 1) (e.getArg! 2))
+  return .visit (e.getArg! 2)
 
 /-- An equation of two spelled rows as the equations of their components,
 each named `name`, by the injectivity of pairing; an equation of units is
@@ -1354,14 +1311,14 @@ private partial def injectRowEquation (goal : MVarId) (equation : FVarId) (name 
 
 /-- The entry-value equation of an arguments row, opened per component: the
 row's settling computed (`HList.settle`), a mutable reference's currents
-equated, and any other argument's value read at its own type
-(`NTy.forget_eq_forget`).  Both entries forms are opened by it: a clause's
+equated, and any other argument's value read at its own type.
+Both entries forms are opened by it: a clause's
 `aborts_of` as a hypothesis (`openAtEntries`) and its `requires_of` as a
 goal (`dispatchBehavior`).
 
 Its set is closed: the splitter of a row's equation
 (`pairInjectionRows`) and the steps that settle its reads back into the
-values they came from (`rowOfReads`, `certifiedByConstruction`) belong to
+values they came from (`rowOfReads`) belong to
 the normal form, not to a pass, and taken here on every point they leave
 shapes the pass does not settle again.  Where the goal reads a component
 the equation does not substitute, it is opened once the goal states the
@@ -1372,8 +1329,6 @@ private def openEntryValues (goal : MVarId) (equation : Name) : TacticM MVarId :
       setGoals [goal]
       evalTactic (← `(tactic| simp only [VerexIR.Proofs.Denote.HList.settle, ↓settleDeclared,
         VerexIR.Proofs.Denote.NTy.settle, VerexIR.Proofs.Denote.HList.finals,
-        VerexIR.Proofs.Denote.NTy.forget_eq_forget,
-        VerexIR.Proofs.Denote.Carriers.lent_of_eq_of,
         Prod.mk.injEq, Prod.fst, Prod.snd, and_true, true_and] at $(mkIdent equation):ident))
       let goals ← getGoals
       setGoals saved
@@ -1382,7 +1337,7 @@ private def openEntryValues (goal : MVarId) (equation : Name) : TacticM MVarId :
       setGoals saved
       if verex.solverDebug.get (← getOptions) then
         IO.println s!"entry values not rewritten: {← error.toMessageData.toString}"
-      -- A row whose type is spelled at the plain layer or at another family
+      -- A row whose type is spelled at another family
       -- is no product to the rewriting; its pairs are constructors all the same.
       try
         goal.withContext do
@@ -1433,14 +1388,6 @@ private def openEntryValues (goal : MVarId) (equation : Name) : TacticM MVarId :
       if let some next := split then
         current := next
         continue
-      -- A certified argument equated with a lent value: the argument as
-      -- that value certified (`certifiedComponent?`).
-      let (current', component) ← match ← (try
-            certifiedComponent? current component equation
-          catch _ => pure none) with
-        | some (goal, equal) => pure (goal, equal)
-        | none => pure (current, component)
-      current := current'
       current ← try
           Lean.Meta.substCore current component (symm := true) <&> (·.2)
         catch _ => try
@@ -1656,49 +1603,28 @@ private partial def rowMetavariables (carriers row : Lean.Expr) :
   if row.isConstOf ``NRow.nil then return some (mkConst ``Unit.unit)
   unless row.isAppOfArity ``NRow.cons 2 do return none
   let (τ, rest) := (row.getArg! 0, row.getArg! 1)
-  -- A mutable reference's carrier is its plain current and its certified
-  -- prophecy, which the two equations determine one each: the entry is
-  -- spelled as that pair, or the settling would stand under a projection
-  -- of it (`NTy.carrier`, `doc/designs/data-invariants.md`).  The
-  -- current is spelled in the canonical spelling of the plain layer
-  -- (`PlainSpelling`).
+  -- A mutable reference's carrier is its current and its prophecy, which the
+  -- two equations determine one each: the entry is spelled as that pair, or
+  -- the settling would stand under a projection of it (`NTy.carrier`).
   let spelled := (← whnfR τ).consumeMData
   let head ← if spelled.isAppOfArity ``NTy.ref 1 then
       let σ := spelled.appArg!
-      let referent := mkApp2 (mkConst ``NTy.plainOf)
-        (mkApp (mkConst ``Carriers.toPlain) carriers) σ
-      let prophecy := mkApp2 (mkConst ``NTy.carrier) carriers σ
-      mkAppOptM ``Prod.mk #[referent, prophecy, ← mkFreshExprMVar referent,
-        ← mkFreshExprMVar prophecy]
+      let referent := mkApp2 (mkConst ``NTy.carrier) carriers σ
+      mkAppOptM ``Prod.mk #[referent, referent, ← mkFreshExprMVar referent,
+        ← mkFreshExprMVar referent]
     else mkFreshExprMVar (mkApp2 (mkConst ``NTy.carrier) carriers τ)
   let some tail ← rowMetavariables carriers rest | return none
   return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) carriers τ,
     mkApp2 (mkConst ``HList) carriers rest, head, tail])
 
-/-- The row a clause's entry values name where no row of the clause's own
-forgets to them: the values themselves, certified at the hand-over to the
-invocation.
-
-A value a specification builds is plain, its data invariants owed by the cut
-at the position that holds it (`nativeConstructed`).  The position that
-holds the entry values of an invocation is the hand-over to it, where the
-caller owes the invariants of what it hands over, as it owes them of a
-`&mut` argument's referent.  So the certificate this row carries is that
-hand-over's obligation, read where it is owed: the leaf proves it, and where
-it cannot the row is not read and the residual reports the violation at the
-hand-over.
-
-Reference-free rows only: a reference's settling reads its current twice, so
-no certified row built from settled values is the row the clause named. -/
-private partial def certifiedEntries? (carriers row entries : Lean.Expr) :
-    TacticM (Option Lean.Expr) := do
+/-- The row a clause's entry values name where unification over a single row
+metavariable does not read a spelled product spine: the values themselves,
+spelled per entry at a reference-free row. -/
+private partial def spelledEntries? (carriers row entries : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
   let free := mkApp (mkConst ``NRow.refFree) row
   unless (← withDefault (whnf free)).isConstOf ``Bool.true do return none
-  -- Spelled per entry, as the hand-over of a call spells its certified
-  -- arguments (`Term.certifying`, `NTy.ofDeepHolds` of each value): a
-  -- leaf's facts about the call and the statement read at this row are
-  -- then the same proposition, certificates aside.
-  let rec spell (row entries : Lean.Expr) : TacticM (Option Lean.Expr) := do
+  let rec spell (row entries : Lean.Expr) : MetaM (Option Lean.Expr) := do
     let row := (← whnfR row).consumeMData
     if row.isConstOf ``NRow.nil then return some (mkConst ``Unit.unit)
     unless row.isAppOfArity ``NRow.cons 2 do return none
@@ -1706,16 +1632,9 @@ private partial def certifiedEntries? (carriers row entries : Lean.Expr) :
     let entries := entries.consumeMData
     unless entries.isAppOfArity ``Prod.mk 4 do return none
     let (value, others) := (entries.getArg! 2, entries.getArg! 3)
-    let holds := mkApp3 (mkConst ``NTy.Holds) carriers τ value
-    let certificate ← mkFreshExprSyntheticOpaqueMVar holds
-    unless ← closesBy certificate.mvarId!
-        (← `(tactic| ((try simp only [vir_denote_norm]) <;> (try verex_holds) <;> verex_leaf))) do
-      return none
-    let head := mkApp4 (mkConst ``NTy.ofDeepHolds) carriers τ value
-      (mkApp4 (mkConst ``NTy.Holds.deepHolds) carriers τ value (← instantiateMVars certificate))
     let some tail ← spell rest others | return none
     return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) carriers τ,
-      mkApp2 (mkConst ``HList) carriers rest, head, tail])
+      mkApp2 (mkConst ``HList) carriers rest, value, tail])
   spell row entries
 
 /-- A proposition with every statement over entry values in a positive
@@ -1725,10 +1644,9 @@ position read at the row those values name, and the implication from it
 statements — the abort conditions of a clause — one row each.  A statement
 that names the finals of the row's mutable references names the whole row:
 settling gives the currents and the finals the prophecies, so both
-equations are solved for one row (`AtEntryFinals`).  Where no row forgets to
-the values — a value a specification builds is plain and names no certified
-row — the row is the values certified (`certifiedEntries?`).  `none` where
-it reads no statement so. -/
+equations are solved for one row (`AtEntryFinals`).  Where unification of a
+single row metavariable does not read a product spine, the row is spelled per
+entry (`spelledEntries?`).  `none` where it reads no statement so. -/
 private partial def strengthenEntries (statement : Lean.Expr) :
     TacticM (Option (Lean.Expr × Lean.Expr)) := do
   let identity (proposition : Lean.Expr) : MetaM Lean.Expr :=
@@ -1773,14 +1691,13 @@ private partial def strengthenEntries (statement : Lean.Expr) :
       let args ← instantiateMVars args
       if args.hasExprMVar then return none
       return some args
-    -- The values a specification builds are plain and name no certified
-    -- row, so unification finds none; the row is then the values certified
-    -- at the hand-over (`certifiedEntries?`), whose settling is the values
-    -- again, as it is of any reference-free row.
+    -- A product spine built directly in a specification is spelled per entry
+    -- (`spelledEntries?`), whose settling is the values again at any
+    -- reference-free row.
     let args? ← match read? with
       | some args => pure (some args)
       | none =>
-          match ← certifiedEntries? view.carriers view.row view.entries with
+          match ← spelledEntries? view.carriers view.row view.entries with
           | none => pure none
           | some args => withDefault do
               let settling := mkApp3 (mkConst ``HList.settle) view.carriers view.row args
@@ -1988,13 +1905,15 @@ private def closeSettled (goal : MVarId) : TacticM MVarId := do
     -- unfolds to its subtype at reducible transparency, which names no type.
     let_expr VerexIR.Proofs.Denote.NTy.carrier carriers σ := domain.consumeMData
       | return none
-    -- The statement's own shape: the current the prophecy forgets, and the
-    -- run at it.  Nothing else quantified over a carrier is witnessed here.
+    -- The statement's own shape: the current the prophecy settles to, and the
+    -- run at `(prophecy, prophecy)`.  Nothing else quantified over a carrier is witnessed here.
     let shaped ← withLocalDeclD `prophecy domain fun prophecy => do
       let inner ← Core.betaReduce (mkApp body prophecy)
       unless inner.isAppOfArity ``And 2 do return false
       let some (_, lhs, _) := (inner.getArg! 0).eq? | return false
-      return (lhs.consumeMData).isAppOfArity ``VerexIR.Proofs.Denote.NTy.forget 3
+      unless lhs.consumeMData == prophecy do return false
+      return ((inner.getArg! 1).find? fun e =>
+        e.isAppOfArity ``Prod.mk 4 && e.getArg! 2 == prophecy && e.getArg! 3 == prophecy).isSome
     unless shaped do return none
     let some prophecy ← returnedProphecy? carriers σ | return none
     let inner ← Core.betaReduce (mkApp body prophecy)
@@ -2359,7 +2278,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
           ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
-              Weave.subst, Weave.compose, vir_denote_norm]) <;>
+              Weave.subst, Weave.compose, HList.Holds, vir_transport, vir_denote_norm]) <;>
             verex_split_hypotheses <;> (repeat apply And.intro) <;> first
               | assumption
               | (apply VerexIR.Proofs.MethodContract.of_instantiate _ (by decide)
@@ -2389,7 +2308,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       -- adapter's instantiated frame. Transport it back to the caller before
       -- the leaf compares it with an abstract callback's own behavior.
       evalTactic (← `(tactic| simp only [$lemmas,*, Weave.subst, Weave.compose, ResultShape.toSkolem,
-        vir_transport, vir_denote_norm, not_false_eq_true, true_implies, not_or]
+        ResultShape.Holds, vir_transport, vir_denote_norm, not_false_eq_true, true_implies, not_or]
         at $(mkIdent `verexBehavior):ident))
       current ← getMainGoal
     catch _ => state.restore
@@ -2726,8 +2645,35 @@ def receiverScopedClosure? (goal : MVarId) : TacticM (Option (List MVarId)) := g
       IO.println s!"scoped receiver receipt: {← error.toMessageData.toString}"
     return none
 
+/-- Normalize an introduced `HList.Holds` or `ResultShape.Holds` hypothesis by
+`FVarId`, splitting any top-level conjunction into individual hypotheses without
+disturbing other local binders. -/
+private def normalizeMethodHolds (goal : MVarId) (fvarId : FVarId) (baseName : Name)
+    (simplifyTarget : Bool := false) : TacticM (Option MVarId) := do
+  setGoals [goal]
+  let (ctx, simprocs) ← goal.withContext do
+    simpContextOf (← `(tactic|
+      simp only [VerexIR.Proofs.Denote.ResultShape.Holds,
+        vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]))
+  let some (replaced, mutGoal) := (← simpGoal goal ctx simprocs
+      (simplifyTarget := simplifyTarget) (fvarIdsToSimp := #[fvarId])).1
+    | return none
+  let fvarId := replaced[0]?.getD fvarId
+  mutGoal.withContext do
+    let some decl := (← getLCtx).find? fvarId | return some mutGoal
+    let parts ← conjuncts decl.toExpr
+    if parts.size ≤ 1 then return some mutGoal
+    let mut current := mutGoal
+    for part in parts do
+      let partType ← current.withContext (inferType part)
+      if partType.isTrue then continue
+      current ← current.withContext do
+        pure (← (← current.assert baseName partType part).intro1P).2
+    current ← (try current.clear fvarId catch _ => pure current)
+    return some current
+
 /-- A dictionary's contract is proved at the caller's frame, then by the
-ordinary verified-target invocation rule at every argument and memory. -/
+ordinary verified-target invocation rule at every valid argument and memory. -/
 def methodContract? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   unless target.isAppOfArity ``VerexIR.Proofs.MethodContract 8 do return none
@@ -2747,7 +2693,12 @@ def methodContract? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.wit
       #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free,
         target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
     return some (← goal.apply rule)
-  let (_, next) ← goal.introN 2 [`verexMethodArguments, `verexMethodInitial]
+  let (introduced, next) ← goal.introN 3
+    [`verexMethodArguments, `verexMethodInitial, `verexMethodValidArgs]
+  if let some validId := introduced[2]? then
+    match ← normalizeMethodHolds next validId `verexMethodValidArgs (simplifyTarget := true) with
+    | some next => return some [next]
+    | none => return some []
   return some [next]
 
 /-- An invocation of a function value the proof does not see: the rule with
@@ -2766,13 +2717,44 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
       unless (declaration.type.find? (·.isConstOf ``VerexIR.Proofs.MethodContract)).isSome do continue
       methodFacts := methodFacts ++ (← conjuncts declaration.toExpr)
     for fact in methodFacts do
-      unless (← inferType fact).isAppOf ``VerexIR.Proofs.MethodContract do continue
+      unless (← whnfR (← inferType fact)).isAppOf ``VerexIR.Proofs.MethodContract do continue
       let saved ← saveState
       try
         let rule ← mkAppM ``VerexIR.Proofs.MethodContract.invoke #[fact, action.getArg! 8]
-        let [next] ← goal.apply rule | saved.restore; continue
-        let (_, next) ← next.introN 2 [`verexResult, `verexEnsures]
-        return some [next]
+        let [validArgsGoal, next] ← goal.apply rule | saved.restore; continue
+        let validGoals ← do
+          setGoals [validArgsGoal]
+          evalTactic (← `(tactic|
+            (try simp only [VerexIR.Proofs.Denote.ResultShape.Holds,
+              vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]) <;>
+              (repeat apply And.intro) <;>
+              (try first | trivial | assumption)))
+          let mut remaining := []
+          for subgoal in ← getGoals do
+            let openGoal? ← subgoal.withContext do
+              let subType ← instantiateMVars (← subgoal.getType)
+              if let some proof ← findHoldsHypothesis? subType then
+                subgoal.assign proof
+                return none
+              for declaration in ← getLCtx do
+                if declaration.isImplementationDetail then continue
+                if ← isProp declaration.type then
+                  for candidate in ← conjuncts declaration.toExpr do
+                    if ← isDefEq (← inferType candidate) subType then
+                      subgoal.assign candidate
+                      return none
+              return some subgoal
+            if let some openGoal := openGoal? then
+              remaining := remaining ++ [openGoal]
+          pure remaining
+        let (introduced, next) ← next.introN 3 [`verexResult, `verexResultHolds, `verexEnsures]
+        let nextGoals ← match introduced[1]? with
+          | some holdsId =>
+              match ← normalizeMethodHolds next holdsId `verexResultHolds with
+              | some next => pure [next]
+              | none => pure []
+          | none => pure [next]
+        return some (validGoals ++ nextGoals)
       catch _ => saved.restore
     let original ← saveState
     let result ← do
@@ -2786,7 +2768,6 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
           evalTactic (← `(tactic| verex_split_hypotheses))
           evalTactic (← `(tactic| verex_stored_reads))
           evalTactic (← `(tactic| simp_all only [Which.project?_eq_some_iff,
-            Which.projectCertified?_eq_some_iff,
             Which.inject_here, Which.inject_there, vir_denote_norm]))
           -- Tuple/enum matches expose another payload equation after the
           -- first normalization. Substitute it before matching the frame to
@@ -3417,7 +3398,6 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
       evalTactic (← `(tactic| verex_split_hypotheses))
       evalTactic (← `(tactic| verex_stored_reads))
       evalTactic (← `(tactic| simp_all only [Which.project?_eq_some_iff,
-        Which.projectCertified?_eq_some_iff,
         Which.inject_here, Which.inject_there, vir_denote_norm]))
       for _ in [0:2] do
         evalTactic (← `(tactic| verex_split_hypotheses))
@@ -3669,7 +3649,7 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
     let (theoremArguments, _, _) ← forallMetaTelescope (← inferType theoremProof)
     let verified := mkAppN theoremProof theoremArguments
     let implication ← if view.run?.isSome then
-        mkAppOptM ``VerexIR.Proofs.runOfSatisfies
+        mkAppOptM ``VerexIR.Proofs.runOfSatisfies_valid
           #[none, none, none, none, none, none, some verified, none, none, none, none,
             some (.fvar runVar)]
       else
@@ -3686,7 +3666,8 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
           ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
-              VerexIR.Proofs.Denote.Weave.compose, vir_denote_norm]) <;>
+              VerexIR.Proofs.Denote.Weave.compose, VerexIR.Proofs.Denote.HList.Holds,
+              vir_transport, vir_denote_norm]) <;>
             verex_leaf))) do
         throwError "the target's contract premises are not established"
       fact := mkApp fact (← instantiateMVars premise)
@@ -3698,7 +3679,8 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
     try
       setGoals [next]
       evalTactic (← `(tactic| simp only [$lemmas,*, VerexIR.Proofs.Denote.Weave.compose,
-        vir_denote_norm, not_false_eq_true, true_implies, not_or] at $(mkIdent `verexBehavior):ident))
+        VerexIR.Proofs.Denote.ResultShape.Holds, vir_denote_norm,
+        not_false_eq_true, true_implies, not_or] at $(mkIdent `verexBehavior):ident))
       return some (← getMainGoal)
     catch _ =>
       state.restore

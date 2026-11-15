@@ -4,29 +4,27 @@
 import VerexSL
 
 /-!
-# Total-read off-domain soundness controls (`doc/plan/plain-values-semantics.md` §2)
+# Total-read off-domain and invariant-boundary soundness controls
 
-Every total specification read is tested across the 7 rows of §2:
-1. `nativeSlot` (absent global resource `T[a]`)
-2. `typedVariantField?` (field selection from an inactive variant)
-3. `SpecMap.get` / `valueAt` / `keyAt` (missing map key or out-of-bounds position)
-4. `indexVector` (out-of-bounds vector index `v[i]`)
-5. `ResultOf` (`result_of<f>(x)` when no run returns)
-6. `nativeArbitrary` / `outsideValue` (aborting spec path or out-of-domain recursive spec fun)
-7. `unspecifiedGhost` (ghost slot left unspecified by spec construction)
+Total specification reads and specification witness boundaries are tested across seven sections:
+1. `nativeSlot` (off-domain read of absent global resource `T[a]`)
+2. `typedVariantField?` (off-domain field selection from an inactive variant)
+3. `SpecMap.get` / `valueAt` / `keyAt` (off-domain read at missing map key or out-of-bounds position)
+4. `indexVector` (off-domain out-of-bounds vector index `v[i]`)
+5. `ResultOf` (off-domain `result_of<f>(x)` when no run returns)
+6. `outsideValue` (off-domain recursive spec fun) and `nativeArbitrary` (invariant-boundary witness on an aborting spec path)
+7. `unspecifiedGhost` (invariant-boundary witness for a ghost slot left unspecified by spec construction)
 
-For each row:
-- **Positive guarded controls** (`exists<Item>(a)`, `c is Present`, `has(t, k)` / `i < size(t)`,
-  `0 <= i && i < v.length`, `!aborts_of<f>(x)`, caller domain `requires`, explicit ghost
-  initialization / `iter_new`) **verify cleanly**.
+For each section:
+- **Negative structural-zero and `Holds` controls** are semantically rejected via `assertRejected`
+  because off-domain reads (`plainFallback` / `outsideValue`) and uncertified specification
+  witnesses (`nativeArbitrary` / `unspecifiedGhost`) denote uninterpreted plain carrier values that
+  carry neither structural zeros nor `NTy.Holds` invariants.
 - **Prepared `plainFallback` uninterpretedness controls** verify directly that `verex_decide`
-  cannot equate `plainFallback` / `NTy.plainFallbackOf` to `0`, `false`, or any `Holds` property.
-- **Rows 6–7 (`nativeArbitrary` / `outsideValue` and `unspecifiedGhost`)** negative controls
-  are **already rejected in Phase 1**.
-- **Rows 1–5 (`nativeSlot`, `typedVariantField?`, `SpecMap.get`/`keyAt`, `indexVector`,
-  `ResultOf`)** off-domain structural-zero and `Holds` negative controls are defined and staged
-  below to flip to `assertRejected` in Phase 2d when all off-domain total specification reads
-  switch uniformly to `plainFallback`.
+  cannot equate `plainFallback` / `NTy.plainFallback` to `0` or `false`.
+- **Positive guarded controls** (`exists<Item>(a)`, `c is Present`, `has(t, k)` / `i < size(t)`,
+  `i < v.length`, `!aborts_of<f>(x)`, caller domain `requires`, explicit ghost initialization /
+  `iter_new`) **verify cleanly** using the in-domain branch and its `NTy.Holds` invariants.
 -/
 
 namespace VerexSL.Tests.TotalReadSoundness
@@ -47,8 +45,11 @@ private def forbiddenSubstrings : List String := [
   "kernel", "PANIC at", "internal exception"
 ]
 
-private def assertRejected (base : Name) (command : TSyntax `command) (label : String) :
+private def assertRejected (base : Name) (command : TSyntax `command) (label : String)
+    (expectedSnippet : String) :
     CommandElabM Unit := do
+  if expectedSnippet.isEmpty then
+    throwError "assertRejected requires a non-empty expectedSnippet for `{label}` ({base})"
   let saved ← get
   let priorCount := saved.messages.toList.length
   let command := Id.run <| command.raw.replaceM fun stx =>
@@ -88,13 +89,18 @@ private def assertRejected (base : Name) (command : TSyntax `command) (label : S
     (text.startsWith "the specification clause " && text.endsWith " is not established") ||
     (text.startsWith "the data invariant " && text.contains " does not hold ")
   let hasSummary := errorTexts.any (·.startsWith summaryPrefix)
-  let hasClause := errorTexts.any isSemanticClause
+  let clauseTexts := errorTexts.filter isSemanticClause
+  let hasClause := !clauseTexts.isEmpty
   let allExpected := errorTexts.all fun text =>
     text.startsWith summaryPrefix || isSemanticClause text
   unless !errorTexts.isEmpty && hasSummary && hasClause && allExpected do
     throwError "expected `{label}` ({base}) to fail with a semantic clause diagnostic, got: {errorTexts}"
+  unless clauseTexts.any (·.contains expectedSnippet) do
+    throwError "expected `{label}` ({base}) clause diagnostic containing `{expectedSnippet}`, got: {clauseTexts}"
+  if (← IO.getEnv "VEREX_DUMP_CLAUSES") == some "1" then
+    IO.println s!"[CLAUSE_FAIL] {base} | {String.intercalate " ;; " clauseTexts}"
 
-/-! ## Row 1: `nativeSlot` (absent resource `T[a]`) -/
+/-! ## 1. `nativeSlot` (absent resource `T[a]`) -/
 
 verex module 0x42::row1_slot where
   pragma verify = false
@@ -125,23 +131,26 @@ verex module 0x42::row1_slot where
     aborts_if false
     ensures Counter[a].n == 0
 
-  -- Staged for Phase 2 (`2b`/`2d`): `nativeSlot` currently falls back via
-  -- `typedInhabitant` (`NTy.inhabitant` on the certified subtype `Item.carrier`),
-  -- and flips to `plainFallbackValue` in Phase 2 so this off-domain `Holds`
-  -- claim becomes rejected.
-  fun staged_absent_holds(a : Address) -> Unit := ()
-  spec staged_absent_holds where
+  fun neg_absent_holds(a : Address) -> Unit := ()
+  spec neg_absent_holds where
     requires !exists<Item>(a)
     aborts_if false
     ensures Item[a].count > 0
 
+run_cmd do
+  assertRejected `«0x42».row1_slot.neg_absent_zero
+    (← `(command| verify 0x42::row1_slot::neg_absent_zero))
+    "Row 1 nativeSlot absent Counter.n == 0"
+    "the specification clause `ensures Counter[a].n == 0` is not established"
+  assertRejected `«0x42».row1_slot.neg_absent_holds
+    (← `(command| verify 0x42::row1_slot::neg_absent_holds))
+    "Row 1 nativeSlot absent Item.count > 0"
+    "the specification clause `ensures Item[a].count > 0` is not established"
+
 verify 0x42::row1_slot::pos_value
 verify 0x42::row1_slot::pos_holds
 
--- `neg_absent_zero` and `staged_absent_holds` flip to `assertRejected` in Phase 2d
--- when `nativeSlot` switches its off-domain fallback to `plainFallbackValue`.
-
-/-! ## Row 2: `typedVariantField?` (inactive variant field selection) -/
+/-! ## 2. `typedVariantField?` (inactive variant field selection) -/
 
 verex module 0x42::row2_variant where
   pragma verify = false
@@ -199,21 +208,34 @@ verex module 0x42::row2_variant where
   spec neg_plain_holds where
     aborts_if false
 
-  -- Staged for Phase 2 (`2b`/`2d`): certified `typedVariantField?` on `ItemChoice`
-  -- switches from `NTy.inhabitant` to `plainFallbackValue` in Phase 2.
-  fun staged_certified_holds(c : ItemChoice) -> Unit := ()
-  spec staged_certified_holds where
+  fun neg_empty_holds(c : ItemChoice) -> Unit := ()
+  spec neg_empty_holds where
     requires c is Empty
     aborts_if false
     ensures (core.data.selectVariants[ItemChoice, Present.item](c)).count > 0
 
+run_cmd do
+  assertRejected `«0x42».row2_variant.neg_scalar_zero
+    (← `(command| verify 0x42::row2_variant::neg_scalar_zero))
+    "Row 2 typedVariantField? Empty scalar == 0"
+    "the specification clause `ensures core.data.selectVariants[ScalarChoice, Present.n](c) == 0` is not established"
+  assertRejected `«0x42».row2_variant.neg_plain_zero
+    (← `(command| verify 0x42::row2_variant::neg_plain_zero))
+    "Row 2 typedVariantField? Empty pack .count == 0"
+    "the data invariant `invariant !(choice is Empty) ||\n      (core.data.selectVariants[ItemChoice, Present.item](choice)).count == 0` does not hold where a value is constructed"
+  assertRejected `«0x42».row2_variant.neg_plain_holds
+    (← `(command| verify 0x42::row2_variant::neg_plain_holds))
+    "Row 2 typedVariantField? Empty pack .count > 0"
+    "the data invariant `invariant !(choice is Empty) ||\n      (core.data.selectVariants[ItemChoice, Present.item](choice)).count > 0` does not hold where a value is constructed"
+  assertRejected `«0x42».row2_variant.neg_empty_holds
+    (← `(command| verify 0x42::row2_variant::neg_empty_holds))
+    "Row 2 typedVariantField? Empty .count > 0"
+    "the specification clause `ensures (core.data.selectVariants[ItemChoice, Present.item](c)).count > 0` is not established"
+
 verify 0x42::row2_variant::pos_scalar
 verify 0x42::row2_variant::pos_holds
 
--- `neg_scalar_zero`, `neg_plain_zero`, `neg_plain_holds`, and `staged_certified_holds`
--- flip to `assertRejected` in Phase 2d when `typedVariantField?` switches to `plainFallbackValue`.
-
-/-! ## Row 3: `SpecMap.get` / `valueAt` / `keyAt` (missing key or OOB position) -/
+/-! ## 3. `SpecMap.get` / `valueAt` / `keyAt` (missing key or OOB position) -/
 
 verex module 0x42::row3_map where
   pragma verify = false
@@ -273,23 +295,35 @@ verex module 0x42::row3_map where
     aborts_if false
     ensures !get(*t, k)
 
-  -- Staged for Phase 2 (`2b`/`2d`): certified `Table<u64, Item>` view switches
-  -- from certified `NTy.inhabitantOf` to plain carrier in Phase 2.
-  fun staged_missing_holds(t : &Table<u64, Item>, k : u64) -> Unit := ()
-  spec staged_missing_holds where
+  fun neg_missing_holds(t : &Table<u64, Item>, k : u64) -> Unit := ()
+  spec neg_missing_holds where
     requires !has(*t, k)
     aborts_if false
     ensures (get(*t, k)).count > 0
+
+run_cmd do
+  assertRejected `«0x42».row3_map.neg_missing_value_zero
+    (← `(command| verify 0x42::row3_map::neg_missing_value_zero))
+    "Row 3 SpecMap missing get == 0"
+    "the specification clause `ensures get(*t, k) == 0` is not established"
+  assertRejected `«0x42».row3_map.neg_oob_key_at_zero
+    (← `(command| verify 0x42::row3_map::neg_oob_key_at_zero))
+    "Row 3 SpecMap OOB key_at == 0"
+    "the specification clause `ensures key_at(*t, i) == 0` is not established"
+  assertRejected `«0x42».row3_map.neg_missing_bool_false
+    (← `(command| verify 0x42::row3_map::neg_missing_bool_false))
+    "Row 3 SpecMap missing Bool == false"
+    "the specification clause `ensures !get(*t, k)` is not established"
+  assertRejected `«0x42».row3_map.neg_missing_holds
+    (← `(command| verify 0x42::row3_map::neg_missing_holds))
+    "Row 3 SpecMap missing Item .count > 0"
+    "the specification clause `ensures (get(*t, k)).count > 0` is not established"
 
 verify 0x42::row3_map::pos_value
 verify 0x42::row3_map::pos_holds
 verify 0x42::row3_map::pos_key_at
 
--- `neg_missing_value_zero`, `neg_oob_key_at_zero`, `neg_missing_bool_false`, and
--- `staged_missing_holds` flip to `assertRejected` in Phase 2d when `SpecMap` views
--- switch their off-domain fallback to `plainFallback`.
-
-/-! ## Row 4: `indexVector` (out-of-bounds vector read `v[i]`) -/
+/-! ## 4. `indexVector` (out-of-bounds vector read `v[i]`) -/
 
 verex module 0x42::row4_vector where
   pragma verify = false
@@ -343,22 +377,38 @@ verex module 0x42::row4_vector where
   spec neg_plain_vec_holds where
     aborts_if false
 
-  -- Staged for Phase 2 (`2b`/`2d`): certified `Vector<Item>` OOB fallback flips
-  -- from `NTy.inhabitant` to `plainFallbackValue` in Phase 2.
-  fun staged_certified_oob_holds(v : Vector<Item>, i : u64) -> Unit := ()
-  spec staged_certified_oob_holds where
+  fun neg_oob_holds(v : Vector<Item>, i : u64) -> Unit := ()
+  spec neg_oob_holds where
     requires i >= v.length
     aborts_if false
     ensures (v[i]).count > 0
 
+run_cmd do
+  assertRejected `«0x42».row4_vector.neg_oob_u64_zero
+    (← `(command| verify 0x42::row4_vector::neg_oob_u64_zero))
+    "Row 4 indexVector OOB u64 == 0"
+    "the specification clause `ensures v[i] == 0` is not established"
+  assertRejected `«0x42».row4_vector.neg_oob_bool_false
+    (← `(command| verify 0x42::row4_vector::neg_oob_bool_false))
+    "Row 4 indexVector OOB Bool == false"
+    "the specification clause `ensures !v[i]` is not established"
+  assertRejected `«0x42».row4_vector.neg_plain_vec_zero
+    (← `(command| verify 0x42::row4_vector::neg_plain_vec_zero))
+    "Row 4 indexVector OOB pack .count == 0"
+    "the data invariant `invariant items.length > 0 || (items[0]).count == 0` does not hold where a value is constructed"
+  assertRejected `«0x42».row4_vector.neg_plain_vec_holds
+    (← `(command| verify 0x42::row4_vector::neg_plain_vec_holds))
+    "Row 4 indexVector OOB pack .count > 0"
+    "the data invariant `invariant items.length > 0 || (items[0]).count > 0` does not hold where a value is constructed"
+  assertRejected `«0x42».row4_vector.neg_oob_holds
+    (← `(command| verify 0x42::row4_vector::neg_oob_holds))
+    "Row 4 indexVector OOB Item .count > 0"
+    "the specification clause `ensures (v[i]).count > 0` is not established"
+
 verify 0x42::row4_vector::pos_scalar
 verify 0x42::row4_vector::pos_holds
 
--- `neg_oob_u64_zero`, `neg_oob_bool_false`, `neg_plain_vec_zero`, `neg_plain_vec_holds`,
--- and `staged_certified_oob_holds` flip to `assertRejected` in Phase 2d when `indexVector`
--- switches its off-domain fallback to `plainFallbackValue`.
-
-/-! ## Row 5: `ResultOf` (`result_of<f>(x)` when no run returns) -/
+/-! ## 5. `ResultOf` (`result_of<f>(x)` when no run returns) -/
 
 verex module 0x42::row5_result_of where
   pragma verify = false
@@ -415,19 +465,24 @@ verex module 0x42::row5_result_of where
     aborts_if false
     ensures result_of<f>(x) == 0
 
-  -- Staged for Phase 2 (`2b`/`2d`): `ResultOf` default for `Item` switches from
-  -- certified `typedInhabitant` to plain carrier in Phase 2.
-  fun staged_aborting_holds(f : Fn(u64) -> Item has Copy, Drop, x : u64) -> Unit := ()
-  spec staged_aborting_holds where
+  fun neg_aborting_holds(f : Fn(u64) -> Item has Copy, Drop, x : u64) -> Unit := ()
+  spec neg_aborting_holds where
     requires aborts_of<f>(x)
     aborts_if false
     ensures (result_of<f>(x)).count > 0
 
+run_cmd do
+  assertRejected `«0x42».row5_result_of.neg_aborting_zero
+    (← `(command| verify 0x42::row5_result_of::neg_aborting_zero))
+    "Row 5 ResultOf aborting u64 == 0"
+    "the specification clause `ensures result_of<f>(x) == 0` is not established"
+  assertRejected `«0x42».row5_result_of.neg_aborting_holds
+    (← `(command| verify 0x42::row5_result_of::neg_aborting_holds))
+    "Row 5 ResultOf aborting Item .count > 0"
+    "the specification clause `ensures (result_of<f>(x)).count > 0` is not established"
+
 verify 0x42::row5_result_of::pos_returning
 verify 0x42::row5_result_of::pos_returning_holds
-
--- `neg_aborting_zero` and `staged_aborting_holds` flip to `assertRejected` in Phase 2d
--- when `ResultOf` switches its off-domain fallback to `plainFallback`.
 
 /-! ## Prepared `plainFallback` decider-uninterpretedness controls -/
 
@@ -450,17 +505,17 @@ run_cmd liftTermElabM do
     (some (.sort .zero))
   Elab.Term.synthesizeSyntheticMVarsNoPostponing
   assertTacticFails (← instantiateMVars zeroGoal) (← `(tactic| verex_decide))
-    "prepared plainFallbackOf u64 == 0"
+    "prepared plainFallback u64 == 0"
   let boolGoal ← Elab.Term.elabTerm
     (← `(@NTy.plainFallback Carriers.ground .bool rfl = false))
     (some (.sort .zero))
   Elab.Term.synthesizeSyntheticMVarsNoPostponing
   assertTacticFails (← instantiateMVars boolGoal) (← `(tactic| verex_decide))
-    "prepared plainFallbackOf Bool == false"
+    "prepared plainFallback Bool == false"
 
 end PreparedPlainFallbackControls
 
-/-! ## Row 6: `nativeArbitrary` / `outsideValue` -/
+/-! ## 6. `nativeArbitrary` / `outsideValue` (aborting spec path and out-of-domain recursion) -/
 
 verex module 0x42::row6_outside where
   pragma verify = false
@@ -515,31 +570,39 @@ verex module 0x42::row6_outside where
     aborts_if false
     ensures (count_item(300)).count > 0
 
-  -- Staged for Phase 2 (`2b`/`2d`): `nativeArbitrary` on a nominal result type
-  -- currently inhabits `Item.carrier` until Phase 2 switches carriers to plain.
-  fun staged_arbitrary_holds() -> Unit := ()
-  spec staged_arbitrary_holds where
+  -- Invariant-boundary control (not an off-domain read): on an aborting path,
+  -- `nativeArbitrary` denotes an uninterpreted plain `Item` witness without `Item.Holds`.
+  fun neg_arbitrary_holds() -> Unit := ()
+  spec neg_arbitrary_holds where
     aborts_if false
     ensures (item_or_abort(0)).count > 0
-
-verify 0x42::row6_outside::pos_arbitrary
-verify 0x42::row6_outside::pos_in_domain
 
 run_cmd do
   assertRejected `«0x42».row6_outside.neg_arbitrary_zero
     (← `(command| verify 0x42::row6_outside::neg_arbitrary_zero))
     "Row 6 nativeArbitrary == 0"
+    "the specification clause `ensures positive_only(0) == 0` is not established"
   assertRejected `«0x42».row6_outside.neg_outside_u64_zero
     (← `(command| verify 0x42::row6_outside::neg_outside_u64_zero))
     "Row 6 outsideValue u64 == 0"
+    "the specification clause `ensures count_u64(300) == 0` is not established"
   assertRejected `«0x42».row6_outside.neg_outside_item_zero
     (← `(command| verify 0x42::row6_outside::neg_outside_item_zero))
     "Row 6 outsideValue Item .count == 0"
+    "the specification clause `ensures (count_item(300)).count == 0` is not established"
   assertRejected `«0x42».row6_outside.neg_outside_item_holds
     (← `(command| verify 0x42::row6_outside::neg_outside_item_holds))
     "Row 6 outsideValue Item .count > 0"
+    "the specification clause `ensures (count_item(300)).count > 0` is not established"
+  assertRejected `«0x42».row6_outside.neg_arbitrary_holds
+    (← `(command| verify 0x42::row6_outside::neg_arbitrary_holds))
+    "Row 6 nativeArbitrary Item .count > 0"
+    "the specification clause `ensures (item_or_abort(0)).count > 0` is not established"
 
-/-! ## Row 7: `unspecifiedGhost` (unspecified ghost slots & iterator validity) -/
+verify 0x42::row6_outside::pos_arbitrary
+verify 0x42::row6_outside::pos_in_domain
+
+/-! ## 7. `unspecifiedGhost` (unspecified ghost slots and iterator validity) -/
 
 verex module 0x42::row7_ghost where
   pragma verify = false
@@ -612,27 +675,35 @@ verex module 0x42::row7_ghost where
     aborts_if false
     ensures ((new ItemTagged { x := 1 }).tag).count == 0
 
-  -- Staged for Phase 2 (`2b`/`2d`): `ghostValues` currently types `unspecifiedGhost`
-  -- at `Item.carrier` until Phase 2 switches carriers to plain.
-  fun staged_item_ghost_holds() -> Unit := ()
-  spec staged_item_ghost_holds where
+  -- Invariant-boundary control (not an off-domain read): an unspecified ghost slot
+  -- denotes an uninterpreted plain `Item` witness (`unspecifiedGhost`) without `Item.Holds`.
+  fun neg_item_ghost_holds() -> Unit := ()
+  spec neg_item_ghost_holds where
     aborts_if false
     ensures ((new ItemTagged { x := 1 }).tag).count > 0
 
 verify 0x42::row7_ghost::iter_new
-verify 0x42::row7_ghost::pos_initialized
-verify 0x42::row7_ghost::pos_iter_new
 
 run_cmd do
   assertRejected `«0x42».row7_ghost.neg_spec_pack_zero
     (← `(command| verify 0x42::row7_ghost::neg_spec_pack_zero))
     "Row 7 unspecifiedGhost == 0"
+    "the specification clause `ensures (new Tagged { x := 1 }).tag == 0` is not established"
   assertRejected `«0x42».row7_ghost.neg_iter_new_zero
     (← `(command| verify 0x42::row7_ghost::neg_iter_new_zero))
     "Row 7 uninitialized iterator ghost validity == 0"
+    "the specification clause `ensures (new Iter { pos := 0 }).validity == 0` is not established"
   assertRejected `«0x42».row7_ghost.neg_item_ghost_zero
     (← `(command| verify 0x42::row7_ghost::neg_item_ghost_zero))
     "Row 7 nominal unspecifiedGhost .count == 0"
+    "the specification clause `ensures ((new ItemTagged { x := 1 }).tag).count == 0` is not established"
+  assertRejected `«0x42».row7_ghost.neg_item_ghost_holds
+    (← `(command| verify 0x42::row7_ghost::neg_item_ghost_holds))
+    "Row 7 nominal unspecifiedGhost .count > 0"
+    "the specification clause `ensures ((new ItemTagged { x := 1 }).tag).count > 0` is not established"
+
+verify 0x42::row7_ghost::pos_initialized
+verify 0x42::row7_ghost::pos_iter_new
 
 /-! ## Rejection-helper budget-exhaustion and infrastructure-failure controls -/
 
@@ -652,6 +723,7 @@ run_cmd do
       (← `(command| set_option verex.verifyHeartbeats 1 in
         verify 0x42::rejection_helper_control::pos_branch))
       "budget-exhausted positive control"
+      "the specification clause `ensures result == (if b then 11 else 12)` is not established"
     pure none
   catch error =>
     pure (some (← error.toMessageData.toString))
@@ -669,6 +741,7 @@ run_cmd do
     assertRejected `«0x42».rejection_helper_control.missing_fn
       (← `(command| verify 0x42::rejection_helper_control::missing_fn))
       "unknown-function infrastructure control"
+      "the specification clause `ensures true` is not established"
     pure none
   catch error =>
     pure (some (← error.toMessageData.toString))

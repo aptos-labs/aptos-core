@@ -11,37 +11,15 @@ namespace VerexSL.Tests.GivenPlainVectorReads
 
 open Lean Meta Elab Command VerexIR VerexIR.Proofs.Denote VerexSL
 
-run_meta withSyntheticNativeTypes do
-  let procs ← Simp.SimprocsArray.add #[] ``plainParameterField false
-  let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
-  let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
-  let fields := mkApp2 (mkConst ``NRow.cons) parameter (mkConst ``NRow.nil)
-  let empty := mkConst ``NRow.nil
-  let source := toExpr (⟨⟨0⟩, 0⟩ : StructHandle)
-  let ownerType := mkApp3 (mkConst ``NTy.struct) source empty fields
-  let position := mkApp2 (mkConst ``Var.here) empty parameter
-  let check (family : Lean.Expr) (identity : Bool) : MetaM Unit := do
-    withLocalDeclD `owner (mkApp2 (mkConst ``NTy.carrier) family ownerType) fun owner => do
-      let selected := mkAppN (mkConst ``Var.selectCertified)
-        #[family, source, empty, fields, parameter, position, owner]
-      unless ← isTypeCorrect selected do throwError "ill typed selected field fixture"
-      let (result, _) ← withReducible <| simp selected context procs
-      if identity then
-        unless result.expr != selected do throwError "given parameter field was not observed"
-        unless ← withDefault <| isDefEq selected result.expr do
-          throwError "given parameter projection changed its value"
-      else
-        unless result.expr == selected do
-          throwError "unknown parameter family lost its certification operation"
-  withLocalDeclD `unknown (mkConst ``Carriers) fun family => check family false
-  withLocalDeclD `given (mkConst ``GivenFrame) fun given =>
-    check (mkApp (mkConst ``GivenFrame.toCarriers) given) true
-
-open Lean Meta Elab Command VerexIR VerexIR.Proofs.Denote
-
 run_cmd liftTermElabM do
   let index := mkNatLit 0
   let stable := #[``Carriers.carrier, ``Carriers.codec, ``Carriers.orders]
+  withLocalDeclD `unknown (mkConst ``Carriers) fun family => do
+    for head in stable do
+      let projected := mkApp2 (mkConst head) family index
+      let result ← canonicalFamilyResult projected
+      unless result.expr == projected do
+        throwError "unknown operation family changed"
   withLocalDeclD `given (mkConst ``GivenFrame) fun given => do
     let declarationsType := mkApp (mkConst ``GivenOwnDeclarations) given
     withLocalDeclD `declarations declarationsType fun declarations => do
@@ -50,6 +28,11 @@ run_cmd liftTermElabM do
       for family in #[mkApp (mkConst ``GivenFrame.toCarriers) installed,
           mkApp (mkConst ``GivenFrame.clauseScaffold) given,
           mkApp (mkConst ``GivenFrame.operations) installed] do
+        for head in #[``Carriers.reads, ``Carriers.holds, ``Carriers.own] do
+          let projected := mkApp (mkConst head) family
+          let result ← canonicalFamilyResult projected
+          unless result.expr == projected do
+            throwError "operation observation erased a view-specific member: {result.expr}"
         for head in stable do
           let projected := mkApp2 (mkConst head) family index
           let result ← canonicalFamilyResult projected
@@ -59,70 +42,6 @@ run_cmd liftTermElabM do
           unless ← isTypeCorrect result.expr do throwError "ill typed given operation"
           unless ← withDefault <| isDefEq projected result.expr do
             throwError "given operation observation changed its interpretation"
-        if family.getAppFn.isConstOf ``GivenFrame.toCarriers ||
-            family.getAppFn.isConstOf ``GivenFrame.clauseScaffold then
-          let projected := mkApp (mkConst ``Carriers.toPlain) family
-          let result ← canonicalFamilyResult projected
-          let expected := mkApp (mkConst ``Carriers.toPlain)
-            (mkApp (mkConst ``GivenFrame.toCarriers) given)
-          unless result.expr == expected do
-            throwError "Given plain view did not retain its canonical identity lent layer"
-          unless ← withDefault <| isDefEq projected result.expr do
-            throwError "Given plain observation changed its interpretation"
-        for head in #[``Carriers.reads, ``Carriers.lent, ``Carriers.plainRead, ``Carriers.own] do
-          let projected := mkApp (mkConst head) family
-          let result ← canonicalFamilyResult projected
-          unless result.expr == projected do
-            throwError "operation observation erased a view-specific member: {result.expr}"
-  withLocalDeclD `unknown (mkConst ``Carriers) fun family => do
-    for head in stable do
-      let projected := mkApp2 (mkConst head) family index
-      let result ← canonicalFamilyResult projected
-      unless result.expr == projected do
-        throwError "unknown operation family changed"
-
-open Lean Meta Elab Command VerexIR VerexIR.Proofs.Denote
-
--- A symbolic element retains its actual forgetting, including in a missing
--- read. The case's original certified proof remains available.
-run_cmd liftTermElabM do
-  withLocalDeclD `family (mkConst ``Carriers) fun family =>
-    withLocalDeclD `element (mkConst ``NTy) fun element => do
-      let empty := mkConst ``NRow.nil
-      let vectorType := mkApp (mkConst ``NTy.vector) element
-      let fields := mkApp2 (mkConst ``NRow.cons) vectorType empty
-      let source := toExpr (⟨⟨0⟩, 0⟩ : StructHandle)
-      let host := mkApp3 (mkConst ``NTy.struct) source empty fields
-      let position := mkApp2 (mkConst ``Var.here) empty vectorType
-      let carrier := mkApp2 (mkConst ``NTy.carrier) family element
-      withLocalDeclD `owner (mkApp2 (mkConst ``NTy.carrier) family host) fun owner => do
-        let vector := mkAppN (mkConst ``Var.selectCertified)
-          #[family, source, empty, fields, vectorType, position, owner]
-        let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
-        let lookup ← mkAppM ``GetElem?.getElem? #[values, mkNatLit 0]
-        let check (result : Lean.Expr) (present : Bool) : MetaM Unit := do
-          withLocalDeclD `originalRead (← mkEq lookup result) fun equation => do
-            let goal ← mkFreshExprMVar (mkConst ``True)
-            let next ← assertPlainVectorLookup goal.mvarId! equation
-            next.withContext do
-              unless (← getLCtx).contains equation.fvarId! do
-                throwError "lookup producer discarded its certified source proof"
-              let some fact := (← getLCtx).findFromUserName? `verexPlainRead
-                | throwError "lookup producer omitted its plain case"
-              let some (_, _, rhs) := fact.type.eq? | throwError "not a lookup equation"
-              if present then
-                unless rhs.isAppOfArity ``Option.some 2 &&
-                    rhs.appArg!.isAppOfArity ``NTy.forget 3 &&
-                    rhs.appArg!.getArg! 0 == family && rhs.appArg!.getArg! 1 == element do
-                  throwError "symbolic lookup erased its actual forgetting: {rhs}"
-              else unless rhs.isAppOfArity ``Option.none 1 do
-                throwError "missing lookup acquired a fallback value"
-              next.assign (mkConst ``True.intro)
-            unless ← isTypeCorrect (← instantiateMVars goal) do
-              throwError "lookup case proof is ill typed"
-        check (← mkAppOptM ``Option.none #[carrier]) false
-        withLocalDeclD `value carrier fun value => do
-          check (← mkAppOptM ``Option.some #[carrier, value]) true
 
 end VerexSL.Tests.GivenPlainVectorReads
 

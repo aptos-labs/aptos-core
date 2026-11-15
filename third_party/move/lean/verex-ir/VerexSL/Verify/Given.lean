@@ -268,17 +268,18 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
                 ← `(tactic| skip))
           let errorsBefore := (← Core.getMessageLog).reportedPlusUnreported.toArray.countP (·.severity == .error)
           let proof ← Term.elabTerm (← `(term| by
-            apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro)
-            intro $arguments:ident initialState assumed permitted
+            apply VerexIR.Proofs.satisfies_of_wp_valid
+            intro $arguments:ident initialState validArgs assumed permitted
             have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments initialState
             $destructure:tactic
             simp only [$(rootIdent functionName):ident, $(rootIdent contractName):ident,
               VerexIR.Proofs.Denote.Function.denoteIn,
-              VerexIR.Proofs.Denote.Carriers.lent, vir_denote_norm,
+              VerexIR.Proofs.Denote.Carriers.holds,
+              VerexIR.Proofs.Denote.GivenFrame.holds_param, vir_denote_norm,
               reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq,
-              String.reduceBNe, String.reduceNe] at assumed permitted ⊢
+              String.reduceBNe, String.reduceNe] at validArgs assumed permitted ⊢
             all_goals try simp only [VerexIR.Proofs.Obligation_eq] at permitted
-            all_goals verex_normalize at permitted ⊢
+            all_goals verex_normalize at validArgs permitted ⊢
             all_goals $automatic:tactic
             all_goals $authored:tactic)) (some statement)
           Term.synthesizeSyntheticMVarsNoPostponing
@@ -305,7 +306,10 @@ def declareGivenFunction (unit : ValidatedUnit) (handle : FunctionHandle)
     CommandElabM GivenFunctionArtifacts := do
   elabCommand (← `(command| section))
   try
-    elabCommand (← `(command| attribute [local vir_denote_norm] VerexIR.Proofs.Denote.Carriers.lent))
+    elabCommand (← `(command|
+      attribute [local vir_denote_norm]
+        VerexIR.Proofs.Denote.Carriers.holds
+        VerexIR.Proofs.Denote.GivenFrame.holds_param))
     declareGivenFunctionCore unit handle compiled base strategy? own? authored scopedArguments?
   finally
     elabCommand (← `(command| end))

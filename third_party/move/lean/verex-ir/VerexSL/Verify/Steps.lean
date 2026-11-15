@@ -1298,20 +1298,11 @@ def lowerStepExpressions (related : Environment → ValidatedUnit → Array (Arr
 open Meta Tactic VerexIR.Proofs.Denote
 
 
-/-- The family a local's type or a hypothesis names: a certified value's
-(`NTy.carrier`), a plain value's, which names the family through its lent
-layer (`NTy.plainOf Carriers.toPlain`), or the data invariants of a plain
-value (`NTy.Holds`).  A leaf whose certified values the preparation
-opened holds the plain row and its invariants in place of the certified
-value, and the family is the same one
-(`doc/designs/data-invariants.md`). -/
+/-- The family a local's type or a hypothesis names: a value's carrier
+(`NTy.carrier`) or its data invariants (`NTy.Holds`). -/
 private def declCarriers? (type : Lean.Expr) : Option Lean.Expr :=
-  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.deepHolds 3 ||
-      type.isAppOfArity ``NTy.Holds 3 then
+  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.Holds 3 then
     some (type.getArg! 0).consumeMData
-  else if type.isAppOfArity ``NTy.plainOf 2 then
-    let plain := (type.getArg! 0).consumeMData
-    if plain.isAppOfArity ``Carriers.toPlain 1 then some (plain.getArg! 0).consumeMData else none
   else none
 
 /-- The carriers the leaf's native values are at: those of a local of a
@@ -2695,13 +2686,11 @@ private def nameSomeReads (goal : MVarId) (fact : FVarId) : MetaM (MVarId × Boo
     let some (_, lhs, rhs) := part.eq? | continue
     unless rhs.isConstOf ``Bool.true && lhs.isAppOfArity ``Option.isSome 2 do continue
     let read := lhs.appArg!.consumeMData
+    let isPlainAt := read.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 &&
+      (read.getArg! 6).consumeMData.isFVar
     let witness? ← goal.withContext do
-      if read.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 &&
-          (read.getArg! 6).consumeMData.isFVar then
-        let iffProof := mkAppN
-          (mkConst ``VerexIR.Proofs.Denote.Skolems.isSome_plainAt_iff_exists_carrier)
-          read.getAppArgs
-        return some (← mkAppM ``Iff.mp #[iffProof, proof])
+      if isPlainAt then
+        return some (← mkAppM ``Iff.mp #[← mkAppOptM ``Option.isSome_iff_exists #[none, read], proof])
       let .fvar memory := read.getAppFn | return none
       unless read.getAppNumArgs == 2 do return none
       unless (← whnfR (← memory.getType)).isAppOf ``VerexIR.Proofs.Denote.Memory do return none
@@ -2711,7 +2700,14 @@ private def nameSomeReads (goal : MVarId) (fact : FVarId) : MetaM (MVarId × Boo
       witness).intro1P
     let subgoals ← next.cases stated #[{ varNames := [`read_value, `read_case] }]
     let some subgoal := subgoals[0]? | continue
-    goal := subgoal.mvarId
+    let mut nextGoal := subgoal.mvarId
+    if isPlainAt && subgoal.fields.size == 2 then
+      let holdsProof := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.holds_plainAt)
+        (read.getAppArgs ++ #[subgoal.fields[0]!, subgoal.fields[1]!])
+      let holdsType ← nextGoal.withContext (inferType holdsProof)
+      let (_, asserted) ← (← nextGoal.assert `read_holds holdsType holdsProof).intro1P
+      nextGoal := asserted
+    goal := nextGoal
     named := true
   return (goal, named)
 
@@ -3635,7 +3631,7 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
             if let .vector τ ← context.exprType argument then
               let carriers ← context.carriers
               let quoted ← Contract.quoteNTy τ
-              fallback := some (← Contract.typedInhabitant carriers quoted)
+              fallback := some (← Contract.plainFallbackValue carriers quoted)
               read := some (← elementRead (Contract.carrierType carriers quoted) τ)
               search := some (← elementEquality carriers quoted)
               elementType := some τ
@@ -4680,10 +4676,8 @@ def closeByDecide : TacticM (Array MVarId) := do
     let known ← goal.withContext do
       return (← getLCtx).foldl (init := (#[] : Array FVarId)) fun found decl =>
         found.push decl.fvarId
-    VerexIR.Proofs.Denote.assertCertifiedClauses
-      (fun statement => return (← VerexIR.Proofs.Denote.canonicalFamilyResult statement).expr)
     evalTactic (← `(tactic| all_goals verex_split_hypotheses))
-    -- Exposing a certificate can split the path. Normalize its new facts
+    -- Splitting hypotheses can split the path. Normalize its new facts
     -- in every resulting context and retain every remaining obligation.
     let branches ← getGoals
     let mut prepared := #[]
@@ -4704,12 +4698,7 @@ def closeByDecide : TacticM (Array MVarId) := do
     setGoals [normal]
     if !introduced.isEmpty then
       -- Grouped clauses keep their premises inside their own conjunct.
-      -- Read certificates only for newly introduced values; the path's
-      -- existing values were prepared before its clauses were split.
-      VerexIR.Proofs.Denote.assertCertifiedClauses
-        (fun statement => return (← VerexIR.Proofs.Denote.canonicalFamilyResult statement).expr)
-        (some (introduced.map Lean.mkFVar))
-      -- Propagate these new facts before deciding that conjunct.
+      -- Propagate newly introduced facts before deciding that conjunct.
       evalTactic (← `(tactic| all_goals verex_canonical_families))
       evalTactic (← `(tactic| all_goals verex_split_hypotheses))
       evalTactic (← `(tactic| all_goals verex_subst_vars))

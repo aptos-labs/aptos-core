@@ -66,6 +66,9 @@ def declareGivenTransferAdapter (assumptionName adapterName : Name)
   let assumption ← forallTelescope concreteType fun binders conclusion => do
     if transferIndex > binders.size then
       throwError "transfer binder index exceeds the concrete theorem telescope"
+      -- Preserve `GivenTransfer.lean:25-37`: `Contract.RelationalCertificate` keeps
+      -- `concrete.validArgs → given.validArgs` and `given.validResult → concrete.validResult`
+      -- as genuine proof obligations with zero synthesized validity evidence.
     let witnesses ← givenWitnesses conclusion (← givenProofAt binders)
     mkForallFVars binders witnesses
   addAbbrev assumptionName assumption

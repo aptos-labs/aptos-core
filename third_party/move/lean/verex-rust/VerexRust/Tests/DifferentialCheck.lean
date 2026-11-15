@@ -71,14 +71,11 @@ private def plainReads : TypedReads PlainValue Subtype.val where
   plain := fun _ value => value.property
   functionCarrier := FunctionCarriers.carrier unit
   functions := FunctionCarriers.functions
-  nominalCarrier := RuntimeNominal unit
-  nominals := RuntimeNominal.nominals unit
-  nominalInhabitant := fun source arguments _ =>
-    ⟨witnessOrUnit unit source arguments, NTy.admits_witnessOrUnit unit source arguments⟩
-  nominalInhabitant_unit := @Carriers.nominalInhabitant_unit (Carriers.runtime unit)
+  nominals := NominalCarriers.toNominalFunctor unit
   reads := fun _ => plainReads
   orders := fun _ => PlainValue.orders
   erasures := fun _ => PlainValue.erasures
+  own := FunctionCarriers.own unit
 
 theorem runtimeCarriers_eq : runtimeCarriers unit = Carriers.runtime unit := by
   have reads : plainReads = PlainValue.reads := by
@@ -103,20 +100,32 @@ private theorem encode_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : 
   subst same
   rfl
 
+private theorem holds_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : @NTy.carrier F τ) :
+    @NTy.Holds G τ (cast (carrier_eq same τ) value) ↔ @NTy.Holds F τ value := by
+  subst same
+  exact Iff.rfl
+
 /-- `Skolems.runtime` with its decisions computed: its family is the same one
 (`runtimeCarriers_eq`). -/
 @[reducible] def runtimeSkolems : Skolems unit where
   toCarriers := runtimeCarriers unit
   resolve := fun τ => τ
+  argument := fun index => .param index
   resolve_eq := fun τ => (NTy.substWith_param τ).symm
   toRuntime := fun τ value => cast (carrier_eq (runtimeCarriers_eq unit) τ) value
   ofRuntime := fun τ value => cast (carrier_eq (runtimeCarriers_eq unit).symm τ) value
   ofRuntime_toRuntime := fun _ _ => by simp
   toRuntime_ofRuntime := fun _ _ => by simp
   encode_toRuntime := fun τ value => encode_cast (runtimeCarriers_eq unit) τ value
-  type_inhabitable := fun _ => rfl
+  holds_toRuntime := fun τ value => holds_cast (runtimeCarriers_eq unit) τ value
+  argument_inhabitable := fun _ => rfl
+  own_resolve := fun _ arguments _ => by rw [NRow.substWith_param arguments]; rfl
 
 end Family
+
+instance (unit : ValidatedUnit) :
+    @NoDataInvariants (@runtimeCarriers unit (FunctionCarriers.runtime unit)) :=
+  ⟨fun _ _ => trivial, fun _ _ _ => trivial⟩
 
 /-! ## Inputs -/
 
@@ -189,6 +198,7 @@ def NTy.samples : Nat → (τ : NTy) → List τ.carrier
   | _ + 1, .ghost _ => []
   | _ + 1, .param _ => []
   | _ + 1, .function _ _ _ => []
+  | _ + 1, .observed _ => []
   | _ + 1, .nominal _ _ _ => []
 
 /-- Rows of sample values, at most a few per component. -/
@@ -355,13 +365,86 @@ def variantReadLent (boundary : BoundaryReadback) :
       else (variantReadLent boundary names rest variant raws).map .inr
 end
 
+mutual
+/-- Computable evaluation of `NTy.lend` (`NTy.encode` is computable). -/
+private def evalLend : (τ : NTy) → Bool → τ.carrier → List Nat → Option (RuntimeValue × List Nat)
+  | .ref σ, prophecies, value, loan :: loans =>
+      (evalLend σ prophecies (if prophecies then value.2 else value.1) loans).map
+        fun lent => (.borrow loan lent.1, lent.2)
+  | .ref _, _, _, [] => none
+  | .sliceRef σ, prophecies, value, loan :: loans =>
+      some (.borrow loan (NTy.encode (.vector σ)
+        (if prophecies then value.finalVector else value.currentVector)), loans)
+  | .sliceRef _, _, _, [] => none
+  | .tuple elements, prophecies, values, loans =>
+      (evalLendRow elements prophecies values loans).map fun lent => (.tuple lent.1.toArray, lent.2)
+  | .struct source _ fields, prophecies, values, loans =>
+      (evalLendRow fields prophecies values loans).map fun lent =>
+        (.nominal source none lent.1.toArray, lent.2)
+  | .unit, _, value, loans => some (NTy.encode .unit value, loans)
+  | .bool, _, value, loans => some (NTy.encode .bool value, loans)
+  | .int width signed, _, value, loans => some (NTy.encode (.int width signed) value, loans)
+  | .num, _, value, loans => some (NTy.encode .num value, loans)
+  | .address, _, value, loans => some (NTy.encode .address value, loans)
+  | .signer, _, value, loans => some (NTy.encode .signer value, loans)
+  | .string, _, value, loans => some (NTy.encode .string value, loans)
+  | .bytes, _, value, loans => some (NTy.encode .bytes value, loans)
+  | .char, _, value, loans => some (NTy.encode .char value, loans)
+  | .enum source _ names rows _, prophecies, value, loans =>
+      evalLendVariant source names rows prophecies value loans
+  | .vector element, _, value, loans => some (NTy.encode (.vector element) value, loans)
+  | .slice element, _, value, loans => some (NTy.encode (.slice element) value, loans)
+  | .array element length, _, value, loans => some (NTy.encode (.array element length) value, loans)
+  | .table key value, _, entries, loans => some (NTy.encode (.table key value) entries, loans)
+  | .ghost slot, _, value, loans => some (NTy.encode (.ghost slot) value, loans)
+  | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
+  | .function parameters shared results, _, value, loans =>
+      some (NTy.encode (.function parameters shared results) value, loans)
+  | .nominal source arguments productive, _, value, loans =>
+      some (NTy.encode (.nominal source arguments productive) value, loans)
+  | .observed referent, _, value, loans => some (NTy.encode (.observed referent) value, loans)
+
+private def evalLendRow : (row : NRow) → Bool → HList row → List Nat →
+    Option (List RuntimeValue × List Nat)
+  | .nil, _, _, loans => some ([], loans)
+  | .cons τ rest, prophecies, values, loans =>
+      (evalLend τ prophecies values.1 loans).bind fun head =>
+        (evalLendRow rest prophecies values.2 head.2).map fun tail => (head.1 :: tail.1, tail.2)
+
+private def evalLendVariant (source : StructHandle) : (names : List String) →
+    (rows : NRows) → Bool → variantCarrier names rows → List Nat →
+    Option (RuntimeValue × List Nat)
+  | _, .nil, _, value, _ => nomatch value
+  | [], .cons _ _, _, value, _ => nomatch value
+  | name :: _, .cons fields _, prophecies, .inl values, loans =>
+      (evalLendRow fields prophecies values loans).map fun lent =>
+        (.nominal source (some name) lent.1.toArray, lent.2)
+  | _ :: names, .cons _ rest, prophecies, .inr later, loans =>
+      evalLendVariant source names rest prophecies later loans
+end
+
+private def evalLendArguments (σs : NRow) (args : HList σs) (loans : List Nat) :
+    Option (Array RuntimeValue) :=
+  match evalLendRow σs false args loans with
+  | some (row, []) => some row.toArray
+  | _ => none
+
+private def evalLendResult : (shape : ResultShape) → Bool → shape.carrier → List Nat →
+    Option (Array RuntimeValue)
+  | .none, _, _, [] => some #[]
+  | .none, _, _, _ :: _ => Option.none
+  | .one τ, prophecies, value, loans =>
+      match evalLend τ prophecies value loans with
+      | some (raw, []) => some #[raw]
+      | _ => Option.none
+
 /-- Decode the original lent argument tree against the final boundary map. This
 retains settlement obligations for every original nested reference even when its
 containing slot's final value holds a reference to a different loan. -/
 def withProphecies (row : NRow) (values : HList row) (loans : List Nat)
     (results : Array RuntimeValue) (exports : List (Nat × RuntimeValue)) : Option (HList row) := do
   let boundary ← BoundaryReadback.ofOutputs? results exports
-  let raws ← lendArguments row values loans
+  let raws ← evalLendArguments row values loans
   NRow.readLent boundary row raws.toList
 
 mutual
@@ -403,7 +486,7 @@ def NTy.perturbed : (τ : NTy) → τ.carrier → List Nat → List (τ.carrier 
 def NRow.perturbed : (row : NRow) → HList row → List Nat → List (HList row × Nat)
   | .nil, _, _ => []
   | .cons τ rest, values, loans =>
-      let left := match τ.lend false values.1 loans with
+      let left := match evalLend τ false values.1 loans with
         | some (_, left) => left
         | none => loans
       (NTy.perturbed τ values.1 loans).map (fun (head, at') => (HList.cons head values.2, at')) ++
@@ -428,7 +511,7 @@ def NTy.prophecyAt (boundary : BoundaryReadback) : (τ : NTy) → τ.carrier →
       if loan == target then do
         let actual ← boundary.promises.lookup loan
         let ids := (boundaryBorrows actual).map (·.1)
-        let (raw, remaining) ← σ.lend false value.2 ids
+        let (raw, remaining) ← evalLend σ false value.2 ids
         if remaining.isEmpty then some raw else none
       else NTy.prophecyAt boundary σ value.1 loans target
   | .sliceRef σ, value, loan :: _, target =>
@@ -445,7 +528,7 @@ def NRow.prophecyAt (boundary : BoundaryReadback) : (row : NRow) → HList row �
       match NTy.prophecyAt boundary τ values.1 loans target with
       | some value => some value
       | none => do
-          let (_, left) ← τ.lend false values.1 loans
+          let (_, left) ← evalLend τ false values.1 loans
           NRow.prophecyAt boundary rest values.2 left target
 
 def variantProphecyAt (boundary : BoundaryReadback) : (names : List String) → (rows : NRows) →
@@ -478,7 +561,7 @@ def perturbed (row : NRow) (values : HList row) (loans : List Nat)
     Except String (List (HList row × Nat)) := do
   let some boundary := BoundaryReadback.ofOutputs? results exports
     | throw "the original boundary does not reconstruct"
-  let some originals := lendArguments row values loans
+  let some originals := evalLendArguments row values loans
     | throw "the original arguments do not lend"
   let live := (results.toList ++ exports.map (·.2)).flatMap fun raw =>
     (boundaryBorrows raw).map (·.1)
@@ -573,7 +656,7 @@ references they return. -/
 def sameResult (shape : ResultShape) (value : shape.carrier) (results : Array RuntimeValue) : Bool :=
   let loans := returnedLoans results
   let results := unitless shape results
-  shape.lend false value loans == some results && shape.lend true value loans == some results
+  evalLendResult shape false value loans == some results && evalLendResult shape true value loans == some results
 
 /-- `toOriginal` and `toUnit` translate struct handles between the unit the
 interpreter runs and the unit compiled, which may order its structs differently. -/
@@ -585,14 +668,14 @@ def checkInput {original unit : ValidatedUnit} [FunctionCarriers unit] [Skolems 
   let tree (values : HList f.params) : Tree f.result.carrier :=
     Function.tree (callTree compiled loopFuel 16) loopFuel f values
   let budget := 2048
-  let used := (NRow.lend f.params false args (List.range 16)).map (16 - ·.2.length) |>.getD 0
+  let used := (evalLendRow f.params false args (List.range 16)).map (16 - ·.2.length) |>.getD 0
   let resultText (value : f.result.carrier) : String :=
-    match f.result.lend false value (List.range used) with
+    match evalLendResult f.result false value (List.range used) with
     | some row => oneLine (reprStr row)
     | none => "()"
   let inputs := argumentsText f.params args
   let loans := List.range used
-  match lendArguments f.params args loans with
+  match evalLendArguments f.params args loans with
   | none => .inconclusive "the arguments do not lend"
   | some arguments =>
     let start : RuntimeState := { nextLoan := used }
@@ -649,7 +732,7 @@ def checkInput {original unit : ValidatedUnit} [FunctionCarriers unit] [Skolems 
                       match outcome with
                       | .ok value =>
                           !(returned.contains loan || through.contains loan) ||
-                            f.result.lend false value (returnedLoans results) != some (unitless f.result results)
+                            evalLendResult f.result false value (returnedLoans results) != some (unitless f.result results)
                       | .vacuous .. => returned.contains loan
                       | .unknown _ => false
                       | _ => true

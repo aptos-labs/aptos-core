@@ -82,8 +82,6 @@ verex namespace slice_provenance where
     let s := if flag then &mut (unsize h1.arr) else &mut (unsize h2.arr)
     s[0usize] := new Percent { value := 50u32 }
     0u32
-  spec slice_holder_either_ok where
-    pragma heartbeats = 350
 
   fun slice_holder_either_bad(flag : Bool) -> u32 := do
     let mut h1 := new Holder {
@@ -93,8 +91,6 @@ verex namespace slice_provenance where
     let s := if flag then &mut (unsize h1.arr) else &mut (unsize h2.arr)
     s[0usize] := new Percent { value := 100u32 }
     0u32
-  spec slice_holder_either_bad where
-    pragma heartbeats = 390
 
   fun slice_holder_diff_len_ok(flag : Bool) -> u32 := do
     let mut h2 := new Holder {
@@ -105,8 +101,6 @@ verex namespace slice_provenance where
     let s := if flag then &mut (unsize h2.arr) else &mut (unsize h3.arr)
     s[0usize] := new Percent { value := 50u32 }
     0u32
-  spec slice_holder_diff_len_ok where
-    pragma heartbeats = 400
 
   fun slice_holder_diff_len_bad(flag : Bool) -> u32 := do
     let mut h2 := new Holder {
@@ -117,8 +111,6 @@ verex namespace slice_provenance where
     let s := if flag then &mut (unsize h2.arr) else &mut (unsize h3.arr)
     s[0usize] := new Percent { value := 100u32 }
     0u32
-  spec slice_holder_diff_len_bad where
-    pragma heartbeats = 450
 
   fun slice_reborrow_single_bad(p : &mut Slice<Percent>) -> Unit := do
     let s := &mut *p
@@ -132,7 +124,6 @@ verex namespace slice_provenance where
     let elem := &mut s[0usize]
     (*elem).value := amount
   spec slice_slot_reborrow_ok where
-    pragma heartbeats = 690
     requires p.length > 0
     requires amount <= 100
 
@@ -142,7 +133,6 @@ verex namespace slice_provenance where
     let elem := &mut s[0usize]
     (*elem).value := 101u32
   spec slice_slot_reborrow_bad where
-    pragma heartbeats = 700
     requires p.length > 0
 
   -- (d) Slice settlement current-element check through an open reference

@@ -20,6 +20,8 @@ ignored_paths = [
     "**/README.md",
     "**/AGENTS.md",
     "**/CLAUDE.md",
+    # Agent skills and rules: documentation no build or test reads.
+    ".cursor/**",
 ]
 
 [subsystems.move]
@@ -29,6 +31,11 @@ e2e_tests = ["lean"]
 ignored_paths = [
     "third_party/move/documentation",
     "third_party/move/move-prover/doc",
+    # Read only by the Prover's lean feature, which runs in the `lean` suite
+    # (`[e2e_tests.lean]` names them as inputs); no other test of
+    # `move-prover` or of its dependents reads them.
+    "third_party/move/move-prover/tests/sources/**/*.lean_exp",
+    "third_party/move/move-prover/tests/sources/**/*.proof.lean",
 ]
 selection = "affected"
 related_test_roots = ["api"]
@@ -96,6 +103,9 @@ input_paths = [
     "third_party/move/lean",
     ".github/workflows/lean.yaml",
     "scripts/dev_setup.sh",
+    # The baselines and authored proofs of the Prover's lean feature.
+    "third_party/move/move-prover/tests/sources/**/*.lean_exp",
+    "third_party/move/move-prover/tests/sources/**/*.proof.lean",
 ]
 
 # These packages anchor dependency analysis even though their own Rust tests

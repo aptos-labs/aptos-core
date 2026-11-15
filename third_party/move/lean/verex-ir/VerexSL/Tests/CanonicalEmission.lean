@@ -11,16 +11,15 @@ namespace VerexSL.Tests.CanonicalEmission
 open Lean Meta Elab Tactic VerexIR.Proofs.Denote
 open VerexIR.Tests.CanonicalEmissionState
 
-
 -- Fresh case equations can expose primitive projections. Emit the same
 -- inferred applications as source clauses, while preserving held caller terms.
-example (record : { row : Nat × Bool // row.2 = true }) : True := by
+example (record : VerexIR.SpecInt (.bits 64) false × Bool) : True := by
   run_tac withMainContext do
     let record := (← getLocalDeclFromUserName `record).toExpr
-    let raw := mkProj ``Prod 0 (mkProj ``Subtype 0 record)
+    let raw := mkProj ``VerexIR.SpecInt 0 (mkProj ``Prod 0 record)
     unless (← canonicalValueProjection? (mkProj ``Prod 0 (mkBVar 0))).isNone do
       throwError "unopened projection binder was interpreted in the local context"
-    let expected ← mkAppM ``Prod.fst #[← mkAppM ``Subtype.val #[record]]
+    let expected ← mkAppM ``VerexIR.SpecInt.val #[← mkAppM ``Prod.fst #[record]]
     let canonical ← canonicalEmission {} none
     let output ← canonical raw
     unless output == expected do throwError "primitive value projection was not canonical"
@@ -34,32 +33,10 @@ example (record : { row : Nat × Bool // row.2 = true }) : True := by
     unless simplified.expr == expected do throwError "simp changed canonical projection spelling"
   trivial
 
-example [family : Carriers] [_inherited : CarriersNonempty family] : True := by
+example [family : Carriers] : True := by
   run_tac
-    let source ← elabTerm (← `(@NTy.toSkolem
-      (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
-      (CarriersNonempty.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
-      (⟨.cons .bool .nil, rfl⟩ : TypeArgs) .bool true)) none
-    let source ← instantiateMVars source
     let family := (← getLocalDeclFromUserName `family).fvarId
-    let instanceType := mkApp (mkConst ``CarriersNonempty) (mkFVar family)
-    let make (name : Name) := withLocalDecl name .instImplicit instanceType fun local_ =>
-      mkLambdaFVars #[local_] source
-    let left ← make `first
-    let right ← make `second
-    let input ← mkAppM ``Prod.mk #[left, right]
     let canonical ← canonicalEmission {} none
-    let output ← canonical input
-    if output == input then throwError "binder test observed no canonical conversion"
-    let allowed := (collectFVars {} input).fvarIds
-    unless (collectFVars {} output).fvarIds.all allowed.contains do
-      throwError "canonical conversion leaked a temporary instance binder"
-    check output
-    unless ← withDefault (isDefEq input output) do
-      throwError "canonical conversion changed the expression"
-    let again ← canonical input
-    unless again == output do throwError "canonical cache result changed"
-    check again
     let semantic ← elabTerm (← `(@Flow
       (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
       (.one (.param 0)) .nil
@@ -78,56 +55,53 @@ example [family : Carriers] [_inherited : CarriersNonempty family] : True := by
     unless ← withDefault (isDefEq semantic rebuilt) do throwError "Flow annotation changed meaning"
   trivial
 
-
 example (_given : GivenFrame) : True := by
   run_tac
-    let inner ← elabTerm (← `(@Carriers.toPlain
-      (@Carriers.instantiate (⟨.cons (.param 0) (.cons (.param 1) .nil), rfl⟩ : TypeArgs)
-        (GivenFrame.clauseScaffold $(mkIdent `_given))
-        (GivenFrame.clauseScaffoldNonempty $(mkIdent `_given))))) none
-    let outer ← elabTerm (← `(@Carriers.toPlain (GivenFrame.toCarriers $(mkIdent `_given)))) none
+    let inner ← elabTerm (← `(@Carriers.instantiate
+      (⟨.cons (.param 0) (.cons (.param 1) .nil), rfl⟩ : TypeArgs)
+      (GivenFrame.toCarriers $(mkIdent `_given)))) none
+    let outer ← elabTerm (← `(GivenFrame.toCarriers $(mkIdent `_given))) none
     let row ← elabTerm (← `(NRow.cons (.param 0) (.cons (.param 1) .nil))) none
     let rows ← elabTerm (← `(NRows.cons (.cons (.param 0) (.cons (.param 1) .nil)) .nil)) none
     let names ← elabTerm (← `(["Entry"])) none
-    let proof := mkEqRefl (mkConst ``Bool.true)
-    let proof ← proof
+    let proof ← mkEqRefl (mkConst ``Bool.true)
     let nativeType := mkApp (mkConst ``NTy.tuple) row
     let input := #[
-      mkApp3 (mkConst ``NTy.plainInhabitantOf) inner nativeType proof,
-      mkApp3 (mkConst ``HListPlainOf.inhabitant) inner row proof,
-      mkApp4 (mkConst ``variantPlainOf.inhabitant) inner names rows proof]
+      mkApp3 (mkConst ``NTy.plainFallback) inner nativeType proof,
+      mkApp3 (mkConst ``NTy.inhabitant) inner nativeType proof,
+      mkApp3 (mkConst ``HList.inhabitant) inner row proof,
+      mkApp4 (mkConst ``variantCarrier.inhabitant) inner names rows proof]
     let expected := #[
-      mkApp3 (mkConst ``NTy.plainInhabitantOf) outer nativeType proof,
-      mkApp3 (mkConst ``HListPlainOf.inhabitant) outer row proof,
-      mkApp4 (mkConst ``variantPlainOf.inhabitant) outer names rows proof]
+      mkApp3 (mkConst ``NTy.plainFallback) outer nativeType proof,
+      mkApp3 (mkConst ``NTy.inhabitant) outer nativeType proof,
+      mkApp3 (mkConst ``HList.inhabitant) outer row proof,
+      mkApp4 (mkConst ``variantCarrier.inhabitant) outer names rows proof]
     let canonical ← canonicalEmission {} none
     for i in [:input.size] do
       let output ← canonical input[i]!
-      if output == input[i]! then throwError "plain operation {i} was not respelled"
+      if output == input[i]! then throwError "default operation {i} was not respelled"
       unless output == expected[i]! do
-        throwError "plain operation {i} has a noncanonical spelling: {output}"
+        throwError "default operation {i} has a noncanonical spelling: {output}"
       check output
       unless ← withDefault (isDefEq input[i]! output) do
-        throwError "plain operation {i} changed meaning"
+        throwError "default operation {i} changed meaning"
   trivial
 
--- An instance available only inside an opened binder cannot escape through
--- a cached conversion; that operation keeps its original family spelling.
-example [_family : Carriers] : True := by
+-- A deferred `NTy.inhabitantOf` operation whose `Carriers` family is bound only
+-- inside an opened lambda does not convert definitionally across `Carriers.instantiate`,
+-- so canonical emission preserves its original family spelling untouched.
+example : True := by
   run_tac
-    let family := mkFVar (← getLocalDeclFromUserName `_family).fvarId
     let arguments ← elabTerm (← `((⟨.cons .bool .nil, rfl⟩ : TypeArgs))) none
     let proof ← mkEqRefl (mkConst ``Bool.true)
-    let input ← withLocalDecl `inner .instImplicit
-        (mkApp (mkConst ``CarriersNonempty) family) fun inner => do
-      let induced := mkApp3 (mkConst ``Carriers.instantiate) arguments family inner
-      let nonempty := mkApp3 (mkConst ``CarriersNonempty.instantiate) arguments family inner
-      let value := mkApp4 (mkConst ``NTy.inhabitantOf) induced nonempty (mkConst ``NTy.bool) proof
+    let canonical ← canonicalEmission {} none
+    let input ← withLocalDecl `inner .instImplicit (mkConst ``Carriers) fun inner => do
+      let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments inner
+      let value := mkApp3 (mkConst ``NTy.inhabitantOf) induced (mkConst ``NTy.bool) proof
       mkLambdaFVars #[inner] value
     check input
-    let canonical ← canonicalEmission {} none
     let output ← canonical input
-    unless output == input do throwError "binder-only instance changed a deferred operation"
+    unless output == input do throwError "binder-bound family changed a deferred operation"
     check output
   trivial
 
@@ -138,18 +112,6 @@ run_cmd do observation.set {}
    bodies. Earlier callee-local intermediate representations are permitted. -/
 namespace CallerState
 open Lean Meta Elab Command VerexIR.Proofs.Denote
-
--- Inspect computational values only: proof certificates may mention the
--- old generic construction without retaining a wrapper in the runtime value.
-private partial def hasLentValue (e : Lean.Expr) : MetaM Bool := do
-  if ← isProof e then return false
-  if (← whnf (← inferType e)).isSort then return false
-  if e.isAppOf ``ParamPlain.of then return true
-  match e with
-  | .app f a => return (← hasLentValue f) || (← hasLentValue a)
-  | .mdata _ e => hasLentValue e
-  | .proj _ _ e => hasLentValue e
-  | _ => return false
 
 private partial def hasStaleCarrier (e : Lean.Expr) : MetaM Bool := do
   if ← isProof e then return false
@@ -162,20 +124,27 @@ private partial def hasStaleCarrier (e : Lean.Expr) : MetaM Bool := do
   | _ => return false
 
 elab "observe_return_boundary" : tactic => Lean.Elab.Tactic.withMainContext do
-  for decl in ← getLCtx do
-    let type ← instantiateMVars decl.type
-    let some (_, lhs, rhs) := type.eq? | continue
-    let findLiteral (e : Lean.Expr) := e.find? fun node => node.isAppOfArity ``List.toArray 2 &&
-      (node.getArg! 1).isAppOfArity ``List.cons 3
-    let (some literal, none) := (findLiteral lhs, findLiteral rhs) | continue
-    unless rhs.hasFVar do continue
-    let lent ← hasLentValue (literal.getArg! 1)
+  let findLiteral (e : Lean.Expr) := e.find? fun node => node.isAppOfArity ``List.toArray 2 &&
+    (node.getArg! 1).isAppOfArity ``List.cons 3
+  let recordLiteral (literal : Lean.Expr) : Lean.Elab.Tactic.TacticM Unit := do
     let stale ← hasStaleCarrier literal
     let previous ← observation.get
     observation.set {
       count := previous.count + 1
-      badCount := previous.badCount + (if lent || stale then 1 else 0)
-      firstBad := if lent || stale then "retained caller state has parameter wrapper or induced carrier" else previous.firstBad }
+      badCount := previous.badCount + (if stale then 1 else 0)
+      firstBad := if stale then "retained caller state has induced carrier" else previous.firstBad }
+  for decl in ← getLCtx do
+    let type ← instantiateMVars decl.type
+    if type.consumeMData.isAppOfArity ``NTy.Holds 3 then
+      if let some literal := findLiteral (type.consumeMData.getArg! 2) then
+        recordLiteral literal
+      continue
+    let some (_, lhs, rhs) := type.eq? | continue
+    let (some literal, none) := (findLiteral lhs, findLiteral rhs) | continue
+    unless rhs.hasFVar do continue
+    recordLiteral literal
+  if let some literal := findLiteral (← instantiateMVars (← getMainTarget)) then
+    recordLiteral literal
 
 verex module 0x42::canonical_construction where
   pragma verify = false
@@ -212,7 +181,9 @@ run_cmd do observation.set {}
 open VerexIR.Tests.CanonicalEmissionState
 elab "observe_canonical_entry_invariant" : tactic => withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  unless target.isForall && (target.find? fun e => e.isAppOf ``NTy.plainInhabitantOf).isSome do return
+  unless target.isForall &&
+      (target.find? fun e => e.isAppOf ``plainFallback || e.isAppOf ``NTy.plainFallback).isSome do
+    return
   for decl in ← getLCtx do
     let type ← instantiateMVars decl.type
     unless type.isForall do continue
@@ -260,8 +231,7 @@ verex module 0x42::read_only_invariant_loan where
   -- A mutation that writes back what it read owes the invariant of the value
   -- it wrote, which the entry states one for: the owed spelling and the held
   -- one are compared here, where a read-only loan's owed invariant is closed
-  -- by the value's own fact before any spelling is read
-  -- (`openHoldsGoal`, `doc/plan/one-spelling.md`, D1).
+  -- by the value's own fact before any spelling is read (`openHoldsGoal`).
   public fun reseat {K has Copy, Drop, Store} {V has Copy, Drop, Store}(map : &mut Map<K, V>) -> Unit := do
     let entries := &mut map.entries
     *entries := *entries

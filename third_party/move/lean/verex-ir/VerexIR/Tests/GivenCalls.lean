@@ -24,6 +24,44 @@ def caller (unit : Validation.ValidatedUnit) : Function unit where
   mutables := .nil
   exitSite := 0
 
+def directCaller (unit : Validation.ValidatedUnit) : Function unit where
+  params := row
+  locals := .nil
+  frame := row
+  frame_eq := rfl
+  result := .one (.param 0)
+  body := .call 2 handle (.one (.param 0)) (.cons (.take .here) .nil)
+  mutables := .nil
+  exitSite := 0
+
+-- Negative control first: a callee contract demanding an unestablished `validArgs`
+-- premise cannot be discharged at a Given call site without that validity proof.
+def guardedContract [C : Carriers] (State : Type)
+    (P : @NTy.carrier C (.param 0) → Prop) :
+    Contract State Failure (@HList C row) (@NTy.carrier C (.param 0)) where
+  requires := fun _ _ => True
+  ensures := fun args _ result _ => result = args.1
+  aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+  validArgs := fun args => P args.1
+
+set_option linter.unusedVariables false in
+example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
+    (ops : InterpreterOps unit G.toCarriers State)
+    (P : @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (verified : Satisfies (ops.call handle row (.one (.param 0)))
+      (@guardedContract G.toCarriers State P))
+    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) : True := by
+  fail_if_success
+    have : wp (@Function.denoteIn unit G.toCarriers State ops (directCaller unit) (value, ()))
+        (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
+      simp only [directCaller, row, Function.denoteIn]
+      verex_normalize
+      verex_obligations [] with [PProd.mk (ops.call handle row (.one (.param 0)))
+        (PProd.mk "guarded_direct_callee" verified)]
+      all_goals verex_decide
+  trivial
+
 def identityContract [C : Carriers] (State : Type) :
     Contract State Failure (@HList C row) (@NTy.carrier C (.param 0)) where
   requires := fun _ _ => True
@@ -44,16 +82,6 @@ theorem given_caller (G : GivenFrame) (State : Type) (unit : Validation.Validate
     (PProd.mk "abstract_callee" verified)]
   all_goals verex_solve
 
-def directCaller (unit : Validation.ValidatedUnit) : Function unit where
-  params := row
-  locals := .nil
-  frame := row
-  frame_eq := rfl
-  result := .one (.param 0)
-  body := .call 2 handle (.one (.param 0)) (.cons (.take .here) .nil)
-  mutables := .nil
-  exitSite := 0
-
 theorem given_direct_caller (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
     (verified : Satisfies (ops.call handle row (.one (.param 0)))
@@ -69,12 +97,19 @@ theorem given_direct_caller (G : GivenFrame) (State : Type) (unit : Validation.V
 
 open Lean Elab Command in
 run_cmd do
+  let callRules : Array Name := #[
+    ``wp_call_strict, ``wp_call_strict_valid,
+    ``wp_call_normal, ``wp_call_normal_valid,
+    ``wp_call_equations, ``wp_call_equations_valid,
+    ``wp_call, ``wp_call_valid
+  ]
   for name in [``given_caller, ``given_direct_caller] do
     let .thmInfo theoremInfo ← getConstInfo name | throwError "expected theorem"
-    unless (theoremInfo.value.find? fun expression =>
-      expression.isConstOf ``wp_call_strict || expression.isConstOf ``wp_call_normal ||
-        expression.isConstOf ``wp_call_equations || expression.isConstOf ``wp_call).isSome do
+    unless (theoremInfo.value.find? fun expression => callRules.any expression.isConstOf).isSome do
       throwError "{name} did not use the callee contract rule"
+    let axioms ← collectAxioms name
+    unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do
+      throwError "unexpected axioms in {name}: {axioms}"
 
 #print axioms given_caller
 #print axioms given_direct_caller

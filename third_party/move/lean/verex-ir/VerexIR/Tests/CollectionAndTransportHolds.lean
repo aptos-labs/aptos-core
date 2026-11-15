@@ -150,7 +150,70 @@ example {τ : NTy} {vec rPush : (NTy.vector τ).carrier} {x : τ.carrier}
     exact bad (held.of_mem (Array.mem_push.mpr (.inr rfl)))
   · cases bPush
 
--- Positive 1–7: single-carrier collection read & construction `Holds` preservation.
+-- Negative 3 (non-equivalence boundary): out-of-bounds `SpecVector.set` on an
+-- empty vector or slice preserves `NTy.Holds` even when `¬τ.Holds badVal`,
+-- witnessing that `vector_set` and `slice_set` are one-way implications rather
+-- than equivalences.
+example {τ : NTy} (badVal : τ.carrier) (_bad : ¬τ.Holds badVal) :
+    let emptyVec : SpecVector τ.carrier := ⟨#[], by simp⟩
+    NTy.Holds (.vector τ) (emptyVec.set 0 badVal) ∧
+      NTy.Holds (.slice τ) (emptyVec.set 0 badVal) := by
+  refine ⟨(NTy.holds_vector τ _).mpr ?_, (NTy.holds_slice τ _).mpr ?_⟩
+  · intro x hx
+    simp [SpecVector.set, Array.set!_eq_setIfInBounds] at hx
+  · intro x hx
+    simp [SpecVector.set, Array.set!_eq_setIfInBounds] at hx
+
+-- Negative 4 (non-equivalence boundary): overwriting the sole invalid slot of a
+-- singleton vector with a valid element satisfies `NTy.Holds` on the result
+-- even though `¬NTy.Holds (.vector τ)` on the input vector.
+example {τ : NTy} (badVal goodVal : τ.carrier)
+    (bad : ¬τ.Holds badVal) (good : τ.Holds goodVal) :
+    let badVec : SpecVector τ.carrier := ⟨#[badVal], by simp⟩
+    ¬NTy.Holds (.vector τ) badVec ∧
+      NTy.Holds (.vector τ) (badVec.set 0 goodVal) ∧
+      NTy.Holds (.slice τ) (badVec.set 0 goodVal) ∧
+      NTy.Holds (.array τ 1) ⟨badVec.set 0 goodVal, by simp [badVec, SpecVector.set]⟩ := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro held
+    exact bad (held.of_getElem 0 (by simp))
+  · refine (NTy.holds_vector τ _).mpr ?_
+    intro x hx
+    simp [SpecVector.set, Array.set!_eq_setIfInBounds] at hx
+    exact hx ▸ good
+  · refine (NTy.holds_slice τ _).mpr ?_
+    intro x hx
+    simp [SpecVector.set, Array.set!_eq_setIfInBounds] at hx
+    exact hx ▸ good
+  · refine (NTy.holds_array τ 1 _).mpr ?_
+    intro x hx
+    simp [SpecVector.set, Array.set!_eq_setIfInBounds] at hx
+    exact hx ▸ good
+
+-- Negative 5: writing an invalid element at an in-bounds index refutes
+-- `NTy.Holds` on the resulting slice, array, and updated `SpecSliceRef`.
+example {τ : NTy} {len : Nat} {arr : (NTy.array τ len).carrier}
+    {ref : (NTy.sliceRef τ).carrier} {i : Nat} {badVal : τ.carrier}
+    (bad : ¬τ.Holds badVal)
+    (inArr : i < len)
+    (inRef : i < ref.extent) :
+    ¬NTy.Holds (.slice τ) (arr.vector.set i badVal) ∧
+      ¬NTy.Holds (.array τ len) ⟨arr.vector.set i badVal, SpecArray.size_set arr i badVal⟩ ∧
+      ¬NTy.Holds (.sliceRef τ)
+        (ref.withCurrent ⟨ref.currentVector.set i badVal, by
+          rw [SpecVector.values_set, Array.size_set!, SpecSliceRef.currentVector_size]⟩) := by
+  have hiArr : i < arr.vector.values.size := by simpa [arr.size_eq] using inArr
+  have memArr : badVal ∈ (arr.vector.set i badVal).values := by
+    rw [SpecVector.values_set, Array.set!_eq_setIfInBounds]
+    exact Array.mem_of_getElem? (i := i) (by simp [hiArr])
+  have memRef : badVal ∈ (ref.currentVector.set i badVal).values := by
+    rw [SpecVector.values_set, Array.set!_eq_setIfInBounds]
+    exact Array.mem_of_getElem? (i := i) (by simp [inRef])
+  refine ⟨fun h => bad (h.of_mem_slice memArr), fun h => bad (h.of_mem_array memArr), ?_⟩
+  intro hRef
+  exact bad (hRef.of_current memRef)
+
+-- Positive 1–10: single-carrier collection read, write & construction `Holds` preservation.
 example {τ : NTy} {vec : (NTy.vector τ).carrier}
     (held : NTy.Holds (.vector τ) vec) (i : Nat) (h : i < vec.values.size) :
     τ.Holds (vec.values[i]'h) :=
@@ -214,6 +277,52 @@ example {τ : NTy} {vec rPush rIns rRem rSwap rCat rSl rRev : (NTy.vector τ).ca
   exact ⟨hPush, held.of_insert hx bIns, held.of_remove bRem,
     held.of_swap hx hy bSwap, held.of_concat hPush bCat,
     held.slice bSl, held.reverseSlice bRev⟩
+
+example {τ : NTy} {len : Nat} {arr : (NTy.array τ len).carrier}
+    {slice : (NTy.slice τ).carrier} {ref : (NTy.sliceRef τ).carrier}
+    (arrHeld : NTy.Holds (.array τ len) arr)
+    (sliceHeld : NTy.Holds (.slice τ) slice)
+    (sized : slice.values.size = len)
+    (refHeld : NTy.Holds (.sliceRef τ) ref) :
+    NTy.Holds (.slice τ) arr.vector ∧
+      NTy.Holds (.array τ len) ⟨slice, sized⟩ ∧
+      NTy.Holds (.slice τ) ref.finalVector ∧
+      NTy.Holds (.array τ ref.extent) ref.current ∧
+      NTy.Holds (.array τ ref.extent) ref.final :=
+  ⟨arrHeld.arraySlice,
+   sliceHeld.of_arrayOf_slice sized,
+   refHeld.sliceFinal,
+   refHeld.sliceCurrentArray,
+   refHeld.sliceFinalArray⟩
+
+example {τ : NTy} {len : Nat} {arr : (NTy.array τ len).carrier}
+    {slice : (NTy.slice τ).carrier} {ref : (NTy.sliceRef τ).carrier}
+    {x : τ.carrier} (i : Nat)
+    (arrHeld : NTy.Holds (.array τ len) arr)
+    (sliceHeld : NTy.Holds (.slice τ) slice)
+    (refHeld : NTy.Holds (.sliceRef τ) ref)
+    (hx : τ.Holds x) :
+    NTy.Holds (.array τ len) ⟨arr.vector.set i x, SpecArray.size_set arr i x⟩ ∧
+      NTy.Holds (.slice τ) (slice.set i x) ∧
+      NTy.Holds (.sliceRef τ)
+        (ref.withCurrent ⟨ref.currentVector.set i x, by
+          rw [SpecVector.values_set, Array.size_set!, SpecSliceRef.currentVector_size]⟩) ∧
+      NTy.Holds (.sliceRef τ)
+        (ref.withCurrent ⟨ref.current.vector.set i x, SpecArray.size_set ref.current i x⟩) :=
+  ⟨arrHeld.array_set i hx (SpecArray.size_set arr i x),
+   sliceHeld.slice_set i hx,
+   refHeld.sliceRef_withCurrent (refHeld.sliceCurrent.slice_set i hx),
+   refHeld.sliceRef_withCurrent_of_array
+     (refHeld.sliceCurrentArray.array_set i hx (SpecArray.size_set ref.current i x))⟩
+
+example {τ : NTy} {extent : Nat}
+    {cur fin : (NTy.array τ extent).carrier}
+    (curHeld : NTy.Holds (.array τ extent) cur)
+    (finHeld : NTy.Holds (.array τ extent) fin) :
+    NTy.Holds (.sliceRef τ) (SpecSliceRef.ofArrays cur fin) ∧
+      NTy.Holds (.sliceRef τ) (SpecSliceRef.ofArrays cur fin) :=
+  ⟨NTy.Holds.sliceRef_ofArrays curHeld finHeld,
+   NTy.Holds.sliceRef_ofArrays_of_slice curHeld.arraySlice finHeld.arraySlice⟩
 
 end CollectionTests
 

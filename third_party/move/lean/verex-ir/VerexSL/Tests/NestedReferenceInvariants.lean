@@ -108,10 +108,11 @@ verex namespace folded_boundary_and_loop_invariants where
   spec break_loop_step where
     panics_if false
 
-  fun prove_boundary_routed(value : &mut &mut MultiBounded) -> Unit := do
+  fun prove_boundary_routed(value : &mut &mut MultiBounded, next_high : u64) -> Unit := do
     (**value).low := 2u64
-    (**value).high := 24u64
+    (**value).high := next_high
   spec prove_boundary_routed where
+    requires next_high > 21
     panics_if false
 
   fun prove_loop_routed(value : &mut MultiBounded, next_high : u64, limit : u64) -> Unit := do

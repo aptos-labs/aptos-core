@@ -1419,7 +1419,6 @@ theorem NTy.isSome_decodeWith : (τ : NTy) → (raw : RuntimeValue) → sizeOf r
             (by rw [show closure.encode = raw from encoded]; exact small)
   | .nominal source arguments productive, raw, small =>
       (NominalCarriers.toNominalFunctor unit).nominalDecode?_isSome_congr source productive
-        (NRow.sortsWith unit C arguments) (NRow.sortsWith unit C' arguments)
         (NRow.decodersWith unit decode arguments) (NRow.decodersWith unit decode' arguments) raw
         (NRow.someAgreeBelowWith arguments _ small)
 

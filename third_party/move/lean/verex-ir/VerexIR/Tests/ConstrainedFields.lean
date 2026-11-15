@@ -6,67 +6,95 @@ import VerexIR.Proofs.Denote.Solve.Base
 open VerexIR VerexIR.Proofs.Denote
 namespace VerexIR.Tests.ConstrainedFields
 
--- A field equation exposes the row without opening its nominal invariant.
+-- Negative: Without a field equation, even with explicit `NTy.Holds`, the row's payload remains unknown.
+set_option linter.unusedVariables false in
 example [Carriers]
     (final : (NTy.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.vector .address) .nil)).carrier)
-    (input : (NTy.vector .address).plain)
-    (write : (NTy.vector .address).plain → (NTy.vector .address).plain)
-    (h : write input = final.val.1) (P : (NTy.vector .address).plain → Prop)
-    (known : P (write input)) : P final.val.1 := by
-  verex_subst_vars
-  exact known
-
--- Without a field equation, the row's payload remains unknown.
-example [Carriers]
-    (final : (NTy.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.vector .address) .nil)).carrier)
-    (input : (NTy.vector .address).plain)
-    (write : (NTy.vector .address).plain → (NTy.vector .address).plain)
-    (P : (NTy.vector .address).plain → Prop) (known : P (write input)) : True := by
+    (hFinal : NTy.Holds (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.vector .address) .nil)) final)
+    (input : (NTy.vector .address).carrier)
+    (write : (NTy.vector .address).carrier → (NTy.vector .address).carrier)
+    (P : (NTy.vector .address).carrier → Prop) (known : P (write input)) : True := by
   fail_if_success
-    have : P final.val.1 := by
+    have : P final.1 := by
       verex_subst_vars
       assumption
   trivial
 
--- A whole enum payload is substituted before its tag is inspected.
+-- Positive: A field equation exposes the plain row via `verex_subst_vars` without opening `NTy.Holds`.
+set_option linter.unusedVariables false in
+example [Carriers]
+    (final : (NTy.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.vector .address) .nil)).carrier)
+    (hFinal : NTy.Holds (.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.vector .address) .nil)) final)
+    (input : (NTy.vector .address).carrier)
+    (write : (NTy.vector .address).carrier → (NTy.vector .address).carrier)
+    (h : write input = final.1) (P : (NTy.vector .address).carrier → Prop)
+    (known : P (write input)) : P final.1 := by
+  verex_subst_vars
+  exact known
+
 private def variantType : NTy :=
   .enum (⟨⟨0⟩, 0⟩ : StructHandle) .nil ["First", "Second"]
     (.cons .nil (.cons .nil .nil)) (by decide)
 
-example [Carriers] (final : (NTy.carrier variantType)) (input : (NTy.plain variantType))
-    (choose : (NTy.plain variantType) → (NTy.plain variantType))
-    (h : final.val = choose input) (P : (NTy.plain variantType) → Prop)
-    (known : P (choose input)) : P final.val := by
+-- Negative: `NTy.Holds` on an enum value alone does not determine the variant payload.
+set_option linter.unusedVariables false in
+example [Carriers] (final input : variantType.carrier) (hFinal : NTy.Holds variantType final)
+    (choose : variantType.carrier → variantType.carrier)
+    (P : variantType.carrier → Prop) (known : P (choose input)) : True := by
+  fail_if_success
+    have : P final := by
+      verex_subst_vars
+      assumption
+  trivial
+
+-- Positive: A whole enum value is substituted before its tag is inspected.
+set_option linter.unusedVariables false in
+example [Carriers] (final input : variantType.carrier) (hFinal : NTy.Holds variantType final)
+    (choose : variantType.carrier → variantType.carrier)
+    (h : final = choose input) (P : variantType.carrier → Prop)
+    (known : P (choose input)) : P final := by
   verex_subst_vars
   exact known
 
 private def resultShape : ResultShape := .one variantType
 
--- A call result keeps its declared shape until its payload is read.
+-- Negative: A result shape and `ResultShape.Holds` alone do not determine the variant payload.
+set_option linter.unusedVariables false in
 example [Carriers] (final : (ResultShape.subst .nil resultShape).carrier)
-    (input : (NTy.plain variantType))
-    (choose : (NTy.plain variantType) → (NTy.plain variantType))
-    (h : final.val = choose input) (P : (NTy.plain variantType) → Prop)
-    (known : P (choose input)) : P final.val := by
-  verex_subst_vars
-  exact known
-
--- A result shape alone does not determine the variant payload.
-example [Carriers] (final : (ResultShape.subst .nil resultShape).carrier)
-    (input : (NTy.plain variantType))
-    (choose : (NTy.plain variantType) → (NTy.plain variantType))
-    (P : (NTy.plain variantType) → Prop) (known : P (choose input)) : True := by
+    (hFinal : ResultShape.Holds (ResultShape.subst .nil resultShape) final)
+    (input : variantType.carrier) (choose : variantType.carrier → variantType.carrier)
+    (P : variantType.carrier → Prop) (known : P (choose input)) : True := by
   fail_if_success
-    have : P final.val := by
+    have : P final := by
       verex_subst_vars
       assumption
   trivial
 
--- Authored preparation retains the integer certificate carried by a stored
--- field, even though the local itself has the whole nominal carrier type.
-example [Carriers]
-    (stored : (NTy.struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)).carrier) :
-    0 ≤ stored.val.1.val ∧ stored.val.1.val ≤ 2 ^ 64 - 1 := by
+-- Positive: A call result keeps its declared shape and substitutes when equated.
+set_option linter.unusedVariables false in
+example [Carriers] (final : (ResultShape.subst .nil resultShape).carrier)
+    (hFinal : ResultShape.Holds (ResultShape.subst .nil resultShape) final)
+    (input : variantType.carrier) (choose : variantType.carrier → variantType.carrier)
+    (h : final = choose input) (P : variantType.carrier → Prop)
+    (known : P (choose input)) : P final := by
+  verex_subst_vars
+  exact known
+
+private abbrev u64Struct : NTy := .struct ⟨⟨0⟩, 0⟩ .nil (.cons (.int 64 false) .nil)
+
+-- Negative: `verex_type_bounds` supplies only the `u64` width bounds, not a stricter bound.
+set_option linter.unusedVariables false in
+example [Carriers] (stored : u64Struct.carrier) (hStored : NTy.Holds u64Struct stored) : True := by
+  fail_if_success
+    have : stored.1.val < 2 ^ 64 - 1 := by
+      verex_type_bounds
+      omega
+  trivial
+
+-- Positive: Preparation retains the unsigned `u64` certificate carried by a stored `SpecInt` field.
+set_option linter.unusedVariables false in
+example [Carriers] (stored : u64Struct.carrier) (hStored : NTy.Holds u64Struct stored) :
+    0 ≤ stored.1.val ∧ stored.1.val ≤ 2 ^ 64 - 1 := by
   verex_type_bounds
   omega
 

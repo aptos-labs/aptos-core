@@ -189,12 +189,17 @@ partial def rowEntry? (row : Lean.Expr) (index : Nat) : Option Lean.Expr :=
   else none
 
 /-- A parameter lookup can use its default only after reaching the literal
-end of the row. An unknown tail is not evidence that the entry is absent. -/
-private partial def parameterAt? (row : Lean.Expr) (index : Nat) (fallback : Lean.Expr) :
-    Option Lean.Expr :=
+end of the row. An unknown tail is not evidence that the entry is absent.
+An unspelled entry keeps its induced spelling so `NTy.unmark` is preserved. -/
+private partial def parameterAt? (row : Lean.Expr) (index : Nat) (fallback : Lean.Expr)
+    (env : Option Environment := none) : Option Lean.Expr := do
+  let row := row.consumeMData
   if row.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 then
-    if index == 0 then some (row.getArg! 0)
-    else parameterAt? (row.getArg! 1) (index - 1) fallback
+    if index == 0 then
+      let entry := row.getArg! 0
+      guard (spelledNTy entry env)
+      some entry
+    else parameterAt? (row.getArg! 1) (index - 1) fallback env
   else if row.isConstOf ``VerexIR.Proofs.Denote.NRow.nil then some fallback
   else none
 
@@ -209,7 +214,7 @@ partial def substituteNTy (θ : Lean.Expr) (τ : Lean.Expr)
   match τ.getAppFn.constName? with
   | some ``VerexIR.Proofs.Denote.NTy.param =>
       let index ← (args[0]?).bind fun index => index.nat? <|> index.rawNatLit?
-      parameterAt? θ index τ
+      parameterAt? θ index τ env
   | some ``VerexIR.Proofs.Denote.NTy.tuple =>
       pure (mkApp τ.getAppFn (← substituteNRow θ (← args[0]?) env))
   | some ``VerexIR.Proofs.Denote.NTy.struct =>
@@ -396,7 +401,8 @@ def respellInducedNode (e : Lean.Expr)
   let spelled (row : Lean.Expr) : MetaM (Option Lean.Expr) := do
     let row := row.consumeMData
     if row.isAppOfArity ``Subtype.val 3 then
-      return substitutionRow? (← whnfR (row.getArg! 2))
+      let some extracted := substitutionRow? (← whnfR (row.getArg! 2)) | return none
+      return if spelledNRow extracted (some env) then some extracted else none
     return if spelledNRow row (some env) then some row else none
   match name, args with
   | ``NTy.subst, #[row, τ] =>
@@ -458,6 +464,13 @@ def respellInducedNode (e : Lean.Expr)
         let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
           (← mkEq (mkApp (mkConst ``NTy.inhabitable) substituted) (mkConst ``Bool.true))
         pure (some (mkApp3 (mkConst ``NTy.inhabitantOf) outer substituted decided))
+    | ``NTy.plainFallback, #[_, τ, _] => do
+        let some substituted := substituteNTy row τ (some env) | pure none
+        let inhabitable := mkApp (mkConst ``NTy.inhabitable) substituted
+        if ← isDefEq inhabitable (mkConst ``Bool.true) then
+          let decided ← mkEqRefl (mkConst ``Bool.true)
+          pure (some (mkApp3 (mkConst ``NTy.plainFallback) outer substituted decided))
+        else pure none
     | _, _ => pure none
   -- A respelling of a VALUE the family decides is not a conversion: the
   -- two defaults of a type, and the two orders of a parameter, are one
@@ -468,7 +481,7 @@ def respellInducedNode (e : Lean.Expr)
   -- the values are checked, and a value whose respelling does not
   -- convert keeps the spelling it has, for a rule that carries a proof
   -- to reach (`inhabitantOuterFamily`).
-  let decided := [``NTy.inhabitantOf, ``NTy.readOrder].contains name
+  let decided := [``NTy.inhabitantOf, ``NTy.plainFallback, ``NTy.readOrder].contains name
   match respelled with
   | some value =>
       if decided then

@@ -23,15 +23,16 @@ open Lean Meta Elab Tactic
 
 /-! ## A loan's death certifies before it equates
 
-The prophecy of a mutable borrow is a certified value, so the equation a
-loan's death assumes, `current = NTy.forget prophecy`, holds only of a current
-whose data invariants hold. The death of a reborrow through a reference
-(`&mut b.f`, `&mut *b`, where `b` is a reference) assumed it without a
-certifying step: a run that left the current invalid was pruned there, and
-every later obligation, the owner's exit check among them, was vacuous. The
-automatic tactic rejected such a function, by failing to find the proof; the
-authored script below proved each of them. A holder joined from two reborrows
-died with the bare equation in the same way.
+The prophecy of a mutable borrow carries `NTy.Holds`, so the equation a
+loan's death assumes (`current = prophecy`) is valid only when `current`'s
+data invariants hold. The death of a reborrow through a reference
+(`&mut b.f`, `&mut *b`, where `b` is a reference) must check `NTy.Holds` on
+`current` before assuming `current = prophecy`: without that certifying step, a
+run that left `current` invalid would be pruned at the equation, making
+every later obligation — the owner's exit check among them — vacuous. The
+automatic tactic rejected such a function by failing to find the proof, while
+the authored script below would otherwise discharge it from the contradiction.
+A holder joined from two reborrows must likewise check before equating.
 
 Now every death certifies the side of each equation it assumes
 (`Lender.resolve` and `holderResolves`).
@@ -491,7 +492,7 @@ run_cmd do
         | no_panic => verex_prepare <;> omega
         | leaf => verex_prepare <;> (
             simp (failIfUnchanged := false) only [
-              VerexIR.Proofs.Denote.NTy.forget, VerexIR.SpecSliceRef.map_extent] at heq
+              VerexIR.SpecSliceRef.map_extent] at heq
             omega))),
       (`slice_loans.elem_field_bad, ← `(command| verify slice_loans::elem_field_bad by lean =>
         verex_obligations
@@ -499,7 +500,7 @@ run_cmd do
         | no_panic => verex_prepare <;> omega
         | leaf => verex_prepare <;> (
             simp (failIfUnchanged := false) only [
-              VerexIR.Proofs.Denote.NTy.forget, VerexIR.SpecSliceRef.map_extent] at heq
+              VerexIR.SpecSliceRef.map_extent] at heq
             omega)))] do
     let diagnostics ← rejectedDiagnostics base command
     if let some other := diagnostics.find? fun message =>

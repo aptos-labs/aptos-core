@@ -3,6 +3,9 @@
 
 import VerexSL
 
+-- This test asserts what the Given route does; it selects the route.
+set_option verex.givenRoute true
+
 open Lean Meta Elab Command VerexSL VerexSL.Contract VerexIR.Proofs.Denote
 
 verex module 0x42::nominal_quotation where

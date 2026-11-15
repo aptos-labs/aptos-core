@@ -5,39 +5,9 @@ import VerexIR.Proofs.Denote.Solve.Normal
 
 open Lean Meta Elab Tactic VerexIR.Proofs.Denote
 
--- Select only the existing constructor observer. The check must see its
--- constructor result, rather than closing the equation by definitional equality.
-example [Carriers] (value : NTy.num.plain) :
-    (Which.there Which.here : Which ["End", "Position"]
-      (.cons .nil (.cons (.cons .num .nil) .nil)) (.cons .num .nil)).project?
-      (.inr (.inl (value, PUnit.unit))) = some ((value, PUnit.unit) : HListPlain (.cons .num .nil)) := by
-  run_tac withMainContext do
-    let some (_, lhs, _) := (← getMainTarget).eq? | throwError "expected equality"
-    let procs ← Simp.SimprocsArray.add #[] ``whichProjectConstructor false
-    let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
-    let (result, _) ← simp lhs context procs
-    unless result.expr.isAppOf ``Option.some do
-      throwError "constructed projection did not reduce: {result.expr}"
-  rfl
-
--- The mapped observer is separate: only its own handler is enabled here.
-example [Carriers] (value : NTy.num.plain) :
-    Option.map Var.here.selectPlain
-      ((Which.there Which.here : Which ["End", "Position"]
-        (.cons .nil (.cons (.cons .num .nil) .nil)) (.cons .num .nil)).project?
-        (.inr (.inl (value, PUnit.unit)))) = some value := by
-  run_tac withMainContext do
-    let some (_, lhs, _) := (← getMainTarget).eq? | throwError "expected equality"
-    let procs ← Simp.SimprocsArray.add #[] ``optionMapProjectConstructor true
-    let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
-    let (result, _) ← simp lhs context procs
-    unless result.expr.isAppOf ``Option.some do
-      throwError "mapped constructed projection did not reduce: {result.expr}"
-  rfl
-
--- An unknown variant supplies no constructor observation.
+-- Negative first: an unknown variant supplies no constructor observation.
 example [Carriers]
-    (value : variantPlain ["End", "Position"]
+    (value : variantCarrier ["End", "Position"]
       (.cons .nil (.cons (.cons .num .nil) .nil))) :
     (Which.there Which.here : Which ["End", "Position"]
       (.cons .nil (.cons (.cons .num .nil) .nil)) (.cons .num .nil)).project? value =
@@ -50,6 +20,36 @@ example [Carriers]
     let (result, _) ← simp lhs context procs
     unless result.expr == lhs do
       throwError "unknown variant projection was changed: {result.expr}"
+  rfl
+
+-- Select only the existing constructor observer. The check must see its
+-- constructor result, rather than closing the equation by definitional equality.
+example [Carriers] (value : NTy.num.carrier) :
+    (Which.there Which.here : Which ["End", "Position"]
+      (.cons .nil (.cons (.cons .num .nil) .nil)) (.cons .num .nil)).project?
+      (.inr (.inl (value, PUnit.unit))) = some ((value, PUnit.unit) : HList (.cons .num .nil)) := by
+  run_tac withMainContext do
+    let some (_, lhs, _) := (← getMainTarget).eq? | throwError "expected equality"
+    let procs ← Simp.SimprocsArray.add #[] ``whichProjectConstructor false
+    let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
+    let (result, _) ← simp lhs context procs
+    unless result.expr.isAppOf ``Option.some do
+      throwError "constructed projection did not reduce: {result.expr}"
+  rfl
+
+-- The mapped observer is separate: only its own handler is enabled here.
+example [Carriers] (value : NTy.num.carrier) :
+    Option.map Var.here.select
+      ((Which.there Which.here : Which ["End", "Position"]
+        (.cons .nil (.cons (.cons .num .nil) .nil)) (.cons .num .nil)).project?
+        (.inr (.inl (value, PUnit.unit)))) = some value := by
+  run_tac withMainContext do
+    let some (_, lhs, _) := (← getMainTarget).eq? | throwError "expected equality"
+    let procs ← Simp.SimprocsArray.add #[] ``optionMapProjectConstructor true
+    let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
+    let (result, _) ← simp lhs context procs
+    unless result.expr.isAppOf ``Option.some do
+      throwError "mapped constructed projection did not reduce: {result.expr}"
   rfl
 
 -- Unknown row components use the same inferred Prod projections as clauses

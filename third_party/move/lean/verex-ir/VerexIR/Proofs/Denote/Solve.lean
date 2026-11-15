@@ -41,7 +41,8 @@ private def Provenance.key : Provenance → ObligationKey
   | .loopEntry loop => { kind := "invariant", phase := "entry", loop }
   | .loopIteration loop => { kind := "invariant", phase := "step", loop }
   | .assertion => { kind := "assert" }
-  | .mutationEnd | .construction | .copyOut | .exitMutationEnd | .handOver | .joinPremise _ _ =>
+  | .mutationEnd | .construction | .publish | .copyOut | .exitMutationEnd | .handOver
+  | .joinPremise _ _ =>
       { kind := "data invariant" }
   | .memoryWritten | .callReturned => { kind := "module invariant" }
   | .lemmaRequirement => { kind := "lemma requires" }
@@ -387,8 +388,7 @@ private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
             -- cost it the target's budget and settle nothing.
             let needsSource ← goal.withContext do
               let target ← instantiateMVars (← goal.getType)
-              pure (target.isConstOf ``False ||
-                (target.find? (·.isAppOfArity ``Subtype.mk 4)).isSome)
+              pure (target.isConstOf ``False)
             unless needsSource do
               received.restore
               throw undecided
@@ -893,7 +893,7 @@ private partial def concreteConditionFrame? (unit functions carriers : Lean.Expr
     unless ← isDefEq unit (carriers.getArg! 0) do return none
     unless ← isDefEq functions (carriers.getArg! 1) do return none
     return some (carriers.getArg! 2)
-  if carriers.isAppOfArity ``Carriers.instantiate 3 then
+  if carriers.isAppOfArity ``Carriers.instantiate 2 then
     let some outer ← concreteConditionFrame? unit functions (carriers.getArg! 1) | return none
     let frame := mkAppN (mkConst ``Skolems.instantiate)
       #[unit, functions, carriers.getArg! 0, outer]
@@ -960,8 +960,8 @@ private partial def debugHead (goal : MVarId) : MetaM String := goal.withContext
       | .const name _ => pure (toString name)
       | .fvar id => do return s!"local {(← id.getDecl).userName}"
       | _ => pure "?"
-    let name := if e.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 8 then
-        s!"{name} {e.getArg! 4}" else name
+    let name := if e.isAppOfArity ``VerexIR.Proofs.Denote.propheticMeaning 9 then
+        s!"{name} {e.getArg! 5}" else name
     if depth == 0 then return name
     let inner := if e.isAppOfArity ``VerexIR.Proofs.wp 7 then some (e.getArg! 3)
       else if e.getAppNumArgs ≥ 1 && (e.getAppFn.isConstOf ``VerexIR.Proofs.Spec.bind ||
@@ -1280,9 +1280,7 @@ private def resumeShared (ctx : SolveContext) (index : Nat) : SolveM Unit := do
           let rawVal := StatedFacts.unmarked <|
             if holdTy.getAppNumArgs ≥ 3 then holdTy.getArg! (holdTy.getAppNumArgs - 1) else holdTy
           let valExpr :=
-            if rawVal.isAppOfArity ``NTy.forget 3 || rawVal.isAppOfArity ``ResultShape.forget 3 then
-              StatedFacts.unmarked (rawVal.getArg! 2)
-            else if rawVal.isAppOfArity ``Option.some 2 then
+            if rawVal.isAppOfArity ``Option.some 2 then
               StatedFacts.unmarked (rawVal.getArg! 1)
             else rawVal
           pure (((toString (← ppExpr valExpr)).replace "\n" " ").take 80).toString
@@ -1997,14 +1995,29 @@ update, and what follows takes it. -/
 private def ghostWriteStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   let some (site, arguments) ← ghostWriteGoal? goal | return false
-  let rule := mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_ghostAt) arguments
+  let free? ← goal.withContext do
+    if ← isInvariantFreeNTy arguments[4]! then
+      let free := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.invariantFree) arguments[4]!
+      try withDefault do
+        pure (some (← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+          (← mkEq free (mkConst ``Bool.true))))
+      catch _ => pure none
+    else pure none
+  let (rule, heldMarks) := match free? with
+    | some decided =>
+        (mkAppN (mkConst ``wp_ghostAt_invariantFree)
+          (arguments.extract 0 5 ++ #[decided] ++ arguments.extract 5 11),
+         #[arguments[7]!, arguments[10]!])
+    | none =>
+        (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_ghostAt) arguments,
+         #[arguments[7]!, arguments[8]!, arguments[9]!, arguments[10]!])
   match ← goal.withContext (goal.apply rule) with
   | [defined, continues] =>
       setGoals [continues]
       evalTactic (← `(tactic| intro ghostValue ghostChosen))
       evalTactic (← `(tactic| try verex_normalize at ghostChosen))
       unless (← getGoals).isEmpty do
-        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[arguments[7]!, arguments[10]!]
+        normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization heldMarks
         evalTactic (← `(tactic| all_goals verex_split_hypotheses))
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         queue (← getGoals) provenance clauses
@@ -2082,23 +2095,25 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       queueOpenedInvariants ctx (← getGoals) provenance clauses prepared
     charge "invariant" stageStart
     return true
-  -- A certifying step: the obligation is the value's data invariants at
+  -- A checking step: the obligation is the value's data invariants at
   -- every depth, and the site and the kind are the step's own
-  -- (`certifyingAt`, `doc/designs/data-invariants.md`).
-  let certifying? ← certifyingGoal? goal
-  let check ← match certifying? with
+  -- (`checkingAt`, `doc/designs/data-invariants.md`).
+  let checking? ← checkingGoal? goal
+  let check ← match checking? with
     | some _ => pure none
     | none => match ← mutationEndGoal? goal with
       | some (site, arguments) => pure (some (site, arguments, false))
       | none => match ← constructionGoal? goal with
         | some (site, arguments) => pure (some (site, arguments, true))
         | none => pure none
-  if check.isNone && certifying?.isNone then return false
-  let (rule, marks, origin, site) ← match certifying? with
+  if check.isNone && checking?.isNone then return false
+  let (rule, marks, origin, site) ← match checking? with
     | some (site, kind, arguments) =>
         let origin ←
           if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.construction then
             pure Provenance.construction
+          else if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.publish then
+            pure Provenance.publish
           else if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.mutationEnd then
             pure Provenance.mutationEnd
           else if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.copyOut then
@@ -2107,14 +2122,14 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
             pure Provenance.handOver
           else if kind.isConstOf ``VerexIR.Proofs.Denote.CertifyKind.exit then
             pure Provenance.exitMutationEnd
-          else throwError m!"a certifying step at the site {site} with an unknown kind {kind}"
-        pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_certifyingAt_intro_holds) arguments,
+          else throwError m!"a checking step at the site {site} with an unknown kind {kind}"
+        pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_checkingAt_intro_holds) arguments,
           #[arguments[arguments.size - 1]!], origin, site)
     | none =>
       let some (site, arguments, constructed) := check | return false
       -- The predicate a `constructedAt` or `mutationEndAt` marker checks.
       -- Where the unit states none the marker checks nothing: the obligation
-      -- is the certifying step's, and these two markers retire with the open
+      -- is the checking step's, and these two markers retire with the open
       -- problem `doc/plan/data-and-global-invariants.md`, "`constructedAt` and
       -- `mutationEndAt` are emitted where they check nothing".  The marker's
       -- own terms are read in the goal's context: their types mention the
@@ -2151,11 +2166,11 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
         renormalizeCut ctx.normalization cut
         queue (← getGoals) provenance clauses
       setGoals [holds]
-      -- The certificate of a value whose variant is not known is the
-      -- certificate of each of its variants: split it, so that the clauses
-      -- of an arm are its fields' (`variantPlain.deepHolds_inl`).
-      if let some certifying := certifying? then
-        if let .fvar value := certifying.2.2[5]!.consumeMData then
+      -- The invariant of a value whose variant is not known is the
+      -- invariant of each of its variants: split it, so that the clauses
+      -- of an arm are its fields' (`variantCarrier.holds_inl`).
+      if let some checking := checking? then
+        if let .fvar value := checking.2.2[5]!.consumeMData then
           let abstractVariant ← holds.withContext do
             let type ← whnfD (← instantiateMVars (← value.getType))
             pure (type.isAppOf ``Sum)
@@ -2488,9 +2503,6 @@ private def familyTransports : Array Name := #[``VerexIR.Proofs.Denote.NTy.toSko
   ``VerexIR.Proofs.Denote.NTy.ofSkolem, ``VerexIR.Proofs.Denote.HList.toSkolem,
   ``VerexIR.Proofs.Denote.HList.ofSkolem, ``VerexIR.Proofs.Denote.variantCarrier.toSkolem,
   ``VerexIR.Proofs.Denote.variantCarrier.ofSkolem,
-  ``VerexIR.Proofs.Denote.NTy.plainToSkolem, ``VerexIR.Proofs.Denote.NTy.plainOfSkolem,
-  ``VerexIR.Proofs.Denote.HListPlain.toSkolem, ``VerexIR.Proofs.Denote.HListPlain.ofSkolem,
-  ``VerexIR.Proofs.Denote.variantPlain.toSkolem, ``VerexIR.Proofs.Denote.variantPlain.ofSkolem,
   ``VerexIR.Proofs.Denote.ResultShape.toSkolem,
   ``VerexIR.Proofs.Denote.ResultShape.ofSkolem]
 
@@ -2526,9 +2538,248 @@ private partial def argumentPattern (e : Lean.Expr) (components variables : Arra
     | some index => variables[index]!
     | none => e
 
+private def ResultShape.invariantFree : ResultShape → Bool
+  | .none => true
+  | .one τ => τ.invariantFree
+
+private theorem HList.holds_eq_true_of_invariantFree [Carriers] {row : NRow}
+    (free : row.invariantFree = true) (values : HList row) :
+    HList.Holds row values = True :=
+  eq_true ((HList.holds_iff row values).mpr (HList.deepHolds_of_invariantFree row free values))
+
+private theorem HList.holds_of_invariantFree [Carriers] {row : NRow}
+    (free : row.invariantFree = true) (values : HList row) :
+    HList.Holds row values :=
+  (HList.holds_iff row values).mpr (HList.deepHolds_of_invariantFree row free values)
+
+private theorem ResultShape.holds_eq_true_of_invariantFree [Carriers] {shape : ResultShape}
+    (free : shape.invariantFree = true) (value : shape.carrier) :
+    shape.Holds value = True := by
+  cases shape with
+  | none => exact eq_true trivial
+  | one τ => exact eq_true (NTy.holds_of_invariantFree τ free value)
+
+private theorem wp_call_normal_valid_eq {State : Type} {Args Result : Type}
+    {function : Args → Spec State Failure Result}
+    {contract : Contract State Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {validArgs assumes requires mustAbort : Prop}
+    {validResult : Result → Prop}
+    {established framed : Result → State → Prop}
+    {failed : Failure → Prop}
+    (verified : Satisfies function contract)
+    (strict : contract.mayAbort = contract.mustAbort)
+    (validArgs_eq : contract.validArgs args = validArgs)
+    (validResult_eq : ∀ result, contract.validResult result = validResult result)
+    (assumes_eq : contract.assumes args initial = assumes)
+    (requires_eq : contract.requires args initial = requires)
+    (mustAbort_eq : contract.mustAbort args initial = mustAbort)
+    (ensures_eq : ∀ result final, contract.ensures args initial result final = established result final)
+    (frame_eq : ∀ result final, contract.frame args initial result final = framed result final)
+    (aborts_eq : ∀ error, contract.aborts args initial error = failed error)
+    (valid : validArgs)
+    (assumed : assumes) (permitted : requires)
+    (post : ∀ result final, validResult result → ¬mustAbort → established result final →
+      framed result final → ensures result final)
+    (failing : ∀ error, failed error → aborts error) :
+    wp (function args) ensures aborts initial :=
+  wp_call_normal_valid verified strict assumes_eq requires_eq mustAbort_eq ensures_eq frame_eq
+    aborts_eq (validArgs_eq.symm ▸ valid) assumed permitted
+    (fun result final validRes => post result final (validResult_eq result ▸ validRes))
+    failing
+
+private theorem wp_call_normal_validResult_eq {State : Type} {Args Result : Type}
+    {function : Args → Spec State Failure Result}
+    {contract : Contract State Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {assumes requires mustAbort : Prop}
+    {validResult : Result → Prop}
+    {established framed : Result → State → Prop}
+    {failed : Failure → Prop}
+    (verified : Satisfies function contract)
+    (strict : contract.mayAbort = contract.mustAbort)
+    (validResult_eq : ∀ result, contract.validResult result = validResult result)
+    (assumes_eq : contract.assumes args initial = assumes)
+    (requires_eq : contract.requires args initial = requires)
+    (mustAbort_eq : contract.mustAbort args initial = mustAbort)
+    (ensures_eq : ∀ result final, contract.ensures args initial result final = established result final)
+    (frame_eq : ∀ result final, contract.frame args initial result final = framed result final)
+    (aborts_eq : ∀ error, contract.aborts args initial error = failed error)
+    (valid : contract.validArgs args)
+    (assumed : assumes) (permitted : requires)
+    (post : ∀ result final, validResult result → ¬mustAbort → established result final →
+      framed result final → ensures result final)
+    (failing : ∀ error, failed error → aborts error) :
+    wp (function args) ensures aborts initial :=
+  wp_call_normal_valid verified strict assumes_eq requires_eq mustAbort_eq ensures_eq frame_eq
+    aborts_eq valid assumed permitted
+    (fun result final validRes => post result final (validResult_eq result ▸ validRes))
+    failing
+
+private partial def peelContractExpr (c : Lean.Expr) (fuel : Nat := 12) : MetaM Lean.Expr := do
+  let c := (← whnfCore c).consumeMData
+  if fuel == 0 || c.isAppOf ``VerexIR.Proofs.Contract.mk then return c
+  match ← unfoldDefinition? c with
+  | some next => peelContractExpr next (fuel - 1)
+  | none => return c
+
+private partial def peelToHoldsHead (e : Lean.Expr) (fuel : Nat := 16) : MetaM Lean.Expr := do
+  let e := (← whnfCore e).consumeMData
+  if fuel == 0 || e.isConstOf ``True ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 ||
+      e.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then
+    return e
+  if let .proj s idx structVal := e.getAppFn.consumeMData then
+    let structVal' ← peelContractExpr structVal
+    if structVal' != structVal then
+      return ← peelToHoldsHead (mkAppN (.proj s idx structVal') e.getAppArgs) (fuel - 1)
+  match ← unfoldDefinition? e with
+  | some next => peelToHoldsHead next (fuel - 1)
+  | none => return e
+
+private partial def peelCastsHEq (e : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  let core := e.consumeMData
+  if core.isAppOfArity ``cast 4 then
+    let (inner, hInner) ← peelCastsHEq (core.getArg! 3)
+    let hStep ← mkAppOptM ``cast_heq
+      #[some (core.getArg! 0), some (core.getArg! 1), some (core.getArg! 2), some (core.getArg! 3)]
+    return (inner, ← mkHEqTrans hStep hInner)
+  return (e, ← mkHEqRefl e)
+
+/-- Find a local `NTy.Holds` hypothesis matching `carriers`, `τ`, and `val` componentwise,
+without ever unfolding `NTy.Holds` across non-matching types or families. -/
+private def findMatchingHoldsHyp? (carriers τ val : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let carriers := carriers.consumeMData
+  let τ := τ.consumeMData
+  let val := val.consumeMData
+  for decl in ← getLCtx do
+    if decl.isAuxDecl then continue
+    let raw := decl.type.consumeMData
+    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+    unless ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 do continue
+    let ok ← withNewMCtxDepth do
+      unless ← withDefault (isDefEq (ty.getArg! 1) τ) do return false
+      unless ← withDefault (isDefEq (ty.getArg! 2) val) do return false
+      withDefault (isDefEq (ty.getArg! 0) carriers)
+    if ok then return some decl.toExpr
+  return none
+
+private partial def proveDirectNTyHolds? (carriers τ val : Lean.Expr) (fuel : Nat := 8) :
+    MetaM (Option Lean.Expr) := do
+  let expected := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers τ val
+  if !τ.hasFVar && !τ.hasMVar then
+    if (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.invariantFree) τ)).isConstOf ``Bool.true then
+      let raw := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.holds_of_invariantFree)
+        carriers τ (← mkEqRefl (mkConst ``Bool.true)) val
+      return some (← mkExpectedTypeHint raw expected)
+  if fuel > 0 then
+    if let some (θ, outer) := FamilyTransport.inducedCarriers? carriers.consumeMData then
+      if let some row := FamilyTransport.substitutionRow? θ then
+        if let some substituted := FamilyTransport.substituteNTy row τ (some (← getEnv)) then
+          let (val', heq) ← peelCastsHEq val
+          let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) outer substituted
+          if ← withDefault (isDefEq (← inferType val') expectedCarrier) then
+            if let some innerProof ← proveDirectNTyHolds? outer substituted val' (fuel - 1) then
+              let rhs := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) outer substituted val'
+              let eqProof ← mkAppOptM ``VerexIR.Proofs.Denote.NTy.holds_instantiate_heq
+                #[some outer, some θ, some τ, some val, some val', some heq]
+              let eqHint ← withDefault (mkExpectedTypeHint eqProof (← mkEq expected rhs))
+              let transported ← mkAppOptM ``Eq.mpr #[some expected, some rhs, some eqHint, some innerProof]
+              return some (← withDefault (mkExpectedTypeHint transported expected))
+  if let some h ← findMatchingHoldsHyp? carriers τ val then
+    return some (← withDefault (mkExpectedTypeHint h expected))
+  let τCore := (← whnfCore τ).consumeMData
+  if τCore.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 then
+    if let some h ← findMatchingHoldsHyp? carriers (τCore.getArg! 0) val then
+      return some (← withDefault (mkExpectedTypeHint h expected))
+  return none
+
+private partial def proveDirectHListHolds? (carriers row val : Lean.Expr) (fuel : Nat := 16) :
+    MetaM (Option Lean.Expr) := do
+  if fuel == 0 then return none
+  let expected := mkApp3 (mkConst ``VerexIR.Proofs.Denote.HList.Holds) carriers row val
+  let rowCore := (← whnfD row).consumeMData
+  if rowCore.isConstOf ``VerexIR.Proofs.Denote.NRow.nil then
+    return some (← mkExpectedTypeHint (mkConst ``True.intro) expected)
+  if !row.hasFVar && !row.hasMVar then
+    if (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.invariantFree) row)).isConstOf ``Bool.true then
+      let raw := mkApp4 (mkConst ``HList.holds_of_invariantFree)
+        carriers row (← mkEqRefl (mkConst ``Bool.true)) val
+      return some (← mkExpectedTypeHint raw expected)
+  let valCore := (← whnfCore val).consumeMData
+  if valCore.isAppOfArity ``VerexIR.Proofs.Denote.HList.ofSkolem 4 then
+    let (outerC, θ, row0, innerVals) :=
+      (valCore.getArg! 0, valCore.getArg! 1, valCore.getArg! 2, valCore.getArg! 3)
+    let instC := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate) θ outerC
+    if let some hInner ← proveDirectHListHolds? instC row0 innerVals (fuel - 1) then
+      let iffProof := mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.holds_ofSkolem_iff) outerC θ row0 innerVals
+      let mpProof ← mkAppM ``Iff.mpr #[iffProof, hInner]
+      return some (← withDefault (mkExpectedTypeHint mpProof expected))
+  if valCore.isAppOfArity ``VerexIR.Proofs.Denote.HList.toSkolem 4 then
+    let (outerC, θ, row0, callerVals) :=
+      (valCore.getArg! 0, valCore.getArg! 1, valCore.getArg! 2, valCore.getArg! 3)
+    if let some substRow := FamilyTransport.substitutionRow? θ then
+      if let some rowSubst := FamilyTransport.substituteNRow substRow row0 (some (← getEnv)) then
+        if let some hCaller ← proveDirectHListHolds? outerC rowSubst callerVals (fuel - 1) then
+          let iffProof := mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.holds_toSkolem_iff) outerC θ row0 callerVals
+          let mpProof ← mkAppM ``Iff.mpr #[iffProof, hCaller]
+          return some (← withDefault (mkExpectedTypeHint mpProof expected))
+  if rowCore.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 then
+    let (τ, rest) := (rowCore.getArg! 0, rowCore.getArg! 1)
+    let (headVal, tailVal) ←
+      if valCore.isAppOfArity ``Prod.mk 4 then
+        pure (valCore.getArg! 2, valCore.getArg! 3)
+      else
+        pure (← mkAppM ``Prod.fst #[val], ← mkAppM ``Prod.snd #[val])
+    let some hHead ← proveDirectNTyHolds? carriers τ headVal | return none
+    let some hTail ← proveDirectHListHolds? carriers rest tailVal (fuel - 1) | return none
+    let conj ← mkAppM ``And.intro #[hHead, hTail]
+    return some (← withDefault (mkExpectedTypeHint conj expected))
+  return none
+
+private def proveDirectValidType? (validArgsType : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  try withTransparency .default do
+    let validArgsType ← instantiateMVars validArgsType
+    let peeled ← peelToHoldsHead validArgsType
+    let raw? ←
+      if peeled.isConstOf ``True then
+        pure (some (mkConst ``True.intro))
+      else if peeled.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then
+        proveDirectHListHolds? (peeled.getArg! 0) (peeled.getArg! 1) (peeled.getArg! 2)
+      else
+        pure none
+    let some raw := raw? | return none
+    let hinted ← mkExpectedTypeHint raw validArgsType
+    let hinted ← instantiateMVars hinted
+    if hinted.hasMVar then return none
+    return some hinted
+  catch _ =>
+    return none
+
+private def proveDirectContractValidArgs? (contract args : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  try withTransparency .default do
+    proveDirectValidType? (← mkAppM ``VerexIR.Proofs.Contract.validArgs #[contract, args])
+  catch _ =>
+    return none
+
+private def isContractResultInvariantFree (contract : Lean.Expr) : MetaM Bool := do
+  try
+    let validResultFn ← mkAppM ``VerexIR.Proofs.Contract.validResult #[contract]
+    let .forallE _ resultTy _ _ ← whnfR (← inferType validResultFn) | return false
+    withLocalDeclD `result resultTy fun result => do
+      let peeled ← peelToHoldsHead (mkApp validResultFn result)
+      if peeled.isConstOf ``True then return true
+      if peeled.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then
+        let shape := peeled.getArg! 1
+        if shape.hasFVar || shape.hasMVar then return false
+        return (← whnfD (mkApp (mkConst ``ResultShape.invariantFree) shape)).isConstOf ``Bool.true
+      return false
+  catch _ =>
+    return false
+
 /-- The conditions of a contract the call rules take as equations: those of
-`wp_call_equations` in its order; `wp_call_normal` takes all but the
-permitted failures. -/
+`wp_call_equations_valid` in its order; `wp_call_normal_valid_eq` takes all but the
+permitted failures, after `validArgs` and `validResult`. -/
 private def contractConditions : Array Name := #[``VerexIR.Proofs.Contract.assumes,
   ``VerexIR.Proofs.Contract.requires, ``VerexIR.Proofs.Contract.mayAbort,
   ``VerexIR.Proofs.Contract.mustAbort, ``VerexIR.Proofs.Contract.ensures,
@@ -2580,13 +2831,14 @@ private def contractEquations? (contract args initial : Lean.Expr)
       return none
     let { ctx, simprocs, .. } ← mkSimpContext
       (← `(tactic| simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval,
+        VerexIR.Proofs.Denote.ResultShape.Holds,
+        VerexIR.Proofs.Denote.NTy.holds_toSkolem_iff,
+        VerexIR.Proofs.Denote.HList.holds_toSkolem_iff,
         Prod.fst, Prod.snd]))
       (eraseLocal := false)
     let ctx ← Simp.mkContext { ctx.config with failIfUnchanged := false } ctx.simpTheorems
       ctx.congrTheorems
-    let mut proofs := #[]
-    for condition in contractConditions do
-      let applied := mkApp2 (← mkAppM condition #[contract']) args' state
+    let proveEquation (applied : Lean.Expr) : TacticM (Option Lean.Expr) := do
       let proof ← forallTelescope (← whnfR (← inferType applied)) fun rest _ => do
         let value := mkAppN applied rest
         let (result, _) ← Simp.main value ctx (methods := Simp.mkDefaultMethodsCore simprocs)
@@ -2596,16 +2848,71 @@ private def contractEquations? (contract args initial : Lean.Expr)
         mkLambdaFVars (binders ++ rest) proof
       let proof ← instantiateMVars proof
       if proof.hasFVar || proof.hasMVar then return none
+      return some proof
+    let proveInvariantFreeEquation? (applied : Lean.Expr) : TacticM (Option Lean.Expr) := do
+      try
+        let proof ← forallTelescope (← whnfR (← inferType applied)) fun rest _ => do
+          let value := mkAppN applied rest
+          let reduced ← peelToHoldsHead value
+          let direct ←
+            if reduced.isConstOf ``True then
+              some <$> mkExpectedTypeHint (← mkEqRefl (mkConst ``True)) (← mkEq value (mkConst ``True))
+            else if reduced.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then do
+              let (carriers, row, val) := (reduced.getArg! 0, reduced.getArg! 1, reduced.getArg! 2)
+              if row.hasFVar || row.hasMVar then return none
+              unless (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.invariantFree) row)).isConstOf
+                  ``Bool.true do return none
+              let eqProof := mkApp4 (mkConst ``HList.holds_eq_true_of_invariantFree)
+                carriers row (← mkEqRefl (mkConst ``Bool.true)) val
+              some <$> mkExpectedTypeHint eqProof (← mkEq value (mkConst ``True))
+            else if reduced.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then do
+              let (carriers, shape, val) := (reduced.getArg! 0, reduced.getArg! 1, reduced.getArg! 2)
+              if shape.hasFVar || shape.hasMVar then return none
+              unless (← whnfD (mkApp (mkConst ``ResultShape.invariantFree) shape)).isConstOf
+                  ``Bool.true do return none
+              let eqProof := mkApp4 (mkConst ``ResultShape.holds_eq_true_of_invariantFree)
+                carriers shape (← mkEqRefl (mkConst ``Bool.true)) val
+              some <$> mkExpectedTypeHint eqProof (← mkEq value (mkConst ``True))
+            else
+              pure none
+          let some body := direct | return none
+          some <$> mkLambdaFVars (binders ++ rest) body
+        let some proof := proof | return none
+        let proof ← instantiateMVars proof
+        if proof.hasFVar || proof.hasMVar then return none
+        check proof
+        return some proof
+      catch _ =>
+        return none
+    let mut proofs := #[]
+    let validArgsExpr := mkApp (← mkAppM ``VerexIR.Proofs.Contract.validArgs #[contract']) args'
+    let some validArgsProof ← do
+        match ← proveInvariantFreeEquation? validArgsExpr with
+        | some p => pure (some p)
+        | none => proveEquation validArgsExpr
+      | return none
+    proofs := proofs.push validArgsProof
+    let validResultExpr ← mkAppM ``VerexIR.Proofs.Contract.validResult #[contract']
+    let some validResultProof ← do
+        match ← proveInvariantFreeEquation? validResultExpr with
+        | some p => pure (some p)
+        | none => proveEquation validResultExpr
+      | return none
+    proofs := proofs.push validResultProof
+    for condition in contractConditions do
+      let some proof ← proveEquation (mkApp2 (← mkAppM condition #[contract']) args' state)
+        | return none
       proofs := proofs.push proof
     let constants := proofs.foldl (fun found proof => found ++ proof.getUsedConstants) #[]
     (← targetState).contractNormalForms.modify (·.insert key (proofs, constants))
     return some (proofs.map fun proof => (mkAppN proof actual).headBeta)
 
 /-- Apply the call rule taking the callee's contract normal forms
-(`contractEquations?`, `wp_call_normal`). False, the state restored, where
+(`contractEquations?`, `wp_call_normal_valid_eq`). False, the state restored, where
 the normal forms do not apply. -/
 private def callThroughNormalForms (goal : MVarId) (proofType : Lean.Expr)
-    (proofSyntax : TSyntax `term) (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) :
+    (proofSyntax : TSyntax `term) (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma))
+    (directValid : Bool) (resultFree : Bool) :
     TacticM Bool := do
   let saved ← saveState
   try
@@ -2620,9 +2927,18 @@ private def callThroughNormalForms (goal : MVarId) (proofType : Lean.Expr)
         | return none
       some <$> equations.mapM fun equation => do Lean.Elab.Term.exprToSyntax equation
     let some terms := found | return false
-    evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call_normal $proofSyntax rfl
-      $(terms[0]!) $(terms[1]!) $(terms[3]!) $(terms[4]!) $(terms[5]!) $(terms[6]!)
-      ?_ ?_ ?_ ?_))
+    if directValid && resultFree then
+      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call_normal $proofSyntax rfl
+        $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
+        ?_ ?_ ?_ ?_ ?_))
+    else if directValid then
+      evalTactic (← `(tactic| refine wp_call_normal_validResult_eq $proofSyntax rfl
+        $(terms[1]!) $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
+        ?_ ?_ ?_ ?_ ?_))
+    else
+      evalTactic (← `(tactic| refine wp_call_normal_valid_eq $proofSyntax rfl
+        $(terms[0]!) $(terms[1]!) $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
+        ?_ ?_ ?_ ?_ ?_))
     return true
   catch _ =>
     saved.restore
@@ -2775,6 +3091,16 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         pure (proof, ← instantiateMVars (← inferType proof), ← Lean.Elab.Term.exprToSyntax proof)
     | none => pure (theoremProof, proofType, proofSyntax)
   let goal ← getMainGoal
+  let (directValid?, resultFree) ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    let_expr VerexIR.Proofs.Satisfies _ _ _ _ _ contract :=
+        ← whnfR (← instantiateMVars proofType) | pure (none, false)
+    unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return (none, false)
+    let action := (target.getArg! 3).consumeMData
+    unless action.isApp do return (none, false)
+    let directValid? ← proveDirectContractValidArgs? contract action.appArg!
+    let resultFree ← if directValid?.isSome then isContractResultInvariantFree contract else pure false
+    return (directValid?, resultFree)
   let constants ← goal.withContext (do contractConstants (← inferType theoremProof))
   let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name => do
     let ident := mkIdent (rootNamespace ++ name)
@@ -2782,29 +3108,39 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
   -- The callee's contract normalized once for its instance, its normal
   -- forms instantiated at the call (`doc/designs/native-verification.md`, "Specialized contracts").
   let contractForms ← if verex.contractLemmas.get (← getOptions) then
-      callThroughNormalForms goal proofType proofSyntax lemmas
+      callThroughNormalForms goal proofType proofSyntax lemmas directValid?.isSome resultFree
     else pure false
   -- The equation rule uses the target's normalization below. Build the
   -- contract's unfolding context only when a call rule still needs it.
   let contractNormalization ← if contractForms then pure ctx.normalization else
     goal.withContext do
       simpContextOf (← `(tactic|
-        simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]))
+        simp only [$lemmas,*, vir_denote, vir_denote_norm, vir_denote_eval,
+          VerexIR.Proofs.Denote.ResultShape.Holds,
+          VerexIR.Proofs.Denote.NTy.holds_toSkolem_iff,
+          VerexIR.Proofs.Denote.HList.holds_toSkolem_iff,
+          Prod.fst, Prod.snd]))
   -- A contract whose failure conditions coincide gives its postcondition
   -- outright after a successful run.
   let strict ← if !contractForms then do
       let saved ← (Tactic.saveState : TacticM Tactic.SavedState)
       try
-        evalTactic (← `(tactic|
-          refine VerexIR.Proofs.Denote.wp_call_strict $proofSyntax rfl ?_ ?_ ?_ ?_))
+        if directValid?.isSome && resultFree then
+          evalTactic (← `(tactic|
+            refine VerexIR.Proofs.Denote.wp_call_strict $proofSyntax rfl ?_ ?_ ?_ ?_ ?_))
+        else
+          evalTactic (← `(tactic|
+            refine VerexIR.Proofs.Denote.wp_call_strict_valid $proofSyntax rfl ?_ ?_ ?_ ?_ ?_))
         pure true
       catch _ =>
         saved.restore
         pure false
     else pure false
   unless contractForms || strict do
-    evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call $proofSyntax ?_ ?_ ?_ ?_))
-  let subgoals ← getGoals
+    if directValid?.isSome && resultFree then
+      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call $proofSyntax ?_ ?_ ?_ ?_ ?_))
+    else
+      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call_valid $proofSyntax ?_ ?_ ?_ ?_ ?_))
   -- A callee's theorem assumes the natives it reaches, a generic one's
   -- at every family and instantiation, and that the in-body assumptions
   -- of the functions it relies on hold; the caller assumes them too.
@@ -2850,9 +3186,39 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
             | .const (.str _ part) _ => part.startsWith "lemmaTrusted_"
             | _ => false))
       if native then id.assumption
+  let rawSubgoals ← (← getGoals).filterM fun g => return !(← g.isAssigned)
+  let usedFourRule := directValid?.isSome && resultFree
+  let (subgoals, postIndex, preMaxIndex, hasValidResult) ← do
+    if rawSubgoals.length == 5 then
+      let validGoal := if usedFourRule then rawSubgoals[4]! else rawSubgoals[0]!
+      let assigned ← try
+        validGoal.withContext do
+          let goalTy ← instantiateMVars (← validGoal.getType)
+          let proof? ← match directValid? with
+            | some p => pure (some p)
+            | none => proveDirectValidType? goalTy
+          match proof? with
+          | some p =>
+              if ← withDefault (isDefEq goalTy (← inferType p)) then
+                validGoal.assign p
+                pure true
+              else
+                pure false
+          | none => pure false
+      catch _ =>
+        pure false
+      if assigned then
+        let remaining := if usedFourRule then rawSubgoals.take 4 else rawSubgoals.drop 1
+        pure (remaining, 2, 1, !usedFourRule)
+      else if usedFourRule then
+        pure (rawSubgoals, 2, 1, false)
+      else
+        pure (rawSubgoals, 3, 2, true)
+    else
+      pure (rawSubgoals, 3, 2, true)
   for (subgoal, index) in subgoals.toArray.zipIdx do
     -- The callee's result is named after the callee in the continuation.
-    let subgoal ← if index == 2 then subgoal.withContext do
+    let subgoal ← if index == postIndex then subgoal.withContext do
         let target ← instantiateMVars (← subgoal.getType)
         let .forallE _ domain body info := target | pure subgoal
         let name := Name.mkSimple s!"{identifierPart calleeName}_result"
@@ -2877,13 +3243,16 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         let domain := (← canonicalFamilyResult domain).expr
         let subgoal ← scopedBinderGoal subgoal name domain body info index
         -- The call's premises are named after the callee, as its clauses
-        -- are: the ensures, the frame, and that the call returned.
+        -- are: its result validity, the ensures, the frame, and that the call returned.
         let part := identifierPart calleeName
+        let validName := Name.mkSimple s!"{part}_valid"
         let premises := [s!"{part}_ensures", s!"{part}_frame", s!"{part}_returns"].map Name.mkSimple
         -- The frame stays a fact (`TargetState.keptFacts`).
         noteKeptPremiseNames [premises[1]!]
-        namePremises subgoal (if strict || contractForms then
-          [premises[2]!, premises[0]!, premises[1]!] else premises)
+        let orderedPremises := if strict || contractForms then
+            [premises[2]!, premises[0]!, premises[1]!]
+          else premises
+        namePremises subgoal (if hasValidResult then validName :: orderedPremises else orderedPremises)
       else pure subgoal
     setGoals [subgoal]
     -- Unfold and normalize the contract in one pass, around the continuations.
@@ -2898,14 +3267,14 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
     -- Speculative range search belongs to automatic verification. An authored
     -- proof receives the contract directly instead of paying for normalization
     -- and failed case enumeration before its first tactic runs.
-    if index == 2 && !ctx.handOver then
+    if index == postIndex && !ctx.handOver then
       evalTactic (← `(tactic| all_goals (try verex_timed "call-cases" verex_call_result_cases)))
-    -- What the callee's theorem assumes and its precondition, then
-    -- the continuation and the failures.
+    -- Argument validity, what the callee's theorem assumes, and its precondition,
+    -- then the continuation and the failures.
     let call := ctx.callNumber step.callSite
-    let origin := if index ≤ 1 then some (Provenance.precondition calleeName call)
-      else if index == 2 then some (.continuation calleeName call) else none
-    queue (← getGoals) origin (if index ≤ 1 then #[] else clauses)
+    let origin := if index ≤ preMaxIndex then some (Provenance.precondition calleeName call)
+      else if index == postIndex then some (.continuation calleeName call) else none
+    queue (← getGoals) origin (if index ≤ preMaxIndex then #[] else clauses)
   charge "call" stageStart
 
 /-! ## Derived summaries
@@ -3799,14 +4168,14 @@ private def opensFoldedInvariant (goal : MVarId) (target : Lean.Expr) : MetaM Bo
   let target := target.consumeMData
   if target.isAppOf ``VerexIR.Proofs.Denote.OwnAtArguments then return true
   if target.isAppOfArity ``Carriers.own 4 &&
-      target.appArg!.consumeMData.isAppOfArity ``NTy.plainEncode 3 then
+      target.appArg!.consumeMData.isAppOfArity ``NTy.encode 3 then
     return true
   unless target.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 do return false
   goal.withContext do
     let (carriers, τ, val) := (target.getArg! 0, target.getArg! 1, target.getArg! 2)
     if (← trivialHoldsProof? carriers τ val).isSome then
       return true
-    if ← isCertificateFreeNTy τ then
+    if ← isInvariantFreeNTy τ then
       return true
     let isOpenable (v : Lean.Expr) : Bool :=
       v.isAppOfArity ``NTy.struct 3 || v.isAppOfArity ``NTy.enum 5 ||
@@ -4052,7 +4421,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let prepared := (ctx.preparing?.isSome || ctx.preparesPaths) && (← get).prepared.contains goal
   let (goal, clauses) ← match provenance with
     | some (.loopEntry _) | some (.loopIteration _) | some .assertion | some .mutationEnd
-    | some .construction | some .memoryWritten | some .callReturned
+    | some .construction | some .publish | some .memoryWritten | some .callReturned
     | some (.precondition _ _) | some (.joinPremise _ _) =>
         stripObligations goal clauses
     | _ => pure (goal, clauses)
@@ -5160,10 +5529,8 @@ def nameTypedMaps : TacticM Unit := focusGoal do
       let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | return found
       unless lhs.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 && rhs.isFVar do return found
       let entries := lhs.appArg!.consumeMData
-      let written := if entries.isAppOfArity ``NTy.forget 3 then
-          (entries.getArg! 2).consumeMData else entries
       return if (tableViewOwner? entries).isSome ||
-          written.isAppOfArity ``VerexIR.SpecMap.writeBack 6 then
+          entries.isAppOfArity ``VerexIR.SpecMap.writeBack 6 then
         found.push decl.fvarId else found
   unless reads.isEmpty do
     let goal ← getMainGoal

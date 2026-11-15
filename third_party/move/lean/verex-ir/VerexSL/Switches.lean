@@ -13,13 +13,10 @@ be read in the module that registers it.
 
 /-- Verify a generic function through the Given interpretation, its proof
 transferred to the concrete route (`doc/designs/given-parameters.md`).
-Unset, a generic function is verified exactly as one the Given
-interpretation refuses is: concretely, at its own carriers.  The route is to
-be parked until the concrete route is restored for generic functions
-(`doc/plan/plain-values.md`, U2); until then it is what verifies them, so
-the option is set by default. -/
+Unset (the default), every function is verified concretely at its own
+carriers. -/
 register_option verex.givenRoute : Bool := {
-  defValue := true
-  descr := "verify a generic function through the Given interpretation and transfer its \
-    proof to the concrete route; unset, every function is verified concretely"
+  defValue := false
+  descr := "verify eligible generic functions through the Given interpretation and \
+    explicit transfer proposition rather than the concrete route"
 }

@@ -83,17 +83,13 @@ partial def nativeValueRow (carriers : Lean.Expr) :
   | _, _ => throwError "internal: a row of native values differs from its row type"
 
 /-- The value of a type-reflecting native at the type `τ`, as its result type
-`result` holds it, `fallback` where `τ` mentions a parameter.  The value is
-plain, as a value a specification builds is (`nativeConstructed`): the
-reflected row is a plain row and the fallback is read plainly, so the
-reading is one layer throughout (`doc/designs/data-invariants.md`). -/
+`result` holds it, `fallback` where `τ` mentions a parameter. -/
 def reflectedValue (reflection : TypeReflection) (carriers : Lean.Expr)
     (result : VerexIR.Proofs.Denote.NTy) (τ fallback : Lean.Expr) : MetaM Lean.Expr := do
   let some (unit, _, _) := carriersFrame? carriers
     | throwError "a reflecting native is applied outside a frame"
   let resultType ← quoteNTy result
-  let carrier := plainType carriers resultType
-  let fallback ← plainValueOf carriers resultType fallback
+  let carrier := carrierType carriers resultType
   let bytes := mkApp (mkConst ``VerexIR.SpecVector)
     (mkApp2 (mkConst ``VerexIR.SpecInt) (toExpr (VerexIR.IntWidth.bits 8)) (toExpr false))
   let .struct _ _ row := result
@@ -101,14 +97,14 @@ def reflectedValue (reflection : TypeReflection) (carriers : Lean.Expr)
   match reflection with
   | .name =>
       let pack ← withLocalDeclD `name bytes fun name => do
-        mkLambdaFVars #[name] (← plainNativeRow carriers row [name])
+        mkLambdaFVars #[name] (← nativeValueRow carriers row [name])
       return mkApp5 (mkConst ``VerexIR.Proofs.Denote.reflectedTypeName) carrier unit τ pack fallback
   | .info =>
       let pack ← withLocalDeclD `account (mkConst ``String) fun account =>
         withLocalDeclD `module bytes fun module =>
           withLocalDeclD `name bytes fun name => do
             mkLambdaFVars #[account, module, name]
-              (← plainNativeRow carriers row [account, module, name])
+              (← nativeValueRow carriers row [account, module, name])
       return mkApp5 (mkConst ``VerexIR.Proofs.Denote.reflectedTypeInfo) carrier unit τ pack fallback
 
 /-- A native value read at a type differing from its own only in the widths
@@ -206,25 +202,19 @@ structure Invocation where
 /-- The entry values of an invocation, the row `aborts_of`, `result_of` and
 `state_of` read (`AbortsOfEntries`, `ResultOf`, `StateOf`): a mutable
 reference as the pair of its current value at the pre-state, which no final
-value names, and any other argument with its certificates forgotten
-(`NTy.forget`).  The row is settled by construction — it is the row every
-`NTy.settle` of an argument row with these entry values is — so no
-certificate of a lent current is needed to state the predicates
-(`doc/designs/data-invariants.md`). -/
+value names, and any other argument as itself. -/
 def Invocation.entryArguments (invocation : Invocation) : MetaM Lean.Expr := do
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
     invocation.functions invocation.frame
   let mut values : Array Lean.Expr := #[]
   for (τ, entry) in invocation.row.toList.zip invocation.entries.toList do
     match τ with
-    | .sliceRef element =>
-        let current ← plainValueOf carriers (← quoteNTy (.vector element)) entry
-        values := values.push (← mkAppM ``VerexIR.SpecSliceRef.settled #[current])
-    | .ref referent =>
-        let current ← plainValueOf carriers (← quoteNTy referent) entry
-        values := values.push (← mkAppM ``Prod.mk #[current, current])
+    | .sliceRef _ =>
+        values := values.push (← mkAppM ``VerexIR.SpecSliceRef.settled #[entry])
+    | .ref _ =>
+        values := values.push (← mkAppM ``Prod.mk #[entry, entry])
     | _ => values := values.push entry
-  plainNativeRow carriers invocation.row values.toList
+  nativeValueRow carriers invocation.row values.toList
 
 /-- The function value of an invocation; a known target read directly has none
 (`DirectTarget`): only `aborts_of` and `ensures_of` read it. -/
@@ -251,11 +241,7 @@ def Invocation.directArguments (invocation : Invocation) (direct : DirectTarget)
   | some θ =>
       let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
         invocation.functions invocation.frame
-      -- The transport takes the frame's inhabitants of certified carriers
-      -- beside its carriers (`Skolems.carriersNonempty`).
-      let nonempty := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.carriersNonempty)
-        invocation.unit invocation.functions invocation.frame
-      mkApp5 (mkConst ``VerexIR.Proofs.Denote.HList.toSkolem) carriers nonempty θ direct.full
+      mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.toSkolem) carriers θ direct.full
         arguments
 
 /-- `aborts_of` of a target read directly, at the entry values of its
@@ -311,11 +297,9 @@ def Invocation.directEnsures (invocation : Invocation) (direct : DirectTarget)
   let arguments := invocation.directArguments direct args
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
     invocation.functions invocation.frame
-  let nonempty := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.carriersNonempty)
-    invocation.unit invocation.functions invocation.frame
   let inView ← match direct.θ?, direct.shape with
-    | some θ, .one τ => pure (mkApp5 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers
-        nonempty θ (← quoteNTy τ) result)
+    | some θ, .one τ => pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers
+        θ (← quoteNTy τ) result)
     | _, _ => pure result
   match direct.reading with
   | .run meaning =>
@@ -337,9 +321,8 @@ predicate carries the quantifier. -/
 def settledResult (carriers σ current : Lean.Expr)
     (predicate : Lean.Expr → MetaM Lean.Expr) : MetaM Lean.Expr := do
   withLocalDeclD `prophecy (carrierType carriers σ) fun prophecy => do
-    let forgotten := mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.forget) #[carriers, σ, prophecy]
-    let returned ← mkAppM ``Prod.mk #[forgotten, prophecy]
-    let body ← mkAppM ``And #[← mkEq forgotten current, ← predicate returned]
+    let returned ← mkAppM ``Prod.mk #[prophecy, prophecy]
+    let body ← mkAppM ``And #[← mkEq prophecy current, ← predicate returned]
     mkAppM ``Exists #[← mkLambdaFVars #[prophecy] body]
 
 /-- A value of a specification binder at a type, as a bundle component: an
@@ -357,8 +340,8 @@ private def viewedComponent? (context : Context) (held : Option VerexIR.Proofs.D
   let read ← context.nativeType resultTypeId
   unless read != held && read.erase == held do return none
   let carriers ← context.carriers
-  return some <| mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainUnerase)
-    carriers (← quoteNTy read) (← plainValueOf carriers (← quoteNTy held) value)
+  return some <| mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
+    carriers (← quoteNTy read) value
 
 /-- A tuple a field holds at the type a specification reads it, whose integers are
 unbounded where the field holds them at their widths. -/
@@ -521,29 +504,25 @@ private partial def translateStateChange (context : Context)
   let leading ← frameLeading frame
   let carriers ← frameCarriers frame
   let argumentsExpr := resource.getArg! 4
-  let plain := plainType carriers nativeType
+  let carrier := carrierType carriers nativeType
   if operation matches .remove _ then
-    let noneVal := mkApp (mkConst ``Option.none [Level.zero]) plain
+    let noneVal := mkApp (mkConst ``Option.none [Level.zero]) carrier
     let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
       (leading ++ #[frame, nativeType, argumentsExpr, keyValue, noneVal, pre])
     return (memory, condition)
   let some value := arguments[1]? | throwError "a state-change predicate needs a value"
   let stored ← translate context value
-  let describedPlain ← isPlainValue carriers nativeType stored
-  let plainStored ← if describedPlain then pure stored else plainValueOf carriers nativeType stored
-  let somePlain := mkApp2 (mkConst ``Option.some [Level.zero]) plain plainStored
-  let condition ← if describedPlain then
-      mkAppM ``And
-        #[condition, mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers nativeType plainStored]
-    else pure condition
+  let someVal := mkApp2 (mkConst ``Option.some [Level.zero]) carrier stored
+  let condition ← mkAppM ``And
+    #[condition, mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers nativeType stored]
   if let some postMem := post then
     let postSlot ← plainSlot frame nativeType argumentsExpr keyValue postMem
     let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
       (leading ++ #[frame, nativeType, argumentsExpr, keyValue, postSlot, pre])
-    let written ← mkEq postSlot somePlain
+    let written ← mkEq postSlot someVal
     return (memory, ← mkAppM ``And #[condition, written])
   let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
-    (leading ++ #[frame, nativeType, argumentsExpr, keyValue, somePlain, pre])
+    (leading ++ #[frame, nativeType, argumentsExpr, keyValue, someVal, pre])
   return (memory, condition)
 
 /-- The context reading each mutable reference parameter at a state label,
@@ -1436,12 +1415,9 @@ where
       | throwError "specification function `{repr reference}` does not resolve"
     let some root := declaration.body
       | throwError "a specification function's definition must have a body"
-    -- A specification names values and no certificate, so a position stands
-    -- at the layer a named position holds its values at: plain where the
-    -- type holds a declared type, the carrier everywhere else (`namedType`).
     let namedOf (nty : VerexIR.Proofs.Denote.NTy) : MetaM Lean.Expr := do
       let some carriers := carriers? | throwError "internal: a native position without a frame"
-      namedType carriers nty
+      return carrierType carriers (← quoteNTy nty)
     let positionTypes ← (shape.domains.zip shape.natives).mapM
       fun (domain, nativeType) => match nativeType, domain.scalarType? with
         | some nty, _ => namedOf nty
@@ -1477,8 +1453,7 @@ where
       let value ← match nativeType with
         | some nty => do
             let carriers ← context.carriers
-            namedValueOf carriers nty
-              (← nativeOfClause carriers nty (← translate context argument))
+            nativeOfClause carriers nty (← translate context argument)
         | none => bundleComponent domain (← translate context argument)
       values := values.push value
     bundleOf values
@@ -1488,11 +1463,7 @@ where
   as the frame resolves them, what the definition takes besides its frame and
   types, and the bundled arguments; the same value at every frame resolving
   them alike, as the transport across a call's frame reads it
-  (`ensureDefinitionTransport`).  `valueType?` is the type the value
-  inhabits where it is not the declared result's carrier: the two branches
-  of one function are one value, and a definition whose body builds a
-  declared type has a plain one, under no certificate
-  (`nativeConstructed`, `doc/designs/data-invariants.md`). -/
+  (`ensureDefinitionTransport`). -/
   outsideValue (member : SpecMember) (parameters : Array Lean.Expr) (frame? types? : Option Lean.Expr)
       (typeArgumentTypes : Array (Option VerexIR.Proofs.Denote.NTy)) (bundle : Lean.Expr)
       (valueType? : Option Lean.Expr := none)
@@ -1502,11 +1473,7 @@ where
       | some carriers => pure (some carriers)
       | none => frame?.mapM frameCarriers
     let default ← match member.resultNative, carriers? with
-      | some τ, some carriers =>
-          -- At the layer the value is read at: a value a specification
-          -- builds is plain, under no certificate (`nativeConstructed`).
-          if ← isDefEq resultType (plainType carriers τ) then plainInhabitant carriers τ
-          else typedInhabitant carriers τ
+      | some τ, some carriers => plainFallbackValue carriers τ
       | _, _ => mkAppOptM ``Inhabited.default #[resultType, none]
     let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) resultType default
     let typeArguments ← typeArgumentTypes.mapM fun nty? => do
@@ -1526,8 +1493,7 @@ where
       let type ← inferType parameter
       return some parameter != frame? && some parameter != types? &&
         some parameter != carriers? &&
-        !type.isAppOf ``VerexIR.Proofs.Denote.FunctionCarriers &&
-        !type.isAppOf ``VerexIR.Proofs.Denote.CarriersNonempty
+        !type.isAppOf ``VerexIR.Proofs.Denote.FunctionCarriers
     opaqueValue name typeArguments.toList resultType inhabited (taken.push bundle)
   /-- The types a recursive definition's type parameters stand for at a
   call: the call's type arguments, under the caller's family. -/
@@ -1565,27 +1531,10 @@ where
     if model.handle && role == .new_ then
       throwError "a pure Table constructor's logical identity is not carried"
     let carriers ← context.carriers
-    -- Whether a role's operand is a plain value: the current of a live
-    -- mutable reference, or a value the specification built, which carries
-    -- no certificate (`nativeConstructed`).
-    let operandPlain (index : Nat) : MetaM Bool := do
-      let some id := arguments[index]? | return false
-      isPlainValue carriers (← quoteNTy (← context.exprType id)) (← translate context id)
-    -- The owner a role reads: its operand's native value, at the layer the
-    -- role reads its map at.  That layer is the meet of the operands':
-    -- plain where the owner's own value is plain, and plain where a key or
-    -- value operand is, since a clause cannot compare a plain value with a
-    -- certified key or value of the map.  The two readings of one table
-    -- give one map (`SpecMap.ofEntries_forget_table`), so reading the
-    -- certified owner plainly loses nothing
-    -- (`doc/designs/data-invariants.md`).
     let ownerAt (index : Nat) : MetaM NativeOwner := do
       let id ← operand index
       let τ ← context.exprType id
-      let mut value ← translate context id
-      if (← operandPlain 1) || (← operandPlain 2) then
-        value ← plainValueOf carriers (← quoteNTy τ) value
-      nativeOwner carriers τ value
+      nativeOwner carriers τ (← translate context id)
     -- A key or value operand as the typed value the map holds it as. A key
     -- read off a typed map (`spec_key_at`) is the map's typed key already.
     let typedAt (view : VerexIR.Proofs.Denote.NativeMaps.TypedView) (index : Nat) :
@@ -1785,15 +1734,12 @@ where
     optionalLocal shape.takesFrame `frame
       (if shape.takesCarriers then mkConst ``VerexIR.Proofs.Denote.Carriers
         else atUnit ``VerexIR.Proofs.Denote.Skolems) fun frame =>
-    optionalInstance shape.takesCarriers `nonempty
-      (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty)
-        (frame.getD (mkConst ``Unit))) fun nonempty =>
     optionalLocal reads.state `state (atUnit ``VerexIR.Proofs.Denote.Memory) fun state =>
     -- One taking no frame, but an uninterpreted value at its type
     -- parameters, takes the types they stand for (`definitionTypes`).
     optionalLocal shape.takesTypes `types typesType fun instantiation => do
     let parameters :=
-      #[unit?, functions?, executable, requiresMeaning, frame, nonempty, state, instantiation].filterMap
+      #[unit?, functions?, executable, requiresMeaning, frame, state, instantiation].filterMap
         fun parameter => parameter
     let types ← match instantiation with
       | some instantiation => pure (some instantiation)
@@ -2079,14 +2025,11 @@ where
     for (argument, domain, index) in (arguments.zip domains).zipIdx.map (fun ((a, d), i) => (a, d, i)) do
       let value ← match natives.find? (·.1 == index) with
         | some (_, nty) =>
-            -- A native parameter at the type the lemma's instance gives it,
-            -- at the layer its position stands at (`namedType`).
             let nty := match typeArguments? with
               | some row => nty.subst row
               | none => nty
             let carriers ← context.carriers
-            namedValueOf carriers nty
-              (← nativeOfClause carriers nty (← translate context argument))
+            nativeOfClause carriers nty (← translate context argument)
         | none => bundleComponent domain (← translate context argument)
       values := values.push value
     bundleOf values
@@ -2150,8 +2093,7 @@ where
       match natives.find? (·.1 == index), domain.scalarType? with
       | some (_, nty), _ =>
           let some frame := frame | throwError "a lemma typing its parameters takes no family"
-          -- A lemma names values, as every specification does (`namedType`).
-          namedType (← frameCarriers frame) nty
+          return carrierType (← frameCarriers frame) (← quoteNTy nty)
       | none, some type => pure type
       | none, none => throwError "a lemma parameter has no native type"
     let bundleType ← positionTypes.foldrM (fun type rest => mkAppM ``Prod #[type, rest])
@@ -2326,10 +2268,7 @@ where
                   this contract does not take"
             applied := mkApp applied table
           if shape.takesCarriers then
-            let carriers ← context.carriers
-            applied := mkApp applied carriers
-            applied := mkApp applied (← synthInstance
-              (mkApp (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty) carriers))
+            applied := mkApp applied (← context.carriers)
           else if shape.takesFrame then applied := mkApp applied (← context.frame)
           if reads.state then applied := mkApp applied (← currentState)
           if shape.takesTypes then
@@ -2488,7 +2427,7 @@ where
           let carriers ← context.carriers
           let argumentTypes ← parameterTypeIds.mapM fun parameterTypeId => do
             if declaredNative parameterTypeId then
-              return some (plainWorkerType carriers
+              return some (carrierType carriers
                 (← quoteNTy (← callee.uninterpretedParameterType parameterTypeId)))
             return none
           let domain := domainOf ty
@@ -2502,10 +2441,9 @@ where
               let nty ← callee.nativeType resultTypeId
               let carriers ← context.carriers
               let τ ← quoteNTy nty
-              let carrier := plainWorkerType carriers τ
-              let inhabitant := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
-                carriers τ (← inhabitableProof τ)
-              let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant
+              let carrier := carrierType carriers τ
+              let fallback ← plainFallbackValue carriers τ
+              let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier fallback
               return ← clauseOfNative nty (← reflect nty
                 (← opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile argumentTypes))
           match domain, domain.scalarType? with
@@ -2514,10 +2452,9 @@ where
               let nty ← context.nativeType resultTypeId
               let carriers ← context.carriers
               let τ ← quoteNTy nty
-              let carrier := plainWorkerType carriers τ
-              let inhabitant := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
-                carriers τ (← inhabitableProof τ)
-              let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier inhabitant
+              let carrier := carrierType carriers τ
+              let fallback ← plainFallbackValue carriers τ
+              let inhabited := mkApp2 (mkConst ``Inhabited.mk [1]) carrier fallback
               let value ← reflect nty
                 (← opaqueValue name typeArgumentTerms.toList carrier inhabited values targetNs.profile argumentTypes)
               -- The fields the prelude states of the uninterpreted value.
@@ -2715,17 +2652,10 @@ where
         let some (element, vector) ← nativeVector? (← context.exprType vector) (← translate context vector)
           | throwError "spec.indexVector reads a value that is not a vector"
         let position ← mkAppM ``Int.toNat #[← translate context index]
-        -- An element is its value at the position, the element type's
-        -- inhabitant outside the vector, at the layer the vector holds its
-        -- elements at: a plain vector's elements and their default are
-        -- plain (`plainInhabitant`).
-        let inhabitant ←
-          if ← isPlainValue carriers (← quoteNTy (.vector element)) vector then
-            plainInhabitant carriers (← quoteNTy element)
-          else typedInhabitant carriers (← quoteNTy element)
+        let fallback ← plainFallbackValue carriers (← quoteNTy element)
         let values ← mkAppM ``VerexIR.SpecVector.values #[vector]
         let read ← mkAppM ``GetElem?.getElem? #[values, position]
-        (domainOf ty).ofNative (← mkAppM ``Option.getD #[read, inhabitant])
+        (domainOf ty).ofNative (← mkAppM ``Option.getD #[read, fallback])
     | .specification .lengthVector =>
         let some vector := arguments[0]?
           | throwError "spec.lengthVector expects a vector operand"
@@ -2759,7 +2689,7 @@ where
           | throwError "spec.concatVector expects two vector operands"
         let left ← translate context left
         let right ← translate context right
-        nativeVectorConcat ((← plainJoin? left right).getD left) ((← plainJoin? right left).getD right)
+        nativeVectorConcat left right
     | .specification .sliceVector =>
         let (some vector, some range) := (arguments[0]?, arguments[1]?)
           | throwError "spec.sliceVector expects a vector and a range"
@@ -2778,9 +2708,8 @@ where
           | throwError "spec.updateVector expects an index operand"
         let some replacement := arguments[2]?
           | throwError "spec.updateVector expects a replacement operand"
-        let (replaced, ε) ← nativeOperand context replacement
+        let (replaced, _) ← nativeOperand context replacement
         let vector ← translate context vector
-        let (vector, replaced) ← vectorAndElementAtLayer (← context.carriers) ε vector replaced
         mkAppM ``VerexIR.SpecVector.set #[vector,
           ← mkAppM ``Int.toNat #[← translate context index],
           replaced]
@@ -3041,10 +2970,8 @@ where
               let value ← nativeOfClause carriers (.vector element) (← translate context output)
               mkAppM ``VerexIR.SpecSliceRef.settled #[value]
           | .one (.ref σ), [output] => do
-              let σExpr ← quoteNTy σ
-              settledReferent? := some σExpr
-              plainValueOf carriers σExpr
-                (← nativeOfClause carriers σ (← translate context output))
+              settledReferent? := some (← quoteNTy σ)
+              nativeOfClause carriers σ (← translate context output)
           | .one τ, [output] => nativeOfClause carriers τ (← translate context output)
           | _, _ => throwError "`ensures_of` names one value for the function's result"
         -- The entry values of the arguments and the finals of their mutable
@@ -3077,26 +3004,11 @@ where
                 #[invocation.unit, invocation.functions, invocation.frame, invocation.invoke,
                   ← quoteRow invocation.row, toExpr invocation.shared, σExpr,
                   ← invocation.function, entries, finalsRow, result, invocation.pre, post]
-        -- A final a specification builds is plain — it names a value and no
-        -- certificate (`nativeConstructed`, `nativeFieldUpdate`) — while the
-        -- run's final is certified: the statement is then of a certified row
-        -- of finals whose plain values are the named ones, quantified as a
-        -- returned reference's prophecy is (`EnsuresOfSettled`).
-        let plainFinal ← (finalValues.toList.zip finalTypes).anyM fun (value, σ) => do
-          isPlainValue carriers (← quoteNTy σ) value
-        unless plainFinal do
-          return ← stated (← nativeValueRow carriers finalsNRow finalValues.toList)
-        let named ← plainNativeRow carriers finalsNRow finalValues.toList
-        let rowExpr ← quoteRow finalsNRow
-        withLocalDeclD `finals (mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers rowExpr)
-          fun finals => do
-            let forgotten := mkApp3 (mkConst ``VerexIR.Proofs.Denote.HList.forget) carriers rowExpr finals
-            let body := mkAnd (← mkEq forgotten named) (← stated finals)
-            mkAppM ``Exists #[← mkLambdaFVars #[finals] body]
+        stated (← nativeValueRow carriers finalsNRow finalValues.toList)
     | .resultOf =>
         let default ← match invocation.shape with
           | .none => pure (mkConst ``Unit.unit)
-          | .one τ => typedInhabitant carriers (← quoteNTy τ)
+          | .one τ => plainFallbackValue carriers (← quoteNTy τ)
         let value ← invocation.predicate ``VerexIR.Proofs.ResultOf
           #[← invocation.entryArguments, invocation.pre, default]
         match invocation.shape with
@@ -3177,8 +3089,7 @@ where
       | throwError "internal: membership in a value that is no vector"
     let vectorType : VerexIR.Proofs.Denote.NTy := .vector held
     if held == elementType then
-      return ← mkAppM ``Membership.mem #[← mkAppM ``VerexIR.SpecVector.values #[vector],
-        ← elementAtLayerOf (← context.carriers) held vector element]
+      return ← mkAppM ``Membership.mem #[← mkAppM ``VerexIR.SpecVector.values #[vector], element]
     let ω := widenedNTy held
     unless widenedNTy elementType == ω do
       throwError m!"an element of type {repr elementType} is sought in a vector of \
@@ -3204,9 +3115,8 @@ where
           | throwError "pushVector expects a vector operand"
         let some element := arguments[1]?
           | throwError "pushVector expects an element operand"
-        let (elementValue, ε) ← nativeOperand context element
+        let (elementValue, _) ← nativeOperand context element
         let vector ← translate context vector
-        let (vector, elementValue) ← vectorAndElementAtLayer (← context.carriers) ε vector elementValue
         mkAppM ``VerexIR.SpecVector.push #[vector, elementValue]
     | .concatVector =>
         let some left := arguments[0]?
@@ -3215,7 +3125,7 @@ where
           | throwError "concatVector expects two vector operands"
         let left ← translate context left
         let right ← translate context right
-        nativeVectorConcat ((← plainJoin? left right).getD left) ((← plainJoin? right left).getD right)
+        nativeVectorConcat left right
     | .compare =>
         let (left, right) ← match arguments.toList with
           | [left, right] => pure (left, right)
@@ -3421,11 +3331,8 @@ partial def ensureDefinitionTransport (unit : ValidatedUnit) (source : Name)
       | throwError m!"the definition `{source}` takes no frame, which its transport crosses"
     let frame := parameters[frameIndex]!
     let sourceParameters ← if (← inferType frame).isConstOf ``VerexIR.Proofs.Denote.Carriers then do
-        let nonempty := parameters[frameIndex + 1]!
-        let induced := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate)
-          θExpr frame nonempty
-        let inducedNonempty := mkApp3 (mkConst ``VerexIR.Proofs.Denote.CarriersNonempty.instantiate)
-          θExpr frame nonempty
+        let induced := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate)
+          θExpr frame
         let types := parameters.back!
         let sourceTypes ← withLocalDeclD `index (mkConst ``Nat) fun index => do
           let parameter := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) index
@@ -3433,8 +3340,7 @@ partial def ensureDefinitionTransport (unit : ValidatedUnit) (source : Name)
             (← quoteRow θ.1) parameter
           mkLambdaFVars #[index] (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.substWith)
             types substituted)
-        pure ((parameters.set! frameIndex induced).set! (frameIndex + 1) inducedNonempty
-          |>.set! (parameters.size - 1) sourceTypes)
+        pure ((parameters.set! frameIndex induced).set! (parameters.size - 1) sourceTypes)
       else do
         let induced := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.instantiate)
           ((← frameLeading frame) ++ #[θExpr, frame])

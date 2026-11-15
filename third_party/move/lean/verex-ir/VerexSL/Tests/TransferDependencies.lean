@@ -53,7 +53,7 @@ run_cmd do
   modifyEnv fun env => assumptionDependencies.addEntry env
     (`TransferPlumbingProbe.exported, #[(⟨⟨0⟩, ⟨0⟩⟩, "probe")])
   let binder ← transferBinder ``obligation
-  let pair ← calleePair (← `(term| ())) "exported" ``exported.typedSemanticsVerified #[]
+  let pair ← calleePair (← `(term| ())) "exported" ``exported.typedSemanticsVerified
   let nativeIdent := mkIdent `native_probe
   let assumed := mkIdent `assumptions_probe
   let trusted := mkIdent (trustBinderName ``otherObligation)

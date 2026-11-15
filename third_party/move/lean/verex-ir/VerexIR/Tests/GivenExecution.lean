@@ -18,6 +18,7 @@ section ParameterViews
 
 -- Negative control: fixed-width integer `NTy.readCarrier` (`Int`) is distinct from `NTy.carrier` (`SpecInt`),
 -- unlike an abstract Given parameter whose specification view and carrier coincide.
+set_option linter.unusedVariables false in
 example (frame : GivenFrame) : True := by
   fail_if_success
     have : @NTy.readCarrier frame.toCarriers (.int 64 false) =
@@ -158,7 +159,7 @@ theorem swapped_verified [C : Carriers] {State : Type}
 
 /-- Concrete identity execution is related to actual Given execution by any
 relation on parameter values, at any related input and output stores. There
-is no admitted compiler-wide transfer premise. -/
+is no unproved compiler-wide transfer premise. -/
 theorem identity_refines {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     {executable : VerexIR.Validation.ExecutableUnit unit} [Θ : Skolems unit]
     (meanings : Meanings executable) (G : GivenFrame) {State : Type}
@@ -277,7 +278,7 @@ namespace ConcreteCompatibility
 open VerexIR
 
 variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
-  {executable : Validation.ExecutableUnit unit} [Θ : Skolems unit]
+  {executable : Validation.ExecutableUnit unit} [Skolems unit]
   (meanings : Meanings executable)
 
 /-- Negative control: when the target resource cell is absent (`none`), a concrete
@@ -290,20 +291,9 @@ theorem global_read_absent_refused {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
     ¬ wp ((Term.globalRead (τ := τ) site arguments key).denote meanings env)
         (fun _ _ => True) (fun _ => False) memory := by
   intro hwp
-  have hRead : (Term.globalRead (τ := τ) site arguments key).denote meanings env =
-      Spec.bind Spec.get fun memory =>
-        match memory (Skolems.resource τ arguments) (κ.storageKey k) with
-        | none => abortAt site (Failure.ofInts .abort #[])
-        | some stored => Spec.pure (.value (Skolems.ofRuntime τ stored.val) env) := by
-    unfold Term.denote
-    dsimp only [Term.denoteIn]
-    change Flow.bind (key.denote meanings env) _ = _
-    rw [hKey]
-    simp only [Flow.bind_pure_value, Meanings.interpreterOps, Skolems.plainAt_def]
-    congr 1; funext mem; cases mem (Skolems.resource τ arguments) (κ.storageKey k) <;> rfl
-  rw [hRead, wp_bind_get] at hwp
-  simp only [hAbsent, abortAt] at hwp
-  exact hwp.2.1 (Failure.ofInts .abort #[]) rfl
+  have hKeyIn : key.denoteIn meanings.interpreterOps env = Spec.pure (.value k env) := hKey
+  simp only [Term.denote, Term.denoteIn, hKeyIn, Flow.bind_pure_value, wp_bind_get,
+    Skolems.plainAt_def, hAbsent, Option.map_none, abortAt, wp_abort] at hwp
 
 /-- The refactored generic-call boundary has the exact concrete transport on
 arguments and results, including all failure/undefined outcomes. -/
@@ -322,7 +312,7 @@ theorem generic_call {ρ : ResultShape} {Γ σs σs' : NRow}
   simp only [Term.denote, Term.denoteIn, Args.denote, Meanings.interpreterOps, specializedMeaning,
     callAt, Spec.bind_assoc, Spec.pure_bind]
 
-/-- Under Storage Option A, a concrete global read produces the frame's
+/-- A concrete global read produces the frame's
 `Skolems.ofRuntime` view of the stored cell's runtime value, and aborts
 precisely when the resource is absent. -/
 theorem global_read {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
@@ -342,7 +332,7 @@ theorem global_read {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
 
 end ConcreteCompatibility
 
--- This gate rejects a new global transfer axiom or an admitted test proof.
+-- This gate rejects any unexpected global transfer axiom or unproved test theorem.
 open Lean Elab Command in
 run_cmd do
   for name in [``false_pack_undefined, ``concrete_false_pack_undefined,

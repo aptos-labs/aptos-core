@@ -38,11 +38,10 @@ open VerexSL.Contract
 def functionValuesName (segments : Array String) : Name :=
   (unitName segments).getPrefix ++ `FunctionValue
 
-/-- Name of a unit's requires meaning over its function values, over the
-inhabitants of its certified carriers and the reading of a value no site
-encodes (`RequiresMeaning`): every unit's takes them both, so that a
-statement reading the meaning spells it the same way whether or not the
-unit has closure sites. -/
+/-- Name of a unit's requires meaning over its function values, given the
+reading of a value no site encodes (`RequiresMeaning`): every unit's takes it,
+so that a statement reading the meaning spells it the same way whether or not
+the unit has closure sites. -/
 def functionRequiresName (segments : Array String) : Name :=
   (unitName segments).getPrefix ++ `functionRequires
 
@@ -120,18 +119,17 @@ mutual
 /-- The carrier of a captured type at the family under definition, spelled
 concretely: a function type as the family at its index, a type holding
 function values as the products and sums down to them, any other type as
-its plain carrier at the ground family.
+its carrier at the ground family.
 
-A closure-free type's plain carrier is the same at every family, so the
-spelling names a family it can name before the family under definition
-exists. It must: the plain carrier of a struct or a variant is a row
-(`HListPlainOf`), which does not reduce away the family it is given, so
-spelling such a capture at the family under definition would put that
-family under the `Prod` of its row — a nested occurrence the kernel admits
-only in a positive position, and an argument of `NTy.plainOf` is not one. -/
+A closure-free type's carrier is the same at every family, so the spelling
+names a family it can name before the family under definition exists. It must:
+the carrier of a struct or a variant is a row (`HList`), which does not reduce
+away the family it is given, so spelling such a capture at the family under
+definition would put that family under the `Prod` of its row — a nested
+occurrence the kernel admits only in a positive position. -/
 private partial def spellType (family : Name) (reference : Ident) (τ : NTy) : GenM Term := do
   if τ.closureFree then
-    return ← `(@VerexIR.Proofs.Denote.NTy.plain VerexIR.Proofs.Denote.Carriers.ground
+    return ← `(@VerexIR.Proofs.Denote.NTy.carrier VerexIR.Proofs.Denote.Carriers.ground
       $(← typeIdent family τ))
   match τ with
   | .function parameters shared results =>
@@ -271,8 +269,8 @@ private def defineSiteRequires (unit : ValidatedUnit) (unitDefinition instanceNa
   let some declaration := ns.functions[target.functionId.index]?
     | throwError "internal: a closure site's target has no declaration"
   liftTermElabM do
-    let frameOf := fun (unitExpr functions inhabitants : Lean.Expr) => do
-      let runtimeFrame := mkApp3 (mkConst ``Skolems.runtime) unitExpr functions inhabitants
+    let frameOf := fun (unitExpr functions : Lean.Expr) => do
+      let runtimeFrame := mkApp2 (mkConst ``Skolems.runtime) unitExpr functions
       match instantiation? with
       | some arguments =>
           pure (mkApp4 (mkConst ``Skolems.instantiate) unitExpr functions (mkConst arguments)
@@ -281,13 +279,7 @@ private def defineSiteRequires (unit : ValidatedUnit) (unitDefinition instanceNa
     let requires ← Contract.buildDeclaredRequires unit target.namespaceId ns declaration frameOf
     let unitExpr := mkConst unitDefinition
     let instanceExpr := mkConst instanceName
-    -- The unit's inhabitants are a binder, not an instance resolved here: a
-    -- unit whose data invariants `own` carries declares none, and takes them
-    -- from the public theorem's satisfiability hypothesis
-    -- (`doc/designs/data-invariants.md`).
-    let value ← withLocalDecl `inhabitants .instImplicit
-        (Contract.carriersNonemptyType unitExpr instanceExpr) fun inhabitants => do
-      mkLambdaFVars #[inhabitants] (mkApp3 requires unitExpr instanceExpr inhabitants).headBeta
+    let value := (mkApp2 requires unitExpr instanceExpr).headBeta
     let type ← inferType value
     addDecl (.defnDecl {
       name, levelParams := [], type, value, hints := .regular 0, safety := .safe })
@@ -356,15 +348,7 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     let fullRow ← literal "fullRow" fullOwn
     let capturedRow ← literal "capturedRow" capturedOwn
     let suppliedRow ← literal "suppliedRow" suppliedOwn
-    -- The row the constructor holds, which is the target's own captured row
-    -- at the site's instantiation: what the value's plain captures and the
-    -- certified ones the precondition reads both live at.
     let siteRow ← literal "siteRow" site.captured
-    -- The precondition reads certified captures, as a precondition reads
-    -- every parameter; the family holds a site's captures plain. So the arm
-    -- reads the precondition of the certified captures the value's plain ones
-    -- forget, as the clause layer reads a precondition at entry values
-    -- (`RequiresOfEntries`).
     let bodyFor (capturesTerm : Term) : CommandElabM Term := match instantiation? with
       | none => `($(rootIdent targetRequires)
           (@VerexIR.Proofs.Denote.Weave.compose $unitIdent _ $runtimeFrame $fullRow $capturedRow
@@ -373,16 +357,13 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
           (@VerexIR.Proofs.Denote.Weave.compose $unitIdent _
             (VerexIR.Proofs.Denote.Skolems.instantiate $(rootIdent arguments) $runtimeFrame)
             $fullRow $capturedRow $suppliedRow $weave
-            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers _ $(rootIdent arguments)
+            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers $(rootIdent arguments)
               $capturedRow $capturesTerm)
-            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers _ $(rootIdent arguments)
+            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers $(rootIdent arguments)
               $suppliedRow $args)) $state)
-    let certified := mkIdent `certified
-    let arm ← `(∀ $certified:ident : @VerexIR.Proofs.Denote.HList $runtimeCarriers $siteRow,
-      @VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $siteRow $certified = $captures →
-        $(← bodyFor certified))
-    arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $ctor $captures, $args => $arm))
-    equations := equations.push (index, ← bodyFor captures, siteRow)
+    let body ← bodyFor captures
+    arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $ctor $captures, $args => $body))
+    equations := equations.push (index, body, siteRow)
   let foreignCtor := rootIdent (family ++ `foreign)
   let (key, args, state, foreign) := (mkIdent `key, mkIdent `args, mkIdent `state, mkIdent `foreign)
   arms := arms.push (← `(Lean.Parser.Term.matchAltExpr|
@@ -392,32 +373,19 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     target's declared precondition at the woven arguments, any other value by
     `foreign`. -/
     noncomputable def $requiresIdent:ident
-        [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
         ($foreign : VerexIR.Proofs.RequiresMeaning $unitIdent) :
         VerexIR.Proofs.RequiresMeaning $unitIdent :=
       fun _ _ _ value $args:ident $state:ident => match value, $args:ident with $arms:matchAlt*))
-  -- A normalization lemma per constructor: at the captures a certified row
-  -- forgets, the quantification is that row's own precondition, since a
-  -- certified row is determined by the row it forgets
-  -- (`HList.forget_injective`).
   for (index, body, siteRow) in equations do
     let ctor := rootIdent (family ++ Name.mkSimple s!"site{index}")
     elabCommand (← `(command|
       @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"requires{index}")):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           ($foreign : VerexIR.Proofs.RequiresMeaning $unitIdent)
           ($(mkIdent `captures) : @VerexIR.Proofs.Denote.HList $runtimeCarriers $siteRow)
           $args:ident $state:ident :
-          $requiresIdent $foreign _ _ _
-              ($ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $siteRow
-                $(mkIdent `captures))) $args $state ↔ $body :=
-        ⟨fun holds => holds $(mkIdent `captures) rfl,
-          fun holds $(mkIdent `certified) same => by
-            rw [@VerexIR.Proofs.Denote.HList.forget_injective $runtimeCarriers $siteRow _ _ same]
-            exact holds⟩))
+          $requiresIdent $foreign _ _ _ ($ctor $(mkIdent `captures)) $args $state = $body := rfl))
   elabCommand (← `(command|
     @[vir_denote_norm] theorem $(rootIdent (family ++ `requiresForeign)):ident
-        [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
         ($foreign : VerexIR.Proofs.RequiresMeaning $unitIdent) {parameters shared results} $key:ident
         $args:ident $state:ident :
         $requiresIdent $foreign parameters shared results ($foreignCtor $key) $args $state =
@@ -432,56 +400,19 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     elabCommand (← `(command|
       /-- No closure site's target declares a precondition: where any other
       value is defined, every value is. -/
-      theorem $(rootIdent (everywhereName segments)):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)] :
+      theorem $(rootIdent (everywhereName segments)):ident :
           ∀ parameters shared results value $args:ident $state:ident,
             $requiresIdent (fun _ _ _ _ _ _ => True) parameters shared results value $args
               $state := by
         intro _ _ _ value _ _
         cases value <;>
-          simp only [$requiresIdent:ident, $lemmas,*, implies_true]))
-
-/-- Name of a unit's trivial data invariants, and of the inhabitants of its
-certified carriers they give. -/
-def ownTrivialName (segments : Array String) : Name :=
-  (unitName segments).getPrefix ++ `ownTrivial
-def carriersNonemptyName (segments : Array String) : Name :=
-  (unitName segments).getPrefix ++ `carriersNonempty
+          simp only [$requiresIdent:ident, $lemmas,*]))
 
 /-- Name of a unit's nominal values: the instance that supports no
 declaration natively, which this stage gives every unit
 (`NominalCarriers.none`). -/
 def nominalCarriersName (segments : Array String) : Name :=
   (unitName segments).getPrefix ++ `nominalCarriers
-
-/-- Declare a unit's inhabitants of certified carriers, where no declaration
-of it states a data invariant `own` carries: every declaration's is
-trivially true, so the inhabitants are the plain ones
-(`CarriersNonempty.ofTrivial`) and nothing is assumed.  A unit whose `own`
-states an invariant takes them from the public theorem's satisfiability
-hypothesis instead (`DataInvariantsSatisfiable`,
-`doc/designs/data-invariants.md`), and this instance is withheld, so
-that an artifact's statement and its proof cannot pick different
-inhabitants. -/
-private def ensureCarriersNonempty (segments : Array String) (unitIdent : Ident) :
-    CommandElabM Unit := do
-  let trivialId ← `(Lean.Parser.Command.declId| $(rootIdent (ownTrivialName segments)):ident)
-  let nonemptyId ← `(Lean.Parser.Command.declId| $(rootIdent (carriersNonemptyName segments)):ident)
-  elabCommand (← `(command|
-    /-- No declaration of the unit states a data invariant. -/
-    theorem $trivialId:declId : ∀ source arguments value,
-        @VerexIR.Proofs.Denote.Carriers.own
-          (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent) source arguments value :=
-      fun _ _ _ => trivial))
-  elabCommand (← `(command|
-    /-- The inhabitants of the unit's certified carriers. -/
-    noncomputable instance $nonemptyId:declId :
-        VerexIR.Proofs.Denote.CarriersNonempty
-          (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent) :=
-      @VerexIR.Proofs.Denote.CarriersNonempty.ofTrivial
-        (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)
-        $(rootIdent (ownTrivialName segments)) (fun _ _ => trivial) (fun _ _ _ _ _ => trivial)
-        (fun _ value => value)))
 
 /-- Declare the unit's native nominal types.  No declaration of this unit has
 a generated native carrier yet, so the unit supports none
@@ -499,37 +430,12 @@ private def ensureNominalCarriers (segments : Array String) (unitIdent : Ident) 
       VerexIR.Proofs.Denote.NominalCarriers.none $unitIdent))
 
 /-- Declare the data invariants of a unit's declarations and the instance
-that carries them, given its base function values: the base family's trivial
-`own` and the inhabitants it gives — which the clauses are generated over
-(`ensureDataOwn`) — then the instance proper, the base with `own := dataOwn`
-where any declaration contributes one and the base itself otherwise.  A unit
-without data invariants also gets the inhabitants of its real family, which
-discharge every artifact's binder; one with them takes those from the public
-theorem's satisfiability hypothesis instead, so none is declared here
-(`doc/designs/data-invariants.md`). -/
+that carries them, given its base function values: `ensureDataOwn` over the
+base family, then the instance proper, the base with `own := dataOwn` where
+any declaration contributes one and the base itself otherwise. -/
 private def declareCarrierInstance (segments : Array String) (unit : ValidatedUnit)
     (unitIdent baseIdent : Ident)
     (instanceId : TSyntax ``Lean.Parser.Command.declId) : CommandElabM Unit := do
-  let trivialBaseId ← `(Lean.Parser.Command.declId|
-    $(rootIdent (ownTrivialBaseName segments)):ident)
-  let nonemptyBaseId ← `(Lean.Parser.Command.declId|
-    $(rootIdent (carriersNonemptyBaseName segments)):ident)
-  let baseCarriers ← `(term|
-    @VerexIR.Proofs.Denote.Carriers.runtime $unitIdent $baseIdent)
-  elabCommand (← `(command|
-    /-- The base function values state no data invariant: `Carriers.own` is
-    at its default there. -/
-    theorem $trivialBaseId:declId : ∀ source arguments value,
-        @VerexIR.Proofs.Denote.Carriers.own $baseCarriers source arguments value :=
-      fun _ _ _ => trivial))
-  elabCommand (← `(command|
-    /-- The inhabitants of the base family's certified carriers, which state
-    no invariant (`CarriersNonempty.ofTrivial`). -/
-    @[reducible] noncomputable def $nonemptyBaseId:declId :
-        @VerexIR.Proofs.Denote.CarriersNonempty $baseCarriers :=
-      @VerexIR.Proofs.Denote.CarriersNonempty.ofTrivial $baseCarriers
-        $(rootIdent (ownTrivialBaseName segments)) (fun _ _ => trivial)
-        (fun _ _ _ _ _ => trivial) (fun _ value => value)))
   let own ← ensureDataOwn segments unit
   match own.predicate with
   | some _ =>
@@ -556,7 +462,6 @@ private def declareCarrierInstance (segments : Array String) (unit : ValidatedUn
         `own`, so the instance is the base. -/
         noncomputable instance $instanceId:declId :
             VerexIR.Proofs.Denote.FunctionCarriers $unitIdent := $baseIdent))
-      ensureCarriersNonempty segments unitIdent
 
 /-- Generate the native family, its encoder, and the base carrier instance. -/
 private def defineFunctionFamily (segments : Array String) (unit : ValidatedUnit)
@@ -718,6 +623,253 @@ private def defineFunctionFamily (segments : Array String) (unit : ValidatedUnit
         (fun _ _ _ => True)))
   declareCarrierInstance segments unit unitIdent baseIdent instanceId
 
+mutual
+private def tyNominalFree : NTy → Bool
+  | .nominal _ _ _ => false
+  | .tuple elements | .struct _ _ elements => rowNominalFree elements
+  | .enum _ _ _ rows _ => rowsNominalFree rows
+  | .vector element | .slice element | .array element _ | .ghost element
+  | .observed element | .sliceRef element | .ref element => tyNominalFree element
+  | .table key value => tyNominalFree key && tyNominalFree value
+  | _ => true
+termination_by structural τ => τ
+
+private def rowNominalFree : NRow → Bool
+  | .nil => true
+  | .cons τ rest => tyNominalFree τ && rowNominalFree rest
+termination_by structural row => row
+
+private def rowsNominalFree : NRows → Bool
+  | .nil => true
+  | .cons fields rest => rowNominalFree fields && rowsNominalFree rest
+termination_by structural rows => rows
+end
+
+private theorem congrArg₂ {α : Sort u} {β : Sort v} {γ : Sort w} (f : α → β → γ)
+    {a₁ a₂ : α} {b₁ b₂ : β} (ha : a₁ = a₂) (hb : b₁ = b₂) : f a₁ b₁ = f a₂ b₂ := by
+  subst ha; subst hb; rfl
+
+private theorem heq_prod {α α' β β' : Type} (hα : α = α') (hβ : β = β')
+    {w : α × β} {v : α' × β'} (same : HEq w v) : HEq w.1 v.1 ∧ HEq w.2 v.2 := by
+  subst hα; subst hβ; cases eq_of_heq same; exact ⟨HEq.rfl, HEq.rfl⟩
+
+private theorem heq_sum_inl {α α' β β' : Type} (hα : α = α') (hβ : β = β')
+    {a : α} {v : α' ⊕ β'} (same : HEq (Sum.inl a : α ⊕ β) v) :
+    ∃ a' : α', v = Sum.inl a' ∧ HEq a a' := by
+  subst hα; subst hβ; cases eq_of_heq same; exact ⟨a, rfl, HEq.rfl⟩
+
+private theorem heq_sum_inr {α α' β β' : Type} (hα : α = α') (hβ : β = β')
+    {b : β} {v : α' ⊕ β'} (same : HEq (Sum.inr b : α ⊕ β) v) :
+    ∃ b' : β', v = Sum.inr b' ∧ HEq b b' := by
+  subst hα; subst hβ; cases eq_of_heq same; exact ⟨b, rfl, HEq.rfl⟩
+
+private theorem heq_specVector {α α' : Type} (h : α = α') {f : α → VerexIR.RuntimeValue}
+    {g : α' → VerexIR.RuntimeValue} (fg : ∀ x y, HEq x y → f x = g y)
+    {w : VerexIR.SpecVector α} {v : VerexIR.SpecVector α'} (same : HEq w v) :
+    w.values.map f = v.values.map g := by
+  subst h; cases eq_of_heq same; exact Array.map_congr_left fun x _ => fg x x HEq.rfl
+
+private theorem heq_specArray {α α' : Type} {n : Nat} (h : α = α') {f : α → VerexIR.RuntimeValue}
+    {g : α' → VerexIR.RuntimeValue} (fg : ∀ x y, HEq x y → f x = g y)
+    {w : VerexIR.SpecArray α n} {v : VerexIR.SpecArray α' n} (same : HEq w v) :
+    w.vector.values.map f = v.vector.values.map g := by
+  subst h; cases eq_of_heq same; exact Array.map_congr_left fun x _ => fg x x HEq.rfl
+
+private theorem heq_specEntries {κ κ' ν ν' : Type} (hκ : κ = κ') (hν : ν = ν')
+    {fk : κ → VerexIR.RuntimeValue} {gk : κ' → VerexIR.RuntimeValue}
+    {fv : ν → VerexIR.RuntimeValue} {gv : ν' → VerexIR.RuntimeValue}
+    (fgk : ∀ x y, HEq x y → fk x = gk y) (fgv : ∀ x y, HEq x y → fv x = gv y)
+    {w : VerexIR.SpecEntries (κ × ν)} {v : VerexIR.SpecEntries (κ' × ν')} (same : HEq w v) :
+    (w.entries.map fun e => VerexIR.RuntimeValue.tuple #[fk e.1, fv e.2]) =
+      (v.entries.map fun e => VerexIR.RuntimeValue.tuple #[gk e.1, gv e.2]) := by
+  subst hκ; subst hν; cases eq_of_heq same
+  exact List.map_congr_left fun e _ => by rw [fgk e.1 e.1 HEq.rfl, fgv e.2 e.2 HEq.rfl]
+
+private theorem heq_specSliceRef {α α' : Type} (h : α = α') {f : α → VerexIR.RuntimeValue}
+    {g : α' → VerexIR.RuntimeValue} (fg : ∀ x y, HEq x y → f x = g y)
+    {w : VerexIR.SpecSliceRef α} {v : VerexIR.SpecSliceRef α'} (same : HEq w v) :
+    w.currentVector.values.map f = v.currentVector.values.map g ∧
+      w.finalVector.values.map f = v.finalVector.values.map g := by
+  subst h; cases eq_of_heq same
+  exact ⟨Array.map_congr_left fun x _ => fg x x HEq.rfl,
+    Array.map_congr_left fun x _ => fg x x HEq.rfl⟩
+
+mutual
+private theorem carrierWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
+    (τ : NTy) → tyNominalFree τ = true →
+    NTy.carrierWith unit Φ.F τ = @NTy.carrier (@Carriers.runtime unit (Φ.functionCarriers own)) τ
+  | .tuple elements, free | .struct _ _ elements, free => HListWith_runtime Φ own elements free
+  | .enum _ _ names rows _, free => variantCarrierWith_runtime Φ own names rows free
+  | .vector element, free | .slice element, free =>
+      congrArg VerexIR.SpecVector (carrierWith_runtime Φ own element free)
+  | .array element length, free =>
+      congrArg (VerexIR.SpecArray · length) (carrierWith_runtime Φ own element free)
+  | .table key value, free => by
+      simp only [tyNominalFree, Bool.and_eq_true] at free
+      exact congrArg VerexIR.SpecEntries
+        (congrArg₂ Prod (carrierWith_runtime Φ own key free.1) (carrierWith_runtime Φ own value free.2))
+  | .ghost slot, free => carrierWith_runtime Φ own slot free
+  | .observed referent, free => carrierWith_runtime Φ own referent free
+  | .sliceRef element, free =>
+      congrArg VerexIR.SpecSliceRef (carrierWith_runtime Φ own element free)
+  | .ref referent, free =>
+      congrArg₂ Prod (carrierWith_runtime Φ own referent free) (carrierWith_runtime Φ own referent free)
+  | .nominal _ _ _, free => by simp [tyNominalFree] at free
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _
+  | .string, _ | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => rfl
+termination_by structural τ _ => τ
+
+private theorem HListWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
+    (row : NRow) → rowNominalFree row = true →
+    HListWith unit Φ.F row = @HList (@Carriers.runtime unit (Φ.functionCarriers own)) row
+  | .nil, _ => rfl
+  | .cons τ rest, free => by
+      simp only [rowNominalFree, Bool.and_eq_true] at free
+      exact congrArg₂ Prod (carrierWith_runtime Φ own τ free.1) (HListWith_runtime Φ own rest free.2)
+termination_by structural row _ => row
+
+private theorem variantCarrierWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
+    (names : List String) → (rows : NRows) → rowsNominalFree rows = true →
+    variantCarrierWith unit Φ.F names rows =
+      @variantCarrier (@Carriers.runtime unit (Φ.functionCarriers own)) names rows
+  | _, .nil, _ | [], .cons _ _, _ => rfl
+  | _ :: names, .cons fields rest, free => by
+      simp only [rowsNominalFree, Bool.and_eq_true] at free
+      exact congrArg₂ Sum (HListWith_runtime Φ own fields free.1)
+        (variantCarrierWith_runtime Φ own names rest free.2)
+termination_by structural _ rows _ => rows
+end
+
+mutual
+private theorem tyEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
+    (τ : NTy) → (free : tyNominalFree τ = true) →
+    (w : NTy.carrierWith unit Φ.F τ) →
+    (v : @NTy.carrier (@Carriers.runtime unit (Φ.functionCarriers own)) τ) →
+    HEq w v →
+    @NTy.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) τ w =
+      @NTy.encode (@Carriers.runtime unit (Φ.functionCarriers own)) τ v
+  | .unit, _, _, _, same | .bool, _, _, _, same | .int _ _, _, _, _, same
+  | .num, _, _, _, same | .address, _, _, _, same | .signer, _, _, _, same
+  | .string, _, _, _, same | .bytes, _, _, _, same | .char, _, _, _, same
+  | .param _, _, _, _, same | .function _ _ _, _, _, _, same => by
+      cases eq_of_heq same; rfl
+  | .tuple elements, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [NTy.encodeWith, NTy.encode_tuple]
+      congr 1; congr 1
+      exact rowEncodeWith_runtime Φ own elements free w v same
+  | .struct source _ fields, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [NTy.encodeWith, NTy.encode_struct]
+      congr 1; congr 1
+      exact rowEncodeWith_runtime Φ own fields free w v same
+  | .enum source arguments names rows distinct, free, w, v, same =>
+      rowsEncodeWith_runtime Φ own source arguments names rows distinct free w v same
+  | .slice element, free, w, v, same | .vector element, free, w, v, same => by
+      simp only [NTy.encodeWith, NTy.encode, NTy.codec, VerexIR.Proofs.Codec.boundedVector]
+      congr 1
+      exact heq_specVector (carrierWith_runtime Φ own element free)
+        (fun x y h => tyEncodeWith_runtime Φ own element free x y h) same
+  | .array element _, free, w, v, same => by
+      simp only [NTy.encodeWith, NTy.encode, NTy.codec, VerexIR.Proofs.Codec.array,
+        VerexIR.Proofs.Codec.boundedVector]
+      congr 1
+      exact heq_specArray (carrierWith_runtime Φ own element free)
+        (fun x y h => tyEncodeWith_runtime Φ own element free x y h) same
+  | .table key value, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [tyNominalFree, Bool.and_eq_true] at free
+      simp only [NTy.encodeWith, NTy.encode_table]
+      congr 1; congr 1
+      exact heq_specEntries (carrierWith_runtime Φ own key free.1)
+        (carrierWith_runtime Φ own value free.2)
+        (fun x y h => tyEncodeWith_runtime Φ own key free.1 x y h)
+        (fun x y h => tyEncodeWith_runtime Φ own value free.2 x y h) same
+  | .ghost slot, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [NTy.encodeWith, NTy.encode_ghost]
+      congr 1
+      exact tyEncodeWith_runtime Φ own slot free w v same
+  | .observed referent, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      rw [NTy.encodeWith, NTy.encode_observed]
+      exact tyEncodeWith_runtime Φ own referent free w v same
+  | .sliceRef element, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      have ⟨hc, hf⟩ := heq_specSliceRef (carrierWith_runtime Φ own element free)
+        (fun x y h => tyEncodeWith_runtime Φ own element free x y h) same
+      have hc' : w.currentVector.values.map _ = v.currentVector.values.map element.codec.encode := hc
+      have hf' : w.finalVector.values.map _ = v.finalVector.values.map element.codec.encode := hf
+      dsimp only [NTy.encodeWith]
+      rw [NTy.encode_sliceRef, NTy.encode_vector, NTy.encode_vector, hc', hf']
+  | .ref referent, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      have ⟨h1, h2⟩ := heq_prod (carrierWith_runtime Φ own referent free)
+        (carrierWith_runtime Φ own referent free) same
+      dsimp only [NTy.encodeWith]
+      rw [NTy.encode_ref,
+        tyEncodeWith_runtime Φ own referent free w.1 v.1 h1,
+        tyEncodeWith_runtime Φ own referent free w.2 v.2 h2]
+  | .nominal _ _ _, free, _, _, _ => by simp [tyNominalFree] at free
+termination_by structural τ _ _ _ _ => τ
+
+private theorem rowEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
+    (row : NRow) → (free : rowNominalFree row = true) →
+    (w : HListWith unit Φ.F row) →
+    (v : @HList (@Carriers.runtime unit (Φ.functionCarriers own)) row) →
+    HEq w v →
+    @NRow.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) row w =
+      @HList.encode (@Carriers.runtime unit (Φ.functionCarriers own)) row v
+  | .nil, _, _, _, _ => rfl
+  | .cons τ rest, free, w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [rowNominalFree, Bool.and_eq_true] at free
+      have ⟨h1, h2⟩ := heq_prod (carrierWith_runtime Φ own τ free.1)
+        (HListWith_runtime Φ own rest free.2) same
+      dsimp only [NRow.encodeWith]
+      rw [HList.encode_cons,
+        tyEncodeWith_runtime Φ own τ free.1 w.1 v.1 h1,
+        rowEncodeWith_runtime Φ own rest free.2 w.2 v.2 h2]
+termination_by structural row _ _ _ _ => row
+
+private theorem rowsEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
+    (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop)
+    (source : VerexIR.StructHandle) (arguments : NRow) :
+    (names : List String) → (rows : NRows) → (distinct : names.Nodup) →
+    (free : rowsNominalFree rows = true) →
+    (w : variantCarrierWith unit Φ.F names rows) →
+    (v : @variantCarrier (@Carriers.runtime unit (Φ.functionCarriers own)) names rows) →
+    HEq w v →
+    @NRows.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) source names rows w =
+      @NTy.encode (@Carriers.runtime unit (Φ.functionCarriers own))
+        (.enum source arguments names rows distinct) v
+  | _, .nil, _, _, w, _, _ => nomatch w
+  | [], .cons _ _, _, _, w, _, _ => nomatch w
+  | name :: names, .cons fields rest, distinct, free, .inl w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [rowsNominalFree, Bool.and_eq_true] at free
+      obtain ⟨v', rfl, sameFields⟩ := heq_sum_inl
+        (HListWith_runtime Φ own fields free.1)
+        (variantCarrierWith_runtime Φ own names rest free.2) same
+      rw [NRows.encodeWith, NTy.encode_enum_inl,
+        rowEncodeWith_runtime Φ own fields free.1 w v' sameFields]
+  | name :: names, .cons fields rest, distinct, free, .inr w, v, same => by
+      letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
+      simp only [rowsNominalFree, Bool.and_eq_true] at free
+      obtain ⟨v', rfl, sameRest⟩ := heq_sum_inr
+        (HListWith_runtime Φ own fields free.1)
+        (variantCarrierWith_runtime Φ own names rest free.2) same
+      rw [NRows.encodeWith, NTy.encode_enum_inr]
+      exact rowsEncodeWith_runtime Φ own source arguments names rest
+        (List.nodup_cons.mp distinct).2 free.2 w v' sameRest
+termination_by structural _ rows _ _ _ _ _ => rows
+end
+
 /-- Generate construction and encoding equations, retaining the sites for equality. -/
 private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Name)
     (sites : Array SiteSpec) :
@@ -728,7 +880,7 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
     let row ← rowIdent family site.captured
     elabCommand (← `(command|
       theorem $(rootIdent (family ++ Name.mkSimple s!"carrier{index}")):ident :
-          @VerexIR.Proofs.Denote.HListPlain
+          @VerexIR.Proofs.Denote.HList
             (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent) $row = $captured := rfl))
   -- Construction at the base frame: a site's key is its constructor, the
   -- mask and instantiation evaluated by the caller.
@@ -742,42 +894,30 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
     let results ← rowIdent family site.results
     let key := rootIdent (family ++ Name.mkSimple s!"key{index}")
     let ctor := rootIdent (family ++ Name.mkSimple s!"site{index}")
-    let forgetIdent := rootIdent (family ++ Name.mkSimple s!"encodeForget{index}")
-    -- The family holds a site's captures plain, while a statement about the
-    -- unit binds them certified, so every site statement spells the
-    -- constructor at the forgotten row. Forgetting keeps the encoding, which
-    -- is all a closure reads of its captures.
+    let encodeCapturesIdent := rootIdent (family ++ Name.mkSimple s!"encodeCaptures{index}")
     elabCommand (← `(command|
-      theorem $forgetIdent:ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
+      theorem $encodeCapturesIdent:ident
           (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
           @VerexIR.Proofs.Denote.NRow.encodeWith $unitIdent _ $familyIdent
-              (fun _ _ _ value => $(rootIdent (family ++ `encode)) value) $row
-              (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures) =
-            @VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row captures := by
-        rw [← @VerexIR.Proofs.Denote.HList.encode_forget $runtimeCarriers $row captures]
-        rfl))
-    -- The closure of a site's value at the captures a certified row forgets:
-    -- the family's own, whose captures are that row's encoding
-    -- (`encodeForget`). Both the construction and the closure equation read
-    -- it, so the encoding is unfolded once.
+              (fun _ _ _ value => $(rootIdent (family ++ `encode)) value) $row captures =
+            @VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row captures :=
+        rowEncodeWith_runtime $(rootIdent (family ++ `family))
+          (@VerexIR.Proofs.Denote.FunctionCarriers.own $unitIdent _) $row (by decide)
+          captures captures HEq.rfl))
     let encodeSite := rootIdent (family ++ Name.mkSimple s!"encodeSite{index}")
     elabCommand (← `(command|
       theorem $encodeSite:ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
           VerexIR.Proofs.Denote.SiteFamily.encode $(rootIdent (family ++ `family))
               (VerexIR.Proofs.Denote.SiteFamily.site $(rootIdent (family ++ `family))
-                ⟨$(quote index), by decide⟩
-                (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures)) =
+                ⟨$(quote index), by decide⟩ captures) =
             @VerexIR.Proofs.Denote.closureOf $unitIdent _ $runtimeFrame ($key).function
               ($key).mask ($key).typeInstantiation $row captures := by
         rw [VerexIR.Proofs.Denote.SiteFamily.encode_site_eq]
         exact VerexIR.Proofs.Denote.ClosureValue.ext rfl rfl rfl
-          (congrArg List.toArray ($forgetIdent:ident captures))))
+          (congrArg List.toArray ($encodeCapturesIdent:ident captures))))
     elabCommand (← `(command|
       theorem $(rootIdent (family ++ Name.mkSimple s!"construct{index}")):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (mask : Nat) (masked : mask = ($key).mask)
           (instantiation : Array (VerexIR.TypeId × VerexIR.TypeId))
           (instantiated : instantiation = ($key).typeInstantiation)
@@ -786,38 +926,35 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
             $results ($key).function mask instantiation $row) :
           @VerexIR.Proofs.Denote.Skolems.construct $unitIdent _ $runtimeFrame $parameters $shared
             $results ($key).function mask instantiation $row captures typed =
-              $ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures) := by
+              $ctor captures := by
         subst masked instantiated
         exact VerexIR.Proofs.Denote.SiteFamily.construct_eq $(rootIdent (family ++ `family))
           (σs := $row) captures typed
           (VerexIR.Proofs.Denote.SiteFamily.site $(rootIdent (family ++ `family))
-            ⟨$(quote index), by decide⟩
-            (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures))
+            ⟨$(quote index), by decide⟩ captures)
           ($encodeSite:ident captures).symm))
     -- What a program's equality of two function values decides: their
     -- closures without ghost slots (`TypedFunctions.erased`). A site's is
-    -- its key over the erased encoding of its captures, read at the plain
-    -- row the family holds.
+    -- its key over the erased encoding of its captures.
     let erasedKey := rootIdent (family ++ Name.mkSimple s!"erasedKey{index}")
     elabCommand (← `(command|
       theorem $erasedKey:ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
-          (captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row) :
+          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
           (@VerexIR.Proofs.Denote.Carriers.functions $runtimeCarriers $parameters $shared
               $results).erased ($ctor captures) =
             VerexIR.Proofs.Denote.ErasedClosure.mk
               (VerexIR.RuntimeValue.closure ($key).function ($key).mask
                 ($key).typeInstantiation
                 (VerexIR.RuntimeValue.eraseGhostsAll
-                  (@VerexIR.Proofs.Denote.HListPlain.encode $runtimeCarriers $row
+                  (@VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row
                     captures)).toArray) := by
         show VerexIR.Proofs.Denote.ErasedClosure.mk
           (VerexIR.Proofs.Denote.SiteFamily.encode $(rootIdent (family ++ `family))
             (VerexIR.Proofs.Denote.SiteFamily.site $(rootIdent (family ++ `family))
               ⟨$(quote index), by decide⟩ captures)).encode.eraseGhosts = _
-        rw [VerexIR.Proofs.Denote.SiteFamily.encode_site_eq]
-        simp only [VerexIR.Proofs.Denote.ClosureValue.encode,
-          VerexIR.RuntimeValue.eraseGhosts, VerexIR.Proofs.Denote.HListPlain.encode] <;> rfl))
+        rw [$encodeSite:ident captures]
+        simp only [VerexIR.Proofs.Denote.closureOf, VerexIR.Proofs.Denote.ClosureValue.encode,
+          VerexIR.RuntimeValue.eraseGhosts]))
     erasedSites := erasedSites.push (index, site, row, parameters, shared, results)
   return erasedSites
 
@@ -827,7 +964,7 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
   let runtimeCarriers ← `(VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)
   -- Values of two sites differ by their keys, and values of one site compare
   -- by the native equality of their captures, which is itself modulo ghost
-  -- slots (`HListPlain.equal`). The family's `site…injEq` is never reached:
+  -- slots (`HList.equal`). The family's `site…injEq` is never reached:
   -- the equality reads the erased closures, not the family's values.
   for (index, site, row, parameters, shared, results) in erasedSites do
     for (other, otherSite, otherRow, _, _, _) in erasedSites do
@@ -841,7 +978,7 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
             ($(rootIdent (family ++ Name.mkSimple s!"site{which}")) $value))
       let statement ← if index == other then
           `(($(← erased index left) = $(← erased other right)) ↔
-            @VerexIR.Proofs.Denote.HListPlain.equal $runtimeCarriers false $row $left $right =
+            @VerexIR.Proofs.Denote.HList.equal $runtimeCarriers false $row $left $right =
               true)
         else `(($(← erased index left) = $(← erased other right)) ↔ False)
       let theoremId := mkIdent (family ++ Name.mkSimple s!"erased{index}_{other}")
@@ -852,15 +989,13 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
       if index == other then
         elabCommand (← `(command|
           @[vir_denote_norm] theorem $theoremId:ident
-              [VerexIR.Proofs.Denote.CarriersNonempty
-                (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
-              ($left : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
-              ($right : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $otherRow) :
+              ($left : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+              ($right : @VerexIR.Proofs.Denote.HList $runtimeCarriers $otherRow) :
               $statement := by
             simp only [$keys,*, VerexIR.Proofs.Denote.ErasedClosure.mk.injEq,
               VerexIR.RuntimeValue.closure.injEq, true_and, Array.mk.injEq,
-              VerexIR.Proofs.Denote.HListPlain.equal_codec, decide_eq_true_eq,
-              VerexIR.Proofs.Denote.HListPlain.encode]))
+              VerexIR.Proofs.Denote.HList.equal_codec, decide_eq_true_eq,
+              VerexIR.Proofs.Denote.HList.encode]))
       else
         -- A site's entire key distinguishes it. The same target can occur
         -- at different capture masks or type instantiations.
@@ -873,10 +1008,8 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
             `(tactic| (intro _ _ same; exact absurd same (by decide)))
         elabCommand (← `(command|
           @[vir_denote_norm] theorem $theoremId:ident
-              [VerexIR.Proofs.Denote.CarriersNonempty
-                (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
-              ($left : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
-              ($right : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $otherRow) :
+              ($left : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+              ($right : @VerexIR.Proofs.Denote.HList $runtimeCarriers $otherRow) :
               $statement := by
             simp only [$keys,*, VerexIR.Proofs.Denote.ErasedClosure.mk.injEq,
               VerexIR.RuntimeValue.closure.injEq, iff_false, not_and]
@@ -920,11 +1053,9 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     let maskTerm ← `(VerexIR.Proofs.Denote.Weave.mask $weaveIdent)
     elabCommand (← `(command|
       theorem $(rootIdent (name "closure")):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
           (@VerexIR.Proofs.Denote.Carriers.functions $runtimeCarriers $parameters $shared
-              $results).closure
-              ($ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures)) =
+              $results).closure ($ctor captures) =
             @VerexIR.Proofs.Denote.closureOf $unitIdent _ $runtimeFrame ($key).function $maskTerm
               #[] $row captures := by
         exact $(rootIdent (family ++ Name.mkSimple s!"encodeSite{index}")):ident captures))
@@ -941,27 +1072,22 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
       | some shape => do
           elabCommand (← `(command|
             theorem $(rootIdent (name "invoke")):ident
-                [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
                 (executable : VerexIR.Validation.ExecutableUnit $unitIdent)
                 (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
                 (args : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters) :
                 @VerexIR.Proofs.Denote.closureMeaning $unitIdent _ executable $runtimeFrame
-                    $parameters $shared $shape
-                    ($ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures))
-                    args =
+                    $parameters $shared $shape ($ctor captures) args =
                   @VerexIR.Proofs.Denote.propheticMeaning $unitIdent _ executable $runtimeFrame #[]
                     ($key).function $fullRow $shape (@VerexIR.Proofs.Denote.Weave.compose $unitIdent _ $runtimeFrame _ _ _ $weaveIdent captures args) := by
               letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
               exact VerexIR.Proofs.closureMeaning_closureOf_coherent executable $weaveIdent
                 (by decide) (VerexIR.Proofs.Denote.coherent_runtime $unitIdent _) captures $shared
-                $shape ($ctor (@VerexIR.Proofs.Denote.HList.forget $runtimeCarriers $row captures))
-                ($(rootIdent (name "closure")) captures) args))
+                $shape ($ctor captures) ($(rootIdent (name "closure")) captures) args))
           pure (some (name "invoke"))
     let named? ← if site.captured == .nil then pure none else do
       let namedShared ← sharingIdent family (closureShared unit site.key.function 0)
       elabCommand (← `(command|
-        theorem $(rootIdent (name "named")):ident
-            [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)] :
+        theorem $(rootIdent (name "named")):ident :
             @VerexIR.Proofs.Denote.SiteTyped $unitIdent _ $runtimeFrame $fullRow $namedShared
               $results ($key).function
               (VerexIR.Proofs.Denote.Weave.mask (VerexIR.Proofs.Denote.Weave.supplying $fullRow))
@@ -1012,57 +1138,28 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     let state := mkIdent `state
     let pre := mkIdent `pre
     let post := mkIdent `post
-    let held := mkIdent `held
-    let certified := mkIdent `certified
     let meaning ← `(@VerexIR.Proofs.Denote.closureMeaning $unitIdent _ $executable $runtimeFrame)
-    -- The captures the constructor holds are plain, and a site statement
-    -- quantifies a certified row, so the equation owes the captures'
-    -- invariants; a certificate-free row holds them by its types alone.
-    let certifying : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
-      if site.captured.certificateFree then pure #[]
-      else do
-        let binder ← `(Lean.Parser.Term.bracketedBinderF|
-          ($held : @VerexIR.Proofs.Denote.HListPlain.deepHolds $runtimeCarriers $row $captures))
-        pure #[⟨binder.raw⟩]
-    let heldTerm ← if site.captured.certificateFree then
-        `(@VerexIR.Proofs.Denote.HListPlain.deepHolds_of_certificateFree $runtimeCarriers $row
-          (by decide) $captures)
-      else `($held)
-    let woven ← `(@VerexIR.Proofs.Denote.Weave.composePlain $runtimeCarriers $fullRow $row
+    let woven ← `(@VerexIR.Proofs.Denote.Weave.compose $unitIdent _ $runtimeFrame $fullRow $row
       $parameters $weave $captures $entries)
-    let certifiedRow ← `(@VerexIR.Proofs.Denote.HListPlain.ofDeepHolds $runtimeCarriers $row
-      $captures $certified)
-    let prelude ← `(tactic|
-      have $certified:ident : @VerexIR.Proofs.Denote.HListPlain.deepHolds $runtimeCarriers $row
-        $captures := $heldTerm)
-    let forgetting ← `(tactic|
-      rw [← @VerexIR.Proofs.Denote.HListPlain.forget_ofDeepHolds $runtimeCarriers $row
-        $captures $certified])
     elabCommand (← `(command|
       @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenAborts{index}")):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-          ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
-          $certifying*
-          ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+          ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
           ($state : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
           @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
               $shared $shape ($ctor $captures) $entries $state =
             @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $fullRow
               $namedShared $shape ($namedCtor ()) $woven $state := by
         letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
-        $prelude:tactic
-        $forgetting:tactic
         exact VerexIR.Proofs.abortsOfEntries_closureOf_woven (named_shared := $namedShared)
-          $weave (by decide) #[] $certifiedRow $shared $shape _ ($closure _) ($namedCtor ())
-          ($namedClosure ()) $entries $state))
+          $weave (by decide) #[] $captures $shared $shape ($ctor $captures) ($closure $captures)
+          ($namedCtor ()) ($namedClosure ()) $entries $state))
     elabCommand (← `(command|
       @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenEnsures{index}")):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-          ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
-          $certifying*
-          ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+          ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
           ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
             (VerexIR.Proofs.Denote.NRow.finals $parameters))
           ($result : @VerexIR.Proofs.Denote.ResultShape.carrier $runtimeCarriers $shape)
@@ -1074,12 +1171,10 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
               $namedShared $shape ($namedCtor ()) $woven $finals $result
               $pre $post := by
         letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
-        $prelude:tactic
-        $forgetting:tactic
         exact VerexIR.Proofs.ensuresOfEntries_closureOf_woven (named_shared := $namedShared)
-          (finals := $finals) (finals' := $finals) $weave (by decide) #[] $certifiedRow $shared
-          $shape _ ($closure _) ($namedCtor ()) ($namedClosure ()) $entries HEq.rfl
-          $result $pre $post))
+          (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $shared
+          $shape ($ctor $captures) ($closure $captures) ($namedCtor ()) ($namedClosure ())
+          $entries HEq.rfl $result $pre $post))
     -- A target returning a mutable reference: the clause reads the result as
     -- its current value (`EnsuresOfSettled`).
     if let .cons (.ref referent) .nil := site.results then
@@ -1088,27 +1183,22 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
       elabCommand (← `(command|
         @[vir_denote_norm] theorem
             $(rootIdent (family ++ Name.mkSimple s!"wovenEnsuresSettled{index}")):ident
-            [VerexIR.Proofs.Denote.CarriersNonempty
-              (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
             ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-            ($captures : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $row)
-            $certifying*
-            ($entries : @VerexIR.Proofs.Denote.HListPlain $runtimeCarriers $parameters)
+            ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+            ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
             ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
               (VerexIR.Proofs.Denote.NRow.finals $parameters))
-            ($current : @VerexIR.Proofs.Denote.NTy.plain $runtimeCarriers $σ)
+            ($current : @VerexIR.Proofs.Denote.NTy.carrier $runtimeCarriers $σ)
             ($pre $post : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
             @VerexIR.Proofs.EnsuresOfSettled $unitIdent _ $runtimeFrame $meaning $parameters
                 $shared $σ ($ctor $captures) $entries $finals $current $pre $post =
               @VerexIR.Proofs.EnsuresOfSettled $unitIdent _ $runtimeFrame $meaning $fullRow
                 $namedShared $σ ($namedCtor ()) $woven $finals $current $pre $post := by
           letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
-          $prelude:tactic
-          $forgetting:tactic
           exact VerexIR.Proofs.ensuresOfSettled_closureOf_woven (named_shared := $namedShared)
-            (finals := $finals) (finals' := $finals) $weave (by decide) #[] $certifiedRow $shared
-            $σ _ ($closure _) ($namedCtor ()) ($namedClosure ()) $entries HEq.rfl
-            $current $pre $post))
+            (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $shared
+            $σ ($ctor $captures) ($closure $captures) ($namedCtor ()) ($namedClosure ())
+            $entries HEq.rfl $current $pre $post))
 
 /-- Declare a unit's function values once, before its first theorem: the
 generated family where the link set has closure sites, the library's
@@ -1140,13 +1230,11 @@ def ensureFunctionCarriers (segments : Array String) (unit : ValidatedUnit) :
     elabCommand (← `(command|
       /-- The unit's requires meaning: no closure site encodes a value. -/
       noncomputable def $requiresIdent:ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)]
           (foreign : VerexIR.Proofs.RequiresMeaning $unitIdent) :
           VerexIR.Proofs.RequiresMeaning $unitIdent := foreign))
     elabCommand (← `(command|
       /-- Where any value is defined, every value is. -/
-      theorem $(rootIdent (everywhereName segments)):ident
-          [VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)] :
+      theorem $(rootIdent (everywhereName segments)):ident :
           ∀ parameters shared results value args state,
             $requiresIdent (fun _ _ _ _ _ _ => True) parameters shared results value args state :=
         fun _ _ _ _ _ _ => trivial))

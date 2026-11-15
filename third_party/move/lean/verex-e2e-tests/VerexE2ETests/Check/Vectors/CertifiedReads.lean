@@ -17,10 +17,15 @@ verex module 0x42::certified_reads where
     ensures -128 <= values[index] && values[index] <= 127
   verify signed_bounds
 
+  fun missing_bounds() -> Unit := ()
+  spec missing_bounds where
+    ensures -128 <= vector<i8>[][17] && vector<i8>[][17] <= 127
+  verify missing_bounds
+
   fun missing_is_zero() -> u64 := 0
   spec missing_is_zero where
+    pragma verify = false
     ensures vector<i8>[][17] == result
-  verify missing_is_zero
 
   fun signed_negative() -> i8 := -1
   spec signed_negative where
@@ -33,6 +38,20 @@ verex module 0x42::certified_reads where
     pragma verify = false
     requires index < values.length
     ensures values[index] >= 0
+
+/--
+error: the specification clause `ensures vector<i8>[][17] == result` is not established
+---
+error: verex verification failed: the automatic verification of `missing_is_zero` failed; provide a proof in the module:
+  verify missing_is_zero by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+-/
+#guard_msgs in
+verify 0x42::certified_reads::missing_is_zero
 
 /--
 error: the specification clause `ensures values[index] >= 0` is not established
