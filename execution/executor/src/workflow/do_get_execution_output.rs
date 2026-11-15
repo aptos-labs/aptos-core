@@ -29,6 +29,7 @@ use aptos_storage_interface::state_store::{
     orders::OrderParent,
     positions::PositionParent,
     state::LedgerState,
+    state_update_refs::StateUpdateRefs,
     state_view::cached_state_view::{CachedStateView, PrimingPolicy},
 };
 #[cfg(feature = "consensus-only-perf-test")]
@@ -51,7 +52,6 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
         TransactionStatus, Version,
     },
-    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -446,7 +446,7 @@ impl Parser {
             let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output__next_epoch_state"]);
             to_commit
                 .is_reconfig()
-                .then(|| Self::ensure_next_epoch_state(&to_commit))
+                .then(|| Self::ensure_next_epoch_state(&to_commit, &base_state_view))
                 .transpose()?
         };
 
@@ -576,15 +576,15 @@ impl Parser {
         (to_retry, to_discard)
     }
 
-    fn ensure_next_epoch_state(to_commit: &TransactionsWithOutput) -> Result<EpochState> {
-        let last_write_set = to_commit
-            .transaction_outputs
-            .last()
-            .ok_or_else(|| anyhow!("to_commit is empty."))?
-            .write_set();
+    fn ensure_next_epoch_state(
+        to_commit: &TransactionsToKeep,
+        base_state_view: &CachedStateView,
+    ) -> Result<EpochState> {
+        ensure!(!to_commit.is_empty(), "to_commit is empty.");
 
         let write_set_view = WriteSetStateView {
-            write_set: last_write_set,
+            updates: to_commit.state_update_refs(),
+            base_state_view,
         };
 
         let validator_set = ValidatorSet::fetch_config(&write_set_view)?
@@ -599,8 +599,13 @@ impl Parser {
     }
 }
 
+/// The state at the end of the committed transactions: the latest update to a key across all of
+/// them, falling back to the parent state for keys none of them updated. A VM need not emit a
+/// write for a value it left unchanged (e.g. an unchanged `ValidatorSet` on epoch change), so
+/// looking only at the last transaction's write set is not enough.
 struct WriteSetStateView<'a> {
-    write_set: &'a WriteSet,
+    updates: &'a StateUpdateRefs<'a>,
+    base_state_view: &'a CachedStateView,
 }
 
 impl TStateView for WriteSetStateView<'_> {
@@ -610,10 +615,15 @@ impl TStateView for WriteSetStateView<'_> {
         &self,
         state_key: &Self::Key,
     ) -> aptos_types::state_store::StateViewResult<Option<StateValue>> {
-        Ok(self
-            .write_set
-            .get_write_op(state_key)
-            .and_then(|write_op| write_op.as_state_value()))
+        // `None` for no update or a hotness-only update, which leaves the value unchanged.
+        match self
+            .updates
+            .latest_update(state_key)
+            .and_then(|update| update.state_op.as_state_value_opt())
+        {
+            Some(value) => Ok(value.cloned()),
+            None => self.base_state_view.get_state_value(state_key),
+        }
     }
 
     fn get_usage(&self) -> aptos_types::state_store::StateViewResult<StateStorageUsage> {

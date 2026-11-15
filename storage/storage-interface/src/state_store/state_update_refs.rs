@@ -190,6 +190,11 @@ impl<'kv> StateUpdateRefs<'kv> {
         }
     }
 
+    /// The latest update to `key` across all versions, if any.
+    pub fn latest_update(&self, key: &StateKey) -> Option<&StateUpdateRef<'kv>> {
+        self.for_last_checkpoint.as_ref()?.shards[key.get_shard_id()].get(key)
+    }
+
     pub fn last_inner_checkpoint_index(&self) -> Option<usize> {
         self.for_last_checkpoint
             .as_ref()
