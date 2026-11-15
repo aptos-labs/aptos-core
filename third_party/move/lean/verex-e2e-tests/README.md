@@ -68,6 +68,15 @@ in `Errors` holds negative cases. The ledger is the
 [roadmap](../doc/plan/roadmap.md). Everything
 under `Check/` is VerexSL; the frontend paths keep their own directories.
 
+Every check also runs under `VEREX_E2E_TIMEOUT`, described with the `verify`
+suite below. A run reports every check that did not pass, not the first, and
+keeps the file stems of those in the untracked standing record
+`.lake/check-failed`, comma-separated, so that
+`VEREX_E2E_SUITE=check VEREX_E2E_FILTER=$(cat .lake/check-failed)` reruns
+them; a run removes the checks that matched from the record, adds the ones
+that differed, and leaves the checks it did not run in it. The queue starts
+with the recorded checks, then the largest source first.
+
 `VerexE2ETests/SourceVerify/` verifies Move and Rust sources as
 `verex-move verify` and `verex-rust verify` do
 ([`doc/designs/source-verification.md`](../doc/designs/source-verification.md)): every
@@ -78,6 +87,43 @@ specification, or proof file, are the baseline `<name>.exp` — none when the
 source verifies. A Move file's rendering goes to `.verex/` beside it, where
 its proof file's header finds it; the proof file is then elaborated on its
 own, as the editor elaborates it, and its messages are `<name>.proof.exp`.
+
+The unit of work of that suite is a *name*: a source file's stem (its
+`.move` and `.rs`, with the proof-file check of a Move file), a crate's name
+(`CargoFixture`), a package's name (`MoveStdlib`), or `StaleRendering`, the
+test that a proof file whose Move file changed warns at its header.
+`VEREX_E2E_FILTER` selects names, packages and `StaleRendering` among them,
+and no filter runs every name. One verification already uses more than a
+core, so a run of several names fans out: the driver verifies each name in a
+child of itself — one name, one worker, and `verex.jobs` set to the threads
+that worker plans for itself, unless the caller's `VEREX_OPTIONS` sets
+`verex.jobs` itself — and prints `ok <name>` or `FAIL <name>` with the
+child's output as each one ends, followed by the count and every name that
+failed. `VEREX_E2E_JOBS` is the number of workers, by default half the
+hardware threads bounded by one worker per 3 GB of available memory; one
+worker runs the names in the driver's own process, where the first mismatch
+ends the run. The parent records what it ran in two untracked files under
+`.lake`: `verify-durations`, one `<milliseconds> <name>` per line, and
+`verify-failed`, the names known not to verify, comma-separated, so that
+`VEREX_E2E_FILTER=$(cat .lake/verify-failed)` reruns them. `verify-failed` is
+a standing record rather than one run's list: a fan-out run removes the names
+it verified from it and adds the ones it failed, and the names it did not run
+stay, so a run of a selection never erases what another selection recorded.
+The queue starts with the names of `verify-failed`, then the longest previous
+duration first, a name without a recorded duration counting as the longest.
+
+`VEREX_E2E_TIMEOUT` is the seconds one fixture's process may run, 240 by
+default and none at all when it is `0`. It holds wherever the driver runs a
+fixture in a child: each name of a fan-out `verify` run and each check, the
+latter even with one worker, since a check is always elaborated in a `lean`
+of its own. A `verify` run in the driver's own process — one worker — has no
+timeout. At expiry the process and everything it started are killed, so a
+`lake` leaves no `lean` behind. A timed-out name of `verify` is a failure
+like any other: `FAIL <name>`, then `timed out after <n> s`, counted and
+recorded. A timed-out check is reported in the collected error as
+`<file> timed out after <n> s`, and the run fails. A timeout is never
+recorded as a baseline: a killed process produced no output to compare, so
+`UB=1` neither writes nor removes its `.exp`.
 
 The `VEREX_E2E_SUITE` environment variable selects one suite: `move`, `rust`,
 `verify`, `check`, `monovm`, or `monodiff`. The `monovm` suite is the linked MonoVM smoke check: it calls the

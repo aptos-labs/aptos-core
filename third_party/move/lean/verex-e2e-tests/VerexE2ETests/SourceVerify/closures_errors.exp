@@ -31,7 +31,7 @@ VerexE2ETests/SourceVerify/closures_errors.spec.lean:29:6: error: verex verifica
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/closures_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of call` is not established: the call `g(1)` at VerexE2ETests/SourceVerify/closures_errors.rs:49:5 may panic
-  from: (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds (c, ()).fst; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (c, ()).snd; ¬(0 ≤ 1 + c.val ∧ 1 + c.val ≤ 4294967295)
+  from: (closures_errors.unit.nominal.namespace.0.declaration✝⁸⁻⁰ VerexIR.Proofs.Denote.NTy.unit).Holds (c, ()); ¬(0 ≤ 1 + c.val ∧ 1 + c.val ≤ 4294967295)
 VerexE2ETests/SourceVerify/closures_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `panics` failed; provide a proof in the module:
   verify panics by lean =>
     verex_obligations

@@ -1835,17 +1835,18 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
     (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
     (held : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
-      contract.assumes (weave.compose captures args) pre ∧
+      contract.validArgs (weave.compose captures args) ∧
+        contract.assumes (weave.compose captures args) pre ∧
         contract.requires (weave.compose captures args) pre)
     (framed : ∀ (args : HList supplied) (pre post : Memory unit) (result : shape.carrier),
       contract.frame (weave.compose captures args) pre result post → frame args pre post) :
     FramedAt executable supplied shared shape frame
       function := by
   intro _ _ args result pre post memoryTyped ensures
-  obtain ⟨assumed, permitted⟩ := held args pre memoryTyped
+  obtain ⟨valid, assumed, permitted⟩ := held args pre memoryTyped
   exact framed args pre post result
     (ensuresOf_closureOf_verified weave capturedFree coherent captures args verified ensures closed
-      assumed permitted).2.1
+      assumed permitted valid).2.1
 
 end Rows
 
@@ -1922,16 +1923,32 @@ theorem wp_invoke_unseen (invoke : InvokeMeaning) {σs : NRow} {shared : Sharing
     fails error aborted ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf ⟨error, aborted⟩), defined⟩
 
 omit [Skolems unit] in
+/-- What a verified function's contract states of one of its runs, including
+result validity, where argument validity, what its theorem assumes, and its
+precondition hold. -/
+theorem runOfSatisfies_valid {Args Result : Type} {function : Args → Comp unit Result}
+    {contract : Contract (Memory unit) Failure Args Result} (verified : Satisfies function contract)
+    {args : Args} {initial final : Memory unit} {result : Result}
+    (run : (function args).ok initial result final)
+    (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
+    (valid : contract.validArgs args := by trivial) :
+    contract.validResult result ∧
+      (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
+      contract.frame args initial result final ∧ ¬contract.mustAbort args initial :=
+  (verified args initial valid assumed permitted).1 result final run
+
+omit [Skolems unit] in
 /-- What a verified function's contract states of one of its runs, where
 what its theorem assumes and its precondition hold. -/
 theorem runOfSatisfies {Args Result : Type} {function : Args → Comp unit Result}
     {contract : Contract (Memory unit) Failure Args Result} (verified : Satisfies function contract)
     {args : Args} {initial final : Memory unit} {result : Result}
     (run : (function args).ok initial result final)
-    (assumed : contract.assumes args initial) (permitted : contract.requires args initial) :
+    (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
+    (valid : contract.validArgs args := by trivial) :
     (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
       contract.frame args initial result final ∧ ¬contract.mustAbort args initial :=
-  (verified args initial assumed permitted).1 result final run
+  ((verified args initial valid assumed permitted).1 result final run).2
 
 omit [Skolems unit] in
 /-- An abort of a verified function is one its contract permits, where what
@@ -1940,9 +1957,10 @@ theorem abortOfSatisfies {Args Result : Type} {function : Args → Comp unit Res
     {contract : Contract (Memory unit) Failure Args Result} (verified : Satisfies function contract)
     {args : Args} {initial : Memory unit}
     (aborted : ∃ error, (function args).aborts initial error)
-    (assumed : contract.assumes args initial) (permitted : contract.requires args initial) :
+    (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
+    (valid : contract.validArgs args := by trivial) :
     ∃ error, contract.aborts args initial error :=
-  aborted.imp fun error h => (verified args initial assumed permitted).2.1 error h
+  aborted.imp fun error h => (verified args initial valid assumed permitted).2.1 error h
 
 end Model
 

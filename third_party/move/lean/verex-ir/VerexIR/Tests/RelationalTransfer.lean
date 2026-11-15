@@ -112,6 +112,10 @@ example : Satisfies (fun _ : Unit => (Spec.pure 7 : Spec Unit Nat Nat)) concrete
       exact impossible
     · intro _ _ _ _ _ _ impossible
       exact impossible
+    · intros
+      trivial
+    · intros
+      trivial
   refine Contract.RelationalCertificate.transfer ⟨{
     argsRel := Eq, stateRel, resultRel, errorRel := Eq
     admissible := fun _ _ => True
@@ -119,12 +123,12 @@ example : Satisfies (fun _ : Unit => (Spec.pure 7 : Spec Unit Nat Nat)) concrete
   }⟩ ?_
   · intros
     trivial
-  · intro args _ _ _
+  · intro args _ _ _ _
     exact ⟨args, false, rfl, rfl⟩
-  · intro _ initial _ _
+  · intro _ initial _ _ _
     refine ⟨?_, ?_, ?_⟩
     · intro result final execution
-      exact ⟨fun _ => execution.1, execution.2, fun impossible => impossible⟩
+      exact ⟨trivial, fun _ => execution.1, execution.2, fun impossible => impossible⟩
     · intro _ impossible
       exact impossible
     · intro impossible

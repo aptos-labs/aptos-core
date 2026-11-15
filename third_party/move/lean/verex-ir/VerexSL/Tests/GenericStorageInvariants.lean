@@ -59,19 +59,6 @@ verex module 0x42::generic_storage_invariants where
     aborts_if false
 
 verify 0x42::generic_storage_invariants::deposit
-
-/--
-error: the specification clause `ensures exists<Coin<B> >(addr) == old(exists<Coin<B> >(addr))` is not established
----
-error: verex verification failed: the automatic verification of `deposit_a` failed; provide a proof in the module:
-  verify deposit_a by lean =>
-    verex_obligations
-    verex_on
-    | ensures_2 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
--/
-#guard_msgs in
 verify 0x42::generic_storage_invariants::deposit_a
 
 /--

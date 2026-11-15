@@ -126,11 +126,13 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:34:3: error: `decide` d
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:33:8: error: verex verification failed: the proof of `pick` does not establish its specification
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:47:5: error: the step's fact is not proved:
   p_a p_b : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
+  p_property✝ :
+    (Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
+          (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
+            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))).deepHolds
+      (p_a, p_b, PUnit.unit)
   initialState✝ : Proofs.Denote.Memory unit
-  assumed permitted left✝² : True
-  left✝¹ : (Proofs.Denote.NTy.int 64 false).deepHolds p_a
-  left✝ : (Proofs.Denote.NTy.int 64 false).deepHolds p_b
-  right✝ : Proofs.Denote.HListPlain.deepHolds Proofs.Denote.NRow.nil PUnit.unit
+  assumed permitted : True
   p_a_lower : 0 ≤ p_a
   p_a_upper : p_a ≤ 2 ^ 64 - 1
   p_b_lower : 0 ≤ p_b

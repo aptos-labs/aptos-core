@@ -357,6 +357,12 @@ def quoteResource (skolems : Lean.Expr) (unit : ValidatedUnit) (namespaceId : Ve
 def memorySlot (memory resource key : Lean.Expr) : Lean.Expr :=
   mkApp2 memory resource key
 
+/-- A frame's plain storage read (`Skolems.plainAt`) at a resource's native type,
+quoted arguments row, and storage key. -/
+def plainSlot (skolems nativeType argumentsExpr key memory : Lean.Expr) : MetaM Lean.Expr := do
+  return mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.plainAt)
+    ((← frameLeading skolems) ++ #[skolems, nativeType, argumentsExpr, key, memory])
+
 /-- Whether a memory slot holds a value. -/
 def slotPresent (slot : Lean.Expr) : MetaM Lean.Expr := do
   mkEq (← mkAppM ``Option.isSome #[slot]) (mkConst ``Bool.true)
@@ -560,9 +566,11 @@ def Context.slot (context : Context) (memory : Lean.Expr) (typeId : TypeId)
       | throwError "a type argument of a specification function reading storage has no \
           native type"
     pure (some (VerexIR.Proofs.Denote.NRow.ofList row))
-  let (resource, nativeType) ← quoteResource (← context.frame) context.unit context.namespaceId typeId
+  let frame ← context.frame
+  let (resource, nativeType) ← quoteResource frame context.unit context.namespaceId typeId
     typeArguments
-  return (memorySlot memory resource key, resource, nativeType)
+  let slot ← plainSlot frame nativeType (resource.getArg! 4) key memory
+  return (slot, resource, nativeType)
 
 /-- The type a specification type denotes, as declared: a type parameter's
 values are native values at every instantiation (`Context.ntyOf?`), so that
@@ -842,7 +850,34 @@ def certificateFree (carriers τ : Lean.Expr) : MetaM Bool :=
   withNewMCtxDepth <| isDefEq (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.plain) carriers τ)
     (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers τ)
 
-/-- The inhabitant of a native type whose inhabitability evaluates: the
+/-- The decided inhabitability of a quoted native type. -/
+def inhabitableProof (τ : Lean.Expr) : MetaM Lean.Expr := do
+  let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) τ
+  unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do
+    throwError "the native type {τ} has no values"
+  mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq inhabitable (mkConst ``Bool.true))
+
+/-- The structural inhabitant at the plain layer. Plain reads carry no
+certificate, so their default depends only on the plain family, not on an
+arbitrary certified inhabitant or the declaration predicates installed in
+the current verification family. Certified reads retain `typedInhabitant`.
+-/
+def plainInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
+  return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
+    carriers τ (← inhabitableProof τ)
+
+/-- The uninterpreted off-domain specification fallback at the plain worker
+layer (`plainFallback`), backed by a proof-irrelevant `Nonempty`
+witness so it requires neither custom axioms nor `CarriersNonempty`. -/
+def plainFallbackValue (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
+  let plain := mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toPlain) carriers
+  let worker := plainWorkerType carriers τ
+  let witness := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitantOf)
+    plain τ (← inhabitableProof τ)
+  return mkApp2 (mkConst ``VerexIR.Proofs.Denote.plainFallback)
+    worker (mkApp2 (mkConst ``Nonempty.intro [1]) worker witness)
+
+/-- The fallback of a native type whose inhabitability evaluates: the
 value a read outside a vector or of an absent resource stands for.
 
 A type that certifies nothing has its values structurally, and its
@@ -875,13 +910,6 @@ def typedInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
   let some inhabitant ← typedInhabitant? carriers τ
     | throwError "the native type {τ} has no value a specification can stand for"
   pure inhabitant
-
-/-- The decided inhabitability of a quoted native type. -/
-def inhabitableProof (τ : Lean.Expr) : MetaM Lean.Expr := do
-  let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) τ
-  unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do
-    throwError "the native type {τ} has no values"
-  mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) (← mkEq inhabitable (mkConst ``Bool.true))
 
 /-- The clause form of a native value of a type: an integer's value, a
 Boolean's truth, any other value itself, as `nativeOfClause` reads it back. -/
@@ -1032,6 +1060,22 @@ def elementAtLayerOf (carriers : Lean.Expr) (elementType : VerexIR.Proofs.Denote
     plainValueOf carriers τ element
   else return element
 
+/-- A vector and an element at one common layer: where either stands at the
+plain layer and the other is certified, the certified side forgets its
+certificates (`plainJoin?`). -/
+def vectorAndElementAtLayer (carriers : Lean.Expr) (elementType : VerexIR.Proofs.Denote.NTy)
+    (vector element : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  let τ ← quoteNTy elementType
+  if ← certificateFree carriers τ then return (vector, element)
+  let vecTy := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.vector) τ
+  let plainVecTy := plainType carriers vecTy
+  let plainElemTy := plainType carriers τ
+  let vectorIsPlain ← withNewMCtxDepth (isDefEq (← inferType vector) plainVecTy)
+  let elemIsPlain ← withNewMCtxDepth (isDefEq (← inferType element) plainElemTy)
+  let vector ← if !vectorIsPlain && elemIsPlain then plainValueOf carriers vecTy vector else pure vector
+  let element ← if vectorIsPlain && !elemIsPlain then plainValueOf carriers τ element else pure element
+  return (vector, element)
+
 /-- A clause's conditional: `ite` on the decided test (`decisionOf`), its
 branches at one layer.  A conditional of a clause joins what each branch
 reads, and a branch reading the plain current of a live mutable reference
@@ -1048,15 +1092,6 @@ def conditional (test thenTerm elseTerm : Lean.Expr) (type? : Option Lean.Expr :
     else if let some forgotten ← plainJoin? elseTerm thenTerm then pure (thenTerm, forgotten)
     else pure (thenTerm, elseTerm)
   mkAppOptM ``ite #[type?, test, some (← decisionOf test), thenTerm, elseTerm]
-
-/-- The structural inhabitant at the plain layer. Plain reads carry no
-certificate, so their default depends only on the plain family, not on an
-arbitrary certified inhabitant or the declaration predicates installed in
-the current verification family. Certified reads retain `typedInhabitant`.
--/
-def plainInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
-  return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainInhabitant)
-    carriers τ (← inhabitableProof τ)
 
 /-- A clause's value where a position needs a value of its type.  Reads of
 the plain current of a live mutable reference compose plainly, through a
@@ -1149,6 +1184,17 @@ literal function value it reads (a pending proof, `.call (.closure …)`,
 `SiteTyped.ofCheck`) is bound alike: `∃ checked, p checked`. -/
 partial def bindCuts (proposition : Lean.Expr) : MetaM Lean.Expr := do
   let isCut (e : Lean.Expr) : Bool := e.isAppOfArity ``VerexIR.SpecInt.ofInt 4 && !e.hasLooseBVars
+  if let some iteExpr := proposition.find? fun e =>
+      e.isAppOfArity ``ite 5 && !e.hasLooseBVars && !(e.getArg! 0).isSort &&
+        ((e.getArg! 1).find? isCut).isNone &&
+        (((e.getArg! 3).find? isCut).isSome || ((e.getArg! 4).find? isCut).isSome) then
+    let cond := iteExpr.getArg! 1
+    let dec := iteExpr.getArg! 2
+    let thenBranch := iteExpr.getArg! 3
+    let elseBranch := iteExpr.getArg! 4
+    let thenProp ← bindCuts (proposition.replace fun e => if e == iteExpr then some thenBranch else none)
+    let elseProp ← bindCuts (proposition.replace fun e => if e == iteExpr then some elseBranch else none)
+    return ← mkAppOptM ``ite #[some (mkSort .zero), some cond, some dec, some thenProp, some elseProp]
   let some cut := proposition.find? fun e => isCut e && ((e.getArg! 3).find? isCut).isNone
     | bindTypings proposition
   let value := cut.getArg! 3
@@ -1555,18 +1601,15 @@ def nativeArbitrary (carriers : Lean.Expr) (nty : VerexIR.Proofs.Denote.NTy) (na
 
 /-- The native value a memory slot holds, read at a frame; the type's
 inhabitant where it holds nothing. -/
-def nativeSlot (skolems nativeType resource slot : Lean.Expr) : MetaM Lean.Expr := do
+def nativeSlot (skolems nativeType _resource slot : Lean.Expr) : MetaM Lean.Expr := do
   let carriers ← frameCarriers skolems
   let inhabitant ← typedInhabitant carriers nativeType
-  let leading ← frameLeading skolems
-  let carrier := mkAppN (mkConst ``VerexIR.Proofs.Denote.ResourceType.carrier) (leading.push resource)
+  let plain := plainType carriers nativeType
   let frameCarrier := carrierType carriers nativeType
-  let read ← withLocalDeclD `value carrier fun value =>
-    mkLambdaFVars #[value] (mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.ofRuntime)
-      (leading ++ #[skolems, nativeType, value]))
-  let mapped := mkAppN (mkConst ``Option.map [Level.zero, Level.zero])
-    #[carrier, frameCarrier, read, slot]
-  return mkAppN (mkConst ``Option.getD [Level.zero]) #[frameCarrier, mapped, inhabitant]
+  let ofPlain := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.ofPlain?) carriers nativeType
+  let bound := mkAppN (mkConst ``Option.bind [Level.zero, Level.zero])
+    #[plain, frameCarrier, slot, ofPlain]
+  return mkAppN (mkConst ``Option.getD [Level.zero]) #[frameCarrier, bound, inhabitant]
 
 /-- The value of a three-variant ordering enum at an order, as
 `std::cmp::compare` returns it (`orderingChoice`).  The variants are built

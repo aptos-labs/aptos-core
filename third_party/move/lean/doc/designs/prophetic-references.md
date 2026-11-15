@@ -224,17 +224,21 @@ A contract names each dying loan's final value through the pending
 exports (`final.pending = initial.pending.push (loan, final_value)`), and
 a caller resolves its holes by `applyPending` at the call boundary.
 
-A loan's death certifies before it relates. Where the referent's type carries
-a data invariant, `Lender.resolve` (`VerexIR/Proofs/Denote/Term.lean`) first
-owes the invariants of the value the loan leaves — the current itself where no
-local lends it, the owner rebuilt with that current where a local does — and
-only then assumes the prophecy equation. The order is load-bearing: a run that
-breaks the invariant is undefined before an equation could prune it, so the
+A loan's death certifies before it relates. Every equation `Lender.resolve`
+(`VerexIR/Proofs/Denote/Term.lean`) assumes has its plain side checked first:
+the current itself where no local lends it, the rebuilt owner where a local
+lends along a dereference-free path (`Proj.deepHolds_of_set?`), and both the
+current and the rebuilt owner where the path crosses a dereference (reducing
+to the current check alone when the owner is a bare reference,
+`Lender.resolve_place_deref`). The order is load-bearing: a run that breaks
+the invariant is undefined before an equation could prune it, so the
 obligation lands in the function that broke it, and a run that aborts first
 leaves an unobservable well-formed prophecy in the owner. A holder that several
-loans may have come from owes one obligation per distinct lender and states one
-equation beside them, since no single lender may constrain the owner
-([`data-invariants.md`](data-invariants.md), "A borrowed path").
+loans may have come from (`holderResolves`) certifies the holder's current
+first (`Lender.referent`), then each distinct place lender's rebuilt owner
+(`Lender.candidate`), and states one `Lender.equation` last, since no single
+lender may constrain the owner ([`data-invariants.md`](data-invariants.md),
+"A borrowed path").
 
 The hole-visibility scans (`holeWithin`, `holeInFrame`, `holeInGlobals`)
 are guarded by their predicates (`fillVisibleHole`), so a refuted

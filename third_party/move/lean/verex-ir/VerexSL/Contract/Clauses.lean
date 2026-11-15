@@ -494,7 +494,10 @@ private partial def Context.atRange (context : Context) (range : VerexIR.MemoryR
   return { context with oldState, oldLocals, state, locals }
 
 /-- A state change computes a memory and a presence condition. Naming the
-memory does not assume the condition; it remains an obligation of the predicate. -/
+memory (`post = none`) computes `Skolems.writePlain`; stating the transition of
+`post` (`post = some postMem`) writes `post`'s slot into `pre` and equates that
+slot to the described value so clause-level width cuts are bound outside
+`Skolems.writePlain`. -/
 private partial def translateStateChange (context : Context)
     (operation : VerexIR.SpecOperation) (instantiations : Array VerexIR.GenericArgument)
     (arguments : Array ExprId) (post : Option Lean.Expr := none) :
@@ -516,56 +519,31 @@ private partial def translateStateChange (context : Context)
   let condition := if operation matches .publish _ then mkNot present else present
   let frame ← context.frame
   let leading ← frameLeading frame
-  let carrier := mkAppN (mkConst ``VerexIR.Proofs.Denote.ResourceType.carrier) (leading.push resource)
-  let mut valueCondition := mkConst ``True
-  let value ← if operation matches .remove _ then
-      pure (mkApp (mkConst ``Option.none [Level.zero]) carrier)
-    else do
-      let some value := arguments[1]? | throwError "a state-change predicate needs a value"
-      let stored ← translate context value
-      if let some post := post then
-        let slot := memorySlot post resource keyValue
-        -- Bind the slot's value explicitly. A caller can destruct this
-        -- proposition and read its fields without a program point or a
-        -- reconstruction of the native row (whose empty tail is opaque).
-        let carriers ← frameCarriers frame
-        let describedPlain ← isPlainValue carriers nativeType stored
-        valueCondition ← withLocalDeclD `stored carrier fun held => do
-          let someStored ← mkAppM ``Option.some #[held]
-          let read := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.ofRuntime)
-            (leading ++ #[frame, nativeType, held])
-          -- A typed memory holds certified values only, and a clause that
-          -- builds a value of a declared type describes a plain row: the
-          -- slot holds some value of the type whose plain part is that row
-          -- (`NTy.forget`), so a description naming a value that breaks the
-          -- invariant is unestablishable rather than owed
-          -- (`doc/designs/data-invariants.md`).
-          let read ← if describedPlain then plainValueOf carriers nativeType read else pure read
-          mkAppM ``Exists #[← mkLambdaFVars #[held]
-            (← mkAppM ``And #[← mkEq slot someStored, ← mkEq read stored])]
-        pure slot
-      else
-        let carriers ← frameCarriers frame
-        if ← isPlainValue carriers nativeType stored then
-          -- A clause that builds a value of a declared type describes a plain
-          -- row, and a typed memory holds certified values only: the slot is
-          -- the certified value with that plain part where the declaration's
-          -- data invariant holds of it, and none where it does not, so a
-          -- description naming a value that breaks it is unestablishable
-          -- rather than owed (`NTy.certifyPlain?`,
-          -- `doc/designs/data-invariants.md`).
-          let decoded := mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.certifyPlain?)
-            #[carriers, nativeType, stored]
-          mkAppM ``Option.map
-            #[mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.toRuntime)
-                (leading ++ #[frame, nativeType]), decoded]
-        else
-          let transport := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.toRuntime)
-            (leading ++ #[frame, nativeType, stored])
-          mkAppOptM ``Option.some #[carrier, transport]
-  let memory ← mkAppM ``VerexIR.Proofs.Denote.Memory.set #[pre, resource, keyValue, value]
-  let condition ← if operation matches .remove _ then pure condition
-    else mkAppM ``And #[condition, ← mkAppM ``And #[← slotPresent value, valueCondition]]
+  let carriers ← frameCarriers frame
+  let argumentsExpr := resource.getArg! 4
+  let plain := plainType carriers nativeType
+  if operation matches .remove _ then
+    let noneVal := mkApp (mkConst ``Option.none [Level.zero]) plain
+    let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
+      (leading ++ #[frame, nativeType, argumentsExpr, keyValue, noneVal, pre])
+    return (memory, condition)
+  let some value := arguments[1]? | throwError "a state-change predicate needs a value"
+  let stored ← translate context value
+  let describedPlain ← isPlainValue carriers nativeType stored
+  let plainStored ← if describedPlain then pure stored else plainValueOf carriers nativeType stored
+  let somePlain := mkApp2 (mkConst ``Option.some [Level.zero]) plain plainStored
+  let condition ← if describedPlain then
+      mkAppM ``And
+        #[condition, mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers nativeType plainStored]
+    else pure condition
+  if let some postMem := post then
+    let postSlot ← plainSlot frame nativeType argumentsExpr keyValue postMem
+    let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
+      (leading ++ #[frame, nativeType, argumentsExpr, keyValue, postSlot, pre])
+    let written ← mkEq postSlot somePlain
+    return (memory, ← mkAppM ``And #[condition, written])
+  let memory := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
+    (leading ++ #[frame, nativeType, argumentsExpr, keyValue, somePlain, pre])
   return (memory, condition)
 
 /-- The context reading each mutable reference parameter at a state label,
@@ -2802,9 +2780,10 @@ where
           | throwError "spec.updateVector expects a replacement operand"
         let (replaced, ε) ← nativeOperand context replacement
         let vector ← translate context vector
+        let (vector, replaced) ← vectorAndElementAtLayer (← context.carriers) ε vector replaced
         mkAppM ``VerexIR.SpecVector.set #[vector,
           ← mkAppM ``Int.toNat #[← translate context index],
-          ← elementAtLayerOf (← context.carriers) ε vector replaced]
+          replaced]
     | .specification (.publish range) | .specification (.remove range) |
         .specification (.update range) =>
         let .specification operation := operation | unreachable!
@@ -3227,8 +3206,8 @@ where
           | throwError "pushVector expects an element operand"
         let (elementValue, ε) ← nativeOperand context element
         let vector ← translate context vector
-        mkAppM ``VerexIR.SpecVector.push
-          #[vector, ← elementAtLayerOf (← context.carriers) ε vector elementValue]
+        let (vector, elementValue) ← vectorAndElementAtLayer (← context.carriers) ε vector elementValue
+        mkAppM ``VerexIR.SpecVector.push #[vector, elementValue]
     | .concatVector =>
         let some left := arguments[0]?
           | throwError "concatVector expects two vector operands"

@@ -19,6 +19,7 @@ impl BitVector where
     ensures ∀ (k in 0 .. self.bits.length), !self.bits[k]
 
   spec shift_left where
+    pragma heartbeats = 870
     ensures self.bits.length == old(self).bits.length
     ensures amount < self.bits.length ==>
       ∀ (k in 0 .. self.bits.length - amount), self.bits[k] == old(self).bits[k]

@@ -112,33 +112,19 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
                             (VerexIR.Proofs.Denote.NTy.param 0))
                           VerexIR.Proofs.Denote.NRow.nil } →
                 final resource = initialState✝ resource) ∧
-            initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.Skolems.resolve
-                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
-                        (VerexIR.Proofs.Denote.NTy.param 0)),
-                  arguments :=
-                    VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                        (VerexIR.Proofs.Denote.NTy.param 0))
-                      VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address account) =
+            VerexIR.Proofs.Denote.Skolems.plainAt
+                (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.StorageKey.address account) initialState✝ =
               none)
       (fun failure =>
         VerexIR.Proofs.Obligation "VerexE2ETests/Check/Storage/FrameReadingInvariants.lean" 950 993
-          ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.Skolems.resolve
-                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
-                        (VerexIR.Proofs.Denote.NTy.param 0)),
-                  arguments :=
-                    VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                        (VerexIR.Proofs.Denote.NTy.param 0))
-                      VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address account)).isSome =
+          ((VerexIR.Proofs.Denote.Skolems.plainAt
+                (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝¹⁻⁰
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.StorageKey.address account) initialState✝).isSome =
             true))
       state
 ⊢ VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit
@@ -274,33 +260,19 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
                             (VerexIR.Proofs.Denote.NTy.param 0))
                           VerexIR.Proofs.Denote.NRow.nil } →
                 final resource = initialState✝ resource) ∧
-            initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.Skolems.resolve
-                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
-                        (VerexIR.Proofs.Denote.NTy.param 0)),
-                  arguments :=
-                    VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                        (VerexIR.Proofs.Denote.NTy.param 0))
-                      VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address account) =
+            VerexIR.Proofs.Denote.Skolems.plainAt
+                (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.StorageKey.address account) initialState✝ =
               none)
       (fun failure =>
         VerexIR.Proofs.Obligation "VerexE2ETests/Check/Storage/FrameReadingInvariants.lean" 1222 1265
-          ((initialState✝
-                {
-                  type :=
-                    VerexIR.Proofs.Denote.Skolems.resolve
-                      (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
-                        (VerexIR.Proofs.Denote.NTy.param 0)),
-                  arguments :=
-                    VerexIR.Proofs.Denote.NRow.cons
-                      (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                        (VerexIR.Proofs.Denote.NTy.param 0))
-                      VerexIR.Proofs.Denote.NRow.nil }
-                (VerexIR.StorageKey.address account)).isSome =
+          ((VerexIR.Proofs.Denote.Skolems.plainAt
+                (0x42.frame_reading_invariants.unit.nominal.namespace.0.declaration✝⁻⁰
+                  (VerexIR.Proofs.Denote.NTy.param 0))
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                (VerexIR.StorageKey.address account) initialState✝).isSome =
             true))
       state
 ⊢ VerexIR.Proofs.Denote.OwnAtArguments «0x42».frame_reading_invariants.unit

@@ -1,18 +1,12 @@
 Move prover returns: exiting with verification errors
-../move-stdlib/sources/option.move:13:9: error: the data invariant `invariant vec.length <= 1` does not hold where a value is constructed
-tests/sources/functional/closures/behavioral_congruence.move:30:5: error: verex verification failed: the automatic verification of `rebuilt` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
-  verify rebuilt by lean =>
-    verex_obligations
-    verex_on
-    | data_invariant_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:42:5: error: the continuation after call 1 of `same` is not established
+tests/sources/functional/closures/behavioral_congruence.move:43:9: error: the specification clause `aborts_if aborts_of<cb.f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:42:5: error: verex verification failed: the automatic verification of `field_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify field_equal by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_same => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:49:5: error: the continuation after call 1 of `rebuilt` is not established
@@ -26,14 +20,15 @@ tests/sources/functional/closures/behavioral_congruence.move:49:5: error: verex 
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_congruence.move:58:5: error: the continuation after call 1 of `same` is not established
+tests/sources/functional/closures/behavioral_congruence.move:59:9: error: the specification clause `aborts_if aborts_of<f>(x)` is not established
 tests/sources/functional/closures/behavioral_congruence.move:58:5: error: verex verification failed: the automatic verification of `param_equal` failed; provide a proof in `tests/sources/functional/closures/behavioral_congruence.proof.lean`:
   verify param_equal by lean =>
     verex_obligations
     verex_on
     | after_call_1_of_same => verex_prepare; sorry
+    | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-../move-stdlib/sources/option.move:13:9: error: the data invariant `invariant vec.length <= 1` does not hold where a value is constructed
 tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verification failed with a residual obligation:
 case left.continues.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -53,11 +48,45 @@ cb_f :
       (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
         VerexIR.Proofs.Denote.NRow.nil)
       { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+cb_property✝ :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+              VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
+    (cb_f, PUnit.unit)
 x_n : VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
 x_id_vec :
   VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain
     0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector
+x_property✝ :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons
+            (0x42.behavioral_congruence.unit.nominal.namespace.2.declaration✝⁻⁰
+              0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil))).deepHolds
+    (x_n, (x_id_vec, PUnit.unit), PUnit.unit)
 assumed : True
+cb_property :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+              VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil)
+          VerexIR.Proofs.Denote.NRow.nil)).Holds
+    (cb_f, PUnit.unit)
+x_property :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons
+            (0x42.behavioral_congruence.unit.nominal.namespace.2.declaration✝⁻⁰
+              0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰)
+            VerexIR.Proofs.Denote.NRow.nil))).Holds
+    (x_n, (x_id_vec, PUnit.unit), PUnit.unit)
 permitted :
   VerexIR.Proofs.KeepsMemoryAtOf (verexInvoke (VerexIR.Proofs.Denote.Skolems.runtime unit))
     (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
@@ -67,51 +96,7 @@ named : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
 named_eq : named.val = x_n.val + 1
 a✝¹ : 0 ≤ x_n.val + 1
 a✝ : x_n.val + 1 ≤ 18446744073709551615
-invariantHolds✝¹ :
-  dataOwn.case0
-    ⟨VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰
-        VerexIR.Proofs.Denote.NRow.nil,
-      ⋯⟩
-    (x_id_vec, ())
-left✝¹³ left✝¹¹ left✝⁹ : True
-left✝⁸ :
-  (VerexIR.Proofs.Denote.NTy.function
-        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
-          VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil).deepHolds
-    (cb_f, PUnit.unit).fst
-right✝⁴ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (cb_f, PUnit.unit).snd
-left✝⁷ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (x_n, (x_id_vec, PUnit.unit), PUnit.unit).fst
-left✝⁶ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (named, (x_id_vec, PUnit.unit), ()).fst
-right✝³ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    (x_n, (x_id_vec, PUnit.unit), PUnit.unit).snd.snd
-right✝² :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (named, (x_id_vec, PUnit.unit), ()).snd.snd
-left✝⁴ :
-  dataOwn.case0
-    ⟨VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰
-        VerexIR.Proofs.Denote.NRow.nil,
-      ⋯⟩
-    (x_n, (x_id_vec, PUnit.unit), PUnit.unit).snd.fst
-left✝² :
-  dataOwn.case0
-    ⟨VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰
-        VerexIR.Proofs.Denote.NRow.nil,
-      ⋯⟩
-    (named, (x_id_vec, PUnit.unit), ()).snd.fst
-left✝¹ :
-  0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds
-    (x_n, (x_id_vec, PUnit.unit), PUnit.unit).snd.fst.fst
-right✝¹ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    (x_n, (x_id_vec, PUnit.unit), PUnit.unit).snd.fst.snd
-left✝ :
-  0x42.behavioral_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds
-    (named, (x_id_vec, PUnit.unit), ()).snd.fst.fst
-right✝ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    (named, (x_id_vec, PUnit.unit), ()).snd.fst.snd
+invariantHolds✝¹ : 0x42.behavioral_congruence.unit.nominal.namespace.0.declaration✝⁻⁰.Holds (named, (x_id_vec, ()), ())
 invariantHolds✝ : True
 verexResult : VerexIR.Proofs.Denote.ResultShape.none.carrier
 verexFinal : VerexIR.Proofs.Denote.Memory unit
@@ -135,7 +120,6 @@ tests/sources/functional/closures/behavioral_congruence.move:66:5: error: verex 
   verify field_bumped by lean =>
     verex_obligations
     verex_on
-    | data_invariant_1 => verex_prepare; sorry
     | leaf => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide

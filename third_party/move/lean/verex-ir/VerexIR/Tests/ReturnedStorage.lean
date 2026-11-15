@@ -40,8 +40,8 @@ example : Satisfies next nextContract := by
 
 example : ¬ Satisfies (fun _ => Spec.pure 0) nextContract := by
   intro satisfies
-  have wrong := (satisfies () 0 trivial trivial).1 0 0 ⟨rfl, rfl⟩
-  have impossible : (0 : Nat) = 1 := wrong.2.1.2
+  have wrong := (satisfies () 0 trivial trivial trivial).1 0 0 ⟨rfl, rfl⟩
+  have impossible : (0 : Nat) = 1 := wrong.2.2.1.2
   omega
 
 end VerexIR.Tests.ReturnedStorage

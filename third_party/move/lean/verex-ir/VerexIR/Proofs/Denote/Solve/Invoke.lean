@@ -2351,14 +2351,15 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     let constants ← contractConstants (← inferType theoremProof)
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
       `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
-    -- What the target's theorem assumes, then its precondition.
+    -- What the target's theorem assumes, its precondition, and argument validity.
     let mut fact ← instantiateMVars implication
     let mut established := true
-    for _ in [0:2] do
+    for _ in [0:3] do
       let .forallE _ premiseType _ _ ← whnfR (← inferType fact) | established := false; break
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
-          ((try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm]) <;>
+          ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
+              Weave.subst, Weave.compose, vir_denote_norm]) <;>
             verex_split_hypotheses <;> (repeat apply And.intro) <;> first
               | assumption
               | (apply VerexIR.Proofs.MethodContract.of_instantiate _ (by decide)
@@ -2979,8 +2980,9 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let held ← mkFreshExprSyntheticOpaqueMVar heldType
     unless ← closesBy held.mvarId! (← `(tactic| (
         intro _ _ $(mkIdent `verexTyped):ident
-        (try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm])
-        all_goals (try constructor)
+        (try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
+          Weave.subst, Weave.compose, vir_denote_norm])
+        all_goals (repeat apply And.intro)
         all_goals verex_leaf))) do
       throwError "the target's theorem does not apply everywhere"
     -- The target's frame lies within the closure's.
@@ -3678,12 +3680,13 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
       `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
     let mut fact := implication
-    for _ in [0:2] do
+    for _ in [0:3] do
       let .forallE _ premiseType _ _ ← whnfR (← inferType fact)
         | throwError "the contract's premises are not open"
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
       unless ← closesBy premise.mvarId! (← `(tactic|
-          ((try simp only [$lemmas,*, VerexIR.Proofs.Denote.Weave.compose, vir_denote_norm]) <;>
+          ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
+              VerexIR.Proofs.Denote.Weave.compose, vir_denote_norm]) <;>
             verex_leaf))) do
         throwError "the target's contract premises are not established"
       fact := mkApp fact (← instantiateMVars premise)

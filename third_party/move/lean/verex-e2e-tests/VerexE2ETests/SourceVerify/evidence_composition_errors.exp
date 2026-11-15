@@ -36,12 +36,12 @@ VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:54:6: error: ve
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:69:6: error: the continuation after `multiple::{closure#1}::call_mut` is not established
+VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:70:3: error: the specification clause `ensures result == (value + 3) % 18446744073709551616` is not established
 VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:69:6: error: verex verification failed: the automatic verification of `multiple` failed; provide a proof in the module:
   verify multiple by lean =>
     verex_obligations
     verex_on
-    | after_call_mut => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/evidence_composition_errors.spec.lean:81:3: error: the specification clause `ensures !result.flag` is not established

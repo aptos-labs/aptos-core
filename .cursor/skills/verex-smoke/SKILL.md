@@ -18,8 +18,14 @@ third_party/move/lean/scripts/smoke.sh --no-mvp   # without the Move Prover test
 third_party/move/lean/scripts/smoke.sh --no-exe   # Lean fixtures only: no executable, no cargo
 third_party/move/lean/scripts/smoke.sh --jobs N   # Lean processes at once (or SMOKE_JOBS)
 third_party/move/lean/scripts/smoke.sh --rust     # the Rust gate with a Move canary: under a minute warm
+third_party/move/lean/scripts/smoke.sh --no-failed # without the driver's recorded failures
 third_party/move/lean/scripts/smoke.sh --list     # the fixtures
 ```
+
+Where the e2e driver's suites record fixtures that do not pass
+(`verex-e2e-tests/.lake/verify-failed` and `check-failed`), smoke adds those
+names as fixtures of their own, a few names each, in both modes; `--no-failed`
+leaves them out, and smoke never writes those records.
 
 It builds `verex-ir` and the e2e Check library in place, then elaborates the
 Lean fixtures as parallel processes (by default half the hardware threads, at

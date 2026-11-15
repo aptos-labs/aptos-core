@@ -2,11 +2,13 @@
 
 The design note that [`plain-values.md`](plain-values.md) requires before its
 phases 1 and 2. It is a design read from the source at `78dcaf9df45`. Nothing
-here is implemented. This is its third revision. The first proposed new rules for prophecies, for
-what a loan's death owes and for joins, and a review showed each to conflict
-with the denotation as it is. The second replaced them by one translation, and
-a third review accepted that with corrections, which this revision carries.
-Section 12 lists what changed.
+here is implemented. This is its fourth revision. The first proposed new rules
+for prophecies, for what a loan's death owes and for joins, and a review
+showed each to conflict with the denotation as it is. The second replaced them
+by one translation, and a third review accepted that with corrections. The
+fourth incorporates the settlement and slice audit and the user's decisions on
+unspecified total reads (`U5`), slice provenance (`U6`), and contract domain
+fields (`U7`). Section 12 lists what changed.
 
 ## 1. The design in one sentence
 
@@ -83,26 +85,36 @@ The audit was made twice, independently, and the two agree. No default reaches
 a check, memory, a slot of an environment, a premise of a join or a loop, or a
 contract's receipt: none launders an invalid value into a place stated valid.
 What changes is what a **specification** may conclude from a total read. These
-reads are total by a default, and today the default is a valid value, so its
-invariant is free; after the change it is a raw value with no fact:
+reads are total by a fallback, and today the fallback is a certified value, so
+its invariant is free; after the change it is an **uninterpreted (`opaque`)
+plain value** (`U5`, taking a proof-irrelevant `Nonempty` witness backed by
+`NTy.plainInhabitant` solely to discharge `Classical.choice` without axioms),
+with neither a `Holds` fact nor concrete structural-zero equations:
 
-| Total read in a specification | Where | A fact needs |
-|---|---|---|
-| A resource that is absent | `nativeSlot` | the resource's existence, that is, a successful read |
-| A field of a variant the value is not in | `typedVariantField?` | the variant test or the selection's equation |
-| A missing key of a map, a position outside it | `SpecMap.get`, `valueAt`, `keyAt` | membership or the bound |
-| An index outside a vector | the clause translator's `indexVector` | the bound; with it the read is the element and has the vector's fact |
-| `result_of` where no run returns | `ResultOf` | a returning run |
-| An unspecified result of an aborting or out-of-domain branch | `nativeArbitrary`, `outsideValue` | nothing gives one; it is raw |
-| A ghost slot a specification leaves unspecified | `unspecifiedGhost` | an explicit statement of the slot |
+| Total read in a specification | Where | Off-domain value | A fact needs |
+|---|---|---|---|
+| A resource that is absent | `nativeSlot` | `opaque` plain fallback | the resource's existence, that is, a successful read |
+| A field of a variant the value is not in | `typedVariantField?` | `opaque` plain fallback | the variant test or the selection's equation |
+| A missing key of a map, a position outside it | `SpecMap.get`, `valueAt`, `keyAt` | `opaque` plain fallback | membership or the bound |
+| An index outside a vector | the clause translator's `indexVector` | `opaque` plain fallback | the bound; with it the read is the element and has the vector's fact |
+| `result_of` where no run returns | `ResultOf` | `opaque` plain fallback | a returning run |
+| An unspecified result of an aborting or out-of-domain branch | `nativeArbitrary`, `outsideValue` | `opaque` plain fallback (already opaque) | nothing gives one; it is raw |
+| A ghost slot a specification leaves unspecified | `unspecifiedGhost` | `opaque` plain fallback (already opaque) | an explicit statement of the slot |
 
-The rule is one: **a total read's value has a fact only under the premise that
-makes the read successful.** No assumption that a default is valid is added;
-it would be the satisfiability hypothesis under another name. This is the
-behavior of the tree before the carriers, whose defaults were structural, and
-it departs from the Move Prover, where a read of an absent resource is an
-arbitrary well-formed value. A specification that relied on the free fact
-states the premise instead.
+The rule is one: **an off-domain total read in a specification is unspecified,
+and has a fact (or a concrete value) only under the premise that makes the read
+successful.** Using an `opaque` fallback rather than `NTy.plainInhabitant`
+directly prevents specifications from proving accidental structural-default
+equations (such as `!exists<Counter>(a) ==> global<Counter>(a).n == 0`), while
+refusing any `Holds` axiom on the fallback avoids bringing back
+`DataInvariantsSatisfiable` under another name. This matches the Move Prover's
+intent that off-domain reads are unspecified without inheriting Boogie's
+accidental `WellFormed` axiom on absent reads. Because `plainFallback` is
+indexed by the result type (with a proof-irrelevant `Nonempty` witness), two
+off-domain specification reads of the same type denote the same unspecified
+value (for instance `global<T>(a) == global<T>(b)` when neither resource exists),
+preserving today's congruence behavior without exposing structural defaults or
+`Holds`. A specification that relied on the free fact states the premise instead.
 
 Other findings of the audit:
 
@@ -110,20 +122,22 @@ Other findings of the audit:
   (`NTy.readBack_readWrite`) and at a certificate-free type. The change
   narrows it: today the checked decoder also takes it for a well-shaped value
   that fails its invariant; a plain decoder takes it for a shape mismatch
-  only. No theorem may then claim that an arbitrary plain read recovers a
-  valid value.
+  only. `NTy.readBack` keeps its irreducible `NTy.inhabitantOf` fallback (used
+  internally by `TypedReads` and matched by transport simprocs), and no theorem
+  may claim that an arbitrary plain read recovers a valid value.
 - No place relies on an empty certified type. `Spec.choose` over an empty
   carrier has no outcome, and the choice over plain values under `Holds`
   reproduces that exactly, so nothing becomes newly provable. The global
   vacuity of a unit with an unsatisfiable invariant, which the satisfiability
   hypothesis caused, disappears.
-- `NTy.inhabitant` and `readBack` return to the form they had before the
-  carriers, which today's plain inhabitants already have. The constants stay
-  irreducible: simprocs match them by name. The array, slice, character and
-  nominal arms are newer and keep their own rules.
-- `VerexSL/Tests/PlainDefaults.lean` asserts in its second half that the
-  certified spelling of a default survives. It is re-aimed with the switch and
-  is the tripwire of this gate.
+- `NTy.inhabitant` returns to the total structural plain inhabitant form it had
+  before the carriers (`NTy.plainInhabitantOf`), supplying `[Inhabited]` to the
+  `opaque` specification fallbacks and `NTy.inhabitantOf` without any
+  satisfiability hypothesis. The array, slice, character and nominal arms are
+  newer and keep their own productivity rules.
+- `VerexSL/Tests/PlainDefaults.lean` and `TypedMaps.lean` (`abortsNewFrom_indexed`)
+  are updated to pin the opaque specification fallback spelling and stay the
+  tripwire of this gate.
 
 Before the switch, each row of the table is traced to the facts it feeds, and
 a control per row shows that the fact is refused without its premise and
@@ -163,31 +177,38 @@ depend on the former certified result's binder to find it.
 
 ### Where, and in which order
 
-Each call of `certifyingAt` keeps its place. Read at the revision:
+The governing invariant is uniform: **before a settlement or borrow equality
+restricts an actual runtime value to a certified (valid) domain, its validity
+at that domain is established independently of that equality, by a check or an
+existing preservation proof.** Borrow-time restrictions on future values retain
+matching settlement obligations at the loan's death.
+
+Each call of `certifyingAt` keeps its place, with the settlement and slice
+holes repaired. Read at the revision:
 
 | Step | Today | Plain |
 |---|---|---|
 | A pack (`Term.packAt`) | certifies the packed value | checks it |
 | A loan's death on a slot, and at a place with an absent owner (`Lender.resolve`) | certifies the current, then assumes the equation | the same order |
 | A referent check (`Lender.resolve` at `.referent`) | certifies the current and assumes no equation | the same |
-| The equation of a combined settlement (`Lender.resolve` at `.equation`, emitted by `holderResolves` in `Compile.lean` after the candidates' and the referent's obligations) | assumes the equation and certifies nothing itself. For a place whose path dereferences, `holderResolves` emits **no** obligation, so a settlement whose possible origins all dereference emits the equation alone | **repair**, in the compiler as well as in the resolver: every emitted `.equation` is preceded on its path by a check sufficient for its referent |
-| A loan's death at a place of a local, no dereference on the path | certifies the owner rebuilt with the current, at every depth, then assumes two equations | the same order. The sibling fields hold what they hold today, prophecies of other loans included, valid by their choice |
-| A loan's death through a reference (a dereference on the path) | **assumes both equations, certifies nothing** | **repair:** checks the current at the referent's type first. The owner is a reference's current and is checked where that reference dies, is handed over or exits, as today |
-| A candidate holder (`.candidate`) | where the owner is present and the path rebuilds: certifies the rebuilt owner, no equation; nothing when the path dereferences, the owner is absent or the path fails | the same, with the repairs of the rows above. Today's conservatism over branch-dependent candidates is kept, not refined |
+| The equation of a combined settlement (`Lender.resolve` at `.equation`, emitted by `holderResolves` in `Compile.lean` after the candidates' and the referent's obligations) | assumes the equation and certifies nothing itself. For a place whose path has `hasDeref`, `holderResolves` emits **no** obligation, so a settlement whose possible origins all have `hasDeref` emits the equation alone | **repair:** `holderResolves` emits one unconditional `.referent` first, then `.candidate` for every place origin (`hasDeref` included), then `.equation` |
+| A loan's death at a place of a local, no dereference on the path | certifies the owner rebuilt with the current, at every depth, then assumes two equations | the same order; referent validity is implied by the rebuilt owner (`Proj.deepHolds_of_set?`). Sibling fields hold what they hold today, prophecies of other loans included, valid by their choice |
+| A loan's death at a place with `path.hasDeref` (`.deref`, `.sliceIndex`, or a path above one) | **assumes both equations, certifies nothing** | **repair:** checks the referent's current first, then checks the rebuilt owner, then assumes both equations. When the path starts with a direct `.deref rest`, the owner is an ordinary reference whose validity is its unchanged prophecy's (`Proj.set?_deref_deepHolds`), so `Lender.resolve_place_deref` erases the owner check; at `.sliceIndex` or a struct holding a reference, the rebuilt owner check stays and catches cross-field violations |
+| A candidate holder (`.candidate`) | where the owner is present and the path rebuilds: certifies the rebuilt owner when `!path.hasDeref`, nothing when `path.hasDeref`, the owner is absent or the path fails | **repair:** checks the rebuilt owner whenever the owner is present and the path rebuilds (`hasDeref` split removed; direct-root `.deref rest` erases via `Lender.resolve_candidate_deref`, and the referent is checked once by `.referent`). Today's conservatism over branch-dependent candidates is kept |
 | A hand-over (`Term.handedOver`) | certifies the current | checks it. Kept for a call the walk inlines too: an inlined callee can receive an open current |
 | A returned reference (`Term.returned`) | certifies the current and assumes no equation; the caller settles it | the same |
 | A `&mut` parameter's exit (`Mutables.resolve` at `.cons` and `.at`) | certifies the current, then assumes the equation; at a certificate-free type the check is trivially true and omitted. An absent or moved slot skips both | the same |
 | A write into an owner through a path (`Proj.setOwner?`, used by `writePlace` and `takeAt`) | certifies as its definition states | the same |
-| A slice reference's resolution (`Mutables.resolve` at `.sliceAt`, `resolveSliceAtValue`) | assumes the equality of the readings and checks nothing; both readings are certified by the slice's representation (`NTy.deepHolds_sliceRef`) | an explicit check that each element of the current reading holds, before the equality. Under the translation a valid slice reference has that fact already, so the check is discharged by it; it is a defensive cut and not the repair of a shown hole |
+| A slice borrow or reborrow (`borrowArraySliceAt`, `borrowVectorSliceAt`, `reborrowSliceAt`) | chooses a certified slice and owner and equates the extracted `current` with the certified slice's current, with **no** check when `path.hasDeref` | **repair (`U6`):** checks the extracted `current` elements before the existential assumption when `path.hasDeref` (erased by `Proj.get?_deepHolds` when `!path.hasDeref`) |
+| Moving a slice out (`takeSliceAtValue`) | chooses a certified `cleared` owner and equates `path.set? (ofArrays final final) value` with `forget cleared`, without checking the computed cleared owner | **repair (`U6`):** rebuilds the cleared owner concretely, checks it at the owner's type before the update, and installs it |
+| A slice reference's resolution (`Mutables.resolve` at `.sliceAt`, `SliceLender.resolve`, `resolveSliceAt`) | assumes `reference.current = reference.final` and checks nothing; carries no lender provenance for an enclosing owner | **repair (`U6`):** checks `reference.currentVector` unconditionally before the settlement equation (`Mutables.resolve` at `.sliceAt` has no path, and `SliceLender.resolve` checks `currentVector` first), and carries slice lender provenance (`SliceLender`) so any enclosing local/candidate owner rebuilt with the settled slice is checked before assuming `current = final` |
 | A copy out of an open current (`Term.deref`, `Term.observe`, `Term.readPlace`) | certifies the copy | checks it |
 | A write of storage | owes by typing | section 7 |
 
-One repair closes a shown hole: a settlement through a reference, in the
-resolver's dereferencing branches and in the compiler's combined settlement.
-It and the slice's explicit check are made on the present tree with
-`certifyingAt` before the representation changes (section 8). Apart from that
-repair, the checks and their guards are today's, so the translation adds no
-logical rejection.
+All settlement and slice repairs above are made on the present tree with
+`certifyingAt` before the representation changes (section 8). Apart from those
+soundness repairs, the checks and their guards are today's, so the translation
+adds no logical rejection.
 
 A missing or moved holder skips its settlement and assumes no equation. A
 loan handed to a call or returned stays under the present correspondence of
@@ -301,30 +322,42 @@ limit of the classifier that decides whether a type has an invariant.
 
 ## 5. What the function's theorem says
 
-The theorem is `Satisfies` of `VerexIR/Proofs/Contract.lean` as it is: over
-the arguments and the initial state, under `contract.assumes` and
-`contract.requires`; a successful run satisfies `ensures` unless the contract
-lets it abort, satisfies the frame unconditionally and is not one that must
-abort; an abort satisfies the abort clause; undefined behavior is excluded.
-Those keep their meaning. The translation restricts two domains:
+`Contract` in `VerexIR/Proofs/Contract.lean` gains two generated domain fields
+with `True` defaults (`U7`):
 
-- **The arguments.** Their validity restricts the theorem's argument domain,
-  as their certified type did. For a reference argument that is its
-  prophecy's validity, which a caller may supply and need not be chosen by the
-  function. Its current's validity is not part of the translation: it is the
-  entry precondition that `Term.assumeCurrent` and the generated entry
-  conditions state, discharged by the caller's hand-over.
-- **Every successful result, unconditionally.** A result's validity is a
-  constraint of the success domain in the summary and the meaning relation,
-  outside the guard that lets a contract excuse its postcondition
-  (`mayAbort`) and outside the settlement premises of a returned reference.
-  That is the translation of the typed result: today a result is certified
-  whatever the postcondition's guards say. Stating it only as a clause of
-  `ensures` would let a caller receive an invalid result from a run whose
-  postcondition was excused, and would make a live returned reference's fact
-  wait for a settlement. The summary's rule quantifies the result under its
-  validity apart from the guarded postcondition, and a concrete body proves
-  that validity of its results.
+```
+validArgs   : Args → Prop   := fun _ => True
+validResult : Result → Prop := fun _ => True
+```
+
+`Satisfies` quantifies over `args` and `initial` under `contract.validArgs args`,
+`contract.assumes args initial`, and `contract.requires args initial`; a
+successful run establishes `contract.validResult result` unconditionally,
+`ensures` unless `mayAbort` excuses it, `frame` unconditionally, and
+`¬mustAbort`; an abort satisfies `aborts`; undefined behavior is excluded.
+`Contract.summary` and `wp_summary` include `contract.validResult result`
+unconditionally in `.ok` (quantifying `result` under `validResult` apart from
+the guarded postcondition), while `contract.requires` carries the caller-owed
+entry obligations as before. Because both fields live on `Contract` directly,
+every summary, generic instantiation, closure invocation (`Invocation.lean`,
+`Behavior.lean`, `Closures.lean`), and transfer adapter inherits unconditional
+domain validity without a parallel contract hierarchy:
+
+- **The arguments (`validArgs`).** Set to `HList.Holds Γ args`, restricting the
+  theorem's argument domain as their certified type did. For a reference
+  argument that is its prophecy's validity, which a caller may supply and need
+  not be chosen by the function. Its current's validity is not part of
+  `validArgs`: it is the entry precondition that `Term.assumeCurrent` and the
+  generated entry conditions state in `requires`, discharged by the caller's
+  hand-over.
+- **Every successful result, unconditionally (`validResult`).** Set to
+  `shape.Holds result`, constraining the success domain in `Satisfies`,
+  `Contract.summary`, and `Meanings` outside `mayAbort` and outside the
+  settlement premises of a returned reference. Stating it only inside `ensures`
+  would let a caller receive an invalid result from a run whose postcondition
+  was excused, and would make a live returned reference's fact wait for a
+  settlement. A concrete body proves `validResult` of its results alongside
+  `ensures` and `frame`.
 
 Every check is a conjunct of the body's weakest precondition by the
 equivalence of `checkingAt`. The assumption ledger loses
@@ -507,28 +540,32 @@ by construction to name its source.
 These do not depend on the representation and are checked on the present
 tree:
 
-1. The repair of section 3, with `certifyingAt`, first and with its controls:
-   the check before a settlement through a reference, in the resolver's
-   dereferencing branches and in `holderResolves`. Then the explicit check of
-   a slice reference's current reading.
+1. The settlement and slice repairs of section 3, with `certifyingAt`, and
+   their controls: `Lender.resolve` and `holderResolves` first (1.1), then the
+   slice-current, slice-borrow and `takeSliceAtValue` checks (1.2), and slice
+   lender provenance for enclosing owners at slice death (1.2b).
 2. The controls: the soundness counterexamples and the loan-death set, each
    run with the validated loan facts captured beside the verdict (the
    `CheckedLoanFact`s, the carrier deaths, the holder paths, the candidates,
    and the emitted order of checks and equations). Among them a combined
-   settlement whose candidates all dereference, and a result whose
-   postcondition is excused or guarded by a settlement.
+   settlement whose candidates all dereference, the four slice soundness cases,
+   and a result whose postcondition is excused or guarded by a settlement.
 3. The inventory of section 2: every former receipt of a certificate,
-   classified, the structural operations included; and the audit of defaults,
-   which gates the switch.
-4. The folded boundary clauses with their opening rules and clause metadata.
-   This touches contracts, reports and authored proofs and is validated as a
-   change of its own, not as a renaming.
-5. The new interfaces that can stand beside the old ones: the `Holds`
-   preservation laws of the transports, the join's premise bundle in the
-   node's structure, the folded write rule.
-6. A benchmark of the storage wrappers. Before the switch it measures their
-   integration under the present representation, not the cost of flat memory;
-   the measurement is repeated after the switch.
+   classified, the structural operations included; the audit of defaults and
+   controls per row of the total-read table, plus the opaque fallback helper
+   for off-domain specification reads (1.3).
+4. The folded boundary clauses with their opening rules and clause metadata
+   (1.4). This touches contracts, reports and authored proofs and is validated
+   as a change of its own, not as a renaming.
+5. A benchmark and routing of the storage wrappers (`Skolems.plainAt`,
+   `Skolems.writePlain` and its folded write rule, 1.5). Before the switch it
+   measures their integration under the present representation, not the cost of
+   flat memory; the measurement is repeated after the switch.
+6. The new interfaces and library lemmas that can stand beside the old ones
+   (1.6): `Contract.validArgs` and `Contract.validResult` with `True` defaults;
+   collection `Holds`-preservation lemmas for vector, array, slice and map
+   operations; the `Holds`-preservation laws of the transports; the join's
+   premise bundle in the node's structure.
 
 Where a new interface lands beside the old one, the existing certificates
 discharge its evidence; no proof is made twice in the final form.
@@ -652,3 +689,21 @@ former certificate receipts; the slice repair; the mandatory premise bundle of
 a join; the `Holds`-preserving transports; the Given frame's predicate; the
 work items of storage; what may land before the switch; the deferral of the
 path-only obligation.
+
+Updated in the fourth revision, from the settlement/slice audit and user
+decisions:
+
+- Off-domain total reads in specifications use an uninterpreted (`opaque`)
+  plain fallback backed by `NTy.plainInhabitant` for `[Inhabited]`, exposing
+  neither `Holds` nor structural-zero layout equations (`U5`).
+- The settlement rule checks both the referent and the rebuilt owner on
+  `hasDeref` paths (`.sliceIndex` and aggregates holding references), erasing
+  only direct-root `.deref rest` via `Lender.resolve_place_deref` and
+  `Lender.resolve_candidate_deref`, with one unconditional `.referent` in
+  `holderResolves`.
+- All three remaining slice equations — slice borrow/reborrow current checks
+  under `hasDeref`, `takeSliceAtValue`'s cleared owner, and slice lender
+  provenance for enclosing owners at slice death — land in phase 1 (`U6`).
+- `Contract` gains first-class `validArgs` and `validResult` domain predicates
+  defaulting to `True`, enforced unconditionally in `Satisfies`,
+  `Contract.summary`, and `wp_summary` (`U7`).

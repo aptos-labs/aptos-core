@@ -351,6 +351,8 @@ def typed (arguments : Codec NativeArgs RuntimeArgs)
   mustAbort := fun args initial => contract.mustAbort (arguments.encode args) initial
   frame := fun args initial result final =>
     contract.frame (arguments.encode args) initial (results.encode result) final
+  validArgs := fun args => contract.validArgs (arguments.encode args)
+  validResult := fun result => contract.validResult (results.encode result)
 
 /-- Runtime-row form of a typed contract.  Arguments must be in the image of
 their codec; normal results must decode.  This is the generated
@@ -377,6 +379,10 @@ def runtime (arguments : Codec NativeArgs RuntimeArgs)
   frame := fun runtimeArgs initial runtimeResult final =>
     ∃ args result, arguments.encode args = runtimeArgs ∧
       results.decode? runtimeResult = some result ∧ contract.frame args initial result final
+  validArgs := fun runtimeArgs =>
+    ∀ args, arguments.encode args = runtimeArgs → contract.validArgs args
+  validResult := fun runtimeResult =>
+    ∃ result, results.decode? runtimeResult = some result ∧ contract.validResult result
 
 end Contract
 
@@ -449,10 +455,10 @@ theorem satisfies_runtime
     (contract : Contract State Error NativeArgs NativeResult)
     (verified : Satisfies (typedFunction arguments results function) contract) :
     Satisfies function (contract.runtime arguments results) := by
-  intro runtimeArgs initial assumed permitted
+  intro runtimeArgs initial valid assumed permitted
   obtain ⟨args, encodedArgs, typedPermitted⟩ := permitted
   subst runtimeArgs
-  have established := verified args initial (assumed args rfl) typedPermitted
+  have established := verified args initial (valid args rfl) (assumed args rfl) typedPermitted
   refine ⟨?_, ?_, ?_⟩
   · intro runtimeResult final execution
     have decoded : ∃ result, results.decode? runtimeResult = some result := by
@@ -465,9 +471,9 @@ theorem satisfies_runtime
     have typedExecution :
         (typedFunction arguments results function args).ok initial result final :=
       ⟨runtimeResult, execution, decoded⟩
-    obtain ⟨postcondition, framed, notMustAbort⟩ :=
+    obtain ⟨validResult, postcondition, framed, notMustAbort⟩ :=
       established.1 result final typedExecution
-    refine ⟨?_, ⟨args, result, rfl, decoded, framed⟩, ?_⟩
+    refine ⟨⟨result, decoded, validResult⟩, ?_, ⟨args, result, rfl, decoded, framed⟩, ?_⟩
     · intro noRuntimeAbort
       refine ⟨args, result, rfl, decoded, postcondition ?_⟩
       intro typedAbort

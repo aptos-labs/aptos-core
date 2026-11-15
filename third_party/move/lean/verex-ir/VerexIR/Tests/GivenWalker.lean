@@ -141,7 +141,7 @@ run_cmd do
       (``generic_assertion, ``wp_assertAt), (``generic_memory, ``wp_memoryWrittenAt),
       (``generic_memory, ``wp_anchorAt), (``generic_ghost, ``wp_ghostAt),
       (``generic_construction, ``wp_constructedAt), (``generic_mutation_end, ``wp_mutationEndAt),
-      (``given_certification, ``wp_certifyingAt_intro), (``given_unroll, ``wp_loopAt_unroll),
+      (``given_certification, ``wp_certifyingAt_intro_holds), (``given_unroll, ``wp_loopAt_unroll),
       (``given_unroll, ``wp_loopUnroll_step)] do
     let .thmInfo theoremInfo ← getConstInfo name | throwError "expected theorem"
     unless (theoremInfo.value.find? (fun expression => expression.isConstOf rule)).isSome do

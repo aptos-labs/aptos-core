@@ -236,7 +236,7 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
         withLocalDeclsDND evidence fun proofs => do
           let conditions ← loopInvariants unit frame.unit handle.namespaceId ns declaration
             compiled.params compiled.frame (some frame.types) none (markedInvariant own view)
-            (some frame)
+            (some frame) (carried := own.carriers)
           let mut loopPairs : Array Term := #[]
           for (site, condition, _) in conditions do
             let pair ← mkAppM ``Prod.mk #[toExpr handle, condition]
@@ -268,7 +268,7 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
                 ← `(tactic| skip))
           let errorsBefore := (← Core.getMessageLog).reportedPlusUnreported.toArray.countP (·.severity == .error)
           let proof ← Term.elabTerm (← `(term| by
-            apply VerexIR.Proofs.satisfies_of_wp
+            apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro)
             intro $arguments:ident initialState assumed permitted
             have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments initialState
             $destructure:tactic

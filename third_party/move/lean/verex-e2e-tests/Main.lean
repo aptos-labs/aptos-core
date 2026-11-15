@@ -31,32 +31,37 @@ private def buildManagedMoveCli : IO (Option System.FilePath) := do
   return some binary
 
 unsafe def runSuites : IO Unit := do
-  let environment ← VerexSL.Print.loadEnvironment
   match ← IO.getEnv "VEREX_E2E_SUITE" with
   | none =>
       -- `lake test` is the full package suite: selecting one suite is a
       -- development convenience, never the default coverage.
+      VerexE2ETests.Workers.testProcessGroupCleanup
+      let environment ← VerexSL.Print.loadEnvironment
       VerexE2ETests.MoveToVerexSL.testBaselines environment
       VerexE2ETests.RustToVerexSL.testBaselines environment
-      -- The checks elaborate in processes of their own, so they run beside
-      -- the source verification, which elaborates in this one.
-      let checks ← IO.asTask (prio := .dedicated) VerexE2ETests.Check.testBaselines
+      -- Both run their fixtures in processes of their own, over the whole
+      -- pool, so one follows the other.
+      let checks ← VerexE2ETests.Check.testBaselines.toBaseIO
       let verified ← VerexE2ETests.SourceVerify.testBaselines.toBaseIO
-      match verified, ← IO.wait checks with
+      match verified, checks with
       | .ok (), .ok () => pure ()
       | .error error, .ok () | .ok (), .error error => throw error
       | .error first, .error second => throw <| IO.userError s!"{first}\n{second}"
       VerexE2ETests.MonoVM.testSmoke
       VerexE2ETests.MonoDifferential.testBaselines environment
-  | some "move" => VerexE2ETests.MoveToVerexSL.testBaselines environment
+  | some "workers" => VerexE2ETests.Workers.testProcessGroupCleanup
+  | some "move" =>
+      VerexE2ETests.MoveToVerexSL.testBaselines (← VerexSL.Print.loadEnvironment)
   | some "check" => VerexE2ETests.Check.testBaselines
-  | some "rust" => VerexE2ETests.RustToVerexSL.testBaselines environment
+  | some "rust" =>
+      VerexE2ETests.RustToVerexSL.testBaselines (← VerexSL.Print.loadEnvironment)
   | some "verify" => VerexE2ETests.SourceVerify.testBaselines
   | some "monovm" => VerexE2ETests.MonoVM.testSmoke
-  | some "monodiff" => VerexE2ETests.MonoDifferential.testBaselines environment
+  | some "monodiff" =>
+      VerexE2ETests.MonoDifferential.testBaselines (← VerexSL.Print.loadEnvironment)
   | some suite =>
       throw <| IO.userError
-        s!"unknown VEREX_E2E_SUITE `{suite}`; expected `move`, `rust`, `verify`, `check`, `monovm`, or `monodiff`"
+        s!"unknown VEREX_E2E_SUITE `{suite}`; expected `workers`, `move`, `rust`, `verify`, `check`, `monovm`, or `monodiff`"
 
 unsafe def main : IO UInt32 := do
   -- Freshness contract: inside a checkout the driver always runs the locked

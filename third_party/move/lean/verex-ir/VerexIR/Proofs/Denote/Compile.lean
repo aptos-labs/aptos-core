@@ -860,14 +860,58 @@ def writesIndexUnderLoan (unit : ValidatedUnit) (handle : FunctionHandle) : Bool
 /-- The lender a dying loan writes back to: the local a borrow of a place is
 rooted in and the path it names, so that the owner rebuilt with the final
 current is certified at the death (`Lender`).  A borrow of global memory
-names the slot, and so does a place the compiler cannot resolve at the
-referent's type, where the current is certified instead. -/
+names the slot.  A loan whose expression does not have type `&mut referent` is
+a transitive parent loan (such as an enclosing slice or aggregate loan,
+resolved at its own holder) and answers `.slot` before `compilePlace` runs;
+once the type guard passes, a place type mismatch is a compilation error. -/
 def lenderOf (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace) (loan : CheckedLoanFact)
     (referent : NTy) : Except String (Lender Γ referent) := do
   if ns.writesGlobal loan then return .slot
+  let some expression := ns.expressions.get? loan.expression.index | return .slot
+  unless ns.nty unit ns.namespaceId (ns.source.typeId expression.typeId) ==
+      some (.ref referent) do
+    return .slot
   let some place := ns.borrowedPlace? loan | return .slot
   let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns ns.placeFuel place
-  if equal : component = referent then return .place x (equal ▸ path) else return .slot
+  if equal : component = referent then
+    return .place x (equal ▸ path)
+  else
+    .error "borrowed place type does not match loan referent"
+
+/-- The backing sequence place a mutable slice borrow unwraps to, shared
+between birth (`compileOperation`) and death (`sliceLenderOf`,
+`sliceLenderIdentity`). -/
+def sliceBorrowBase (ns : CompileNamespace) (place : PlaceId) : Except String PlaceId :=
+  match ns.place? place with
+  | some (.unsize base) | some (.deref base) => .ok base
+  | some (.subslice ..) => notCarried "a mutable subslice without a typed fixed-extent splice"
+  | _ => .ok place
+
+/-- The lender a dying mutable slice loan writes back to (`SliceLender`).
+Loans whose expression is not `&mut Slice<element>` are transitive parent loans
+resolved at their own holder and answer `.slot` at the type guard; after the
+guard passes, the unwrapped base must be a sequence of `element`. -/
+def sliceLenderOf (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace)
+    (loan : CheckedLoanFact) (element : NTy) : Except String (SliceLender Γ element) := do
+  if ns.writesGlobal loan then return .slot
+  let some expression := ns.expressions.get? loan.expression.index | return .slot
+  unless ns.nty unit ns.namespaceId (ns.source.typeId expression.typeId) ==
+      some (.sliceRef element) do
+    return .slot
+  let some place := ns.borrowedPlace? loan | return .slot
+  let base ← sliceBorrowBase ns place
+  let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns ns.placeFuel base
+  match component, path with
+  | .array held _, path =>
+      if equal : held = element then return .array x (equal ▸ path)
+      else .error "slice borrow array element does not match loan slice element"
+  | .vector held, path =>
+      if equal : held = element then return .vector x (equal ▸ path)
+      else .error "slice borrow vector element does not match loan slice element"
+  | .sliceRef held, path =>
+      if equal : held = element then return .slice x (equal ▸ path)
+      else .error "reborrowed slice element does not match loan slice element"
+  | _, _ => .error "slice borrow base is not an array, vector, or mutable slice"
 
 /-- One step of a path, comparable: two borrows of the same place have the
 same steps however their expressions encode the place. -/
@@ -913,9 +957,35 @@ this referent; it answers `slot` exactly where `lenderOf` does. -/
 def lenderIdentity (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace)
     (loan : CheckedLoanFact) (referent : NTy) : Except String LenderIdentity := do
   if ns.writesGlobal loan then return .slot
+  let some expression := ns.expressions.get? loan.expression.index | return .slot
+  unless ns.nty unit ns.namespaceId (ns.source.typeId expression.typeId) ==
+      some (.ref referent) do
+    return .slot
   let some place := ns.borrowedPlace? loan | return .slot
   let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns ns.placeFuel place
-  unless component = referent do return .slot
+  unless component = referent do
+    .error "borrowed place type does not match loan referent"
+  match path.steps? with
+  | some steps => return .place x.index steps
+  | none => return .incomparable place
+
+/-- The canonical identity of the lender `sliceLenderOf` builds for this loan
+at this slice element; it answers `slot` exactly where `sliceLenderOf` does. -/
+def sliceLenderIdentity (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace)
+    (loan : CheckedLoanFact) (element : NTy) : Except String LenderIdentity := do
+  if ns.writesGlobal loan then return .slot
+  let some expression := ns.expressions.get? loan.expression.index | return .slot
+  unless ns.nty unit ns.namespaceId (ns.source.typeId expression.typeId) ==
+      some (.sliceRef element) do
+    return .slot
+  let some place := ns.borrowedPlace? loan | return .slot
+  let base ← sliceBorrowBase ns place
+  let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns ns.placeFuel base
+  let matchesElement := match component with
+    | .array held _ | .vector held | .sliceRef held => decide (held = element)
+    | _ => false
+  unless matchesElement do
+    .error "slice borrow base does not match loan slice element"
   match path.steps? with
   | some steps => return .place x.index steps
   | none => return .incomparable place
@@ -995,7 +1065,7 @@ def holderDeaths (unit : ValidatedUnit) (ns : CompileNamespace) (ρ : ResultShap
   paths.filterMapM fun steps => do
     let ⟨target, path⟩ ← holderProj unit ns τ steps.toList
     match target, path with
-    | .sliceRef _, path => .ok (some (Term.resolveSliceAt x path))
+    | .sliceRef _, path => .ok (some (Term.resolveSliceAt site x path .slot))
     | .ref _, path => .ok (some (Term.resolveAt site x path .slot))
     | target, _ =>
         if target.refFree then .ok none else notCarried "a loan held inside an aggregate"
@@ -1012,10 +1082,15 @@ constrains the owner it sets to agree with the reference's prophecy at the
 path (`Term.borrowPlace`) — so `Lender.equation` states it once.
 
 The `origins` are every loan that may sit at this place, whichever loan's
-death this is; each owes its own obligation here — the referent's invariants
-for a loan no local lends, the owner rebuilt for a borrow of a local place,
-nothing for a reborrow through a dereference, as that lender owes nothing
-anywhere. Only where the place is `certain` to hold the dying loan — the
+death this is. The holder's current is certified first, once
+(`Lender.referent`), and each distinct place lender's owner rebuilt after it
+(`Lender.candidate`); a reborrow through a reference owes no more than the
+current, its candidate being no step at all
+(`Lender.resolve_candidate_deref`).
+Invariant: every emitted `Lender.equation` is preceded, on every path that
+reaches it, by `Lender.referent` of the same holder at the same site. No
+equation with a certified side is stated before the check of its plain side;
+`Lender.equation` is built nowhere else. Only where the place is `certain` to hold the dying loan — the
 loan's death names this place alone — and may hold no other lender is the
 precise resolve of that lender stated, write-back and all. `resolve` states a
 lender's resolution at the place: at a local, or at a path within an
@@ -1034,16 +1109,43 @@ def holderResolves (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace)
   match distinct, certain with
   | [(_, only)], true => return resolve (← lenderOf unit Γ ns only referent)
   | _, _ => do
-      let obligations ← distinct.filterMapM fun (_, loan) => do
+      -- The owner each distinct place lender holds, rebuilt: the check of
+      -- the write-back that lender's own resolve would assume.  A loan no
+      -- local lends has no owner.
+      let owners ← distinct.filterMapM fun (_, loan) => do
         match ← lenderOf unit Γ ns loan referent with
-        | .slot => .ok (some (resolve .referent))
-        | .place owner path =>
-            if path.hasDeref then .ok none else .ok (some (resolve (.candidate owner path)))
+        | .slot => .ok none
+        | .place owner path => .ok (some (Lender.candidate owner path))
         -- `lenderOf` builds only the two lenders above.
-        | .candidate .. | .referent | .equation => .ok none
-      -- The obligations first, the equation last: a violation must be undefined
-      -- before an equation could prune the run (`Lender.resolve`).
-      return obligations.foldr (fun effect rest => Term.drop effect rest) (resolve .equation)
+        | .candidate .. | .referent | .equation | .seq .. => .ok none
+      -- The holder's current first, once, whatever the origins are: the
+      -- equation stated last has a certified side, and no candidate need
+      -- fire.  The checks first, the equation last: a violation must be
+      -- undefined before the equation could prune the run (`Lender.resolve`).
+      return resolve (.seq .referent (owners.foldr .seq .equation))
+
+/-- How a place holding mutable slice references resolves a loan ending here,
+mirroring `holderResolves` across `SliceLender`. -/
+def sliceHolderResolves (unit : ValidatedUnit) (Γ : NRow) (ns : CompileNamespace)
+    (ρ : ResultShape) (origins : List CheckedLoanFact) (certain : Bool) {element : NTy}
+    (resolve : SliceLender Γ element → Term unit ρ Γ .unit) :
+    Except String (Term unit ρ Γ .unit) := do
+  let keyed ← origins.mapM fun loan => do
+    return (← sliceLenderIdentity unit Γ ns loan element, loan)
+  let distinct := keyed.foldl (init := ([] : List (LenderIdentity × CheckedLoanFact)))
+    fun seen entry => if seen.any (·.1 == entry.1) then seen else seen ++ [entry]
+  match distinct, certain with
+  | [(_, only)], true => return resolve (← sliceLenderOf unit Γ ns only element)
+  | _, _ => do
+      let owners ← distinct.filterMapM fun (_, loan) => do
+        match ← sliceLenderOf unit Γ ns loan element with
+        | .slot => .ok none
+        | .array owner path => .ok (some (SliceLender.candidateArray owner path))
+        | .vector owner path => .ok (some (SliceLender.candidateVector owner path))
+        | .slice owner path => .ok (some (SliceLender.candidateSlice owner path))
+        | .candidateArray .. | .candidateVector .. | .candidateSlice ..
+        | .referent | .equation | .seq .. => .ok none
+      return resolve (.seq .referent (owners.foldr .seq .equation))
 
 /-- The effect of ending loans, `none` when it resolves nothing. A loan's
 death resolves the reference wherever it is held, at its path in an
@@ -1094,7 +1196,9 @@ def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
     | some steps =>
         let ⟨target, path⟩ ← holderProj unit ns σ steps.toList
         match target, path with
-        | .sliceRef _, path => .ok (some (Term.resolveSliceAt (ρ := ρ) x path))
+        | .sliceRef _, path =>
+            .ok (some (← sliceHolderResolves unit Γ ns ρ origins certain
+              (Term.resolveSliceAt (ρ := ρ) site x path)))
         | .ref _, path =>
             .ok (some (← holderResolves unit Γ ns ρ origins certain
               (Term.resolveAt (ρ := ρ) site x path)))
@@ -1102,7 +1206,9 @@ def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
             if target.refFree then .ok none else notCarried "a loan held inside an aggregate"
     | none =>
         match σ, x with
-        | .sliceRef _, x => .ok (some (Term.resolveSliceAt (ρ := ρ) x .nil))
+        | .sliceRef _, x =>
+            .ok (some (← sliceHolderResolves unit Γ ns ρ origins certain
+              (Term.resolveSliceAt (ρ := ρ) site x .nil)))
         | .ref _, x =>
             .ok (some (← holderResolves unit Γ ns ρ origins certain
               (Term.resolve (ρ := ρ) site x)))
@@ -1130,6 +1236,7 @@ def deathEffect (unit : ValidatedUnit) (ns : CompileNamespace)
         let some ⟨σ, _⟩ := Var.ofIndex Γ holder.index | .error "a local is out of range"
         match σ with
         | .ref referent => .ok (if ns.carriesInvariant referent then some referent else none)
+        | .sliceRef element => .ok (if ns.carriesInvariant element then some element else none)
         | _ => .ok none
       return if referents.isEmpty then [written] else [mutated, written]
     let some lender := ns.lender? fact | .ok []
@@ -1420,9 +1527,12 @@ def DroppedTypeArgumentsTrivial (unit : ValidatedUnit) (handle : FunctionHandle)
     holdsDestructor unit (θ.1.getD index .unit) = false ∧
       (θ.1.getD index .unit).refFree = true
 
-/-- Decides `DroppedTypeArgumentsTrivial` directly on `(unit, handle, θ)` without
-compiling the callee: every dropped type parameter of `handle` receives a
-destructor-free, reference-free argument in `θ`. -/
+/-- Boolean decision procedure for `DroppedTypeArgumentsTrivial`: whether every
+type argument in `θ` at a parameter index that `handle` can drop neither runs a
+destructor nor holds a mutable reference. Because `ntyOf` erases shared
+references (`&Guard` becomes `Guard` in `θ`), a call passing `&Guard` satisfies
+`!dropsDestructor` on the pre-erasure `GenericArgument` while `θ.droppedTrivial`
+is `false`, excluding the erased row compilation route (`view.at θ`). -/
 def TypeArgs.droppedTrivial (θ : TypeArgs) (unit : ValidatedUnit)
     (handle : FunctionHandle) : Bool :=
   let fuel := unit.namespaces.foldl (fun n ns => n + ns.expressions.size + 1) 1
@@ -2131,7 +2241,7 @@ mutual
                 -- it there.
                 match component, path with
                 | .sliceRef element, path =>
-                    .ok (.at (.sliceRef element) (.reborrowSlice (ns.mismatchOn path) x path))
+                    .ok (.at (.sliceRef element) (.reborrowSlice site (ns.mismatchOn path) x path))
                 | .ref referent, path =>
                     let reborrow := path.append (.deref .nil)
                     .ok (.at (.ref referent) (.borrowPlace (ns.mismatchOn reborrow) x reborrow))
@@ -2144,7 +2254,7 @@ mutual
                 if consume then
                   match τ, equal with
                   | .sliceRef element, equal =>
-                      .ok (.at (.sliceRef element) (.takeSliceAt (ns.mismatchOn path) x (equal ▸ path)))
+                      .ok (.at (.sliceRef element) (.takeSliceAt site (ns.mismatchOn path) x (equal ▸ path)))
                   | .ref σ, equal =>
                       .ok (.at (.ref σ) (.takeAt site (ns.mismatchOn path) x (equal ▸ path)))
                   | _, _ => read
@@ -2286,24 +2396,22 @@ mutual
               .ok (.at τ (equal ▸ .observe site (readOut site (ns.mismatchOn path) x path)))
             else compileRead unit Γ ns site false fuel τ place
         | .error _ => compileRead unit Γ ns site false fuel τ place
-    | fuel + 1, _, .sliceRef element, .borrow .mutable place, [] => do
-        let base ← match ns.place? place with
-          | some (.unsize base) | some (.deref base) => pure base
-          | some (.subslice ..) => notCarried "a mutable subslice without a typed fixed-extent splice"
-          | _ => pure place
+    | fuel + 1, origin, .sliceRef element, .borrow .mutable place, [] => do
+        let site := ns.site origin.index
+        let base ← sliceBorrowBase ns place
         let ⟨_, component, x, path⟩ ← compilePlace unit Γ ns fuel base
         match component, path with
         | .array held _, path =>
             if equal : held = element then
-              .ok (.at (.sliceRef element) (equal ▸ .borrowArraySlice (ns.mismatchOn path) x path))
+              .ok (.at (.sliceRef element) (equal ▸ .borrowArraySlice site (ns.mismatchOn path) x path))
             else .error "a mutable array slice has an unexpected element type"
         | .vector held, path =>
             if equal : held = element then
-              .ok (.at (.sliceRef element) (equal ▸ .borrowVectorSlice (ns.mismatchOn path) x path))
+              .ok (.at (.sliceRef element) (equal ▸ .borrowVectorSlice site (ns.mismatchOn path) x path))
             else .error "a mutable vector slice has an unexpected element type"
         | .sliceRef held, path =>
             if equal : held = element then
-              .ok (.at (.sliceRef element) (equal ▸ .reborrowSlice (ns.mismatchOn path) x path))
+              .ok (.at (.sliceRef element) (equal ▸ .reborrowSlice site (ns.mismatchOn path) x path))
             else .error "a mutable slice reborrow has an unexpected element type"
         | _, _ => notCarried "a mutable slice borrow of a non-sequence"
     | fuel + 1, origin, .ref referent, .borrow .mutable place, [] => do

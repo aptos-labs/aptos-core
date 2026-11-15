@@ -69,7 +69,7 @@ elab "check_shared " memory:("keeping_memory ")? closed:("without_entries ")?
   if memory.isSome && node.summaryArguments.any (·.parameter == node.captures + 2) then
     throwError "the summary generalized unchanged memory"
   let some summary := node.summary? | throwError "no summary"
-  let (_, goal) ← summary.introNP (node.summaryArguments.size + 1)
+  let (_, goal) ← summary.introNP (node.summaryArguments.size + node.hypotheses + 1)
   let goal ← VerexIR.Proofs.Denote.SharedContinuations.unfold node goal
   let goals ← if closed.isSome then pure [goal]
     else exposeEntries goal #[node.relation?.get!.constName!]
@@ -235,3 +235,205 @@ example (b : Bool) (env : HEnv Γ) (state : Memory unit) :
     cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
   with
     all_goals try simp_all
+
+-- ============================================================================
+-- Phase 1.6c & 1.6d Tests: Contract validArgs/validResult, atPlain, and Join Holds
+-- ============================================================================
+
+section Phase16cdTests
+
+private def positiveContract : Contract Unit Unit Nat Nat where
+  requires := fun _ _ => True
+  ensures := fun _ _ _ _ => True
+  aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+  validArgs := fun n => n > 0
+  validResult := fun r => r > 0
+
+-- `wp_summary` demands `validArgs` and supplies `validResult` to the continuation.
+example (n : Nat) (hn : n > 0) :
+    wp (positiveContract.summary n) (fun r _ => r > 0) (fun _ => False) () := by
+  rw [wp_summary]
+  exact ⟨hn, trivial, fun _ _ hr _ _ _ => hr, fun _ h => h⟩
+
+-- Outside `validArgs`, the summary is undefined so `wp` fails even when `requires` holds.
+example : ¬wp (positiveContract.summary 0) (fun _ _ => True) (fun _ => True) () := by
+  rw [wp_summary]
+  rintro ⟨hvalid, _⟩
+  exact Nat.lt_irrefl 0 hvalid
+
+-- Negative test: returning an invalid result fails `Satisfies` even when `ensures` and `frame` hold.
+example : ¬Satisfies (fun _ => Spec.pure 0) positiveContract := by
+  intro verified
+  have h := (verified 1 () (show 1 > 0 by decide) trivial trivial).1 0 () ⟨rfl, rfl⟩
+  exact Nat.lt_irrefl 0 h.1
+
+-- `satisfies_atPlain_iff` and `satisfies_specAtPlain_iff` over non-`certificateFree` types.
+section PlainContractTests
+variable [Carriers]
+
+private abbrev paramRow : NRow := .cons (.param 0) .nil
+private abbrev paramShape : ResultShape := .one (.param 0)
+
+private def plainIdentityContract :
+    Contract Unit Failure (HListPlain paramRow) paramShape.plain where
+  requires := fun _ _ => True
+  ensures := fun args _ result _ => result = args.1
+  aborts := fun _ _ _ => False
+  mayAbort := fun _ _ => False
+
+example :
+    Satisfies (fun (args : HList paramRow) => (Spec.pure args.1 : Spec Unit Failure paramShape.carrier))
+      plainIdentityContract.atPlain := by
+  rw [satisfies_atPlain_iff]
+  intro args holds _ _ _ _
+  have hforget : paramShape.forget (NTy.ofHolds (.param 0) args.1 holds.1) = args.1 :=
+    ResultShape.forget_ofHolds paramShape args.1 holds.1
+  simp [wp_pure, HListPlain.ofHolds, plainIdentityContract]
+  exact hforget
+
+example :
+    Satisfies (Spec.atPlain (shape := paramShape)
+      (fun (args : HList paramRow) => (Spec.pure args.1 : Spec Unit Failure paramShape.carrier)))
+      plainIdentityContract.plainValidated := by
+  rw [satisfies_specAtPlain_iff, satisfies_atPlain_iff]
+  intro args holds _ _ _ _
+  have hforget : paramShape.forget (NTy.ofHolds (.param 0) args.1 holds.1) = args.1 :=
+    ResultShape.forget_ofHolds paramShape args.1 holds.1
+  simp [wp_pure, HListPlain.ofHolds, plainIdentityContract]
+  exact hforget
+
+end PlainContractTests
+
+-- Harness verifying `holdsCount` on sealed nodes and checking refusal-to-seal (`none`).
+elab "check_shared_holds " expectedHolds:num " : "
+    incoming:tacticSeq " with " suffix:tacticSeq : tactic => do
+  let some (folded, node) ← fold? (← getMainGoal) | throwError "not a Flow continuation"
+  setGoals [folded]
+  evalTactic incoming
+  let mut node := node
+  for goal in ← getGoals do
+    let some arrival ← arrival? node goal | throwError "not a normal arrival"
+    node := { node with arrivals := node.arrivals.push arrival }
+  let sealedNode ← sealNode (← closeArrivals (← prepareArrivals node {}))
+  unless sealedNode.holdsCount == expectedHolds.getNat do
+    throwError "expected holdsCount = {expectedHolds.getNat}, got {sealedNode.holdsCount}"
+  let some summary := sealedNode.summary? | throwError "no summary"
+  let (_, goal) ← summary.introNP (sealedNode.summaryArguments.size + sealedNode.hypotheses + 1)
+  let goal ← VerexIR.Proofs.Denote.SharedContinuations.unfold sealedNode goal
+  setGoals [goal]
+  evalTactic suffix
+  unless (← getUnsolvedGoals).isEmpty do throwError "shared summary incomplete"
+  let some finished ← finish? sealedNode | throwError "summary has unresolved dependencies"
+  unless finished.finished && finished.certified do throwError "summary not certified"
+  setGoals []
+
+elab "check_pending_holds " expectedHolds:num expectedPending:num " : " incoming:tacticSeq : tactic => do
+  let saved ← Lean.Elab.Tactic.saveState
+  let some (folded, node) ← fold? (← getMainGoal) | throwError "not a Flow continuation"
+  setGoals [folded]
+  evalTactic incoming
+  let mut node := node
+  for goal in ← getGoals do
+    let some arrival ← arrival? node goal | throwError "not a normal arrival"
+    node := { node with arrivals := node.arrivals.push arrival }
+  let sealedNode ← sealNode (← closeArrivals (← prepareArrivals node {}))
+  unless sealedNode.sealed do
+    throwError "sealNode did not seal the node"
+  unless sealedNode.holdsCount == expectedHolds.getNat do
+    throwError "expected holdsCount = {expectedHolds.getNat}, got {sealedNode.holdsCount}"
+  unless sealedNode.pendingHolds.size == expectedPending.getNat do
+    throwError "expected pendingHolds.size = {expectedPending.getNat}, got {sealedNode.pendingHolds.size}"
+  unless sealedNode.pendingHolds[0]!.1 == 0 do
+    throwError "expected pending obligation at arrival 0, got arrival {sealedNode.pendingHolds[0]!.1}"
+  if (← instantiateMVars sealedNode.holdsProofs[1]![0]!).hasExprMVar then
+    throwError "arrival 1's Holds proof should be closed and unaffected, but has open mvars"
+  if (← finish? sealedNode).isSome then
+    throwError "finish? certified a summary while an arrival's Holds obligation was still open!"
+  saved.restore
+
+-- 1. Certified non-`certificateFree` variable (`NTy.param 0`): `sealNode` emits 1 mandatory `Holds`
+-- premise and discharges both arrivals via `NTy.holds_forget`.
+example (b : Bool) (left right : (NTy.param 0).carrier) (env : HEnv Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (flow : Flow ρ Γ (NTy.param 0).carrier) _ => match flow with
+        | .value v _ => NTy.Holds (.param 0) (NTy.forget (.param 0) v)
+        | _ => False)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 1 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    assumption
+
+-- 2. Plain non-`certificateFree` variable (`(NTy.param 0).plain`) WITH `NTy.Holds` at both arrivals:
+-- `sealNode` emits 1 mandatory `Holds` premise, proves it from `LCtx` at each arrival, and supplies
+-- it to the shared suffix without re-splitting the entry disjunction!
+example (b : Bool) (left right : (NTy.param 0).plain)
+    (hLeft : NTy.Holds (.param 0) left) (hRight : NTy.Holds (.param 0) right)
+    (env : HEnv Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (flow : Flow ρ Γ (NTy.param 0).plain) _ => match flow with
+        | .value v _ => NTy.Holds (.param 0) v
+        | _ => False)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 1 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    assumption
+
+-- 3. Mutable reference `(NTy.ref (.param 0)).plain`: open reference currents
+-- `curLeft`, `curRight` lack `NTy.Holds` (they may be open across arrivals!), while prophecies
+-- `prophLeft`, `prophRight` satisfy `NTy.Holds`. `sealNode` checks ONLY the prophecy (holdsCount = 1),
+-- NEVER the open current!
+example (b : Bool) (curLeft curRight prophLeft prophRight : (NTy.param 0).plain)
+    (hProphLeft : NTy.Holds (.param 0) prophLeft) (hProphRight : NTy.Holds (.param 0) prophRight)
+    (env : HEnv Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value ((curLeft, prophLeft) : (NTy.ref (.param 0)).plain) env)
+        else Spec.pure (.value ((curRight, prophRight) : (NTy.ref (.param 0)).plain) env))
+      (fun (flow : Flow ρ Γ (NTy.ref (.param 0)).plain) _ => match flow with
+        | .value r _ => NTy.Holds (.param 0) r.2
+        | _ => False)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 1 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    assumption
+
+-- 4. Mandatory arrival obligation: `cases b` puts `false` (`right`, missing `NTy.Holds`) at
+-- arrival 0 and `true` (`left`, carrying `_hLeft`) at arrival 1. `sealNode` seals the join
+-- (`holdsCount = 1`), records only arrival 0's open obligation in `pendingHolds`, keeps arrival 1's
+-- proof closed and unaffected, and `finish?` refuses to certify until arrival 0's obligation closes.
+example (b : Bool) (left right : (NTy.param 0).plain)
+    (_hLeft : NTy.Holds (.param 0) left)
+    (env : HEnv Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (_ : Flow ρ Γ (NTy.param 0).plain) _ => True)
+      (fun (_ : Failure) => False) state := by
+  check_pending_holds 1 1 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  cases b <;> simp [wp_pure]
+
+-- 5. Transitive constructor conflict in `closeImpossibleEntry` (both orientations on a
+-- non-variable term `opaqueOpt k`, including `x = C₁ …` followed by `C₂ … = x`).
+opaque opaqueOpt (k : Nat) : Option Nat := some k
+private def mirroredConflictEntry (k : Nat) (choice : Bool) : Prop :=
+  ∃ (_ : earlierEntry choice) (_ : opaqueOpt k = some 1), none = opaqueOpt k
+private def forwardConflictEntry (k : Nat) (choice : Bool) : Prop :=
+  ∃ (_ : earlierEntry choice) (_ : opaqueOpt k = some 1), opaqueOpt k = none
+attribute [irreducible] mirroredConflictEntry forwardConflictEntry
+
+example (k : Nat) (choice : Bool) (entry : mirroredConflictEntry k choice) : False := by
+  run_tac do
+    let goals ← exposeEntries (← getMainGoal) #[``mirroredConflictEntry, ``earlierEntry]
+    unless goals.isEmpty do
+      throwError "expected 0 surviving alternatives, got {goals.length}"
+    setGoals goals
+
+example (k : Nat) (choice : Bool) (entry : forwardConflictEntry k choice) : False := by
+  run_tac do
+    let goals ← exposeEntries (← getMainGoal) #[``forwardConflictEntry, ``earlierEntry]
+    unless goals.isEmpty do
+      throwError "expected 0 surviving alternatives, got {goals.length}"
+    setGoals goals
+
+end Phase16cdTests

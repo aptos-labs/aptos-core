@@ -1351,6 +1351,8 @@ def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape 
   mustAbort := fun args => contract.mustAbort (HList.toSkolem θ σs args)
   frame := fun args initial result final =>
     contract.frame (HList.toSkolem θ σs args) initial (ResultShape.toSkolem θ shape result) final
+  validArgs := fun args => contract.validArgs (HList.toSkolem θ σs args)
+  validResult := fun result => contract.validResult (ResultShape.toSkolem θ shape result)
 
 /-- A meaning satisfying a contract at the frame type arguments induce
 satisfies, at the caller's types, every contract equivalent to that one
@@ -1365,16 +1367,18 @@ theorem satisfies_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
     (verified : Satisfies meaning generic)
     (equivalent : Contract.Equivalent specialized (generic.ofSkolem θ)) :
     Satisfies (specializedMeaning θ meaning) specialized := by
-  intro args initial assumed required
+  intro args initial valid assumed required
   obtain ⟨normal, failing, defined⟩ := verified (HList.toSkolem θ σs args) initial
+    ((equivalent.validArgs args).mp valid)
     ((equivalent.assumes args initial).mp assumed) ((equivalent.requires args initial).mp required)
   refine ⟨fun result final ok => ?_, fun error aborted => ?_, fun undefined => ?_⟩
   · simp only [specializedMeaning, Spec.bind_ok, Spec.pure_ok] at ok
     obtain ⟨value, middle, run, rfl, rfl⟩ := ok
-    obtain ⟨established, kept, proper⟩ := normal value _ run
-    refine ⟨fun excused => (equivalent.ensures args initial _ _).mpr ?_,
+    obtain ⟨validRes, established, kept, proper⟩ := normal value _ run
+    refine ⟨(equivalent.validResult _).mpr ?_, fun excused => (equivalent.ensures args initial _ _).mpr ?_,
       (equivalent.frame args initial _ _).mpr ?_,
       fun aborting => proper ((equivalent.mustAbort args initial).mp aborting)⟩
+    · simpa only [Contract.ofSkolem, NTy.toSkolem_ofSkolem_shape] using validRes
     · simp only [Contract.ofSkolem, NTy.toSkolem_ofSkolem_shape]
       exact established fun aborting => excused ((equivalent.mayAbort args initial).mpr aborting)
     · simpa only [Contract.ofSkolem, NTy.toSkolem_ofSkolem_shape] using kept
@@ -1416,12 +1420,14 @@ theorem satisfies_of_equivalent {Args Result : Type}
     {stated specialized : Contract (Memory unit) Failure Args Result}
     (verified : Satisfies meaning stated) (equivalent : Contract.Equivalent specialized stated) :
     Satisfies meaning specialized := by
-  intro args initial assumed required
+  intro args initial valid assumed required
   obtain ⟨normal, failing, defined⟩ := verified args initial
+    ((equivalent.validArgs args).mp valid)
     ((equivalent.assumes args initial).mp assumed) ((equivalent.requires args initial).mp required)
   refine ⟨fun result final ok => ?_, fun error aborted => ?_, defined⟩
-  obtain ⟨established, kept, proper⟩ := normal result final ok
-  exact ⟨fun excused => (equivalent.ensures args initial _ _).mpr
+  obtain ⟨validRes, established, kept, proper⟩ := normal result final ok
+  exact ⟨(equivalent.validResult _).mpr validRes,
+    fun excused => (equivalent.ensures args initial _ _).mpr
       (established fun aborting => excused ((equivalent.mayAbort args initial).mpr aborting)),
     (equivalent.frame args initial _ _).mpr kept,
     fun aborting => proper ((equivalent.mustAbort args initial).mp aborting)⟩
@@ -1456,9 +1462,9 @@ theorem satisfies_run_ofSkolem (executable : VerexIR.Validation.ExecutableUnit u
     Satisfies
       (propheticRun executable typeInstantiation handle (NRow.subst θ.1 σs) (shape.subst θ.1))
       (contract.ofSkolem θ) := by
-  intro args initial assumed required
+  intro args initial valid assumed required
   obtain ⟨normal, failing, defined⟩ :=
-    verified (HList.toSkolem θ σs args) initial assumed required
+    verified (HList.toSkolem θ σs args) initial valid assumed required
   rw [propheticRun_subst executable typeInstantiation handle θ free σs shape args]
   refine ⟨fun result final ok => ?_, fun error aborted => ?_, fun undefined => ?_⟩
   · simp only [Spec.bind_ok, Spec.pure_ok] at ok

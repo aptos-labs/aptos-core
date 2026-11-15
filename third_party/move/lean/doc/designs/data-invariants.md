@@ -216,10 +216,10 @@ what the site does, and the solver cuts at it (`wp_certifyingAt`,
 | Kind | Where it is produced |
 |---|---|
 | `construction` | `Term.pack`, `Term.variant` |
-| `mutationEnd` | a write into a local's own value (`Proj.setOwner?`) and every owing arm of `Lender.resolve` |
-| `exit` | `Mutables.resolve` of a `&mut` parameter, and `Term.returned` |
+| `mutationEnd` | a write into a local's own value (`Proj.setOwner?`), `Term.takeSliceAtValue`, and every owing arm of `Lender.resolve` and `SliceLender.resolve` |
+| `exit` | `Mutables.resolve` of a `&mut` or `&mut [T]` parameter, and `Term.returned` |
 | `copyOut` | `Term.deref`, and `Term.readPlace` through a dereference |
-| `handOver` | `Term.handedOver` |
+| `handOver` | `Term.handedOver`, and slice borrows/reborrows through a dereference (`Term.borrowArraySliceAt`, `Term.borrowVectorSliceAt`, `Term.reborrowSliceAt` when `path.hasDeref`) |
 
 A certificate-free referent owes nothing anywhere: `NTy.certificateFree`
 decides of the type, and the compiler emits `Term.copy` in place of
@@ -238,10 +238,8 @@ that breaks it (`VerexIR/Proofs/Denote/Agreement.lean`).
 ### Open while lent, repacked where the loan dies
 
 A value under a mutable loan may break its invariant between writes, as the
-Move Prover permits, and it may do so at any depth: `memory_instrumentation.rs`
-emits `PackRefDeep` only before a write-back to a local or global root and for
-a `&mut` parameter at exit; a write-back into another reference is never
-checked. So the current of a `&mut σ` is *plain* — σ with every certificate
+Move Prover permits, and an enclosing level's invariant may remain open while
+its loan lives. The current of a `&mut σ` is *plain* — σ with every certificate
 inside it removed — and the prophecy is certified:
 
 ```
@@ -252,15 +250,16 @@ A write through the reference (`Term.mutate`, and `Proj.setOwner?` through a
 `.deref` step) acts on the plain current and certifies nothing. The owner has
 held the prophecy since the borrow (`Term.borrowPlace`, `Term.globalBorrow` for
 a slot), a value of the carrier and so well-formed by type. Where the loan
-dies, `Lender.resolve` owes `certifyingAt site .mutationEnd` of the current —
-`deepHolds`, every level at once, which is `PackRefDeep` — and only then
-assumes `current = NTy.forget prophecy`. The order matters: a violation is
-undefined before the equation could prune it, so a run that breaks the
-invariant and reaches the loan's death has no outcome, and one that aborts
-first leaves an unobservable well-formed prophecy in the owner. A value copied
-out of the plain current into an owned position (`let c = *r`, `let c =
-r.inner`) is certified at the copy — stricter than the Prover, which lets a
-broken value escape that way, and the right place.
+dies, `Lender.resolve` checks the plain side of every equation it assumes before
+assuming it — `deepHolds`, every level at once, which is `PackRefDeep` — and
+only then assumes `rebuilt = NTy.forget held` (where a local lends) and
+`current = NTy.forget prophecy`. The order matters: a violation is undefined
+before an equation could prune it, so a run that breaks the invariant and
+reaches the loan's death has no outcome, and one that aborts first leaves an
+unobservable well-formed prophecy in the owner. A value copied out of the plain
+current into an owned position (`let c = *r`, `let c = r.inner`) is certified
+at the copy — stricter than the Prover, which lets a broken value escape that
+way, and the right place.
 
 ### A borrowed path
 
@@ -269,15 +268,20 @@ value with the prophecy set at the path would need the enclosing levels'
 certificates at the borrow, which nothing gives. The prophecy is therefore the
 *owner's* — a well-formed `s1'` chosen at the borrow, constrained to agree with
 `s1` off the path, the reference's prophecy being its component. At the death
-the enclosing levels rebuilt with the current are certified bottom-up (`s3`,
-then `s2` with the new `s3`, then `s1`) before the equation, which is what the
-structure of `NTy.deepHolds` gives and the order the Prover's `PackRefDeep`
-checks; a marker ending several loans reconciles them in decreasing instance
-order ([`prophetic-references.md`](prophetic-references.md)). A reborrow `&mut
-*b` or `&mut b.f` takes its prophecy from `b`'s prophecy, a certified value, at
-its path, and its current from `b`'s current; its death writes back into `b`'s
-current, a reference, and owes nothing. Only the write-back into a root is a
-cut.
+where `path.hasDeref = false`, certifying `rebuilt` (`s1` with the final `s3`)
+before the equations covers `s3`, `s2`, and `s1` bottom-up (`Proj.deepHolds_of_set?`);
+a marker ending several loans reconciles them in decreasing instance order
+([`prophetic-references.md`](prophetic-references.md)). Where `path.hasDeref = true`
+— a reborrow `&mut *b` or `&mut b.f`, a borrow through a reference field of a
+local aggregate, or an element loan into a `&mut [σ]` — the owner's certificate
+does not reach below the dereference, so `Lender.resolve` certifies both
+`reference.current` and `rebuilt` before the equations. When the owner is
+itself a bare reference (`owner : Var Γ (.ref υ)` at `.deref rest`), `rebuilt`
+inherits `held`'s prophecy certificate (`Proj.set?_deref_deepHolds`), so
+`Lender.resolve_place_deref` and `Lender.resolve_candidate_deref` erase the
+vacuous owner check and leave the referent's current check alone; an enclosing
+level's clause stays open until the outer loan dies, while the reborrow's own
+referent is checked where the reborrow dies.
 
 The lender a dying loan writes back to is one of five forms (`Lender`,
 `VerexIR/Proofs/Denote/Term.lean`): `slot` (a global borrow, or a `&mut`

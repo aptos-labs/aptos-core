@@ -1,1 +1,1 @@
-VerexE2ETests/SourceVerify/library_iter_mut_errors.rs:11:5: error: no denotation for `set_all`: a dereference of a place that is not a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/library_iter_mut_errors.spec.lean:12:6: error: `set_all` calls `core::iter::traits::collect::<I as std::iter::IntoIterator>::into_iter` at a reference type argument, and `core::iter::traits::collect::<I as std::iter::IntoIterator>::into_iter` is native: a generic contract does not transfer to a mutable reference, so it has no reading there

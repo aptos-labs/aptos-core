@@ -3189,7 +3189,7 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
       let invariants ← loopInvariants unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types stored.predicate
         (fun τ => view?.all fun view => markedInvariant own view τ)
-        (atArguments := atArguments)
+        (atArguments := atArguments) (carried := own.carriers)
       let assertions ← assertionConditions unit executable owner.namespaceId ownerNs ownerDeclaration
         ownerCompiled.params row types (ownProof := owner == handle)
         (atArguments := atArguments)
@@ -3242,7 +3242,7 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
       let invariants ← loopInvariants unit executable owner.handle.namespaceId owner.ns
         owner.declaration owner.compiled.params row types stored.predicate
         (fun τ => view?.all fun view => markedInvariant own view τ)
-        (atArguments := atArguments)
+        (atArguments := atArguments) (carried := own.carriers)
       -- A step of the callee's own proof states nothing in its caller, as
       -- for a callee inlined generically.
       let assertions ← assertionConditions unit executable owner.handle.namespaceId owner.ns
@@ -4007,7 +4007,7 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
           (VerexIR.Proofs.Denote.ResultShape.finish (Γ := $row) $exitSite $mutables $shape)
           else VerexIR.Proofs.Spec.stuck) _
       $unitFact:tactic
-      apply VerexIR.Proofs.satisfies_of_wp
+      apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro)
       $introduction:tactic
       all_goals
         (simp only [$body:ident, $row:ident, $params:ident, $locals:ident,
@@ -4544,7 +4544,8 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
       verex_proof $(mkIdent attempt) =>
         verex_timed "setup unit fact" $unitFact:tactic
         $assumptionsTactic:tactic
-        verex_timed "setup wp" (apply VerexIR.Proofs.satisfies_of_wp)
+        verex_timed "setup wp"
+          (apply VerexIR.Proofs.satisfies_of_wp (validRes := Function.const _ True.intro))
         $markReturns:tactic
         verex_timed "setup introduction" $introduction:tactic
         all_goals

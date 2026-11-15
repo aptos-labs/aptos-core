@@ -35,6 +35,139 @@ theorem NTy.certifyPlain?_eq_decode [Carriers] (τ : NTy) (value : τ.plain) :
     | some certified =>
       exact False.elim (absent ((NTy.decode?_plainEncode_iff τ value).mp ⟨certified, decoded⟩))
 
+theorem NTy.ofHolds_forget [Carriers] (τ : NTy) (c : τ.carrier)
+    (holds : NTy.Holds τ (NTy.forget τ c)) :
+    NTy.ofHolds τ (NTy.forget τ c) holds = c :=
+  NTy.forget_injective τ (NTy.forget_ofDeepHolds τ (NTy.forget τ c) holds.deepHolds)
+
+/-- Non-dependent partial carrier lift from `τ.plain` to `Option τ.carrier`.
+Deliberately NOT marked `@[vir_denote_norm]` so `simp` never unfolds it into `dite`. -/
+noncomputable def NTy.ofPlain? [Carriers] (τ : NTy) (value : τ.plain) : Option τ.carrier :=
+  open Classical in
+  if holds : NTy.Holds τ value then some (NTy.ofHolds τ value holds) else none
+
+theorem NTy.ofPlain?_of_holds [Carriers] (τ : NTy) (value : τ.plain) (holds : NTy.Holds τ value) :
+    NTy.ofPlain? τ value = some (NTy.ofDeepHolds τ value holds.deepHolds) :=
+  dif_pos holds
+
+theorem NTy.ofPlain?_of_not_holds [Carriers] (τ : NTy) (value : τ.plain)
+    (holds : ¬NTy.Holds τ value) :
+    NTy.ofPlain? τ value = none :=
+  dif_neg holds
+
+@[simp] theorem NTy.ofPlain?_forget [Carriers] (τ : NTy) (c : τ.carrier) :
+    NTy.ofPlain? τ (NTy.forget τ c) = some c := by
+  rw [NTy.ofPlain?_of_holds τ (NTy.forget τ c) (NTy.holds_forget τ c), NTy.ofDeepHolds_forget]
+
+@[simp] theorem NTy.ofPlain?_eq_some_iff [Carriers] (τ : NTy) (value : τ.plain) (c : τ.carrier) :
+    NTy.ofPlain? τ value = some c ↔ value = NTy.forget τ c := by
+  constructor
+  · intro h
+    by_cases holds : NTy.Holds τ value
+    · rw [NTy.ofPlain?_of_holds τ value holds] at h
+      rw [← Option.some.inj h]
+      exact (NTy.forget_ofDeepHolds τ value holds.deepHolds).symm
+    · rw [NTy.ofPlain?_of_not_holds τ value holds] at h
+      cases h
+  · rintro rfl
+    exact NTy.ofPlain?_forget τ c
+
+theorem NTy.isSome_bind_ofPlain?_of_holds [Carriers] (τ : NTy) (opt : Option τ.plain)
+    (holds : ∀ v, opt = some v → NTy.Holds τ v) :
+    (opt.bind (NTy.ofPlain? τ)).isSome = opt.isSome := by
+  cases opt with
+  | none => rfl
+  | some v =>
+    simp only [Option.bind_some, NTy.ofPlain?_of_holds τ v (holds v rfl), Option.isSome_some]
+
+theorem NTy.bind_ofPlain?_eq_none_of_holds [Carriers] (τ : NTy) (opt : Option τ.plain)
+    (holds : ∀ v, opt = some v → NTy.Holds τ v) :
+    opt.bind (NTy.ofPlain? τ) = none ↔ opt = none := by
+  cases opt with
+  | none => simp
+  | some v =>
+    simp only [Option.bind_some, NTy.ofPlain?_of_holds τ v (holds v rfl), reduceCtorEq]
+
+theorem NTy.bind_ofPlain?_eq_some_of_holds [Carriers] (τ : NTy) (opt : Option τ.plain)
+    (holds : ∀ v, opt = some v → NTy.Holds τ v) (c : τ.carrier) :
+    opt.bind (NTy.ofPlain? τ) = some c ↔ opt = some (NTy.forget τ c) := by
+  cases opt with
+  | none => simp
+  | some v =>
+    simp only [Option.bind_some, NTy.ofPlain?_eq_some_iff, Option.some.injEq]
+
+@[simp] theorem NTy.bind_ofPlain?_unit [Carriers] (opt : Option (@NTy.plain ‹_› .unit)) :
+    opt.bind (NTy.ofPlain? .unit) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .unit v
+
+@[simp] theorem NTy.bind_ofPlain?_bool [Carriers] (opt : Option (@NTy.plain ‹_› .bool)) :
+    opt.bind (NTy.ofPlain? .bool) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .bool v
+
+@[simp] theorem NTy.bind_ofPlain?_int [Carriers] (w : Nat) (s : Bool)
+    (opt : Option (@NTy.plain ‹_› (.int w s))) :
+    opt.bind (NTy.ofPlain? (.int w s)) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget (.int w s) v
+
+@[simp] theorem NTy.bind_ofPlain?_num [Carriers] (opt : Option (@NTy.plain ‹_› .num)) :
+    opt.bind (NTy.ofPlain? .num) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .num v
+
+@[simp] theorem NTy.bind_ofPlain?_address [Carriers] (opt : Option (@NTy.plain ‹_› .address)) :
+    opt.bind (NTy.ofPlain? .address) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .address v
+
+@[simp] theorem NTy.bind_ofPlain?_signer [Carriers] (opt : Option (@NTy.plain ‹_› .signer)) :
+    opt.bind (NTy.ofPlain? .signer) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .signer v
+
+@[simp] theorem NTy.bind_ofPlain?_string [Carriers] (opt : Option (@NTy.plain ‹_› .string)) :
+    opt.bind (NTy.ofPlain? .string) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .string v
+
+@[simp] theorem NTy.bind_ofPlain?_bytes [Carriers] (opt : Option (@NTy.plain ‹_› .bytes)) :
+    opt.bind (NTy.ofPlain? .bytes) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .bytes v
+
+@[simp] theorem NTy.bind_ofPlain?_char [Carriers] (opt : Option (@NTy.plain ‹_› .char)) :
+    opt.bind (NTy.ofPlain? .char) = opt := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_forget .char v
+
+theorem NTy.ofPlain?_certificateFree [Carriers] (τ : NTy) (free : τ.certificateFree = true)
+    (v : τ.plain) :
+    NTy.ofPlain? τ v = some (cast (NTy.carrier_eq_plain_of_certificateFree τ free).symm v) := by
+  let c : τ.carrier := cast (NTy.carrier_eq_plain_of_certificateFree τ free).symm v
+  have hforget : NTy.forget τ c = v := by
+    rw [NTy.forget_eq_cast_of_certificateFree τ free c, cast_cast, cast_eq]
+  conv => lhs; rw [← hforget]
+  exact NTy.ofPlain?_forget τ c
+
+theorem NTy.bind_ofPlain?_certificateFree [Carriers] (τ : NTy) (free : τ.certificateFree = true)
+    (opt : Option τ.plain) :
+    opt.bind (NTy.ofPlain? τ) =
+      opt.map (cast (NTy.carrier_eq_plain_of_certificateFree τ free).symm) := by
+  cases opt with
+  | none => rfl
+  | some v => exact NTy.ofPlain?_certificateFree τ free v
+
 
 open VerexIR.Validation VerexIR.SemanticOperations
 
@@ -300,6 +433,36 @@ theorem Skolems.forget_ofRuntime (τ : NTy)
   rw [← Θ.plainOfRuntime_plainToRuntime τ (NTy.forget τ (Θ.ofRuntime τ value)),
     Θ.forget_toRuntime τ (Θ.ofRuntime τ value), Θ.toRuntime_ofRuntime]
 
+/-- Carrying a plain value to the runtime family preserves its invariants. -/
+@[simp, vir_transport] theorem Skolems.holds_plainToRuntime_iff
+    (τ : NTy) (value : @NTy.plain Θ.toCarriers τ) :
+    @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.plainToRuntime τ value) ↔
+      @NTy.Holds Θ.toCarriers τ value := by
+  constructor
+  · intro runtimeHeld
+    let certifiedRuntime := @NTy.ofHolds (Carriers.runtime unit) (Θ.resolve τ)
+      (Θ.plainToRuntime τ value) runtimeHeld
+    have eqPlain : @NTy.forget Θ.toCarriers τ (Θ.ofRuntime τ certifiedRuntime) = value := by
+      rw [Skolems.forget_ofRuntime, @NTy.forget_ofDeepHolds (Carriers.runtime unit),
+        Θ.plainOfRuntime_plainToRuntime]
+    exact eqPlain ▸ @NTy.holds_forget Θ.toCarriers τ (Θ.ofRuntime τ certifiedRuntime)
+  · intro frameHeld
+    let certifiedFrame := @NTy.ofHolds Θ.toCarriers τ value frameHeld
+    have eqPlain : @NTy.forget (Carriers.runtime unit) (Θ.resolve τ)
+        (Θ.toRuntime τ certifiedFrame) = Θ.plainToRuntime τ value := by
+      rw [← Θ.forget_toRuntime, @NTy.forget_ofDeepHolds Θ.toCarriers]
+    exact eqPlain ▸ @NTy.holds_forget (Carriers.runtime unit) (Θ.resolve τ)
+      (Θ.toRuntime τ certifiedFrame)
+
+/-- Reading a plain value off the runtime family preserves its invariants. -/
+@[simp, vir_transport] theorem Skolems.holds_plainOfRuntime_iff
+    (τ : NTy) (value : @NTy.plain (Carriers.runtime unit) (Θ.resolve τ)) :
+    @NTy.Holds Θ.toCarriers τ (Θ.plainOfRuntime τ value) ↔
+      @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) value := by
+  have step := Skolems.holds_plainToRuntime_iff (Θ := Θ) τ (Θ.plainOfRuntime τ value)
+  rw [Θ.plainToRuntime_plainOfRuntime] at step
+  exact step.symm
+
 /-- A stored value of a frame's resource as the plain value it certifies: what
 a leaf reads of global memory. -/
 def Skolems.plainAt (τ : NTy) (arguments : NRow) (key : StorageKey) (memory : Memory unit) :
@@ -323,48 +486,57 @@ noncomputable def Skolems.writePlain (τ : NTy) (arguments : NRow) (key : Storag
       ((NTy.slotOfHolds τ value holds).map (Θ.toRuntime τ))
   else memory
 
+end Frames
+
+section FrameTheorems
+variable {Θ : Skolems unit}
+
 theorem Skolems.writePlain_of_holds (τ : NTy) (arguments : NRow) (key : StorageKey)
-    (value : Option τ.plain) (memory : Memory unit)
-    (holds : Option.elim value True (NTy.Holds τ)) :
-    Skolems.writePlain τ arguments key value memory =
-      memory.set (Skolems.resource τ arguments) key
-        ((NTy.slotOfHolds τ value holds).map (Θ.toRuntime τ)) :=
+    (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (holds : Option.elim value True (@NTy.Holds Θ.toCarriers τ)) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory =
+      memory.set (Skolems.resource (Θ := Θ) τ arguments) key
+        ((@NTy.slotOfHolds Θ.toCarriers τ value holds).map (Θ.toRuntime τ)) :=
   dif_pos holds
 
 theorem Skolems.writePlain_of_not_holds (τ : NTy) (arguments : NRow) (key : StorageKey)
-    (value : Option τ.plain) (memory : Memory unit)
-    (holds : ¬Option.elim value True (NTy.Holds τ)) :
-    Skolems.writePlain τ arguments key value memory = memory :=
+    (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (holds : ¬Option.elim value True (@NTy.Holds Θ.toCarriers τ)) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory = memory :=
   dif_neg holds
 
 theorem Skolems.set_toRuntime_ofDeepHolds (τ : NTy) (arguments : NRow) (key : StorageKey)
-    (memory : Memory unit) (value : τ.plain) (holds : NTy.deepHolds τ value) :
-    memory.set (Skolems.resource τ arguments) key
-        (some (Θ.toRuntime τ (NTy.ofDeepHolds τ value holds))) =
-      Skolems.writePlain τ arguments key (some value) memory :=
+    (memory : Memory unit) (value : @NTy.plain Θ.toCarriers τ)
+    (holds : @NTy.deepHolds Θ.toCarriers τ value) :
+    memory.set (Skolems.resource (Θ := Θ) τ arguments) key
+        (some (Θ.toRuntime τ (@NTy.ofDeepHolds Θ.toCarriers τ value holds))) =
+      Skolems.writePlain (Θ := Θ) τ arguments key (some value) memory :=
   (Skolems.writePlain_of_holds τ arguments key (some value) memory ⟨holds⟩).symm
 
 theorem Skolems.set_none_eq_writePlain (τ : NTy) (arguments : NRow) (key : StorageKey)
     (memory : Memory unit) :
-    memory.set (Skolems.resource τ arguments) key none =
-      Skolems.writePlain τ arguments key none memory :=
+    memory.set (Skolems.resource (Θ := Θ) τ arguments) key none =
+      Skolems.writePlain (Θ := Θ) τ arguments key none memory :=
   (Skolems.writePlain_of_holds τ arguments key none memory trivial).symm
 
-theorem Skolems.plainAt_slot (τ : NTy) : (slot : Option τ.plain) →
-    (holds : Option.elim slot True (NTy.Holds τ)) →
-    (((NTy.slotOfHolds τ slot holds).map (Θ.toRuntime τ)).map (Θ.ofRuntime τ)).map
-        (NTy.forget τ) = slot
+theorem Skolems.plainAt_slot (τ : NTy) : (slot : Option (@NTy.plain Θ.toCarriers τ)) →
+    (holds : Option.elim slot True (@NTy.Holds Θ.toCarriers τ)) →
+    (((@NTy.slotOfHolds Θ.toCarriers τ slot holds).map (Θ.toRuntime τ)).map (Θ.ofRuntime τ)).map
+        (@NTy.forget Θ.toCarriers τ) = slot
   | none, _ => rfl
   | some value, holds => by
+      letI : Skolems unit := Θ
       show some (NTy.forget τ (Θ.ofRuntime τ (Θ.toRuntime τ (NTy.ofHolds τ value holds)))) =
         some value
       rw [Θ.ofRuntime_toRuntime, NTy.forget_ofDeepHolds]
 
 theorem Skolems.plainAt_writePlain (τ : NTy) (arguments : NRow) (key otherKey : StorageKey)
-    (memory : Memory unit) (value : Option τ.plain)
-    (holds : Option.elim value True (NTy.Holds τ)) :
-    Skolems.plainAt τ arguments otherKey (Skolems.writePlain τ arguments key value memory) =
-      if otherKey = key then value else Skolems.plainAt τ arguments otherKey memory := by
+    (memory : Memory unit) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (holds : Option.elim value True (@NTy.Holds Θ.toCarriers τ)) :
+    Skolems.plainAt (Θ := Θ) τ arguments otherKey
+        (Skolems.writePlain (Θ := Θ) τ arguments key value memory) =
+      if otherKey = key then value else Skolems.plainAt (Θ := Θ) τ arguments otherKey memory := by
+  letI : Skolems unit := Θ
   rw [Skolems.writePlain_of_holds τ arguments key value memory holds, Skolems.plainAt_def,
     Memory.set_same, Skolems.plainAt_def]
   split
@@ -372,18 +544,22 @@ theorem Skolems.plainAt_writePlain (τ : NTy) (arguments : NRow) (key otherKey :
   · rfl
 
 theorem Skolems.plainAt_writePlain_other (τ σ : NTy) (arguments others : NRow)
-    (key otherKey : StorageKey) (memory : Memory unit) (value : Option τ.plain)
-    (distinct : Skolems.resource σ others ≠ Skolems.resource τ arguments) :
-    Skolems.plainAt σ others otherKey (Skolems.writePlain τ arguments key value memory) =
-      Skolems.plainAt σ others otherKey memory := by
+    (key otherKey : StorageKey) (memory : Memory unit) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (distinct : Skolems.resource (Θ := Θ) σ others ≠ Skolems.resource (Θ := Θ) τ arguments) :
+    Skolems.plainAt (Θ := Θ) σ others otherKey
+        (Skolems.writePlain (Θ := Θ) τ arguments key value memory) =
+      Skolems.plainAt (Θ := Θ) σ others otherKey memory := by
+  letI : Skolems unit := Θ
   by_cases holds : Option.elim value True (NTy.Holds τ)
   · rw [Skolems.writePlain_of_holds τ arguments key value memory holds, Skolems.plainAt_def,
       Skolems.plainAt_def, Memory.set_other _ key otherKey _ distinct]
   · rw [Skolems.writePlain_of_not_holds τ arguments key value memory holds]
 
 theorem Skolems.holds_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
-    (memory : Memory unit) {value : τ.plain}
-    (read : Skolems.plainAt τ arguments key memory = some value) : NTy.Holds τ value := by
+    (memory : Memory unit) {value : @NTy.plain Θ.toCarriers τ}
+    (read : Skolems.plainAt (Θ := Θ) τ arguments key memory = some value) :
+    @NTy.Holds Θ.toCarriers τ value := by
+  letI : Skolems unit := Θ
   rw [Skolems.plainAt_def] at read
   rcases stored : memory (Skolems.resource τ arguments) key with _ | source
   · rw [stored] at read
@@ -393,14 +569,16 @@ theorem Skolems.holds_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
 
 theorem Skolems.isSome_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
     (memory : Memory unit) :
-    (Skolems.plainAt τ arguments key memory).isSome =
-      (memory (Skolems.resource τ arguments) key).isSome := by
+    (Skolems.plainAt (Θ := Θ) τ arguments key memory).isSome =
+      (memory (Skolems.resource (Θ := Θ) τ arguments) key).isSome := by
+  letI : Skolems unit := Θ
   rw [Skolems.plainAt_def, Option.isSome_map, Option.isSome_map]
 
 theorem Skolems.plainAt_eq (τ : NTy) (arguments : NRow) (key : StorageKey)
     (memory : Memory unit) :
-    Skolems.plainAt τ arguments key memory =
-      (memory.plainAt (Skolems.resource τ arguments) key).map (Θ.plainOfRuntime τ) := by
+    Skolems.plainAt (Θ := Θ) τ arguments key memory =
+      (memory.plainAt (Skolems.resource (Θ := Θ) τ arguments) key).map (Θ.plainOfRuntime τ) := by
+  letI : Skolems unit := Θ
   rw [Skolems.plainAt_def, Memory.plainAt_eq]
   rcases memory (Skolems.resource τ arguments) key with _ | source
   · rfl
@@ -409,8 +587,458 @@ theorem Skolems.plainAt_eq (τ : NTy) (arguments : NRow) (key : StorageKey)
     rw [Skolems.forget_ofRuntime]
     rfl
 
+@[simp] theorem Skolems.isSome_bind_ofPlain?_plainAt (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    ((Skolems.plainAt (Θ := Θ) τ arguments key memory).bind (@NTy.ofPlain? Θ.toCarriers τ)).isSome =
+      (Skolems.plainAt (Θ := Θ) τ arguments key memory).isSome :=
+  @NTy.isSome_bind_ofPlain?_of_holds Θ.toCarriers τ _
+    fun _ h => Skolems.holds_plainAt τ arguments key memory h
 
-end Frames
+@[simp] theorem Skolems.bind_ofPlain?_plainAt_eq_none (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) :
+    (Skolems.plainAt (Θ := Θ) τ arguments key memory).bind (@NTy.ofPlain? Θ.toCarriers τ) = none ↔
+      Skolems.plainAt (Θ := Θ) τ arguments key memory = none :=
+  @NTy.bind_ofPlain?_eq_none_of_holds Θ.toCarriers τ _
+    fun _ h => Skolems.holds_plainAt τ arguments key memory h
+
+@[simp] theorem Skolems.bind_ofPlain?_plainAt_eq_some (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) (c : @NTy.carrier Θ.toCarriers τ) :
+    (Skolems.plainAt (Θ := Θ) τ arguments key memory).bind (@NTy.ofPlain? Θ.toCarriers τ) = some c ↔
+      Skolems.plainAt (Θ := Θ) τ arguments key memory = some (@NTy.forget Θ.toCarriers τ c) :=
+  @NTy.bind_ofPlain?_eq_some_of_holds Θ.toCarriers τ _
+    (fun _ h => Skolems.holds_plainAt τ arguments key memory h) c
+
+theorem Skolems.isSome_plainAt_iff_exists_carrier (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    (Skolems.plainAt (Θ := Θ) τ arguments key memory).isSome = true ↔
+      ∃ c : @NTy.carrier Θ.toCarriers τ,
+        Skolems.plainAt (Θ := Θ) τ arguments key memory = some (@NTy.forget Θ.toCarriers τ c) := by
+  rw [← Skolems.isSome_bind_ofPlain?_plainAt, Option.isSome_iff_exists]
+  exact exists_congr fun c => Skolems.bind_ofPlain?_plainAt_eq_some τ arguments key memory c
+
+theorem Skolems.plainAt_writePlain_ne (τ : NTy) (arguments : NRow) (key otherKey : StorageKey)
+    (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit) (ne : otherKey ≠ key) :
+    Skolems.plainAt (Θ := Θ) τ arguments otherKey
+        (Skolems.writePlain (Θ := Θ) τ arguments key value memory) =
+      Skolems.plainAt (Θ := Θ) τ arguments otherKey memory := by
+  letI : Skolems unit := Θ
+  by_cases holds : Option.elim value True (NTy.Holds τ)
+  · rw [Skolems.plainAt_writePlain τ arguments key otherKey memory value holds, if_neg ne]
+  · rw [Skolems.writePlain_of_not_holds τ arguments key value memory holds]
+
+theorem Skolems.plainAt_writePlain_same (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (holds : Option.elim value True (@NTy.Holds Θ.toCarriers τ)) :
+    Skolems.plainAt (Θ := Θ) τ arguments key
+        (Skolems.writePlain (Θ := Θ) τ arguments key value memory) = value := by
+  rw [Skolems.plainAt_writePlain τ arguments key key memory value holds, if_pos rfl]
+
+theorem Skolems.plainAt_writePlain_none (τ : NTy) (arguments : NRow) (key otherKey : StorageKey)
+    (memory : Memory unit) :
+    Skolems.plainAt (Θ := Θ) τ arguments otherKey
+        (Skolems.writePlain (Θ := Θ) τ arguments key none memory) =
+      if otherKey = key then none else Skolems.plainAt (Θ := Θ) τ arguments otherKey memory :=
+  Skolems.plainAt_writePlain τ arguments key otherKey memory none trivial
+
+theorem Skolems.plainAt_writePlain_none_same (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (memory : Memory unit) :
+    Skolems.plainAt (Θ := Θ) τ arguments key
+        (Skolems.writePlain (Θ := Θ) τ arguments key none memory) = none := by
+  rw [Skolems.plainAt_writePlain_none, if_pos rfl]
+
+theorem Skolems.plainAt_eq_of_eq (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (m1 m2 : Memory unit)
+    (same : m1 (Skolems.resource (Θ := Θ) τ arguments) key =
+      m2 (Skolems.resource (Θ := Θ) τ arguments) key) :
+    Skolems.plainAt (Θ := Θ) τ arguments key m1 =
+      Skolems.plainAt (Θ := Θ) τ arguments key m2 := by
+  letI : Skolems unit := Θ
+  rw [Skolems.plainAt_def, Skolems.plainAt_def, same]
+
+theorem Skolems.writePlain_writePlain_same (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (v1 v2 : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (holds2 : Option.elim v2 True (@NTy.Holds Θ.toCarriers τ)) :
+    Skolems.writePlain (Θ := Θ) τ arguments key v2
+        (Skolems.writePlain (Θ := Θ) τ arguments key v1 memory) =
+      Skolems.writePlain (Θ := Θ) τ arguments key v2 memory := by
+  letI : Skolems unit := Θ
+  by_cases holds1 : Option.elim v1 True (NTy.Holds τ)
+  · rw [Skolems.writePlain_of_holds τ arguments key v1 memory holds1,
+      Skolems.writePlain_of_holds τ arguments key v2 _ holds2,
+      Skolems.writePlain_of_holds τ arguments key v2 memory holds2]
+    funext r k
+    by_cases hr : r = Skolems.resource τ arguments
+    · subst hr
+      simp only [Memory.set_same]
+      by_cases hk : k = key <;> simp [hk]
+    · simp only [Memory.set_other _ _ _ _ hr]
+  · rw [Skolems.writePlain_of_not_holds τ arguments key v1 memory holds1]
+
+theorem Skolems.writePlain_writePlain_none_same (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (v1 : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit) :
+    Skolems.writePlain (Θ := Θ) τ arguments key none
+        (Skolems.writePlain (Θ := Θ) τ arguments key v1 memory) =
+      Skolems.writePlain (Θ := Θ) τ arguments key none memory :=
+  Skolems.writePlain_writePlain_same τ arguments key v1 none memory trivial
+
+theorem Skolems.writePlain_other_key (τ : NTy) (arguments : NRow) (key otherKey : StorageKey)
+    (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit) (ne : otherKey ≠ key) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory
+        (Skolems.resource (Θ := Θ) τ arguments) otherKey =
+      memory (Skolems.resource (Θ := Θ) τ arguments) otherKey := by
+  letI : Skolems unit := Θ
+  by_cases holds : Option.elim value True (NTy.Holds τ)
+  · rw [Skolems.writePlain_of_holds τ arguments key value memory holds, Memory.set_same, if_neg ne]
+  · rw [Skolems.writePlain_of_not_holds τ arguments key value memory holds]
+
+theorem Skolems.writePlain_other_key_of_eq (τ : NTy) (arguments : NRow) {r : ResourceType}
+    (key otherKey : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (same : r = Skolems.resource (Θ := Θ) τ arguments) (ne : otherKey ≠ key) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory r otherKey = memory r otherKey := by
+  subst same
+  exact Skolems.writePlain_other_key τ arguments key otherKey value memory ne
+
+theorem Skolems.writePlain_other_resource (τ : NTy) (arguments : NRow) (other : ResourceType)
+    (key : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (ne : other ≠ Skolems.resource (Θ := Θ) τ arguments) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory other = memory other := by
+  letI : Skolems unit := Θ
+  funext otherKey
+  by_cases holds : Option.elim value True (NTy.Holds τ)
+  · rw [Skolems.writePlain_of_holds τ arguments key value memory holds,
+      Memory.set_other _ _ _ _ ne]
+  · rw [Skolems.writePlain_of_not_holds τ arguments key value memory holds]
+
+theorem Skolems.writePlain_other_resource_apply (τ : NTy) (arguments : NRow) (other : ResourceType)
+    (key otherKey : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (ne : other ≠ Skolems.resource (Θ := Θ) τ arguments) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory other otherKey =
+      memory other otherKey :=
+  congrFun (Skolems.writePlain_other_resource τ arguments other key value memory ne) otherKey
+
+theorem Skolems.writePlain_ne_key (τ : NTy) (arguments : NRow) (other : ResourceType)
+    (key otherKey : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ)) (memory : Memory unit)
+    (ne : otherKey ≠ key) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory other otherKey =
+      memory other otherKey := by
+  by_cases hr : other = Skolems.resource (Θ := Θ) τ arguments
+  · exact Skolems.writePlain_other_key_of_eq τ arguments key otherKey value memory hr ne
+  · exact Skolems.writePlain_other_resource_apply τ arguments other key otherKey value memory hr
+
+theorem Skolems.plainAt_writePlain_ne_key (τ σ : NTy) (arguments others : NRow)
+    (key otherKey : StorageKey) (memory : Memory unit) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (ne : otherKey ≠ key) :
+    Skolems.plainAt (Θ := Θ) σ others otherKey
+        (Skolems.writePlain (Θ := Θ) τ arguments key value memory) =
+      Skolems.plainAt (Θ := Θ) σ others otherKey memory := by
+  letI : Skolems unit := Θ
+  rw [Skolems.plainAt_def, Skolems.plainAt_def,
+    Skolems.writePlain_ne_key τ arguments (Skolems.resource σ others) key otherKey value memory ne]
+
+@[vir_denote_norm] theorem Skolems.resource_ne_allocationResource (τ : NTy) (arguments : NRow) :
+    Skolems.resource (Θ := Θ) τ arguments ≠ TableMemory.allocationResource :=
+  TableMemory.value_ne_allocationResource _ _
+
+@[vir_denote_norm] theorem Skolems.allocationResource_ne_resource (τ : NTy) (arguments : NRow) :
+    TableMemory.allocationResource ≠ Skolems.resource (Θ := Θ) τ arguments :=
+  TableMemory.allocationResource_ne_value _ _
+
+@[simp, vir_denote_norm] theorem Skolems.writePlain_allocationResource (τ : NTy) (arguments : NRow)
+    (key otherKey : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (memory : Memory unit) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory
+        TableMemory.allocationResource otherKey =
+      memory TableMemory.allocationResource otherKey :=
+  Skolems.writePlain_other_resource_apply τ arguments TableMemory.allocationResource key otherKey
+    value memory (Skolems.allocationResource_ne_resource τ arguments)
+
+@[simp, vir_denote_norm] theorem Skolems.writePlain_allocationResource_fun (τ : NTy)
+    (arguments : NRow) (key : StorageKey) (value : Option (@NTy.plain Θ.toCarriers τ))
+    (memory : Memory unit) :
+    Skolems.writePlain (Θ := Θ) τ arguments key value memory TableMemory.allocationResource =
+      memory TableMemory.allocationResource :=
+  Skolems.writePlain_other_resource τ arguments TableMemory.allocationResource key value memory
+    (Skolems.allocationResource_ne_resource τ arguments)
+
+theorem DataInvariants.writePlain {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} {value : Option (@NTy.plain Θ.toCarriers τ)}
+    (stored : ∀ (v : @NTy.plain Θ.toCarriers τ) (hv : @NTy.Holds Θ.toCarriers τ v),
+      value = some v →
+      invariant (Skolems.resource (Θ := Θ) τ arguments)
+        (Θ.toRuntime τ (@NTy.ofDeepHolds Θ.toCarriers τ v hv.deepHolds))) :
+    DataInvariants invariant (Skolems.writePlain (Θ := Θ) τ arguments key value memory) := by
+  letI : Skolems unit := Θ
+  by_cases h : Option.elim value True (NTy.Holds τ)
+  · rw [Skolems.writePlain_of_holds τ arguments key value memory h]
+    cases value with
+    | none => exact holds.set_none
+    | some v => exact holds.set_some (stored v h rfl)
+  · rw [Skolems.writePlain_of_not_holds τ arguments key value memory h]
+    exact holds
+
+theorem DataInvariants.writePlain_some {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} {v : @NTy.plain Θ.toCarriers τ}
+    (stored : ∀ (hv : @NTy.Holds Θ.toCarriers τ v),
+      invariant (Skolems.resource (Θ := Θ) τ arguments)
+        (Θ.toRuntime τ (@NTy.ofDeepHolds Θ.toCarriers τ v hv.deepHolds))) :
+    DataInvariants invariant (Skolems.writePlain (Θ := Θ) τ arguments key (some v) memory) :=
+  DataInvariants.writePlain holds fun _ hv eq =>
+    Option.some.inj eq ▸ stored (Option.some.inj eq ▸ hv)
+
+theorem DataInvariants.writePlain_forget {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} {c : @NTy.carrier Θ.toCarriers τ}
+    (stored : invariant (Skolems.resource (Θ := Θ) τ arguments) (Θ.toRuntime τ c)) :
+    DataInvariants invariant
+      (Skolems.writePlain (Θ := Θ) τ arguments key (some (@NTy.forget Θ.toCarriers τ c)) memory) :=
+  DataInvariants.writePlain_some holds fun hv => by
+    letI : Skolems unit := Θ
+    rwa [NTy.ofDeepHolds_forget τ c]
+
+theorem DataInvariants.writePlain_none {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} :
+    DataInvariants invariant (Skolems.writePlain (Θ := Θ) τ arguments key none memory) :=
+  DataInvariants.writePlain holds fun _ _ eq => nomatch eq
+
+theorem DataInvariants.read_plainAt {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} {plainVal : @NTy.plain Θ.toCarriers τ}
+    (read : Skolems.plainAt (Θ := Θ) τ arguments key memory = some plainVal) :
+    invariant (Skolems.resource (Θ := Θ) τ arguments)
+      (Θ.toRuntime τ
+        (@NTy.ofDeepHolds Θ.toCarriers τ plainVal
+          (Skolems.holds_plainAt τ arguments key memory read).deepHolds)) := by
+  letI : Skolems unit := Θ
+  have hread := read
+  rw [Skolems.plainAt_def] at hread
+  rcases hmem : memory (Skolems.resource τ arguments) key with _ | rawVal
+  · rw [hmem] at hread; cases hread
+  · rw [hmem, Option.map_some, Option.map_some, Option.some.injEq] at hread
+    have hinv := holds.read hmem
+    have hrt : Θ.toRuntime τ
+        (NTy.ofDeepHolds τ plainVal
+          (Skolems.holds_plainAt τ arguments key memory read).deepHolds) = rawVal := by
+      have hc : NTy.ofDeepHolds τ plainVal
+          (Skolems.holds_plainAt τ arguments key memory read).deepHolds =
+          Θ.ofRuntime τ rawVal := by
+        apply NTy.forget_injective τ
+        rw [NTy.forget_ofDeepHolds, ← hread]
+      rw [hc, Θ.toRuntime_ofRuntime]
+    rwa [hrt]
+
+theorem DataInvariants.read_plainAt_forget {invariant : (r : ResourceType) → r.carrier unit → Prop}
+    {memory : Memory unit} (holds : DataInvariants invariant memory)
+    {τ : NTy} {arguments : NRow} {key : StorageKey} {c : @NTy.carrier Θ.toCarriers τ}
+    (read : Skolems.plainAt (Θ := Θ) τ arguments key memory =
+      some (@NTy.forget Θ.toCarriers τ c)) :
+    invariant (Skolems.resource (Θ := Θ) τ arguments) (Θ.toRuntime τ c) := by
+  letI : Skolems unit := Θ
+  have h := DataInvariants.read_plainAt holds read
+  rwa [NTy.ofDeepHolds_forget τ c] at h
+
+end FrameTheorems
+
+private theorem NTy.unmark_not_isObserved : (σ : NTy) → σ.unmark.isObserved = false
+  | .observed r => NTy.unmark_not_isObserved r
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string
+  | .bytes | .char | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .slice _
+  | .vector _ | .array _ _ | .table _ _ | .ghost _ | .ref _ | .sliceRef _
+  | .param _ | .function _ _ _ | .nominal _ _ _ => rfl
+
+private theorem NTy.substWith_not_isObserved (f : Nat → NTy) :
+    (τ : NTy) → τ.isObserved = false → (τ.substWith f).isObserved = false
+  | .observed _, h => nomatch h
+  | .param index, _ => NTy.unmark_not_isObserved (f index)
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
+  | .bytes, _ | .char, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .slice _, _
+  | .vector _, _ | .array _ _, _ | .table _ _, _ | .ghost _, _ | .ref _, _ | .sliceRef _, _
+  | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+
+private theorem NTy.unmark_eq_self_of_not_isObserved : (τ : NTy) → τ.isObserved = false →
+    τ.unmark = τ
+  | .observed _, h => nomatch h
+  | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
+  | .bytes, _ | .char, _ | .tuple _, _ | .struct _ _ _, _ | .enum _ _ _ _ _, _ | .slice _, _
+  | .vector _, _ | .array _ _, _ | .table _ _, _ | .ghost _, _ | .ref _, _ | .sliceRef _, _
+  | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => rfl
+
+private theorem NTy.substWith_unmark_argumentWith (g : Nat → NTy) (σ : NTy) :
+    (σ.unmark).substWith g = (σ.argumentWith g).unmark := by
+  cases σ with
+  | param _ => rfl
+  | observed r => exact NTy.substWith_unmark g r
+  | _ => exact (NTy.unmark_eq_self_of_not_isObserved _ (NTy.substWith_not_isObserved g _ rfl)).symm
+
+mutual
+private theorem NTy.substWith_substWith (f g : Nat → NTy) : (τ : NTy) →
+    (τ.substWith f).substWith g = τ.substWith (fun i => (f i).argumentWith g)
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => rfl
+  | .param index => NTy.substWith_unmark_argumentWith g (f index)
+  | .tuple elements => congrArg NTy.tuple (NRow.substWith_substWith f g elements)
+  | .struct s args fields => by
+      simp only [NTy.substWith, NRow.substWith_substWith f g args,
+        NRow.substWith_substWith f g fields]
+  | .enum s args names rows d => by
+      simp only [NTy.substWith, NRow.substWith_substWith f g args,
+        NRows.substWith_substWith f g rows]
+  | .slice e => congrArg NTy.slice (NTy.substWith_substWith f g e)
+  | .vector e => congrArg NTy.vector (NTy.substWith_substWith f g e)
+  | .array e n => congrArg (NTy.array · n) (NTy.substWith_substWith f g e)
+  | .table k v => by
+      simp only [NTy.substWith, NTy.substWith_substWith f g k, NTy.substWith_substWith f g v]
+  | .ghost s => congrArg NTy.ghost (NTy.substWith_substWith f g s)
+  | .sliceRef r => congrArg NTy.sliceRef (NTy.substWith_substWith f g r)
+  | .ref r => congrArg NTy.ref (NTy.substWith_substWith f g r)
+  | .observed r => congrArg NTy.observed (NTy.substWith_substWith f g r)
+  | .function ps sh rs => by
+      simp only [NTy.substWith, NRow.substWith_substWith f g ps, NRow.substWith_substWith f g rs]
+  | .nominal s args p => by
+      simp only [NTy.substWith, NRow.substWith_substWith f g args]
+
+private theorem NRow.substWith_substWith (f g : Nat → NTy) : (row : NRow) →
+    (row.substWith f).substWith g = row.substWith (fun i => (f i).argumentWith g)
+  | .nil => rfl
+  | .cons τ rest => by
+      simp only [NRow.substWith, NTy.substWith_substWith f g τ, NRow.substWith_substWith f g rest]
+
+private theorem NRows.substWith_substWith (f g : Nat → NTy) : (rows : NRows) →
+    (rows.substWith f).substWith g = rows.substWith (fun i => (f i).argumentWith g)
+  | .nil => rfl
+  | .cons row rest => by
+      simp only [NRows.substWith, NRow.substWith_substWith f g row,
+        NRows.substWith_substWith f g rest]
+end
+
+theorem NTy.argumentWith_argumentWith (f g : Nat → NTy) (τ : NTy) :
+    (τ.argumentWith f).argumentWith g = τ.argumentWith (fun i => (f i).argumentWith g) := by
+  cases τ with
+  | param _ => rfl
+  | observed r => exact congrArg NTy.observed (NTy.substWith_substWith f g r)
+  | unit | bool | int _ _ | num | address | signer | string | bytes | char
+  | tuple _ | struct _ _ _ | enum _ _ _ _ _ | slice _ | vector _ | array _ _
+  | table _ _ | ghost _ | ref _ | sliceRef _ | function _ _ _ | nominal _ _ _ =>
+    exact NTy.substWith_substWith f g _
+
+theorem NRow.map_argumentWith_argumentWith (f g : Nat → NTy) : (row : NRow) →
+    (row.map (NTy.argumentWith f)).map (NTy.argumentWith g) =
+      row.map (NTy.argumentWith (fun i => (f i).argumentWith g))
+  | .nil => rfl
+  | .cons τ rest => by
+      simp only [NRow.map, NTy.argumentWith_argumentWith f g τ,
+        NRow.map_argumentWith_argumentWith f g rest]
+
+theorem Skolems.resource_instantiate (θ : TypeArgs) (outer : Skolems unit) (τ : NTy)
+    (arguments : NRow) :
+    @Skolems.resource unit _ (Skolems.instantiate θ outer) τ arguments =
+      @Skolems.resource unit _ outer (τ.subst θ.1) (arguments.map (NTy.argumentWith θ.1.argument)) := by
+  simp only [Skolems.resource, Skolems.resolve_instantiate]
+  exact congrArg (ResourceType.mk _ · .value)
+    (NRow.map_argumentWith_argumentWith θ.1.argument outer.argument arguments).symm
+
+theorem Skolems.plainAt_instantiate (θ : TypeArgs) (outer : Skolems unit) (τ : NTy)
+    (arguments : NRow) (key : StorageKey) (memory : Memory unit) :
+    @Skolems.plainAt unit _ (Skolems.instantiate θ outer) τ arguments key memory =
+      (@Skolems.plainAt unit _ outer (τ.subst θ.1)
+        (arguments.map (NTy.argumentWith θ.1.argument)) key memory).map
+        (@NTy.plainToSkolem outer.toCarriers inferInstance θ τ) := by
+  let rawAt (args : NRow) :
+      Option (@NTy.carrier (Carriers.runtime unit) (outer.resolve (τ.subst θ.1))) :=
+    memory ⟨outer.resolve (τ.subst θ.1), args, .value⟩ key
+  have hraw : rawAt (arguments.map (NTy.argumentWith (Skolems.instantiate θ outer).argument)) =
+      rawAt ((arguments.map (NTy.argumentWith θ.1.argument)).map (NTy.argumentWith outer.argument)) :=
+    congrArg rawAt (NRow.map_argumentWith_argumentWith θ.1.argument outer.argument arguments).symm
+  show ((rawAt (arguments.map (NTy.argumentWith (Skolems.instantiate θ outer).argument))).map
+      ((Skolems.instantiate θ outer).ofRuntime τ)).map
+        (@NTy.forget (Skolems.instantiate θ outer).toCarriers τ) =
+    (((rawAt ((arguments.map (NTy.argumentWith θ.1.argument)).map (NTy.argumentWith outer.argument))).map
+      (outer.ofRuntime (τ.subst θ.1))).map (@NTy.forget outer.toCarriers (τ.subst θ.1))).map
+      (@NTy.plainToSkolem outer.toCarriers inferInstance θ τ)
+  rw [hraw]
+  rcases rawAt ((arguments.map (NTy.argumentWith θ.1.argument)).map (NTy.argumentWith outer.argument)) with _ | raw
+  · rfl
+  · simp only [Option.map_some]
+    exact congrArg some (@NTy.forget_toSkolem outer.toCarriers inferInstance θ τ
+      (outer.ofRuntime (τ.subst θ.1) raw)).symm
+
+theorem Skolems.writePlain_instantiate (θ : TypeArgs) (outer : Skolems unit) (τ : NTy)
+    (arguments : NRow) (key : StorageKey)
+    (value : Option (@NTy.plain (Skolems.instantiate θ outer).toCarriers τ))
+    (memory : Memory unit) :
+    @Skolems.writePlain unit _ (Skolems.instantiate θ outer) τ arguments key value memory =
+      @Skolems.writePlain unit _ outer (τ.subst θ.1)
+        (arguments.map (NTy.argumentWith θ.1.argument)) key
+        (value.map (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ)) memory := by
+  let setAt (args : NRow)
+      (slot : Option (@NTy.carrier (Carriers.runtime unit) (outer.resolve (τ.subst θ.1)))) :
+      Memory unit :=
+    memory.set ⟨outer.resolve (τ.subst θ.1), args, .value⟩ key slot
+  have hargs : arguments.map (NTy.argumentWith (Skolems.instantiate θ outer).argument) =
+      (arguments.map (NTy.argumentWith θ.1.argument)).map (NTy.argumentWith outer.argument) :=
+    (NRow.map_argumentWith_argumentWith θ.1.argument outer.argument arguments).symm
+  cases value with
+  | none =>
+      have h1 := @Skolems.writePlain_of_holds unit _ (Skolems.instantiate θ outer) τ arguments key
+        none memory trivial
+      have h2 := @Skolems.writePlain_of_holds unit _ outer (τ.subst θ.1)
+        (arguments.map (NTy.argumentWith θ.1.argument)) key none memory trivial
+      rw [Option.map_none, h1, h2]
+      exact congrArg (setAt · none) hargs
+  | some v =>
+      by_cases hv : @NTy.Holds (Skolems.instantiate θ outer).toCarriers τ v
+      · have hvOuter : @NTy.Holds outer.toCarriers (τ.subst θ.1)
+            (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v) :=
+          (@NTy.holds_plainOfSkolem_iff outer.toCarriers inferInstance θ τ v).mpr hv
+        have h1 := @Skolems.writePlain_of_holds unit _ (Skolems.instantiate θ outer) τ arguments key
+          (some v) memory (hv : Option.elim (some v) True _)
+        have h2 := @Skolems.writePlain_of_holds unit _ outer (τ.subst θ.1)
+          (arguments.map (NTy.argumentWith θ.1.argument)) key
+          (some (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v)) memory
+          (hvOuter : Option.elim (some _) True _)
+        rw [Option.map_some, h1, h2]
+        have hval : (Skolems.instantiate θ outer).toRuntime τ
+              (@NTy.ofHolds (Skolems.instantiate θ outer).toCarriers τ v hv) =
+            outer.toRuntime (τ.subst θ.1)
+              (@NTy.ofHolds outer.toCarriers (τ.subst θ.1)
+                (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v) hvOuter) := by
+          apply congrArg (outer.toRuntime (τ.subst θ.1))
+          apply @NTy.forget_injective outer.toCarriers (τ.subst θ.1)
+          have hf1 : @NTy.forget outer.toCarriers (τ.subst θ.1)
+              (@NTy.ofSkolem outer.toCarriers inferInstance θ τ
+                (@NTy.ofHolds (Skolems.instantiate θ outer).toCarriers τ v hv)) =
+              @NTy.plainOfSkolem outer.toCarriers inferInstance θ τ
+                (@NTy.forget (Skolems.instantiate θ outer).toCarriers τ
+                  (@NTy.ofHolds (Skolems.instantiate θ outer).toCarriers τ v hv)) :=
+            (@NTy.forget_ofSkolem outer.toCarriers inferInstance θ τ _).symm
+          have hf2 : @NTy.forget (Skolems.instantiate θ outer).toCarriers τ
+              (@NTy.ofHolds (Skolems.instantiate θ outer).toCarriers τ v hv) = v :=
+            @NTy.forget_ofDeepHolds (Skolems.instantiate θ outer).toCarriers τ v
+              (@NTy.Holds.deepHolds (Skolems.instantiate θ outer).toCarriers τ v hv)
+          have hf3 : @NTy.forget outer.toCarriers (τ.subst θ.1)
+              (@NTy.ofHolds outer.toCarriers (τ.subst θ.1)
+                (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v) hvOuter) =
+              @NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v :=
+            @NTy.forget_ofDeepHolds outer.toCarriers (τ.subst θ.1) _
+              (@NTy.Holds.deepHolds outer.toCarriers (τ.subst θ.1) _ hvOuter)
+          rw [hf1, hf2, hf3]
+        show setAt (arguments.map (NTy.argumentWith (Skolems.instantiate θ outer).argument))
+            (some ((Skolems.instantiate θ outer).toRuntime τ
+              (@NTy.ofHolds (Skolems.instantiate θ outer).toCarriers τ v hv))) =
+          setAt ((arguments.map (NTy.argumentWith θ.1.argument)).map (NTy.argumentWith outer.argument))
+            (some (outer.toRuntime (τ.subst θ.1)
+              (@NTy.ofHolds outer.toCarriers (τ.subst θ.1) _ hvOuter)))
+        rw [hargs, hval]
+      · have hvOuter : ¬@NTy.Holds outer.toCarriers (τ.subst θ.1)
+            (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v) := fun h =>
+          hv ((@NTy.holds_plainOfSkolem_iff outer.toCarriers inferInstance θ τ v).mp h)
+        have h1 := @Skolems.writePlain_of_not_holds unit _ (Skolems.instantiate θ outer) τ arguments
+          key (some v) memory hv
+        have h2 := @Skolems.writePlain_of_not_holds unit _ outer (τ.subst θ.1)
+          (arguments.map (NTy.argumentWith θ.1.argument)) key
+          (some (@NTy.plainOfSkolem outer.toCarriers inferInstance θ τ v)) memory hvOuter
+        rw [Option.map_some, h1, h2]
 
 /-- The data invariant of the stored values of a declaration of native type
 `σ` and arguments `arguments`, its type parameters: of a value of the
@@ -789,6 +1417,26 @@ theorem Skolems.forget_reframe [@CarriersNonempty (Carriers.runtime unit)]
       @NTy.forget (Θ.instance params own).toCarriers τ (Θ.reframe own bounded value) := by
   apply @NTy.plainEncode_injective (Θ.instance params own).toCarriers τ
   simp only [Θ.plainEncode_plainReframe, NTy.plainEncode_forget, Θ.encode_reframe]
+
+/-- A plain value's invariants do not see a cast between the plain carriers of
+equal types. -/
+theorem NTy.holds_castCarrier {Φ : Carriers} {ρ ρ' : NTy} (same : ρ = ρ')
+    (carriers : @NTy.plain Φ ρ = @NTy.plain Φ ρ') (value : @NTy.plain Φ ρ) :
+    @NTy.Holds Φ ρ' (cast carriers value) ↔ @NTy.Holds Φ ρ value := by
+  subst same; rfl
+
+/-- Moving a plain value to the frame of its type arguments preserves its
+invariants. -/
+@[simp, vir_transport] theorem Skolems.holds_plainReframe_iff
+    [@CarriersNonempty (Carriers.runtime unit)] (Θ : Skolems unit) {params : NRow}
+    (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
+    (value : @NTy.plain Θ.toCarriers τ) :
+    @NTy.Holds (Θ.instance params own).toCarriers τ (Θ.plainReframe own bounded value) ↔
+      @NTy.Holds Θ.toCarriers τ value :=
+  ((Θ.instance params own).holds_plainOfRuntime_iff τ _).trans
+    ((NTy.holds_castCarrier (Θ.resolve_instance own bounded).symm _ _).trans
+      (Θ.holds_plainToRuntime_iff τ value))
 
 /-- A lent value at the frame of a type without type parameters, at the base
 frame at the same type: the lent form of `Skolems.toRuntimeFree`. -/

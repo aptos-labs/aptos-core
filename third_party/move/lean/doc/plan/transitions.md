@@ -5,7 +5,9 @@ section per transition: the state the system was in, the alternative that was
 rejected and why, the measurement that decided it, and what the transition left
 open.
 
-This file is the only place in the documentation that carries that narrative.
+This file is the only place in the documentation that carries that narrative,
+with one exception: [`why-plain-values.md`](why-plain-values.md)
+compares the encodings of a data invariant that the first transition below moved between.
 The design documents describe the current state and nothing else; the other
 files in `doc/plan/` state open problems. A line reference inside a section
 below belongs to the revision the section describes and is not expected to

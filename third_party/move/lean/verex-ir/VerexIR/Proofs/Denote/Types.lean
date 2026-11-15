@@ -5751,6 +5751,81 @@ theorem NTy.Holds.of_getElem?_final {element : NTy}
     (read : reference.finalVector.values[index]? = some value) : NTy.Holds element value :=
   holds.of_final (Array.mem_of_getElem? read)
 
+theorem NTy.Holds.of_getElem {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (index : Nat)
+    (inBounds : index < vector.values.size) :
+    τ.Holds (vector.values[index]'inBounds) :=
+  held.of_mem (Array.getElem_mem inBounds)
+
+theorem NTy.Holds.arrayVector {τ : NTy} {length : Nat} {array : (NTy.array τ length).plain}
+    (held : NTy.Holds (.array τ length) array) :
+    NTy.Holds (.vector τ) array.vector :=
+  ⟨held.deepHolds⟩
+
+theorem NTy.Holds.slice_iff_vector {τ : NTy} {vector : SpecVector τ.plain} :
+    NTy.Holds (.slice τ) vector ↔ NTy.Holds (.vector τ) vector :=
+  ⟨fun h => ⟨h.deepHolds⟩, fun h => ⟨h.deepHolds⟩⟩
+
+theorem NTy.Holds.sliceCurrent {τ : NTy} {reference : (NTy.sliceRef τ).plain}
+    (held : NTy.Holds (.sliceRef τ) reference) :
+    NTy.Holds (.slice τ) reference.currentVector :=
+  ⟨held.deepHolds.1⟩
+
+theorem NTy.Holds.of_arrayOf {τ : NTy} {length : Nat} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (sized : vector.values.size = length) :
+    NTy.Holds (.array τ length) ⟨vector, sized⟩ :=
+  ⟨held.deepHolds⟩
+
+theorem NTy.Holds.extract {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (lower upper : Nat) :
+    NTy.Holds (.vector τ) (vector.extract lower upper) := by
+  rw [NTy.holds_vector, SpecVector.values_extract]
+  intro _ member
+  obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem member
+  rw [Array.getElem_extract]
+  exact held.of_getElem _ (by simp only [Array.size_extract] at hi; omega)
+
+theorem NTy.Holds.of_eraseIdxIfInBounds {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (index : Nat) :
+    ∀ x ∈ vector.values.eraseIdxIfInBounds index, τ.Holds x := by
+  intro _ member
+  rw [Array.eraseIdxIfInBounds] at member
+  split at member
+  · obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem member
+    rw [Array.getElem_eraseIdx]
+    split <;> exact held.of_getElem _ (by simp only [Array.size_eraseIdx] at hi; omega)
+  · exact held.of_mem member
+
+/-- A row of one type repeated: the elements of a vector literal. -/
+abbrev NRow.replicate : Nat → NTy → NRow
+  | 0, _ => .nil
+  | count + 1, τ => .cons τ (NRow.replicate count τ)
+
+/-- The elements of a uniform plain row, in order. -/
+def HListPlain.toListOf {τ : NTy} :
+    (count : Nat) → HListPlain (NRow.replicate count τ) → List τ.plain
+  | 0, _ => []
+  | count + 1, values => values.1 :: HListPlain.toListOf count values.2
+
+@[simp, vir_denote] theorem HListPlain.toListOf_zero {τ : NTy}
+    (values : HListPlain (NRow.replicate 0 τ)) :
+    HListPlain.toListOf 0 values = [] := rfl
+
+@[simp, vir_denote] theorem HListPlain.toListOf_succ {τ : NTy} (count : Nat)
+    (values : HListPlain (NRow.replicate (count + 1) τ)) :
+    HListPlain.toListOf (count + 1) values = values.1 :: HListPlain.toListOf count values.2 :=
+  rfl
+
+theorem HListPlain.holds_mem_toListOf {τ : NTy} :
+    {count : Nat} → {values : HListPlain (NRow.replicate count τ)} →
+    HListPlain.Holds (NRow.replicate count τ) values →
+    ∀ x ∈ HListPlain.toListOf count values, τ.Holds x
+  | 0, _, _, _, member => nomatch member
+  | _ + 1, _, held, _, member => by
+      rcases List.mem_cons.mp member with rfl | tail
+      · exact held.1
+      · exact HListPlain.holds_mem_toListOf held.2 _ tail
+
 /-! ### The fold in the normal form
 
 What a producer states as a certificate is folded, and a fact of a spelled
@@ -7479,10 +7554,100 @@ The generator states a contract over plain arguments and a plain result; the
 certified contract is its image (`Contract.comap`), and the two rules a leaf
 reads of it are the image of the ones it reads today. -/
 
+@[reducible] def _root_.VerexIR.Proofs.Contract.plainValidated {σ ε : Type} {Γ : NRow}
+    {shape : ResultShape} (contract : Contract σ ε (HListPlain Γ) shape.plain) :
+    Contract σ ε (HListPlain Γ) shape.plain :=
+  { contract with
+    validArgs := fun args => HListPlain.Holds Γ args ∧ contract.validArgs args
+    validResult := fun result => shape.Holds result ∧ contract.validResult result }
+
 @[reducible] def _root_.VerexIR.Proofs.Contract.atPlain {σ ε : Type} {Γ : NRow}
     {shape : ResultShape} (contract : Contract σ ε (HListPlain Γ) shape.plain) :
     Contract σ ε (HList Γ) shape.carrier :=
   contract.comap (HList.forget Γ) shape.forget
+
+/-- Project a certified function onto the plain layer over valid plain inputs. -/
+def _root_.VerexIR.Proofs.Spec.atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
+    (function : HList Γ → Spec σ ε shape.carrier) (args : HListPlain Γ) :
+    Spec σ ε shape.plain where
+  ok initial result final :=
+    ∀ holds : HListPlain.Holds Γ args,
+      ∃ certified : shape.carrier,
+        (function (HListPlain.ofHolds Γ args holds)).ok initial certified final ∧
+        shape.forget certified = result
+  aborts initial error :=
+    ∃ holds : HListPlain.Holds Γ args,
+      (function (HListPlain.ofHolds Γ args holds)).aborts initial error
+  undefined initial :=
+    ∃ holds : HListPlain.Holds Γ args,
+      (function (HListPlain.ofHolds Γ args holds)).undefined initial
+
+theorem satisfies_atPlain_iff {σ ε : Type} {Γ : NRow} {shape : ResultShape}
+    (function : HList Γ → Spec σ ε shape.carrier)
+    (contract : Contract σ ε (HListPlain Γ) shape.plain) :
+    Satisfies function contract.atPlain ↔
+      ∀ (args : HListPlain Γ) (holds : HListPlain.Holds Γ args) (initial : σ),
+        contract.validArgs args → contract.assumes args initial → contract.requires args initial →
+        wp (function (HListPlain.ofHolds Γ args holds))
+          (fun result final =>
+            contract.validResult (shape.forget result) ∧
+            (¬contract.mayAbort args initial →
+              contract.ensures args initial (shape.forget result) final) ∧
+            contract.frame args initial (shape.forget result) final ∧
+            ¬contract.mustAbort args initial)
+          (contract.aborts args initial) initial := by
+  constructor
+  · intro verified args holds initial valid assumed permitted
+    have eq := HListPlain.forget_ofHolds Γ args holds
+    have step := verified (HListPlain.ofHolds Γ args holds) initial
+      (by simpa [Contract.atPlain, Contract.comap, eq] using valid)
+      (by simpa [Contract.atPlain, Contract.comap, eq] using assumed)
+      (by simpa [Contract.atPlain, Contract.comap, eq] using permitted)
+    simpa [wp, Contract.atPlain, Contract.comap, eq] using step
+  · intro proof args initial valid assumed permitted
+    have step := proof (HList.forget Γ args) (HList.holds_forget Γ args) initial
+      valid assumed permitted
+    rwa [HListPlain.ofHolds_forget] at step
+
+theorem satisfies_specAtPlain_iff {σ ε : Type} {Γ : NRow} {shape : ResultShape}
+    (function : HList Γ → Spec σ ε shape.carrier)
+    (contract : Contract σ ε (HListPlain Γ) shape.plain) :
+    Satisfies (Spec.atPlain function) contract.plainValidated ↔
+      Satisfies function contract.atPlain := by
+  constructor
+  · intro verified args initial valid assumed permitted
+    have holdsArgs := HList.holds_forget Γ args
+    have step := verified (HList.forget Γ args) initial ⟨holdsArgs, valid⟩ assumed permitted
+    refine ⟨?_, ?_, ?_⟩
+    · intro result final ok
+      have plainOk : (Spec.atPlain function (HList.forget Γ args)).ok initial
+          (shape.forget result) final := by
+        intro h
+        exact ⟨result, by simpa [HListPlain.ofHolds_forget] using ok, rfl⟩
+      obtain ⟨⟨_, validRes⟩, ensured, framed, noMust⟩ := step.1 (shape.forget result) final plainOk
+      exact ⟨validRes, ensured, framed, noMust⟩
+    · intro error aborted
+      exact step.2.1 error ⟨holdsArgs, by simpa [HListPlain.ofHolds_forget] using aborted⟩
+    · intro undef
+      exact step.2.2 ⟨holdsArgs, by simpa [HListPlain.ofHolds_forget] using undef⟩
+  · intro verified args initial ⟨holdsArgs, valid⟩ assumed permitted
+    have eq := HListPlain.forget_ofHolds Γ args holdsArgs
+    have step := verified (HListPlain.ofHolds Γ args holdsArgs) initial
+      (by simpa [Contract.atPlain, Contract.comap, eq] using valid)
+      (by simpa [Contract.atPlain, Contract.comap, eq] using assumed)
+      (by simpa [Contract.atPlain, Contract.comap, eq] using permitted)
+    refine ⟨?_, ?_, ?_⟩
+    · intro result final ok
+      obtain ⟨certified, okCert, rfl⟩ := ok holdsArgs
+      obtain ⟨validRes, ensured, framed, noMust⟩ := step.1 certified final okCert
+      exact ⟨⟨shape.holds_forget certified, validRes⟩,
+        by simpa [Contract.atPlain, Contract.comap, eq] using ensured,
+        by simpa [Contract.atPlain, Contract.comap, eq] using framed,
+        by simpa [Contract.atPlain, Contract.comap, eq] using noMust⟩
+    · rintro error ⟨_, aborted⟩
+      simpa [Contract.atPlain, Contract.comap, eq] using step.2.1 error aborted
+    · rintro ⟨_, undef⟩
+      exact step.2.2 undef
 
 theorem satisfies_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
     (function : HList Γ → Spec σ ε shape.carrier)
@@ -7495,19 +7660,23 @@ theorem satisfies_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
             (shape.forget result) final) ∧
           contract.frame args initial (shape.forget result) final ∧
           ¬contract.mustAbort args initial)
-        (contract.aborts args initial) initial) :
+        (contract.aborts args initial) initial)
+    (validRes : ∀ r, contract.validResult r := by intros; trivial) :
     Satisfies function contract.atPlain := by
-  refine satisfies_of_wp function contract.atPlain ?_
-  intro args initial assumed permitted
-  have step := proof (HList.forget Γ args) (HList.holds_forget Γ args) initial assumed permitted
-  rwa [HListPlain.ofHolds_forget] at step
+  refine (satisfies_atPlain_iff function contract).mpr ?_
+  intro args holds initial _ assumed permitted
+  have step := proof args holds initial assumed permitted
+  exact ⟨fun result final ok => ⟨validRes (shape.forget result), step.1 result final ok⟩,
+    step.2.1, step.2.2⟩
 
 theorem wp_summary_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
     (contract : Contract σ ε (HListPlain Γ) shape.plain) (args : HList Γ)
     (ensures : shape.carrier → σ → Prop) (aborts : ε → Prop) (initial : σ) :
     wp (contract.atPlain.summary args) ensures aborts initial ↔
+      contract.validArgs (HList.forget Γ args) ∧
       contract.requires (HList.forget Γ args) initial ∧
       (∀ (result : shape.plain) (holds : shape.Holds result) (final : σ),
+        contract.validResult result →
         (¬contract.mayAbort (HList.forget Γ args) initial →
           contract.ensures (HList.forget Γ args) initial result final) →
         contract.frame (HList.forget Γ args) initial result final →
@@ -7516,10 +7685,12 @@ theorem wp_summary_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
       (∀ error, contract.aborts (HList.forget Γ args) initial error → aborts error) := by
   rw [wp_summary]
   constructor
-  · rintro ⟨permitted, normal, failing⟩
-    refine ⟨permitted, ?_, failing⟩
-    intro result holds final ensured framed must
-    refine normal (shape.ofHolds result holds) final ?_ ?_ must
+  · rintro ⟨valid, permitted, normal, failing⟩
+    refine ⟨valid, permitted, ?_, failing⟩
+    intro result holds final validRes ensured framed must
+    refine normal (shape.ofHolds result holds) final ?_ ?_ ?_ must
+    · show contract.validResult (shape.forget (shape.ofHolds result holds))
+      rwa [ResultShape.forget_ofHolds]
     · intro noAbort
       show contract.ensures (HList.forget Γ args) initial
         (shape.forget (shape.ofHolds result holds)) final
@@ -7529,10 +7700,11 @@ theorem wp_summary_atPlain {σ ε : Type} {Γ : NRow} {shape : ResultShape}
         (shape.forget (shape.ofHolds result holds)) final
       rw [ResultShape.forget_ofHolds]
       exact framed
-  · rintro ⟨permitted, normal, failing⟩
-    refine ⟨permitted, ?_, failing⟩
-    intro result final ensured framed must
-    have step := normal (shape.forget result) (shape.holds_forget result) final ensured framed must
+  · rintro ⟨valid, permitted, normal, failing⟩
+    refine ⟨valid, permitted, ?_, failing⟩
+    intro result final validRes ensured framed must
+    have step := normal (shape.forget result) (shape.holds_forget result) final
+      validRes ensured framed must
     rwa [ResultShape.ofHolds_forget] at step
 
 /-- The result-row codec of a function. -/
@@ -8356,6 +8528,121 @@ theorem _root_.VerexIR.SpecArray.size_set {α : Type} {length : Nat} (array : Sp
 
 @[simp] theorem _root_.VerexIR.SpecVector.values_mk {α : Type} (values : Array α) (bounded : values.size < 2 ^ 64) :
     (SpecVector.mk values bounded).values = values := rfl
+
+section CollectionHolds
+variable [Carriers]
+
+theorem NTy.Holds.of_ofArray? {τ : NTy} {xs : Array τ.plain} {v : (NTy.vector τ).plain}
+    (elements : ∀ x ∈ xs, τ.Holds x) (built : SpecVector.ofArray? xs = some v) :
+    NTy.Holds (.vector τ) v := by
+  unfold SpecVector.ofArray? at built
+  split at built
+  · cases Option.some.inj built
+    exact (NTy.holds_vector τ _).mpr elements
+  · cases built
+
+theorem NTy.Holds.of_vectorLit {τ : NTy} {count : Nat}
+    {values : HListPlain (NRow.replicate count τ)} {v : (NTy.vector τ).plain}
+    (held : HListPlain.Holds (NRow.replicate count τ) values)
+    (built : SpecVector.ofArray? (HListPlain.toListOf count values).toArray = some v) :
+    NTy.Holds (.vector τ) v :=
+  NTy.Holds.of_ofArray?
+    (fun x member => HListPlain.holds_mem_toListOf held x (Array.mem_toList_iff.mpr member))
+    built
+
+theorem NTy.Holds.of_repeatVector {τ : NTy} {count : Nat} {value : τ.plain}
+    {v : (NTy.vector τ).plain} (held : τ.Holds value)
+    (built : SpecVector.ofArray? (Array.replicate count value) = some v) :
+    NTy.Holds (.vector τ) v :=
+  NTy.Holds.of_ofArray?
+    (fun _ member => Array.eq_of_mem_replicate member ▸ held)
+    built
+
+theorem NTy.Holds.of_push {τ : NTy} {vector result : (NTy.vector τ).plain}
+    {element : τ.plain} (held : NTy.Holds (.vector τ) vector) (elementHeld : τ.Holds element)
+    (built : SpecVector.ofArray? (vector.values.push element) = some result) :
+    NTy.Holds (.vector τ) result :=
+  NTy.Holds.of_ofArray?
+    (fun _ member => (Array.mem_push.mp member).elim held.of_mem (fun eq => eq ▸ elementHeld))
+    built
+
+theorem NTy.Holds.of_insert {τ : NTy} {vector result : (NTy.vector τ).plain}
+    {index : Nat} {element : τ.plain}
+    (held : NTy.Holds (.vector τ) vector) (elementHeld : τ.Holds element)
+    (built : SpecVector.ofArray? (vector.values.insertIdxIfInBounds index element) = some result) :
+    NTy.Holds (.vector τ) result := by
+  refine NTy.Holds.of_ofArray? (fun _ member => ?_) built
+  rw [Array.insertIdxIfInBounds] at member
+  split at member
+  · obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem member
+    rw [Array.getElem_insertIdx]
+    split
+    · exact held.of_getElem i (by simp only [Array.size_insertIdx] at hi; omega)
+    · split
+      · exact elementHeld
+      · exact held.of_getElem (i - 1) (by simp only [Array.size_insertIdx] at hi; omega)
+  · exact held.of_mem member
+
+theorem NTy.Holds.of_remove {τ : NTy} {vector remaining : (NTy.vector τ).plain}
+    {index : Nat} (held : NTy.Holds (.vector τ) vector)
+    (built : SpecVector.ofArray? (vector.values.eraseIdxIfInBounds index) = some remaining) :
+    NTy.Holds (.vector τ) remaining :=
+  NTy.Holds.of_ofArray? (held.of_eraseIdxIfInBounds index) built
+
+private theorem array_holds_set! {τ : NTy} {xs : Array τ.plain}
+    (elements : ∀ x ∈ xs, τ.Holds x) (index : Nat) {value : τ.plain} (valueHeld : τ.Holds value) :
+    ∀ x ∈ xs.set! index value, τ.Holds x := by
+  intro _ member
+  rw [Array.set!_eq_setIfInBounds] at member
+  obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem member
+  have hi' : i < xs.size := by rw [← Array.set!_eq_setIfInBounds, Array.size_set!] at hi; exact hi
+  rw [Array.getElem_setIfInBounds hi']
+  split
+  · exact valueHeld
+  · exact elements _ (Array.getElem_mem hi')
+
+theorem NTy.Holds.of_swap {τ : NTy} {vector result : (NTy.vector τ).plain}
+    {i j : Nat} {a b : τ.plain}
+    (held : NTy.Holds (.vector τ) vector) (ha : τ.Holds a) (hb : τ.Holds b)
+    (built : SpecVector.ofArray? ((vector.values.set! i b).set! j a) = some result) :
+    NTy.Holds (.vector τ) result :=
+  NTy.Holds.of_ofArray?
+    (array_holds_set! (array_holds_set! (fun _ m => held.of_mem m) i hb) j ha)
+    built
+
+theorem NTy.Holds.vector_set {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (index : Nat) {value : τ.plain}
+    (valueHeld : τ.Holds value) :
+    NTy.Holds (.vector τ) (vector.set index value) :=
+  (NTy.holds_vector τ _).mpr
+    (array_holds_set! (fun _ m => held.of_mem m) index valueHeld)
+
+theorem NTy.Holds.of_concat {τ : NTy} {left right result : (NTy.vector τ).plain}
+    (leftHeld : NTy.Holds (.vector τ) left) (rightHeld : NTy.Holds (.vector τ) right)
+    (built : SpecVector.ofArray? (left.values ++ right.values) = some result) :
+    NTy.Holds (.vector τ) result :=
+  NTy.Holds.of_ofArray?
+    (fun _ member => (Array.mem_append.mp member).elim leftHeld.of_mem rightHeld.of_mem)
+    built
+
+theorem NTy.Holds.slice {τ : NTy} {vector result : (NTy.vector τ).plain} {start stop : Nat}
+    (held : NTy.Holds (.vector τ) vector)
+    (built : SpecVector.ofArray? (vector.values.extract start stop) = some result) :
+    NTy.Holds (.vector τ) result :=
+  NTy.Holds.of_ofArray? (fun _ member => (held.extract start stop).of_mem member) built
+
+theorem NTy.Holds.reverseSlice {τ : NTy} {vector result : (NTy.vector τ).plain} {start stop : Nat}
+    (held : NTy.Holds (.vector τ) vector)
+    (built : SpecVector.ofArray? (Denote.reverseSlice vector.values start stop) = some result) :
+    NTy.Holds (.vector τ) result := by
+  refine NTy.Holds.of_ofArray? (fun _ member => ?_) built
+  obtain ⟨i, hi, rfl⟩ := Array.getElem_of_mem member
+  have eqRead : some (Denote.reverseSlice vector.values start stop)[i] =
+      (Denote.reverseSlice vector.values start stop)[i]? := (Array.getElem?_eq_getElem hi).symm
+  rw [getElem?_reverseSlice] at eqRead
+  split at eqRead <;> exact held.of_getElem? eqRead.symm
+
+end CollectionHolds
 
 /-- The bounds a range certificate carries, as facts a leaf adds beside it
 rather than rewrites into it: a term's certificate keeps its type. -/
@@ -11604,6 +11891,26 @@ def variantPlain.inhabitant (names : List String) (rows : NRows)
     (inhabitable : NRows.firstInhabitable names rows = true) : variantPlain names rows :=
   variantPlainOf.inhabitant Carriers.toPlain names rows inhabitable
 
+omit [Carriers] in
+/-- Uninterpreted off-domain specification fallback of a nonempty type.
+Backed by `Classical.choice` on a proof-irrelevant `Nonempty result` witness so
+any two witnesses are definitionally equal, while `opaque` hides both `Holds`
+and structural-zero equations. -/
+noncomputable opaque plainFallback (result : Type) (inhabited : Nonempty result) : result :=
+  Classical.choice inhabited
+
+omit [Carriers] in
+/-- Uninterpreted plain specification fallback over a plain family, at the
+canonical plain worker type `NTy.plainOf F τ`. -/
+noncomputable abbrev NTy.plainFallbackOf (F : PlainFamily) (τ : NTy)
+    (inhabitable : τ.inhabitable = true) : NTy.plainOf F τ :=
+  plainFallback (NTy.plainOf F τ) ⟨NTy.plainInhabitantOf F τ inhabitable⟩
+
+/-- Uninterpreted plain specification fallback at a carrier family. -/
+noncomputable abbrev NTy.plainFallback (τ : NTy)
+    (inhabitable : τ.inhabitable = true) : τ.plain :=
+  NTy.plainFallbackOf Carriers.toPlain τ inhabitable
+
 mutual
 /-- Every plain value satisfies the data invariants where every
 declaration's and every type parameter's is trivially true. -/
@@ -13287,6 +13594,69 @@ theorem NTy.deepHolds_ofSkolem (θ : TypeArgs) (τ : NTy)
   have step := NTy.deepHolds_toSkolem θ τ (NTy.plainOfSkolem θ τ value)
   rw [NTy.plainToSkolem_ofSkolem θ τ value] at step
   exact step.symm
+
+theorem HListPlain.deepHolds_ofSkolem (θ : TypeArgs) (row : NRow)
+    (values : @HListPlain (Carriers.instantiate θ Θ) row) :
+    (@HListPlain.deepHolds Θ (NRow.subst θ.1 row) (HListPlain.ofSkolem θ row values) ↔
+      @HListPlain.deepHolds (Carriers.instantiate θ Θ) row values) := by
+  have step := HListPlain.deepHolds_toSkolem (Θ := Θ) θ row (HListPlain.ofSkolem θ row values)
+  rw [HListPlain.toSkolem_ofSkolem θ row values] at step
+  exact step.symm
+
+theorem variantPlain.deepHolds_ofSkolem (θ : TypeArgs) (names : List String) (rows : NRows)
+    (value : @variantPlain (Carriers.instantiate θ Θ) names rows) :
+    (@variantPlain.deepHolds Θ names (NRows.subst θ.1 rows)
+        (variantPlain.ofSkolem θ names rows value) ↔
+      @variantPlain.deepHolds (Carriers.instantiate θ Θ) names rows value) := by
+  have step := variantPlain.deepHolds_toSkolem (Θ := Θ) θ names rows
+    (variantPlain.ofSkolem θ names rows value)
+  rw [variantPlain.toSkolem_ofSkolem θ names rows value] at step
+  exact step.symm
+
+@[simp, vir_transport] theorem NTy.holds_plainToSkolem_iff (θ : TypeArgs) (τ : NTy)
+    (value : (τ.subst θ.1).plain) :
+    @NTy.Holds (Carriers.instantiate θ Θ) τ (NTy.plainToSkolem θ τ value) ↔
+      @NTy.Holds Θ (τ.subst θ.1) value := by
+  rw [@NTy.holds_iff (Carriers.instantiate θ Θ), @NTy.holds_iff Θ]
+  exact NTy.deepHolds_toSkolem θ τ value
+
+@[simp, vir_transport] theorem NTy.holds_plainOfSkolem_iff (θ : TypeArgs) (τ : NTy)
+    (value : @NTy.plain (Carriers.instantiate θ Θ) τ) :
+    @NTy.Holds Θ (τ.subst θ.1) (NTy.plainOfSkolem θ τ value) ↔
+      @NTy.Holds (Carriers.instantiate θ Θ) τ value := by
+  rw [@NTy.holds_iff Θ, @NTy.holds_iff (Carriers.instantiate θ Θ)]
+  exact NTy.deepHolds_ofSkolem θ τ value
+
+@[simp, vir_transport] theorem HListPlain.holds_toSkolem_iff (θ : TypeArgs) (row : NRow)
+    (values : HListPlain (NRow.subst θ.1 row)) :
+    @HListPlain.Holds (Carriers.instantiate θ Θ) row (HListPlain.toSkolem θ row values) ↔
+      @HListPlain.Holds Θ (NRow.subst θ.1 row) values := by
+  rw [@HListPlain.holds_iff (Carriers.instantiate θ Θ), @HListPlain.holds_iff Θ]
+  exact HListPlain.deepHolds_toSkolem θ row values
+
+@[simp, vir_transport] theorem HListPlain.holds_ofSkolem_iff (θ : TypeArgs) (row : NRow)
+    (values : @HListPlain (Carriers.instantiate θ Θ) row) :
+    @HListPlain.Holds Θ (NRow.subst θ.1 row) (HListPlain.ofSkolem θ row values) ↔
+      @HListPlain.Holds (Carriers.instantiate θ Θ) row values := by
+  rw [@HListPlain.holds_iff Θ, @HListPlain.holds_iff (Carriers.instantiate θ Θ)]
+  exact HListPlain.deepHolds_ofSkolem θ row values
+
+@[simp, vir_transport] theorem variantPlain.holds_toSkolem_iff (θ : TypeArgs)
+    (names : List String) (rows : NRows) (value : variantPlain names (NRows.subst θ.1 rows)) :
+    @variantPlain.Holds (Carriers.instantiate θ Θ) names rows
+        (variantPlain.toSkolem θ names rows value) ↔
+      @variantPlain.Holds Θ names (NRows.subst θ.1 rows) value := by
+  rw [@variantPlain.holds_iff (Carriers.instantiate θ Θ), @variantPlain.holds_iff Θ]
+  exact variantPlain.deepHolds_toSkolem θ names rows value
+
+@[simp, vir_transport] theorem variantPlain.holds_ofSkolem_iff (θ : TypeArgs)
+    (names : List String) (rows : NRows)
+    (value : @variantPlain (Carriers.instantiate θ Θ) names rows) :
+    @variantPlain.Holds Θ names (NRows.subst θ.1 rows)
+        (variantPlain.ofSkolem θ names rows value) ↔
+      @variantPlain.Holds (Carriers.instantiate θ Θ) names rows value := by
+  rw [@variantPlain.holds_iff Θ, @variantPlain.holds_iff (Carriers.instantiate θ Θ)]
+  exact variantPlain.deepHolds_ofSkolem θ names rows value
 
 mutual
 /-- A caller's value in the callee's view: the same runtime value, carried

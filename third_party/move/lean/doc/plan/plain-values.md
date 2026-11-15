@@ -8,12 +8,12 @@ builds on. The measurements behind the decision are in
 [`transitions.md`](transitions.md), "What it cost, and the decision to
 withdraw it".
 
-> **Reviewed; awaiting the user's go-ahead.** Three independent reviews. The
-> first rejected how a condition was enforced and how the carrier was
-> collapsed; the second rejected the first design note's rules for facts; the
-> third accepted the second note's translation with corrections and found the
-> work ready to be specified and estimated. Phases 1 and 2 below are that
-> specification. The design is
+> **Approved; phase 0 complete.** Three independent reviews and a Phase 0/1
+> alignment. The first rejected how a condition was enforced and how the
+> carrier was collapsed; the second rejected the first design note's rules for
+> facts; the third accepted the second note's translation with corrections; the
+> settlement/slice audit and user decisions (`U1`–`U7`) closed the remaining
+> questions. Phases 1 and 2 below are that specification. The design is
 > [`plain-values-semantics.md`](plain-values-semantics.md), which is the
 > authority wherever an older passage of this plan differs from it.
 
@@ -121,12 +121,11 @@ Phase 0 measured both routes, and the parking cannot start yet: with the route
 off, every generic function of `OrderedMap` fails on the concrete route (7 of
 its 17 targets), where at the reference they verified concretely. At this tip
 the Given route is what verifies generic members. So the option is **on** by
-default now, and it is turned off at the switch of phase 2, where the lent
-layer goes and the concrete route for generic members is restored;
+default through phase 1, and it is turned off at the switch of phase 2, where
+the lent layer goes and the concrete route for generic members is restored;
 `OrderedMap`'s authored proofs get their version for the concrete route then.
 The tests that assert what the route does select it explicitly, so they keep
-running whatever the default. This timing was put to the user and awaits his
-confirmation.
+running whatever the default. Confirmed by the user.
 
 **U3. The path-only obligation waits.** A mutation's end owing only its path,
 and any analysis of which levels a death closes, are taken up after G2.
@@ -136,6 +135,29 @@ reference a data invariant was checked by the solver and was not part of the
 proved statement. Here every check is part of it. A target that ends above its
 reference figure for that reason is an exception the user signs off at G2,
 with the measured cause.
+
+**U5. Off-domain total reads in specifications are unspecified (`opaque`).**
+Reading an absent resource (`nativeSlot`), a field of another variant
+(`typedVariantField?`), a missing map key (`SpecMap.get`, `valueAt`, `keyAt`),
+an out-of-bounds vector index (`indexVector`), or `result_of` without a
+returning run yields an uninterpreted (`opaque`) plain fallback, backed by
+`NTy.plainInhabitant` solely to satisfy `[Inhabited]` without axioms. It
+exposes neither a `Holds` fact nor concrete structural-zero layout equations,
+and `DataInvariantsSatisfiable` is removed.
+
+**U6. All slice borrow, take, and settlement equations are checked in phase 1.**
+Before phase 2, slice borrow/reborrow (`borrowArraySliceAt`,
+`borrowVectorSliceAt`, `reborrowSliceAt`) checks an open dereferenced current
+before equating it (`1.2`), `takeSliceAtValue` checks the computed cleared
+owner (`1.2`), and slice settlement (`resolveSliceAt`, `Mutables.sliceAt`)
+checks both the current elements and — via slice lender provenance — any
+enclosing owner rebuilt with the settled slice (`1.2b`).
+
+**U7. Unconditional argument and result validity live on `Contract`.**
+`Contract` in `VerexIR/Proofs/Contract.lean` gains first-class `validArgs` and
+`validResult` predicates defaulting to `fun _ => True`, enforced
+unconditionally in `Satisfies`, `Contract.summary`, and `wp_summary` across
+direct calls, generics, and closures.
 
 ## Corrections from review 1
 
@@ -288,11 +310,13 @@ The design is [`plain-values-semantics.md`](plain-values-semantics.md). In
 brief:
 
 - **Checked** where the carriers certify today: a pack; a loan's death, of the
-  current or of the owner rebuilt with it, before the settlement's equations;
-  a `&mut` hand-over; a returned reference and a `&mut` parameter's exit; a
-  copy out of an open current; a write of storage. One repair: a settlement
-  through a reference, which today assumes its equations unchecked, in the
-  resolver and in the compiler's combined settlement.
+  current and of the owner rebuilt with it (erased at direct-root `.deref`),
+  before the settlement's equations; slice borrow, take and settlement
+  equations, enclosing owners included; a `&mut` hand-over; a returned
+  reference and a `&mut` parameter's exit; a copy out of an open current; a
+  write of storage. Repairs in phase 1 close every settlement and slice
+  equation that today assumes a certified side unchecked, in the resolver, the
+  slice helpers, and the compiler's combined settlement.
 - **A fact** `Holds` for every value the carriers typed as certified: from a
   check, from the argument domain of the theorem, from a callee's result,
   whose validity is unconditional, from a prophecy's choice among valid
@@ -448,9 +472,9 @@ statement forms, the order of edits. The note is reviewed by a second model
 before implementation. Each phase ends with its gate's figures against the
 reference. The estimates are working days and are estimates.
 
-In sum, in working days of effort: phase 0, 2 to 3; phase 1, 12 to 17,
-of which up to three items run at once; phase 2, 10 to 15. That is five to
-seven weeks of effort to G2a, and four to five and a half weeks by the
+In sum, in working days of effort: phase 0, 2 to 3; phase 1, 15 to 21,
+of which up to three items run at once; phase 2, 10 to 15. That is five and a
+half to seven and a half weeks of effort to G2a, and four to six weeks by the
 calendar with phase 1 run in parallel. The first cost signal is phase 0's, in
 the first three days. The nominal track is another three to five weeks without
 recursion, its library part beside the earlier phases. The order is
@@ -501,35 +525,73 @@ controls run, the experiment's table exists.
 
 ### Phase 0b. The semantic design note (done)
 
-[`plain-values-semantics.md`](plain-values-semantics.md), in its third
-revision, reviewed three times. It is the design of phases 1 and 2.
+[`plain-values-semantics.md`](plain-values-semantics.md), in its fourth
+revision, incorporating three reviews, the settlement/slice audit, and `U1`–`U7`.
+It is the design of phases 1 and 2.
 
-### Phase 1. Preparations on the present representation (12 to 17 days of work)
+### Phase 1. Preparations on the present representation (15 to 21 days of work)
 
 Nothing here changes the representation. Each item is a change of its own,
 checked on the tree as it is, and the items touch different files, so up to
 three can proceed at once. The design note's section 8 lists them; the
 specification is:
 
-**1.1 The settlement repair** (2 to 3 days). Every settlement through a
-reference checks the referent before any equation: the dereferencing branches
-of `Lender.resolve`, and `holderResolves` in `Compile.lean`, which today emits
-no obligation for a dereferencing place and can emit the equation of a
-combined settlement alone. With `certifyingAt`. Its controls land with it: the
-loan-death set, and a combined settlement whose candidates all dereference.
+**1.1 The settlement repair** (2 to 3 days). Every settlement checks the plain
+side of each certified equation before assuming it: in `Lender.resolve` at
+`.place` (referent then rebuilt owner when `path.hasDeref`, with direct-root
+`.deref rest` erased by `Lender.resolve_place_deref`) and `.candidate` (rebuilt
+owner whenever present, erased at `.deref rest` by
+`Lender.resolve_candidate_deref`), and in `holderResolves` in `Compile.lean`
+(one unconditional `.referent` before all `.candidate`s and `.equation`). With
+`certifyingAt`. Its controls land with it: the loan-death set, `.sliceIndex`
+and stored-reference negatives, and combined settlements whose candidates all
+dereference.
 
-**1.2 The controls and the slice check** (2 days). The soundness
-counterexamples and the loan-death set as one target, each run recording the
-validated loan facts beside its verdict. The explicit check of a slice
-reference's current reading before its equality, at `Mutables.resolve` and
-`resolveSliceAtValue`; a valid slice reference keeps both readings valid.
+**1.2 The controls, slice-current, slice-borrow and slice-take checks** (2 to 3
+days). The soundness counterexamples and the loan-death set as one target, each
+run recording the validated loan facts beside its verdict. The explicit check
+of a slice reference's current reading before its equality at `Mutables.resolve`
+and `resolveSliceAtValue` (with `site` added to `Term.resolveSliceAt` and
+`CarrierDeaths.lean`); the check of an extracted current under `path.hasDeref`
+before the existential assumption in `borrowArraySliceAt`,
+`borrowVectorSliceAt`, and `reborrowSliceAt`; and the concrete rebuild and
+check of the cleared owner in `takeSliceAtValue` (`U6`), each with its control.
 
-**1.3 The inventory and the audit of defaults** (3 to 4 days, read-only until
-its findings). Every place a certificate is received, classified as
-extraction or preservation, checked production, contractual receipt, or raw
-value. Every formerly certified default, `NTy.readBack`'s fallback first,
-shown unreachable, confined to a raw interface, or given an obligation. **The
-audit gates phase 2**: an observable default left unresolved stops the switch.
+**1.2b Slice lender provenance** (2 to 3 days). Carry lender provenance for
+slice loans to `Term.resolveSliceAt` and `Mutables.sliceAt` so that ending a
+slice loan checks any enclosing local or candidate owner rebuilt with the
+settled slice before assuming `reference.current = reference.final` (`U6`),
+with controls for cross-element owner invariants (split across the
+`VerexIRTests` modules `LoanDeathSupport`, `LoanDeathSoundness`,
+`SliceLeafSupport`, `SliceProvenanceDecls`, `SliceProvenancePositives`,
+`SliceProvenanceNegatives`, and `SliceSemanticControls`). Result at the
+pre-switch representation: a mutable slice borrow of a struct's certified array
+(and slice mutation through an open reference) is not verified automatically
+yet, leaving two leaf shapes in `SliceProvenancePositives.lean` and
+`SliceProvenanceNegatives.lean` (`SliceLeafSupport.lean`): (1) slice
+birth/reborrow leaves carrying an unprojected `NTy.forget (.sliceRef _) v =
+SpecSliceRef.ofArrays current final` equality in `LCtx` together with
+`NTy.forget_array_values` lacking `no_index` on its type arguments (`↑v.extent
+≤ 1 ⊢ False` and enclosing `Holder` relation obligations), and (2) open-reference
+slice/array mutation leaves requiring `SpecArray.size_eq` and element membership
+instantiation across `Array.setIfInBounds`. Under the `250,000` default
+`verex.verifyHeartbeats` budget, six targets in `SliceProvenanceDecls.lean`
+carry measured `pragma heartbeats = N` raises (`slice_holder_either_ok`:
+measured `277,897` -> `350`; `slice_holder_diff_len_ok`: `318,187` -> `400`;
+`slice_slot_reborrow_ok`: `548,353` -> `690`; `slice_holder_either_bad`:
+`313,023` -> `390`; `slice_holder_diff_len_bad`: `362,057` -> `450`;
+`slice_slot_reborrow_bad`: `559,597` -> `700`), with the three negatives
+confirmed to fail at the semantic invariant check (`Percent` / `Holder`) rather
+than the budget.
+
+**1.3 The inventory, audit of defaults, and opaque spec-read fallbacks** (3 to
+4 days). Every place a certificate is received, classified as extraction or
+preservation, checked production, contractual receipt, or raw value. Every
+formerly certified default audited; controls per row of the design note's table
+of total specification reads; and the shared `opaque` plain fallback helper
+prepared for `nativeSlot`, `typedVariantField?`, `SpecMap` total reads,
+`indexVector`, and `ResultOf` (`U5`). **The audit gates phase 2**: an
+observable default left unresolved stops the switch.
 
 **1.4 Folded boundary clauses** (3 to 4 days). `slotDataInvariantTerms` and
 the loop's clauses state one `Holds` per value, with the opening rule and the
@@ -545,38 +607,91 @@ this the switch changes only what is inside the two operations. The cost is
 measured here, on `deposit` and the storage targets, and again after the
 switch.
 
-**1.6 Interfaces that can stand beside the old ones** (2 to 3 days). The
-`Holds`-preservation laws of the frame's transports; the premise bundle in a
-shared continuation's node and its arrivals, discharged for now by the
-certificates the values carry.
+**1.6 Interfaces and library lemmas beside the old ones** (3 to 4 days).
+First-class `Contract.validArgs` and `Contract.validResult` domain predicates
+(defaulting to `fun _ => True`) in `VerexIR/Proofs/Contract.lean` with
+`Satisfies`, `Contract.summary`, and `wp_summary` updated (`U7`); collection
+`Holds`-preservation lemmas introducing `Holds` of vectors, arrays, slices, and
+maps from their elements (`push`, `insert`, `remove`, `swap`, `concat`,
+`slice`, `reverseSlice`, `arrayOf`, `repeatVector`, `SpecMap.ofEntries`); the
+`Holds`-preservation laws of the frame's transports; and the mandatory premise
+bundle in a shared continuation's node and its arrivals, discharged for now by
+the certificates the values carry.
 
 Gate G1:
-- the controls pass, the repair's negatives rejected at the repaired check;
-- the four suites and the ledger are no worse than at the base, and each
-  difference is the repair's and is named;
-- the audit of defaults is complete;
-- cost is recorded per item and is not above the base's, storage included.
+- every soundness control passes, and every negative is rejected by the check
+  it tests (not by a budget stop or an unrelated error), the settlement and
+  slice negatives rejected at the repaired checks;
+- the four suites and the ledger are no worse than at the base, or diagnosed
+  and assigned to G2a (user decision, 2026-11-14: defects in code that survives
+  the switch are repaired now; losses caused by the pre-switch bridge layer or
+  postponed obligations rewritten by parts 2b/2c are diagnosed by cause,
+  recorded in the baselines and ledger as postponed at G1, and due at G2a; no
+  loss enters phase 2 undiagnosed);
+- the audit of defaults and its total-read controls are complete;
+- cost is recorded per item across all benchmark and `DenotePerformance`
+  targets so G2b has the baseline; small cost increases at G1 do not hold this
+  stage as correctness has priority (user decision, 2026-11-14).
+
+Rows diagnosed at G1 and postponed to G2a:
+- `SourceVerify/library_iter` and `SourceVerify/library_iter_errors` (`last_or`, `invariant_2_step`): dual carrier/plain spelling at the loop step (`2a` + `2d`);
+- `SourceVerify/library_iter_adapters` (`find_entry`, `invariant_1_step`, `ensures_2`; paired with `SourceVerify/library_iter_adapters_errors` `find_entry` at `pragma heartbeats = 730`): `Var.selectCertified`/`NTy.forget` round-trip on `NTy.slice Entry` and `Option.map Entry.forget` element read (`2a` + `2d`), while `invariant_3_step` compounds that same `P` round-trip over an inherited `O` range-step split (`0 <= k < pos + 1`, already open on `u32` in `SourceVerify/library_iter_enumerate::position`; listed separately, rechecked at G2a, and neither promised to stay open nor exempted from G2a's reference counts);
+- `functional/enum.move` (`test_enum_vector`, `assert_2`): element `NTy.Holds` recovery across vector indexing (`2a` + `2b` + `2d`);
+- `functional/closures/stored_fun_values.move` (`config_aware_increment`, `aborts_if_1`): dual `nameSomeReads` witness at a global read (`2a` + `2c` + `2d`);
+- `functional/closures/amm_example.move` (`constant_product_with_fee`, `ensures_1`, `ensures_2`): dual `nameSomeReads` witness at a global read (`2a` + `2c` + `2d`);
+- `functional/closures/behavioral_congruence.move` (`field_equal`, `param_equal`, `aborts_if_1`): behavioral entry congruence over the plain row (`2a` + `2d`).
 
 A simplification pass follows each item (working rule 9).
 
 ### Phase 2. The switch (10 to 15 days of work, one implementer)
 
-One coordinated change, prepared in a scratch copy and landed whole, as the
-design note's section 8 lays it out. It is estimated in four parts:
+One coordinated change, developed on a dedicated switch branch starting from the
+signed-off Phase 1 commit, with one checkpoint commit per part (`2a`–`2d`,
+building or labeled intermediate while the tree is mid-switch, committed only on
+the user's word) so work never sits only in a working tree across days and every
+gate runs on a fixed tree; it lands on the main stack whole after G2a, as the
+design note's section 8 lays it out. Item 1.3 only prepares `plainFallback` /
+`plainFallbackValue` and its controls (`PlainDefaults`, `TotalReadSoundness`);
+switching the five off-domain total specification reads (`nativeSlot`,
+`typedVariantField?`, `SpecMap` `get`/`valueAt`/`keyAt`, `indexVector`,
+`ResultOf`) to `plainFallbackValue` happens in part 2d (`U5`), after naming any
+baseline expectation changes for the user. `LoanDeathSoundness` is already split
+into its standalone `VerexIRTests` modules (`LoanDeathSupport`,
+`LoanDeathSoundness`, `SliceLeafSupport`, `SliceProvenanceDecls`,
+`SliceProvenancePositives`, `SliceProvenanceNegatives`, `SliceSemanticControls`).
 
-| Part | Content | Days |
-|---|---|---:|
-| 2a. Family and towers | `Carriers` with `holds` in place of `lent`; one carrier, one row type, one variant type; `deepHolds` over the carrier; `Carriers.instantiate`, `Carriers.runtime`, `Skolems` and its one pair of transports; the parked Given frame's types adapted so that it compiles | 4 to 5 |
-| 2b. Steps and quantified values | `checkingAt`; the denotation's arms; a prophecy's choice with its assumption; the validity of the arguments as a domain and of every successful result unconditionally, outside the postcondition's guards; the mandatory premise bundle of joins and loop frames; the plain selectors | 3 to 4 |
-| 2c. Storage and the bridge | the flat stored value inside the two operations; the global borrow; the encoding, the transports, collection resources, allocation and unnamed-resource agreement, loan correspondence and returned storage justified again | 2 to 3 |
-| 2d. Consumers, inhabitants, generation | the consumers that carry kept behavior replaced; those that only recover a certificate deleted with `forget` and `ofDeepHolds`; inhabitants by productivity; the carrier instance, the `own` predicate and the frames regenerated; authored proofs repaired | 3 to 4 |
+It is estimated in four parts, each verified by its targeted control suite
+before advancing to the next part and before running the full gate:
+
+| Part | Content | Per-part controls (before full gate) | Days |
+|---|---|---|---:|
+| 2a. Family and towers | `Carriers` with `holds` in place of `lent`; one carrier, one row type, one variant type; `deepHolds` over the carrier; `Carriers.instantiate`, `Carriers.runtime`, `Skolems` and its one pair of transports; the parked Given frame's types adapted so that it compiles | `lake build VerexIR` (`Types`, `FamilyTransport`, `Given*` compile cleanly) | 4 to 5 |
+| 2b. Steps and quantified values | `checkingAt`; the denotation's arms (using 1.6's collection preservation lemmas); a prophecy's choice with its assumption; `Contract.validArgs` and `Contract.validResult` wired to `HList.Holds` and `ResultShape.Holds` across `Satisfies`, `Contract.summary` and `Meanings`; the mandatory premise bundle of joins and loop frames; the plain selectors | `VerexIR.Tests.SharedContinuations`, `VerexSL.Tests.ContinuationJoins`, `VerexIR.Tests.CollectionAndTransportHolds`, `VerexSL.Tests.SoundnessCounterexamples` | 3 to 4 |
+| 2c. Storage and the bridge | the flat stored value inside the two operations; the global borrow; the encoding, the transports, collection resources, allocation and unnamed-resource agreement, loan correspondence and returned storage justified again | `VerexIR` agreement/bridge build, `Check/Storage/MutationEnds`, `Check/Generics/GenericStorage`, `DenotePerformance` storage targets | 2 to 3 |
+| 2d. Consumers, inhabitants, generation | the consumers that carry kept behavior replaced (whatever opens or observes `Holds` identifies a fact by its whole proposition — `carriers`, type, and value — carrying over `VerexIR.Tests.HoldsWorklistIdentity`); those that only recover a certificate deleted with `forget` and `ofDeepHolds` (including `SliceLeafSupport.lean`, the 6 `pragma heartbeats` lines in `SliceProvenanceDecls.lean`, `reduceProjection?` in `Solve/Decide.lean` `decideInstance`, and the Phase 1 storage/slice bridge lemmas and simprocs in `Solve/Normal.lean`); inhabitants by productivity; off-domain total spec reads switched to `opaque` plain fallbacks (`U5`); `verex.givenRoute` defaulted to `false` (`U2`); the carrier instance, the `own` predicate and the frames regenerated; authored proofs repaired | split `LoanDeathSoundness` / `SliceProvenance*` / `SliceSemanticControls` modules (with `SliceLeafSupport.lean` and the 6 `pragma heartbeats` lines deleted), `VerexIR.Tests.HoldsWorklistIdentity`, `PlainDefaults`, `TotalReadSoundness`, `SharedStateLabels`, `CertifiedFieldProjections`, `bench/lean/OrderedMap.lean`, then full G2a and G2b gates | 3 to 4 |
 
 Then two gates, kept apart because they answer different questions.
 
 **G2a, semantic acceptance.** The tree is plain and correct:
 - the four suites, the smoke suite and the Move Prover's lean gate pass, with
   the ledger;
-- the controls pass;
+- every row postponed at G1 is back, or goes to the user with its cause — in
+  particular, on the `find_entry` pair (`SourceVerify/library_iter_adapters` and
+  `SourceVerify/library_iter_adapters_errors`) the positive verifies `ensures_2`
+  and `invariant_1_step` while the negative fails at `spec.lean:7` (`ensures_2`,
+  `spec.lean:6` before adding the pragma) with no other failure beyond those the
+  positive shares (demonstrating `.value` vs `.key` discrimination) and its
+  `pragma heartbeats` is re-measured and lowered or removed — and with explicit
+  controls for the postponed global-read and behavioral-congruence recoveries
+  (`stored_fun_values`, `amm_example`, `behavioral_congruence`): two namings of
+  one read (`nameSomeReads`) produce two plain variables that `subst` unifies,
+  and `strengthenEntries` over the plain row does not depend on running before
+  or after substitution;
+- the controls pass, including `SliceLeafSupport.lean` and the six `pragma
+  heartbeats` lines in `SliceProvenanceDecls.lean` deleted and the eight
+  positive slice controls in `SliceProvenancePositives.lean` verifying by bare
+  `verify` within the `250,000` default budget (or any remaining slice-borrow
+  completeness gap reported explicitly to the user);
 - `OrderedMap` 17 of 17, the benchmark's problems and the framework sample at
   or above the reference's counts, the same target identities;
 - the names deleted by the switch have no occurrence.
@@ -750,17 +865,18 @@ one that produced the reference.
 
 | Risk | What shows it | What is done |
 |---|---|---|
-| The condition layer loses a fact at a join or a loop that the carrier kept by typing; no mechanism for a local's fact at a join exists today | phase 0's experiment, fixtures that change verdict | step 1c: the fact is a hypothesis of the continuation, discharged by each arrival's own fact |
-| The condition layer misses an obligation the carrier owed; one such gap is known, a reborrow's death through a reference | the controls | step 1b; a control that verifies stops the phase |
-| The read assumption is a new step, not a re-enabled one, and changes what the public theorem assumes | the ledger; `deposit` | step 1d; it is the existing entry restated, with the write cuts as its conditions |
-| The tree is plain and still above the reference | G2 | attribution as described under G2, before any further phase |
-| A metaprogram that matches the subtype's shape stops firing without an error | timeouts and moved baselines after the collapse | phase 2 deletes each such declaration in the collapse's own change, from a list made first |
-| The collapse cannot be staged finer than one change to `Types.lean`, because a parameter's lent layer changes with the carrier | the design note | references are collapsed first on their own; the rest is one change with identity shims |
+| Joins or loops lose a `Holds` fact that the carrier kept by typing | fixtures that change verdict after the switch | item 1.6 and part 2b: the mandatory premise bundle of `Node` in `SharedContinuations` and loop frames, proved by each arrival from its facts |
+| A settlement or slice equation assumes a certified side before checking its plain side | the loan-death and slice controls | items 1.1, 1.2 and 1.2b; any negative control that verifies stops the phase |
+| Flat valid storage (`Memory`, Option A) adds transport or normalization cost | `deposit` and the storage cost targets | item 1.5 routes the denotation and solver through `Skolems.plainAt` and `Skolems.writePlain` with a folded write rule, measured before and after the switch; Option C is the fallback if dependent packaging dominates |
+| Off-domain total specification reads leak structural zero layouts or lose relied-on facts | the total-read controls and fixture baselines | item 1.3 and part 2d (`U5`): `opaque` plain fallbacks keep off-domain reads unspecified; specifications state the presence/bound premise where a fact is needed |
+| The tree is plain and still above the reference | G2b | attribution as described under G2b, before any further phase |
+| A metaprogram that matches the subtype's shape stops firing without an error | timeouts and moved baselines after the collapse | phase 2 replaces or deletes each such declaration in the switch's own change (C9), from the inventory made in phase 1 |
+| The collapse cannot be staged finer than one coordinated change across `Types.lean` and `Term.lean` | `Carriers.lent` and the family transports (C8) | items 1.1–1.6 land all representation-independent pieces first; phase 2 executes one coordinated switch on a dedicated switch branch with per-part checkpoint commits |
 | The nominal operations are larger than estimated: about 160 pattern sites and 34 quotation sites open the structural layout | N3's progress against its list | the list is made in N0; N3 stops by the stop rules, with the structural layout still working |
 | Nominal generation costs what it did | N0's prototype, N2's gate | N3 of the requirements: no proofs per declaration; the table provider |
 | Nominal values change every leaf's spelling at once | N4 | emission in stages, the structural layout kept until N5 |
 | The Rust-on-Move branch conflicts with the removal | restack at each gate | it touches 120 lines of `verex-ir` and none of the certified layer |
-| The parked Given route rots while it is off | its tests, when it is switched on after G2 | it compiles at every commit; its adaptation is a step of its own after G2 (U2) |
+| The parked Given route rots while it is off after phase 2 | its explicit tests, and when it is switched on after G2 | `verex.givenRoute` stays on in phase 1, compiles at every commit after it flips off in phase 2, and its explicit tests keep running (`U2`) |
 
 ## Documents
 

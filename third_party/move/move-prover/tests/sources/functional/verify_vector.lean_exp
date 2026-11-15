@@ -86,12 +86,10 @@ tests/sources/functional/verify_vector.move:165:5: error: verex verification fai
     | ensures_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_vector.move:179:5: error: the bound `pragma unroll = 3` of a loop is not established
-tests/sources/functional/verify_vector.move:179:5: error: verex verification failed: the automatic verification of `verify_append_with_unroll` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
+tests/sources/functional/verify_vector.move:179:5: error: verex verification failed: the automatic verification of `verify_append_with_unroll` exceeded its budget of 250000 maxHeartbeats after deciding 0 leaves (stage interrupted); provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
   verify verify_append_with_unroll by lean =>
     verex_obligations
     verex_on
-    | unroll => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_vector.move:192:9: error: the specification clause `ensures lhs[0 .. old(lhs).length] == old(lhs)` is not established
@@ -108,14 +106,6 @@ tests/sources/functional/verify_vector.move:245:5: error: verex verification fai
     verex_obligations
     verex_on
     | unroll => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_vector.move:261:9: error: the specification clause `ensures result ==> (∀ (i in 0 .. spec.result[1]), v[i] != e)` is not established
-tests/sources/functional/verify_vector.move:257:5: error: verex verification failed: the automatic verification of `verify_model_index_of` failed; provide a proof in `tests/sources/functional/verify_vector.proof.lean`:
-  verify verify_model_index_of by lean =>
-    verex_obligations
-    verex_on
-    | ensures_3 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 ../move-stdlib/sources/vector.move:11:1: info: `verify_contains` uses concrete verification: Given interpretation does not yet support authored assertion interpretation

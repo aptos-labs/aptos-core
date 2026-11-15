@@ -12,7 +12,14 @@
 #   scripts/smoke.sh --no-exe        # Lean fixtures only: no executable, no Move CLI
 #   scripts/smoke.sh --jobs N        # Lean processes at once (default below)
 #   scripts/smoke.sh --rust          # the Rust gate, with a small Move canary
+#   scripts/smoke.sh --no-failed     # without the driver's recorded failures
 #   scripts/smoke.sh --list          # print the fixtures
+#
+# Where the e2e driver's suites record fixtures that do not pass
+# (verex-e2e-tests/.lake/verify-failed and check-failed), those names are added
+# as fixtures of their own, a few names each, so that a smoke run reruns what
+# the last full run of a suite failed. `--no-failed` leaves them out, and smoke
+# never writes those records.
 #
 # The Lean fixtures need only the libraries. They run as parallel processes,
 # longest first by their times in the previous run, and are reported in the
@@ -110,6 +117,10 @@ MVP_TESTS=(
 # One inexpensive fixture per feature; the `verify` suite runs them all.
 RUST_VERIFY=fnonce_forward,fnonce_adapters,static_fnonce,library_utf8,library_utf8_errors,library_owned_utf8,library_owned_utf8_errors,partial_move_tag,partial_move_tag_errors,slice_extent,slice_extent_errors,fn_forward,static_fn,static_step,static_step_errors,static_fnmut,static_fnmut_errors,evidence_composition,evidence_composition_errors,promoted_constants,library_benchmark,library_benchmark_errors,bench_math64_errors,references_errors,shared_views_errors,cursor_errors,nested_holders_errors,holder_structs_errors,holder_repoint_errors,no_panic,no_panic_cycle,loop_item_errors,loop_sites,arithmetic_errors,casts,drops,destructor_errors,methods,struct_specs_errors,library_vec,library_vec_errors,library_option_errors,library_integers_errors,library_index_errors,library_drops_errors,library_index_mut_false,library_for_errors,library_slice_write_false,library_for_wide_errors,diverging_regions_errors,ordering_errors,return_in_nested_branch_errors,declared_lifetimes_errors,declared_lifetimes_bound,library_iter_errors,lifetime_generic_calls_errors,impure_spec_call_errors,closure_specs_errors,closure_loop_numbers_errors,panic_macros_errors,question_mark_errors,constants_errors,cond_moves_errors,death_points_errors
 RUST_VERIFY_GROUP=3
+# The driver suites that keep a standing record of what does not pass, and the
+# names per fixture the recorded ones are run in.
+FAILED_SUITES=(verify check)
+FAILED_GROUP=3
 RUST_MOVE_RENDERINGS=vectors,move2_index,loops
 RUST_CHECKS=(
   Closures/FnMutEvidence
@@ -163,12 +174,14 @@ default_jobs() {
 run_mvp=1
 run_exe=1
 run_rust=0
+run_failed=1
 list_only=0
 jobs=${SMOKE_JOBS:-}
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-mvp) run_mvp=0 ;;
     --no-exe) run_exe=0; run_mvp=0 ;;
+    --no-failed) run_failed=0 ;;
     --rust) run_rust=1 ;;
     --jobs|-j)
       [ $# -ge 2 ] || { echo "smoke.sh: $1 needs a number" >&2; exit 2; }
@@ -190,12 +203,39 @@ if [ $run_rust = 1 ]; then
   SHARED_IR_TESTS=()
   DURATIONS="$DURATIONS-rust"
 fi
+
+# The names each driver suite records as not passing, as fixtures of
+# FAILED_GROUP names: read here, before the fixtures are listed or built, so
+# that a run both reports them and builds the driver they need.
+FAILED_LABELS=() FAILED_SOURCES=()
+failed_names=0
+if [ $run_failed = 1 ] && [ $run_exe = 1 ]; then
+  for suite in "${FAILED_SUITES[@]}"; do
+    record="$LEAN_ROOT/verex-e2e-tests/.lake/$suite-failed"
+    [ -f "$record" ] || continue
+    names=$(tr -d ' \n' <"$record")
+    [ -n "$names" ] || continue
+    IFS=, read -r -a recorded <<<"$names"
+    failed_names=$(( failed_names + ${#recorded[@]} ))
+    for (( start = 0; start < ${#recorded[@]}; start += FAILED_GROUP )); do
+      group=$(IFS=,; echo "${recorded[*]:start:FAILED_GROUP}")
+      FAILED_LABELS+=("$suite failed ${recorded[start]}…")
+      FAILED_SOURCES+=("$suite|$group")
+    done
+  done
+fi
+
 if [ $list_only = 1 ]; then
   [ ${#CHECKS[@]} = 0 ] || printf 'check %s\n' "${CHECKS[@]}"
   [ ${#IR_TESTS[@]} = 0 ] || printf 'ir %s\n' "${IR_TESTS[@]}"
   [ ${#SHARED_IR_TESTS[@]} = 0 ] || printf 'shared ir %s\n' "${SHARED_IR_TESTS[@]}"
   [ ${#SHARED_CHECKS[@]} = 0 ] || printf 'shared check %s\n' "${SHARED_CHECKS[@]}"
   printf 'verify %s\n' "${SOURCE_VERIFY[@]}"
+  if [ ${#FAILED_SOURCES[@]} -gt 0 ]; then
+    for source in "${FAILED_SOURCES[@]}"; do
+      echo "failed ${source%%|*} ${source#*|}"
+    done
+  fi
   if [ $run_rust = 1 ]; then
     printf 'e2e %s\n' "rust renderings" "rust verify $RUST_VERIFY" \
       "move renderings $RUST_MOVE_RENDERINGS"
@@ -281,7 +321,8 @@ step_report() { # key name lines-of-log-on-failure
 
 echo "smoke: building"
 build verex-ir
-if [ $run_rust = 1 ]; then
+# The driver executable is built where a fixture runs it.
+if [ $run_rust = 1 ] || [ ${#FAILED_SOURCES[@]} -gt 0 ]; then
   build verex-e2e-tests VerexE2ETests VerexE2ETestDriver
 else
   build verex-e2e-tests VerexE2ETests
@@ -344,6 +385,10 @@ if [ $run_rust = 1 ]; then
   fixture "move renderings (canary)" driver "move|$RUST_MOVE_RENDERINGS" /dev/null
   fixture "verex-rust suite" rust-suite "" /dev/null
 fi
+# What a suite recorded as not passing, in both modes, scheduled with the rest.
+for index in "${!FAILED_LABELS[@]}"; do
+  fixture "${FAILED_LABELS[$index]}" driver "${FAILED_SOURCES[$index]}" /dev/null
+done
 
 run_fixture() { # index
   local index=$1 start; start=$(now_ms)
@@ -357,8 +402,11 @@ run_fixture() { # index
       lake env lean "${caps[@]}" -Dverex.sharedContinuations=true "${SOURCES[$index]}" ;;
     driver)
       local suite=${SOURCES[$index]%%|*} filter=${SOURCES[$index]#*|}
+      # One worker: the group of fixtures runs in this process, which is
+      # already one of the pool's.
       cd "$LEAN_ROOT/verex-e2e-tests" &&
-      env VEREX_E2E_SUITE="$suite" VEREX_E2E_MANAGED=1 ${filter:+VEREX_E2E_FILTER="$filter"} \
+      env VEREX_E2E_SUITE="$suite" VEREX_E2E_MANAGED=1 VEREX_E2E_JOBS=1 \
+        ${filter:+VEREX_E2E_FILTER="$filter"} \
         lake env .lake/build/bin/VerexE2ETestDriver ;;
     rust-suite) cd "$LEAN_ROOT/verex-rust" && VEREX_DIFFERENTIAL=smoke lake test ;;
   esac >"$TMP/$index.out" 2>&1
@@ -386,7 +434,9 @@ while read -r _ index; do order+=("$index"); done < <(
     echo "${previous[${LABELS[$index]}]:-999999999} $index"
   done | sort -rn)
 
-echo "smoke: ${#LABELS[@]} Lean fixtures, $jobs at a time"
+recorded_note=""
+[ $failed_names = 0 ] || recorded_note=", $failed_names recorded failures among them"
+echo "smoke: ${#LABELS[@]} Lean fixtures, $jobs at a time$recorded_note"
 # Report the fixtures in their listed order as soon as each one and all
 # before it have finished.
 printed=0

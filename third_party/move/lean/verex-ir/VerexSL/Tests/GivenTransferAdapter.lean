@@ -16,10 +16,10 @@ def valueContract (State : Type) (value : Nat) : Contract State Nat Unit Nat whe
 theorem givenPure (State : Type) (value : Nat) :
     Satisfies (fun _ : Unit => (Spec.pure value : Spec State Nat Nat))
       (valueContract State value) := by
-  intro _ initial _ _
+  intro _ initial _ _ _
   refine ⟨?_, ?_, ?_⟩
   · intro result final execution
-    exact ⟨fun _ => execution.1, execution.2, fun impossible => impossible⟩
+    exact ⟨trivial, fun _ => execution.1, execution.2, fun impossible => impossible⟩
   · intro _ impossible
     exact impossible.elim
   · intro impossible

@@ -77,15 +77,14 @@ theorem Option.elim_eq_iff {α β : Sort _} (option : _root_.Option α) (none : 
 
 /-- Adding entries from lists of certified integer keys aborts as the
 specification states it (`doc/designs/proof-language.md`, "Normal-form
-fixes"): two indices whose keys are equal, or lists of unequal lengths. The
-keys' default is the inhabitant a specification's read takes. -/
-@[vir_denote_spec]
-theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → Int)
+fixes"): two indices whose keys are equal, or lists of unequal lengths,
+at any off-domain fallback `absent`. -/
+theorem abortsNewFrom_indexed_of {n : Nat} {signed : Bool} {β : Type}
+    {absent : SpecInt (.bits (n + 1)) signed} (g : β → Int)
     (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
     SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
       (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
-        (xs[i.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val =
-          (xs[j.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val) ∨
+        (xs[i.toNat]?.getD absent).val = (xs[j.toNat]?.getD absent).val) ∨
       ¬(xs.size : Int) = ys.size := by
   rw [SpecMap.AbortsNewFrom, ← duplicate_indices_map, List.length_map, List.length_map,
     Array.length_toList, Array.length_toList]
@@ -96,6 +95,31 @@ theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → 
   · rintro (duplicate | unequal)
     · exact Or.inr duplicate
     · exact Or.inl (by omega)
+
+/-- `abortsNewFrom_indexed_of` at the structural integer default a clause's
+vector read emits before the switch. -/
+@[vir_denote_spec]
+theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → Int)
+    (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
+    SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
+      (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
+        (xs[i.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val =
+          (xs[j.toNat]?.getD ⟨0, zero_fits (n + 1) signed (Nat.succ_ne_zero n)⟩).val) ∨
+      ¬(xs.size : Int) = ys.size :=
+  abortsNewFrom_indexed_of g xs ys
+
+/-- Prepared instantiation of `abortsNewFrom_indexed_of` at the uninterpreted
+specification fallback (`plainFallback`). -/
+theorem abortsNewFrom_indexed_plainFallback {n : Nat} {signed : Bool} {β : Type} (g : β → Int)
+    (xs : Array (SpecInt (.bits (n + 1)) signed)) (ys : Array β) :
+    SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
+      (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
+        (xs[i.toNat]?.getD
+          (NTy.plainFallbackOf Carriers.ground.toPlain (.int (n + 1) signed) rfl)).val =
+          (xs[j.toNat]?.getD
+            (NTy.plainFallbackOf Carriers.ground.toPlain (.int (n + 1) signed) rfl)).val) ∨
+      ¬(xs.size : Int) = ys.size :=
+  abortsNewFrom_indexed_of g xs ys
 
 /-- A value of a two-variant enum named by its second variant is that
 variant's payload, as a plain row: a field of a certified enum is plain,

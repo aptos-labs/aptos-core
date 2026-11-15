@@ -1,0 +1,39 @@
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:8:15: error: the loop invariant `iter.iter.slice == values && iter.iter.end == values.length && iter.iter.pos <= iter.iter.end` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:10:15: error: the loop invariant `total <= iter.count * 1000` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:4:6: error: verex verification failed: the automatic verification of `enumerate_sum` failed; provide a proof in the module:
+  verify enumerate_sum by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:19:15: error: the loop invariant `∀ (k in 0 .. iter.iter.pos), values[k] != target` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:12:6: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (250000) has been reached
+
+Note: Use `set_option maxHeartbeats <num>` to set the limit.
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:12:6: error: verex verification failed: the automatic verification of `position` exceeded its budget of 250000 maxHeartbeats after deciding 18 leaves (stage interrupted); provide a proof in the module:
+  verify position by lean =>
+    verex_obligations
+    verex_on
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:27:15: error: the loop invariant `total <= iter.count * 1000` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:21:6: error: verex verification failed: the automatic verification of `enumerate_range` failed; provide a proof in the module:
+  verify enumerate_range by lean =>
+    verex_obligations
+    verex_on
+    | invariant_3_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:47:15: error: the loop invariant `iter.iter.end == n && !iter.iter.exhausted && iter.iter.start <= n + 1` is not preserved by an iteration
+VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean:43:6: error: verex verification failed: the automatic verification of `enumerate_inclusive` failed; provide a proof in the module:
+  verify enumerate_inclusive by lean =>
+    verex_obligations
+    verex_on
+    | invariant_1_step => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -151,24 +151,26 @@ theorem IntegerValueFits.zero_of {width : IntWidth} {signed : Bool} (value : Spe
         split at fits <;> simp_all <;> omega
 
 /-- A key of a table's map read from integer carriers, cut back to the
-carriers' width, is the key: the keys fit, as the default does. -/
+carriers' width, is the key: the keys fit, as the fallback does. -/
 @[vir_denote_norm] theorem val_ofInt_keyAt_ofEntries {V V' : Type} {width : IntWidth}
-    {signed : Bool} (default : SpecInt width signed) (value : V → V')
+    {signed : Bool} (default absent : SpecInt width signed) (value : V → V')
     (table : SpecEntries (SpecInt width signed × V)) (index : Int) :
-    (SpecInt.ofInt default (SpecMap.keyAt (SpecMap.ofEntries SpecInt.val value table) index)).val =
-      SpecMap.keyAt (SpecMap.ofEntries SpecInt.val value table) index :=
-  SpecInt.val_ofInt default (SpecMap.keyAt_satisfies_all (keys_ofEntries_fit value table)
-    (IntegerValueFits.zero_of default) index)
+    (SpecInt.ofInt default (@SpecMap.keyAt Int V' ⟨absent.val⟩
+        (SpecMap.ofEntries SpecInt.val value table) index)).val =
+      @SpecMap.keyAt Int V' ⟨absent.val⟩ (SpecMap.ofEntries SpecInt.val value table) index :=
+  SpecInt.val_ofInt default (@SpecMap.keyAt_satisfies_all Int V' ⟨absent.val⟩ _ _
+    (keys_ofEntries_fit value table) absent.fits index)
 
 /-- A value of a table's map read from integer carriers, cut back to the
 carriers' width, is the value. -/
 @[vir_denote_norm] theorem val_ofInt_valueAt_ofEntries {K K' : Type} [DecidableEq K']
-    {width : IntWidth} {signed : Bool} (default : SpecInt width signed) (key : K → K')
+    {width : IntWidth} {signed : Bool} (default absent : SpecInt width signed) (key : K → K')
     (table : SpecEntries (K × SpecInt width signed)) (at_ : K') :
-    (SpecInt.ofInt default (SpecMap.valueAt (SpecMap.ofEntries key SpecInt.val table) at_)).val =
-      SpecMap.valueAt (SpecMap.ofEntries key SpecInt.val table) at_ :=
-  SpecInt.val_ofInt default (SpecMap.valueAt_satisfies (values_ofEntries_fit key table)
-    (IntegerValueFits.zero_of default) at_)
+    (SpecInt.ofInt default (@SpecMap.valueAt K' Int _ ⟨absent.val⟩
+        (SpecMap.ofEntries key SpecInt.val table) at_)).val =
+      @SpecMap.valueAt K' Int _ ⟨absent.val⟩ (SpecMap.ofEntries key SpecInt.val table) at_ :=
+  SpecInt.val_ofInt default (@SpecMap.valueAt_satisfies K' Int _ ⟨absent.val⟩ _ _
+    (values_ofEntries_fit key table) absent.fits at_)
 
 /-- Validity is decidable: distinct keys, or ascending ones; a closed map's
 validity is then evaluated. -/
@@ -1359,7 +1361,8 @@ open Lean Meta in
 value, under typed maps. The lemmas need the map valid, which a chain of
 literal constructions discharges only within simp's depth; evaluation needs
 nothing. -/
-private def evaluateLiteralObservation (e : Lean.Expr) : SimpM Simp.DStep := do
+private def evaluateLiteralObservation (e : Lean.Expr) (operands : Array Lean.Expr) :
+    SimpM Simp.DStep := do
   if e.hasFVar || e.hasMVar || e.hasLooseBVars then return .continue
   let literal (sub : Lean.Expr) : Bool :=
     sub.isConstOf ``List.nil || sub.isConstOf ``List.cons ||
@@ -1367,11 +1370,13 @@ private def evaluateLiteralObservation (e : Lean.Expr) : SimpM Simp.DStep := do
     sub.isConstOf ``SpecMap.Discipline.sequence || sub.isConstOf ``SpecMap.Discipline.ordered ||
     sub.isConstOf ``SpecMap.intOrder || sub.isConstOf ``OfNat.ofNat || sub.isConstOf ``Int ||
     sub.isConstOf ``Prod.mk || sub.isConstOf ``Prod
-  -- Only observations spelled from integer literals, the constructions, and
-  -- instances.
-  for name in e.getUsedConstants do
-    unless literal (mkConst name) || name.getPrefix == ``VerexIR.SpecMap || (← isInstance name) do
-      return .continue
+  -- Only observations whose map and query operands are spelled from integer
+  -- literals, the constructions, and instances. Absent reads reduce to an
+  -- uninterpreted fallback and decline below without leaking a concrete value.
+  for operand in operands do
+    for name in operand.getUsedConstants do
+      unless literal (mkConst name) || name.getPrefix == ``VerexIR.SpecMap || (← isInstance name) do
+        return .continue
   -- Evaluated lazily, to the constructor: a full reduction would also
   -- normalize the instances and proofs inside.
   let value ← withDefault (whnf e)
@@ -1387,26 +1392,26 @@ private def evaluateLiteralObservation (e : Lean.Expr) : SimpM Simp.DStep := do
 
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalHasKey (SpecMap.hasKey _ _) := fun e => do
-  let_expr SpecMap.hasKey _ _ _ _ _ := e | return .continue
-  evaluateLiteralObservation e
+  let_expr SpecMap.hasKey _ _ _ map key := e | return .continue
+  evaluateLiteralObservation e #[map, key]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalValueAt (SpecMap.valueAt _ _) := fun e => do
-  let_expr SpecMap.valueAt _ _ _ _ _ _ := e | return .continue
-  evaluateLiteralObservation e
+  let_expr SpecMap.valueAt _ _ _ _ map key := e | return .continue
+  evaluateLiteralObservation e #[map, key]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalSize (SpecMap.size _) := fun e => do
   let_expr SpecMap.size _ _ map := e | return .continue
   unless map.isAppOf ``SpecMap.update || map.isAppOf ``SpecMap.remove || map.isAppOf ``List.cons ||
     map.isAppOf ``List.nil do return .continue
-  evaluateLiteralObservation e
+  evaluateLiteralObservation e #[map]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalKeyAt (SpecMap.keyAt _ _) := fun e => do
-  let_expr SpecMap.keyAt _ _ _ _ _ := e | return .continue
-  evaluateLiteralObservation e
+  let_expr SpecMap.keyAt _ _ _ map index := e | return .continue
+  evaluateLiteralObservation e #[map, index]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalRank (SpecMap.rank _ _) := fun e => do
-  let_expr SpecMap.rank _ _ _ _ _ := e | return .continue
-  evaluateLiteralObservation e
+  let_expr SpecMap.rank _ _ _ map key := e | return .continue
+  evaluateLiteralObservation e #[map, key]
 
 /-- A choice projecting fields of a value is the value's being that
 variant with those fields (`Which.project?_eq_some_iff`), applied at
@@ -1420,3 +1425,123 @@ simproc [vir_denote, vir_denote_norm] variantProjectionSome
 
 
 end VerexIR.Proofs.Denote.NativeMaps
+
+namespace VerexIR.SpecMap
+
+open VerexIR.Proofs.Denote
+
+/-- The value of a key's first entry, when present. -/
+def get? {K V : Type} [DecidableEq K] : SpecMap K V → K → Option V
+  | [], _ => none
+  | entry :: rest, key => if entry.1 = key then some entry.2 else get? rest key
+
+@[simp] theorem get?_nil {K V : Type} [DecidableEq K] (key : K) :
+    get? ([] : SpecMap K V) key = none := rfl
+
+@[simp] theorem get?_cons {K V : Type} [DecidableEq K] (entry : K × V)
+    (rest : SpecMap K V) (key : K) :
+    get? (entry :: rest) key = if entry.1 = key then some entry.2 else get? rest key := rfl
+
+theorem mem_of_get? {K V : Type} [DecidableEq K] {map : SpecMap K V} {key : K} {value : V}
+    (found : get? map key = some value) : (key, value) ∈ map := by
+  induction map with
+  | nil => cases found
+  | cons entry rest ih =>
+      simp only [get?] at found
+      split at found
+      · rename_i same
+        cases Option.some.inj found
+        exact same ▸ List.mem_cons_self ..
+      · exact List.mem_cons_of_mem _ (ih found)
+
+/-- Every entry of a typed map holds the key and value invariants once unread
+back to the table's plain types. -/
+@[reducible] def EntriesHold [Carriers] {K V : Type} (κ ν : NTy)
+    (unreadKey : K → κ.plain) (unreadValue : V → ν.plain) (map : SpecMap K V) : Prop :=
+  EntriesSatisfy
+    (fun entry => NTy.Holds κ (unreadKey entry.1) ∧ NTy.Holds ν (unreadValue entry.2)) map
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.forget_unread_readPlain [Θ : Carriers] [CarriersNonempty Θ]
+    (τ : NTy) (inhabitable : τ.inhabitable = true) {value : τ.plain}
+    (holds : NTy.Holds τ value) :
+    NTy.forget τ (NTy.unread τ inhabitable (NTy.readPlain τ inhabitable value)) = value := by
+  have readEq : NTy.readPlain τ inhabitable value = NTy.read τ (NTy.ofHolds τ value holds) := by
+    rw [← NTy.readPlain_forget τ inhabitable, NTy.forget_ofDeepHolds]
+  rw [readEq, NTy.unread_read τ inhabitable, NTy.forget_ofDeepHolds]
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.Holds.unread_readPlain [Θ : Carriers] [CarriersNonempty Θ]
+    {τ : NTy} (inhabitable : τ.inhabitable = true) {value : τ.plain}
+    (holds : NTy.Holds τ value) :
+    NTy.Holds τ (NTy.forget τ (NTy.unread τ inhabitable (NTy.readPlain τ inhabitable value))) := by
+  rwa [NTy.forget_unread_readPlain τ inhabitable holds]
+
+theorem entries_hold_ofEntries [Carriers] {K V : Type} {κ ν : NTy}
+    {readKey : κ.plain → K} {readValue : ν.plain → V}
+    {unreadKey : K → κ.plain} {unreadValue : V → ν.plain}
+    {table : (NTy.table κ ν).plain}
+    (held : NTy.Holds (.table κ ν) table)
+    (keyHolds : ∀ k, NTy.Holds κ k → NTy.Holds κ (unreadKey (readKey k)) := by
+      intro _ h; first | exact h | exact ⟨trivial⟩)
+    (valueHolds : ∀ v, NTy.Holds ν v → NTy.Holds ν (unreadValue (readValue v)) := by
+      intro _ h; first | exact h | exact ⟨trivial⟩) :
+    EntriesHold κ ν unreadKey unreadValue (ofEntries readKey readValue table) :=
+  entriesSatisfy_ofEntries readKey readValue table fun entry member =>
+    ⟨keyHolds entry.1 (held.of_mem_table_key member),
+      valueHolds entry.2 (held.of_mem_table_value member)⟩
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.Holds.of_specMap_get? [Carriers]
+    {K V : Type} [DecidableEq K] {κ ν : NTy}
+    {unreadKey : K → κ.plain} {unreadValue : V → ν.plain} {map : SpecMap K V}
+    (entries : EntriesHold κ ν unreadKey unreadValue map)
+    {key : K} {value : V} (found : get? map key = some value) :
+    NTy.Holds ν (unreadValue value) :=
+  (entries (key, value) (mem_of_get? found)).2
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.Holds.of_specMap_valueAt [Carriers]
+    {K V : Type} [DecidableEq K] [Inhabited V]
+    {κ ν : NTy} {unreadKey : K → κ.plain} {unreadValue : V → ν.plain} {map : SpecMap K V}
+    (entries : EntriesHold κ ν unreadKey unreadValue map)
+    {key : K} (present : hasKey map key = true) :
+    NTy.Holds ν (unreadValue (valueAt map key)) :=
+  (entries (key, valueAt map key) (mem_of_get map key present)).2
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.Holds.of_specMap_keyAt [Carriers]
+    {K V : Type} [Inhabited K]
+    {κ ν : NTy} {unreadKey : K → κ.plain} {unreadValue : V → ν.plain} {map : SpecMap K V}
+    (entries : EntriesHold κ ν unreadKey unreadValue map)
+    {index : Int} (low : 0 ≤ index) (high : index < size map) :
+    NTy.Holds κ (unreadKey (keyAt map index)) :=
+  keyAt_satisfies (property := fun k => NTy.Holds κ (unreadKey k))
+    (fun entry member => (entries entry member).1) low high
+
+theorem entries_hold_update [Carriers] {K V : Type} [DecidableEq K]
+    {κ ν : NTy} {unreadKey : K → κ.plain} {unreadValue : V → ν.plain}
+    {discipline : Discipline K} {map : SpecMap K V} {key : K} {value : V}
+    (before : EntriesHold κ ν unreadKey unreadValue map)
+    (keyHeld : NTy.Holds κ (unreadKey key))
+    (valueHeld : NTy.Holds ν (unreadValue value)) :
+    EntriesHold κ ν unreadKey unreadValue (update discipline map key value) :=
+  entriesSatisfy_update before ⟨keyHeld, valueHeld⟩
+
+theorem entries_hold_remove [Carriers] {K V : Type} [DecidableEq K]
+    {κ ν : NTy} {unreadKey : K → κ.plain} {unreadValue : V → ν.plain}
+    {discipline : Discipline K} {map : SpecMap K V} {key : K}
+    (before : EntriesHold κ ν unreadKey unreadValue map) :
+    EntriesHold κ ν unreadKey unreadValue (remove discipline map key) :=
+  entriesSatisfy_remove before
+
+theorem _root_.VerexIR.Proofs.Denote.NTy.Holds.of_writeBack [Carriers]
+    {K V : Type} {κ ν : NTy}
+    {unreadKey : K → κ.plain} {unreadValue : V → ν.plain} {map : SpecMap K V}
+    (entries : EntriesHold κ ν unreadKey unreadValue map) :
+    NTy.Holds (.table κ ν)
+      (writeBack (fun entry => (unreadKey entry.1, unreadValue entry.2)) map) := by
+  rw [NTy.holds_table]
+  intro stored member
+  unfold writeBack SpecEntries.ofList at member
+  split at member
+  · obtain ⟨entry, inside, rfl⟩ := List.mem_map.mp member
+    exact entries entry inside
+  · exact nomatch member
+
+end VerexIR.SpecMap

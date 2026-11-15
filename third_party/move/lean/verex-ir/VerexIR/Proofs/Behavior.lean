@@ -940,13 +940,14 @@ theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle 
     (closed : (Carriers.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) pre)
-    (permitted : contract.requires (weave.compose captures args) pre) :
+    (permitted : contract.requires (weave.compose captures args) pre)
+    (valid : contract.validArgs (weave.compose captures args) := by trivial) :
     (¬contract.mayAbort (weave.compose captures args) pre →
         contract.ensures (weave.compose captures args) pre result post) ∧
       contract.frame (weave.compose captures args) pre result post ∧
       ¬contract.mustAbort (weave.compose captures args) pre :=
-  (verified _ pre assumed permitted).1 result post
-    (ensuresOf_closureOf weave capturedFree coherent captures args ensures closed)
+  ((verified _ pre valid assumed permitted).1 result post
+    (ensuresOf_closureOf weave capturedFree coherent captures args ensures closed)).2
 
 /-- `aborts_of` of a function value whose target is verified: where what the
 target's theorem assumes and its precondition hold at the woven arguments,
@@ -966,10 +967,11 @@ theorem abortsOf_closureOf_verified {executable : ExecutableUnit unit} {handle :
     (closed : (Carriers.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) state)
-    (permitted : contract.requires (weave.compose captures args) state) :
+    (permitted : contract.requires (weave.compose captures args) state)
+    (valid : contract.validArgs (weave.compose captures args) := by trivial) :
     ∃ failure, contract.aborts (weave.compose captures args) state failure := by
   obtain ⟨failure, runs⟩ := abortsOf_closureOf weave capturedFree coherent captures args aborts closed
-  exact ⟨failure, (verified _ state assumed permitted).2.1 failure runs⟩
+  exact ⟨failure, (verified _ state valid assumed permitted).2.1 failure runs⟩
 
 /-- `aborts_of` of a function value capturing values, as of a function value
 naming its target (`named`), at the woven arguments. -/
@@ -1493,7 +1495,9 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
       (shape.subst θ.1) (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed)
       args result pre post)
     (assumed : contract.assumes (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
-    (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre) :
+    (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
+    (valid : contract.validArgs (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) := by
+      trivial) :
     (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
       contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
         (ResultShape.toSkolem θ shape result) post) ∧
@@ -1506,7 +1510,7 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
   subst post
   subst result
   rw [NTy.toSkolem_ofSkolem_shape]
-  exact (verified _ pre assumed permitted).1 value middle run
+  exact ((verified _ pre valid assumed permitted).1 value middle run).2
 
 /-! ## A behavior at a row
 

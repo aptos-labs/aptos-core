@@ -14,15 +14,15 @@ the borrow being the resource. A function that only mutates such a resource
 is verified for the invariant without a specification of its own, and a
 caller takes the referent's invariant from the callee's contract.
 
-The obligation is the invariant at every depth, owed where the borrow's
-root is written back and at the death of a `&mut` parameter's loan, as the
-Move Prover owes it (`memory_instrumentation.rs`, `PackRefDeep` at a
-`LocalRoot` or `GlobalRoot` write-back and at a parameter's death; an
-intermediate reference node owes nothing of its own). A value therefore may
-be broken through a reborrow and repaired before its root is written back,
-but it cannot be read by a callee meanwhile: the callee assumes its
+The obligation is the invariant at every depth, owed where each mutable loan
+dies and at the death of a `&mut` parameter's loan: a root write-back checks
+the rebuilt owner, a reborrow's death checks its referent's current before
+relating it to its prophecy, and an enclosing level's clause stays open until
+its own loan ends (`doc/designs/data-invariants.md`). A value broken under a
+loan may be repaired before that loan dies, and a callee assumes its
 referent's invariant at entry, which the caller owes where it hands the
-reference over.
+reference over, after any inner reborrow over a component has settled
+(`VerexSL/Tests/LoanDeathSoundness.lean`).
 -/
 
 namespace VerexE2ETests.Check.Storage.MutationEnds
@@ -130,8 +130,8 @@ verex module 0x42::mutation_ends where
     aborts_if false
     ensures result > 1
 
-  -- Broken through a reborrow and repaired before the root is written back:
-  -- the root's obligation holds, and no intermediate level owes its own.
+  -- Broken while borrowed and repaired before the loan dies: the write-back's
+  -- obligation holds at every depth, and intermediate writes owe nothing.
   fun repaired_before_root() -> Outer := do
     let mut outer := new Outer { inner := new Inner { v := 2 } }
     let inner := &mut outer.inner
@@ -139,14 +139,14 @@ verex module 0x42::mutation_ends where
     inner.v := 2
     outer
 
-  -- The same break cannot reach a callee: the call owes the referent's
-  -- invariant, which the callee assumes at entry.
+  -- Broken through a reborrow and left open where the reborrow dies before
+  -- the call: the reborrow's death owes `Inner`'s invariant there.
   fun escapes_to_callee() -> u64 := do
     let mut outer := new Outer { inner := new Inner { v := 2 } }
     let r := &mut outer
     let inner := &mut r.inner
     inner.v := 0
-    let observed := observe(r) -- error: the referent's invariant is owed here
+    let observed := observe(r) -- error: the reborrow's invariant fails where its loan ends
     r.inner.v := 2
     observed
 

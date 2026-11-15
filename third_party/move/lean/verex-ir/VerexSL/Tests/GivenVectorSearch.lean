@@ -34,26 +34,70 @@ run_cmd do
   unless (givenProofArtifacts.getState env).find? base == some (base ++ `givenTypedVerified) do
     throwError "generic vector membership did not use the Given proof path"
 
--- An unchanged vector need not contain the requested element.
-run_cmd do
+private def forbiddenSubstrings : List String := [
+  "exceeded its budget", "exceeded its heartbeat budget", "maxHeartbeats",
+  "maximum number of heartbeats", "heartbeats", "stopped by the budget",
+  "deterministic timeout", "(deterministic) timeout",
+  "maximum recursion depth", "deep recursion",
+  "unknown identifier", "unknown constant", "unknown function",
+  "no Verex module declares", "no denotation for",
+  "given verification is unsupported", "given verification concrete transfer failed",
+  "pragma verify = manual",
+  "type mismatch", "application type mismatch", "failed to synthesize",
+  "unsolved goals", "no goals to be solved",
+  "kernel", "PANIC at", "internal exception"
+]
+
+private def assertGivenRejected (base : Name) (expectedClause : String)
+    (command : TSyntax `command) : CommandElabM Unit := do
   let saved ← get
-  let base := `«0x42».given_vector_search.unchanged
+  let priorCount := saved.messages.toList.length
+  let command := Id.run <| command.raw.replaceM fun stx =>
+    pure <| if stx.isIdent then some (mkIdentFrom stx stx.getId.eraseMacroScopes) else none
   let thrown ← try
-    let command ← `(command| verify 0x42::given_vector_search::unchanged)
-    let command := Id.run <| command.raw.replaceM fun stx =>
-      pure <| if stx.isIdent then some (mkIdentFrom stx stx.getId.eraseMacroScopes) else none
     elabCommand command
     pure none
-  catch error => pure (some (← error.toMessageData.toString))
-  let state ← get
-  let messages ← state.messages.toList.mapM fun message => message.data.toString
-  let noProof := !state.env.contains (base ++ `givenTypedVerified) &&
-    !state.env.contains (base ++ `typedVerified) &&
-    !state.env.contains (base ++ `givenTransfer) &&
-    ((givenProofArtifacts.getState state.env).find? base).isNone
-  let expectedFailure := (messages ++ thrown.toList).any fun message =>
-    message.startsWith "verex verification failed: " &&
-      message.contains s!"`{base.getString!}`"
-  set saved
-  unless noProof && expectedFailure do
-    throwError "expected unchanged-vector membership to fail without proof artifacts"
+  catch error =>
+    pure (some (error.isMaxHeartbeat || error.isMaxRecDepth, ← error.toMessageData.toString))
+  let attempted ← get
+  let curNs ← getCurrNamespace
+  let fresh := attempted.messages.toList.drop priorCount
+  let freshErrors := fresh.filter (·.severity == .error)
+  let hasHeartbeatTag := fresh.any (·.data.hasTag (· == `runtime.maxHeartbeats))
+  let freshTexts ← fresh.mapM fun message => message.data.toString
+  let errorTexts := (← freshErrors.mapM fun message => message.data.toString) ++
+    (thrown.map (·.2)).toList
+  let noProof := !attempted.env.contains (base ++ `verified) &&
+    !attempted.env.contains (curNs ++ base ++ `verified) &&
+    !attempted.env.contains (base ++ `givenTypedVerified) &&
+    !attempted.env.contains (curNs ++ base ++ `givenTypedVerified) &&
+    !attempted.env.contains (base ++ `typedVerified) &&
+    !attempted.env.contains (curNs ++ base ++ `typedVerified) &&
+    !attempted.env.contains (base ++ `givenTransfer) &&
+    !attempted.env.contains (curNs ++ base ++ `givenTransfer) &&
+    ((givenProofArtifacts.getState attempted.env).find? base).isNone &&
+    ((givenProofArtifacts.getState attempted.env).find? (curNs ++ base)).isNone
+  modify fun _ => saved
+  unless noProof do
+    throwError "expected `{base}` not to publish any proof artifact"
+  if thrown.any (·.1) || hasHeartbeatTag then
+    throwError "expected semantic rejection for `{base}`, got heartbeat/recursion limit: {errorTexts}"
+  if let some fallback := freshTexts.find? (·.contains "uses concrete verification") then
+    throwError "expected Given rejection for `{base}`, got concrete fallback: {fallback}"
+  if let some bad := errorTexts.find? (fun text => forbiddenSubstrings.any (text.contains ·)) then
+    throwError "expected semantic rejection for `{base}`, got budget/infrastructure diagnostic: {bad}"
+  let summaryPrefix := s!"verex verification failed: the automatic verification of `{base.getString!}` failed;"
+  let isSemanticClause (text : String) : Bool :=
+    text.startsWith "the specification clause " && text.endsWith " is not established"
+  let hasSummary := errorTexts.any (·.startsWith summaryPrefix)
+  let hasClause := errorTexts.any fun text => isSemanticClause text && text.contains expectedClause
+  let allExpected := errorTexts.all fun text =>
+    text.startsWith summaryPrefix || isSemanticClause text
+  unless !errorTexts.isEmpty && hasSummary && hasClause && allExpected do
+    throwError "expected unchanged-vector membership to fail on `{expectedClause}`, got: {errorTexts}"
+
+-- An unchanged vector need not contain the requested element.
+run_cmd do
+  assertGivenRejected `«0x42».given_vector_search.unchanged
+    "element == value"
+    (← `(command| verify 0x42::given_vector_search::unchanged))

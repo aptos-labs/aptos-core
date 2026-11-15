@@ -150,3 +150,95 @@ run_meta do
       withLocalDeclD `target (mkApp (mkConst ``Option [0]) targetType) fun target => do
         rejectOperation (mkAppN generic.getAppFn (generic.getAppArgs.set! 3 target))
       withLocalDeclD `index (mkApp2 (mkConst ``Vars) context resultRow) rejectOperation
+
+section PlainStorageInterfaceTests
+open VerexIR VerexIR.Validation
+
+variable {unit : ValidatedUnit} [FunctionCarriers unit]
+
+local notation "resA" => (NTy.struct (⟨⟨0⟩, 0⟩ : StructHandle) .nil (.cons (.int 64 false) .nil))
+local notation "resB" => (NTy.struct (⟨⟨0⟩, 1⟩ : StructHandle) .nil (.cons .bool .nil))
+local notation "genRes" =>
+  (NTy.struct (⟨⟨0⟩, 2⟩ : StructHandle) (.cons (.param 0) .nil) (.cons (.param 0) .nil))
+local notation "instRes" =>
+  (NTy.struct (⟨⟨0⟩, 2⟩ : StructHandle) (.cons (.int 64 false) .nil) (.cons (.int 64 false) .nil))
+
+-- Fast path 1: distinct resources (premise-free, no `NTy.Holds` needed on `bad`)
+example [Θ : Skolems unit] (m : Memory unit) (k1 k2 : StorageKey)
+    (bad : @NTy.plain Θ.toCarriers resA) :
+    Skolems.plainAt resB .nil k2 (Skolems.writePlain resA .nil k1 (some bad) m) =
+      Skolems.plainAt resB .nil k2 m := by
+  simp only [vir_denote_norm]
+
+-- Fast path 1 negative check: same declaration differing ONLY by unresolved type parameters MUST decline!
+example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
+    (v : @NTy.plain Θ.toCarriers genRes) :
+    Skolems.plainAt genRes (.cons (.param 1) .nil) k
+      (Skolems.writePlain genRes (.cons (.param 0) .nil) k (some v) m) =
+    Skolems.plainAt genRes (.cons (.param 1) .nil) k
+      (Skolems.writePlain genRes (.cons (.param 0) .nil) k (some v) m) := by
+  fail_if_success
+    have : Skolems.plainAt genRes (.cons (.param 1) .nil) k
+        (Skolems.writePlain genRes (.cons (.param 0) .nil) k (some v) m) =
+      Skolems.plainAt genRes (.cons (.param 1) .nil) k m := by
+      simp only [reducePlainAtWritePlain]
+  rfl
+
+-- Fast path 2: `none` (premise-free)
+example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey) :
+    Skolems.plainAt resA .nil k (Skolems.writePlain resA .nil k none m) = none := by
+  simp only [vir_denote_norm]
+
+-- Fast path 3: `otherKey ≠ key` (premise-free, no `NTy.Holds` needed on `bad`)
+example [Θ : Skolems unit] (m : Memory unit) (a1 a2 : String) (hne : a2 ≠ a1)
+    (bad : @NTy.plain Θ.toCarriers resA) :
+    Skolems.plainAt resA .nil (.address a2)
+      (Skolems.writePlain resA .nil (.address a1) (some bad) m) =
+      Skolems.plainAt resA .nil (.address a2) m := by
+  simp only [vir_denote_norm]
+
+-- Fast path 4a + `NTy.ofPlain?_forget`: normal form ends in `c`, NOT `ofDeepHolds (forget c) _`
+example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
+    (c : @NTy.carrier Θ.toCarriers resA) :
+    (Skolems.plainAt resA .nil k
+      (Skolems.writePlain resA .nil k (some (NTy.forget resA c)) m)).bind
+      (NTy.ofPlain? resA) = some c := by
+  simp only [vir_denote_norm]
+
+-- Fast path 4c: `LCtx` `NTy.Holds`
+example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
+    (v : @NTy.plain Θ.toCarriers resA) (hv : @NTy.Holds Θ.toCarriers resA v) :
+    Skolems.plainAt resA .nil k (Skolems.writePlain resA .nil k (some v) m) = some v := by
+  simp only [vir_denote_norm]
+
+-- Outer-frame instantiation laws (`plainAtOuterFrame`, `writePlainOuterFrame`, `optionPlainTransportIdentity`)
+example (outer : Skolems unit) (m : Memory unit) (k : StorageKey) :
+    @Skolems.plainAt unit _ (Skolems.instantiate arguments outer) genRes (.cons (.param 0) .nil) k m =
+      @Skolems.plainAt unit _ outer instRes (.cons (.int 64 false) .nil) k m := by
+  simp only [vir_denote_norm]
+
+example (outer : Skolems unit) (m : Memory unit) (k : StorageKey)
+    (v : Option (@NTy.plain (Skolems.instantiate arguments outer).toCarriers genRes)) :
+    @Skolems.writePlain unit _ (Skolems.instantiate arguments outer) genRes
+      (.cons (.param 0) .nil) k v m =
+      @Skolems.writePlain unit _ outer instRes (.cons (.int 64 false) .nil) k v m := by
+  simp only [vir_denote_norm]
+
+-- `TableMemory.allocationResource` preservation under `Skolems.writePlain`
+example [Θ : Skolems unit] (m : Memory unit) (k1 k2 : StorageKey)
+    (v : Option (@NTy.plain Θ.toCarriers resA)) :
+    Skolems.writePlain resA .nil k1 v m TableMemory.allocationResource k2 =
+      m TableMemory.allocationResource k2 := by
+  simp only [vir_denote_norm]
+
+-- `verex_frame_writes` (`closeFrameWrites`) over `Skolems.writePlain`
+example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
+    (v : Option (@NTy.plain Θ.toCarriers resA)) :
+    (∀ k' : StorageKey, k' ≠ k →
+      Skolems.writePlain resA .nil k v m (Skolems.resource resA .nil) k' =
+        m (Skolems.resource resA .nil) k') ∧
+    (∀ r : ResourceType, r ≠ Skolems.resource resA .nil →
+      Skolems.writePlain resA .nil k v m r = m r) := by
+  verex_frame_writes
+
+end PlainStorageInterfaceTests

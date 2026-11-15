@@ -258,8 +258,8 @@ guard the unfolding by their bounds.
 A specification is established in one of three ways, tried in this order:
 
 1. **Automatically.** The solver proves the function's obligations within
-   a budget (`verex.verifyHeartbeats`, 1000000 thousand heartbeats by
-   default, about thirty seconds of elaboration).
+   a budget (`verex.verifyHeartbeats`, in `maxHeartbeats` units, 250000 by
+   default).
 2. **By a proof file.** Move has no syntax for a proof, so the proofs of a
    Move file live in the Lean file beside it, `foo.proof.lean`:
 
@@ -316,7 +316,7 @@ do and where:
 
 ```text
 foo.move:12:5: error: verex verification failed: the automatic verification
-of `f` exceeded its budget of 1000000 maxHeartbeats after deciding 3 leaves
+of `f` exceeded its budget of 250000 maxHeartbeats after deciding 3 leaves
 at call 2 of `helper` (stage inline); provide a proof:
 `verify f by …` in `sources/foo.proof.lean` (`verify f by lean => verex_obligations`
 lists its obligations), or raise the budget with `pragma heartbeats = N`,
@@ -563,14 +563,13 @@ the first temporary. A body where they differ keeps the rendering's position.
 ## Budgets
 
 Every target runs within a heartbeat budget (`verex.verifyHeartbeats`, in
-`maxHeartbeats` units, 1000000 by default: about thirty seconds at the 32M
-heartbeats a second the elaborator sustains). `prove --lean --heartbeats N`
+`maxHeartbeats` units, 250000 by default). `prove --lean --heartbeats N`
 and `verex-move verify --heartbeats N` set the default for a run; a target
 that needs more raises it for itself with `pragma heartbeats = N;` in its
 Move spec block (a pragma the Move model accepts on functions and modules;
 the Move Prover ignores it) or `pragma heartbeats = N` in VerexSL, or gets
 a proof. `N` counts thousands of `maxHeartbeats` units: the default is
-`1000`.
+`250`.
 
 `verify --ignore-proofs` (`prove --lean --ignore-proofs`,
 `verex.ignoreProofs`) verifies every function automatically, its authored

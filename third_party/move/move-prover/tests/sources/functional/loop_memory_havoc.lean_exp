@@ -103,10 +103,8 @@ this✝ :
   VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 15 } } (s, n, ())
     initialState✝
 permitted :
-  (initialState✝
-        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
-          arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address s)).isSome =
+  (VerexIR.Proofs.Denote.Skolems.plainAt 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰
+        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address s) initialState✝).isSome =
     true
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -249,10 +247,8 @@ this✝ :
   VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 17 } } (s, n, ())
     initialState✝
 permitted :
-  (initialState✝
-        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
-          arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address s)).isSome =
+  (VerexIR.Proofs.Denote.Skolems.plainAt 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰
+        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address s) initialState✝).isSome =
     true
 verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -412,10 +408,8 @@ this✝ :
   VerexIR.Proofs.Denote.FunctionStart { namespaceId := { index := 0 }, functionId := { index := 22 } } (a, n, ())
     initialState✝
 permitted :
-  (initialState✝
-        { type := 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰,
-          arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address a)).isSome =
+  (VerexIR.Proofs.Denote.Skolems.plainAt 0x42.loop_memory_havoc.unit.nominal.namespace.0.declaration✝³⁻⁰
+        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address a) initialState✝).isSome =
     true
 verexContinuation✝³ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address

@@ -31,7 +31,7 @@ VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:37:6: error: verex ver
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:43:3: error: `no panic when aborts at op 1` is not established: the operation `a + c` at VerexE2ETests/SourceVerify/closure_specs_errors.rs:28:24 may panic
-  from: (VerexIR.Proofs.Denote.NTy.int 32 false).deepHolds self_c; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit; ¬(0 ≤ a.val + self_c.val ∧ a.val + self_c.val ≤ 4294967295)
+  from: (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 4 } (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil)).deepHolds (self_c, PUnit.unit); ¬(0 ≤ a.val + self_c.val ∧ a.val + self_c.val ≤ 4294967295)
 VerexE2ETests/SourceVerify/closure_specs_errors.spec.lean:43:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call` failed; provide a proof in the module:
   verify «panicking::{closure#0}»::call by lean =>
     verex_obligations

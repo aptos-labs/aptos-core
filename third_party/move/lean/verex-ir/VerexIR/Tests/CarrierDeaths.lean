@@ -12,7 +12,7 @@ example (unit : ValidatedUnit) (ns : CompileNamespace) :
     holderDeaths unit ns .none
       (Γ := .cons (.ref (.sliceRef (.int 32 false))) .nil) 0 .here
       [#[.dereference]] =
-      .ok [Term.resolveSliceAt .here (.deref .nil)] := rfl
+      .ok [Term.resolveSliceAt 0 .here (.deref .nil) .slot] := rfl
 
 -- The same path rule applies to an ordinary nested mutable reference.
 example (unit : ValidatedUnit) (ns : CompileNamespace) :

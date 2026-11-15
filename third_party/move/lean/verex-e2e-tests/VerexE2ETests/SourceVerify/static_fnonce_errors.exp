@@ -19,14 +19,9 @@ verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed permitted invariantHolds✝¹ left✝⁶ : True
-left✝⁵ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds (value, ()).fst
-right✝² : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil (value, ()).snd
-invariantHolds✝ left✝³ : True
-right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((value, ()), ()).snd
-left✝¹ : True
-left✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds ((value, ()), ()).fst.fst
-right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ((value, ()), ()).fst.snd
+assumed permitted : True
+invariantHolds✝¹ : static_fnonce_errors.unit.nominal.namespace.0.declaration✝⁻⁰.Holds (value, ())
+invariantHolds✝ : static_fnonce_errors.unit.nominal.namespace.0.declaration✝²⁻⁰.Holds ((value, ()), ())
 verexMethodArguments :
   VerexIR.Proofs.Denote.HList
     (VerexIR.Proofs.Denote.NRow.cons static_fnonce_errors.unit.nominal.namespace.0.declaration✝²⁻⁰

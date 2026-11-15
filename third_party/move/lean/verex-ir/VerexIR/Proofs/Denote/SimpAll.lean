@@ -24,14 +24,61 @@ namespace VerexIR.Proofs.Denote
 open Lean Meta
 open Simp (Stats SimprocsArray)
 
-/-- Whether an equation's left side occurs in its right side, including
-conditional and quantified equations: rewriting with it would not terminate,
-so it stays a fact but is no rewrite rule. -/
-def selfReferential (type : Expr) : MetaM Bool := do
+/-- `e` with primitive structure projections (`.proj`) expanded to their
+projection functions (`Subtype.val`, `Prod.fst`, ...), matching the head
+symbols `simp` indexes and `kabstract` compares. -/
+private partial def expandProjections (e : Expr) : MetaM Expr := do
+  if (e.find? (·.isProj)).isNone then return e
+  Meta.transform e
+    (pre := fun sub =>
+      if (sub.find? (·.isProj)).isNone then return .done sub else return .continue)
+    (post := fun sub => do
+      let .proj structName idx s := sub | return .done sub
+      if s.hasLooseBVars then return .done sub
+      let some info := getStructureInfo? (← getEnv) structName | return .done sub
+      let some projFn := info.getProjFn? idx | return .done sub
+      try
+        let iv ← getConstInfoInduct structName
+        let sType ← withDefault <| whnf (← inferType s)
+        let .const declName us := sType.getAppFn | return .done sub
+        unless declName == structName do return .done sub
+        let params ← (sType.getAppArgs.shrink iv.numParams).mapM expandProjections
+        return .done (mkApp (mkAppN (mkConst projFn us) params) s)
+      catch _ =>
+        return .done sub)
+
+/-- Whether `e` is the constant `True` or `False`. -/
+private def isTruthConst (e : Expr) : Bool :=
+  e.isConstOf ``True || e.isConstOf ``False
+
+/-- Whether a single proposition or simp-preprocessed theorem type rewrites its
+left side into a right side mentioning that left side. -/
+private def selfReferentialType (type : Expr) : MetaM Bool := do
   forallTelescope type fun _ body => do
-    let some (_, left, right) := body.eq? | return false
+    let sides? := match body.eq?, body.iff? with
+      | some (_, left, right), _ => some (left, right)
+      | _, some (left, right) => some (left, right)
+      | _, _ => none
+    let some (left, right) := sides? | return false
+    if isTruthConst right then
+      return ← withReducible (isDefEq left right)
+    let left ← expandProjections left
+    let right ← expandProjections right
     -- An instance as rewriting finds one, up to reducible unfolding.
     return (← withReducible (kabstract right left)).hasLooseBVars
+
+/-- Whether an equation's left side occurs in its right side, including
+conditional, quantified, and simp-preprocessed equations: rewriting with it
+would not terminate, so it stays a fact but is no rewrite rule. -/
+def selfReferential (type : Expr) : MetaM Bool := do
+  if ← selfReferentialType type then return true
+  try
+    withLocalDeclD `h type fun proof => do
+      let thms ← mkSimpTheoremFromExpr (.fvar proof.fvarId!) #[] proof
+      thms.anyM fun thm => do
+        selfReferentialType (← instantiateMVars (← inferType (← thm.getValue)))
+  catch _ =>
+    return false
 
 /-- Whether a quantified fact can rewrite: its pattern, the side of its
 conclusion a rule matches, fixes every data binder and is no bare binder.
@@ -51,11 +98,8 @@ def rewritesByPattern (type : Expr) : MetaM Bool := do
       if fixed.contains binder.fvarId! then return true
       isProp (← inferType binder)
 
-/-- Whether rewriting `left` to `right` closes a cycle with the admitted
-equations (origin, left side, right side): `left` is reached from `right`
-through equations whose left sides occur in the right sides met. Ground
-equations without such a cycle rewrite to an end. -/
-partial def closesCycle (rules : Array (Origin × Expr × Expr)) (left right : Expr) :
+/-- Cycle check over already projection-expanded `(origin, left, right)` rules. -/
+private partial def closesCycleExpanded (rules : Array (Origin × Expr × Expr)) (left right : Expr) :
     MetaM Bool := do
   -- What a rule's right side reaches does not depend on the path to it, so
   -- each rule is explored once.
@@ -70,6 +114,18 @@ partial def closesCycle (rules : Array (Origin × Expr × Expr)) (left right : E
         if ← reaches ruleRight then return true
     return false
   reaches right
+
+/-- Whether rewriting `left` to `right` closes a cycle with the admitted
+equations (origin, left side, right side): `left` is reached from `right`
+through equations whose left sides occur in the right sides met. Ground
+equations without such a cycle rewrite to an end. -/
+partial def closesCycle (rules : Array (Origin × Expr × Expr)) (left right : Expr) :
+    MetaM Bool := do
+  let left ← expandProjections left
+  let right ← expandProjections right
+  let rules ← rules.mapM fun (id, ruleLeft, ruleRight) => do
+    return (id, ← expandProjections ruleLeft, ← expandProjections ruleRight)
+  closesCycleExpanded rules left right
 
 /-- The congruences without the ones that take a conditional's condition as
 a rewrite rule into its branches: a condition such as `x = x / k * k`
@@ -103,16 +159,58 @@ structure State where
 
 abbrev M := StateRefT State MetaM
 
-/-- Whether a hypothesis of this type is admitted as a rewrite rule: not an
-equation whose left side its right side mentions, nor one closing a cycle
-with the admitted equations; an admitted equation is recorded. -/
-private def admit (id : Origin) (type : Expr) : M Bool := do
-  if ← selfReferential type then return false
-  unless ← rewritesByPattern type do return false
-  let some (_, left, right) := type.eq? | return true
-  if ← closesCycle (← get).rules left right then return false
-  modify fun s => { s with rules := s.rules.push (id, left, right) }
-  return true
+/-- Insert pre-elaborated `SimpTheorem` entries into `SimpTheoremsArray` without
+re-running `mkSimpTheoremFromExpr`. -/
+private def addAdmittedTheorems (thmsArray : SimpTheoremsArray) (thms : Array SimpTheorem) :
+    SimpTheoremsArray :=
+  if thms.isEmpty then thmsArray
+  else if thmsArray.isEmpty then
+    #[thms.foldl SimpTheorems.addSimpTheorem {}]
+  else
+    thmsArray.modify 0 fun s => thms.foldl SimpTheorems.addSimpTheorem s
+
+/-- Whether a hypothesis with this type and proof is admitted as a rewrite
+rule: judged in the exact `SimpTheorem` form `simp` registers, neither
+rewriting a left side into a right side mentioning it nor closing a cycle with
+the admitted ground equations; admitted ground equations are recorded, and the
+elaborated `SimpTheorem`s are returned for direct insertion. -/
+private def admit (id : Origin) (type proof : Expr) : M (Option (Array SimpTheorem)) := do
+  if ← selfReferentialType type then return none
+  unless ← rewritesByPattern type do return none
+  let config := (← get).ctx.indexConfig
+  let thms ← try
+    mkSimpTheoremFromExpr id #[] proof (config := config)
+  catch _ =>
+    return none
+  let mut nextRules := (← get).rules
+  let recordGround (rules : Array (Origin × Expr × Expr)) (left right : Expr) :
+      MetaM (Option (Array (Origin × Expr × Expr))) := do
+    if isTruthConst right && !(← withReducible (isDefEq left (mkConst ``True))) &&
+        !(← withReducible (isDefEq left (mkConst ``False))) then
+      -- `P = True` / `P = False` terminates at a truth constant unless a rule
+      -- rewrites that truth constant itself.
+      if rules.any fun (_, rl, _) => isTruthConst rl then
+        let left ← expandProjections left
+        if ← closesCycleExpanded rules left right then return none
+      return some rules
+    let left ← expandProjections left
+    let right ← expandProjections right
+    if ← closesCycleExpanded rules left right then return none
+    return some (rules.push (id, left, right))
+  if thms.isEmpty then
+    if let some (_, left, right) := type.eq? then
+      let some updated ← recordGround nextRules left right | return none
+      nextRules := updated
+  else
+    for thm in thms do
+      let thmType ← instantiateMVars (← inferType (← thm.getValue))
+      if ← selfReferentialType thmType then return none
+      unless ← rewritesByPattern thmType do return none
+      if let some (_, left, right) := thmType.eq? then
+        let some updated ← recordGround nextRules left right | return none
+        nextRules := updated
+  modify fun s => { s with rules := nextRules }
+  return some thms
 
 /-- Forget an equation no longer in the rule set. -/
 private def retire (id : Origin) : M Unit :=
@@ -126,13 +224,12 @@ private def initEntries : M Unit := do
     unless simpThms.isErased (.fvar h) do
       let localDecl ← h.getDecl
       let proof  := localDecl.toExpr
-      let ctx := (← get).ctx
-      if ← admit (.fvar h) (← instantiateMVars localDecl.type) then
-        simpThms ← simpThms.addTheorem (.fvar h) proof (config := ctx.indexConfig)
+      let type   ← instantiateMVars localDecl.type
+      if let some admitted ← admit (.fvar h) type proof then
+        simpThms := addAdmittedTheorems simpThms admitted
         modify fun s => { s with ctx := s.ctx.setSimpTheorems simpThms }
       if hsNonDeps.contains h && (← get).targets?.all (·.contains h) then
         -- We only simplify nondependent hypotheses
-        let type ← instantiateMVars localDecl.type
         let entry : Entry := { fvarId := h, userName := localDecl.userName, id := .fvar h, origType := type, type, proof }
         modify fun s => { s with entries := s.entries.push entry }
 
@@ -187,8 +284,9 @@ private partial def loop : M Bool := do
         let mut simpThmsNew := (← getSimpTheorems).eraseTheorem entry.id
         retire entry.id
         let idNew ← mkFreshId
-        if ← admit (.other idNew) typeNew then
-          simpThmsNew ← simpThmsNew.addTheorem (.other idNew) (← mkExpectedTypeHint proofNew typeNew) (config := ctx.indexConfig)
+        let hintedProof ← mkExpectedTypeHint proofNew typeNew
+        if let some admitted ← admit (.other idNew) typeNew hintedProof then
+          simpThmsNew := addAdmittedTheorems simpThmsNew admitted
         modify fun s => { s with
           modified         := true
           ctx              := ctx.setSimpTheorems simpThmsNew

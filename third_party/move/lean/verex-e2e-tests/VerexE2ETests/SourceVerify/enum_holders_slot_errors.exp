@@ -1,0 +1,24 @@
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:8:3: error: the specification clause `ensures c ==> spec.result[0] == a && spec.result[1] == (v + 1) % 256` is not established
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:7:6: error: verex verification failed: the automatic verification of `slot_repointed` failed; provide a proof in the module:
+  verify slot_repointed by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:12:3: error: the specification clause `ensures spec.result[0] == v` is not established
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:11:6: error: verex verification failed: the automatic verification of `slot_repointed_false` failed; provide a proof in the module:
+  verify slot_repointed_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:15:3: error: the specification clause `ensures false` is not established
+VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `slot_repointed_vacuous` failed; provide a proof in the module:
+  verify slot_repointed_vacuous by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

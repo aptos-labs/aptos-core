@@ -547,4 +547,26 @@ example (env : HEnv Γ) (state : Memory unit) :
         (fun (_ : Flow ρ Γ Nat) _ => True)) (fun (_ : Failure) => False) state := by
   simp [Flow.joinPost, wp_pure]
 
+-- When one arrival cannot prove its join `Holds` premise (`right`), the join
+-- still seals (`summaries 1`, `proofs 0`), the other arrival (`left`) and the
+-- shared suffix (`ensures_1`) close unaffected, and the solver reports the
+-- missing data invariant of `right` at the join rather than blaming `ensures_1`.
+/--
+error: the data invariant of `right` at a join is not established
+-/
+#guard_msgs in
+#guard_joins "nodes 1, edges 2, summaries 1, proofs 0" in
+example (b : Bool) (left right : (NTy.param 0).plain)
+    (_hLeft : NTy.Holds (.param 0) left)
+    (env : HEnv .nil) (initial : Memory unit) :
+    wp (Flow.bind
+      (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun v locals => Spec.bind (Spec.pure PUnit.unit) (fun _ => Spec.pure (.value v locals))))
+      (fun (flow : Flow .none .nil (NTy.param 0).plain) final =>
+        Obligation "join-premise" 0 1 (match flow with
+          | .value v _ => NTy.Holds (.param 0) v ∧ final = initial
+          | _ => False))
+      (fun _ => False) initial := by
+  verex_solve_goals [] naming [("ensures_1", "join-premise", 0, 1)]
+
 end JoinRule

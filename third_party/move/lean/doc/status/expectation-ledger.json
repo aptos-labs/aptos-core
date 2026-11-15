@@ -44,7 +44,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 3,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same three errors, the goal now spells the struct as a nominal declaration and names the value `val` instead of `fst`."
     },
     {
@@ -91,9 +91,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 8,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: `call_abort_generic_struct` now leaves a residual obligation on the equality of two `Carriers.lent` spellings of a generic parameter."
+      "errors_now": 5,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `call_abort_generic_struct_concrete` leaves a residual obligation on `rowEqbPlain` over the nominal struct wrapper and fails `aborts_if x == y` and `aborts_if !test_assert1` (`call_abort_generic_struct` verifies cleanly with a concrete-verification info note)."
     },
     {
       "package": "move-prover-lean",
@@ -379,9 +379,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 15,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with `after_add` of `0x2::table::add` and the `ensures` of `remove`/`borrow_mut`/`add_R` failing."
+      "errors_now": 11,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: the baseline appeared with the four `ensures` clauses of `borrow_mut` failing and four proof-step facts in `bitwise_table.proof.lean` for `add_R` unproved (`add_fail_exists` and `remove` verify cleanly)."
     },
     {
       "package": "move-prover-lean",
@@ -475,9 +475,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 3,
-      "errors_now": 12,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the data invariant `invariant x > 20` now fails where a mutation ends and `get_s_error` times out after 14 leaves at 1000000 heartbeats."
+      "errors_now": 10,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `get_s_error` reports `the data invariant invariant x > 20 does not hold where a mutation ends` and stops after 24 leaves at the 250,000 default `verex.verifyHeartbeats` budget (was 1,000,000 after 14 leaves at base); `get_s_no_error` stops after 15 leaves at 250,000 (previously failed at base without budget stop at `the specification clause invariant x > 20 is not established` and `the data invariant invariant x > 20 does not hold where a mutation ends`)."
     },
     {
       "package": "move-prover-lean",
@@ -859,9 +859,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 22,
-      "errors_now": 24,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `aborts_if false` of `amount_out` and `ensures result <= reserve_out` of two functions no longer verify."
+      "errors_now": 26,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `aborts_if false` (`aborts_if_1`) and `ensures result <= reserve_out` (`ensures_3`) of `constant_product_with_fee` and `ensures result <= reserve_out` (`ensures_2`) of `constant_product_with_fee_non_compliant` no longer verify; postponed at G1 (P): `constant_product_with_fee` (`ensures_1`, with `ensures_2` sharing the dual `nameSomeReads` witness at a global read); due at G2a."
     },
     {
       "package": "move-prover-lean",
@@ -891,9 +891,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 17,
-      "errors_now": 20,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: option.move's data invariant `invariant vec.length <= 1` now fails where a value is constructed, in `rebuilt` and one more target."
+      "errors_now": 19,
+      "introduced_at": "worktree",
+      "reason": "postponed at G1 (P): `field_equal` and `param_equal` (`aborts_if_1`) behavioral entry congruence over the plain row, due at G2a; message-change: `field_bumped`'s residual goal uses nominal struct spelling and `field_dropped_id` renames `after call 1 of 0x1::option::none` to `after 0x1::option::none` (`rebuilt` verifies cleanly again)."
     },
     {
       "package": "move-prover-lean",
@@ -1068,7 +1068,7 @@
       "baseline_now": "present",
       "errors_at_reference": 14,
       "errors_now": 6,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "improvement: the baseline lost errors (14 to 6) and the goal shrank to the nominal spelling of the struct rows."
     },
     {
@@ -1670,14 +1670,14 @@
         "third_party/move/move-prover/tests/sources/functional/closures/inline/folds_of_projection_anchors.move"
       ],
       "baseline": "third_party/move/move-prover/tests/sources/functional/closures/inline/folds_of_projection_anchors.lean_exp",
-      "class": "same",
-      "source_status": "identical",
+      "class": "baseline-changed",
+      "source_status": "changed",
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 11,
-      "errors_now": 11,
-      "introduced_at": "same",
-      "reason": ""
+      "errors_now": 13,
+      "introduced_at": "worktree",
+      "reason": "`both` still reports its loop-invariant and `aborts_if false` errors, additionally reports `ensures spec.result[1] == 15`, and stops after 25 leaves at the 250,000 default `verex.verifyHeartbeats` budget (previously finished without budget stop at `the loop invariant a == \u00abspec_fold_idx$lambda$0\u00bb(with_state_anchor!(4, old(a)), n - remaining, with_state_anchor!(0, old(v1)), n) && b == \u00abspec_fold_idx$lambda$0\u00bb(with_state_anchor!(4, old(b)), n - remaining, with_state_anchor!(0, old(v2)), n) && (\u2200 (_j_6 in 0 .. n - remaining), !(\u00abspec_fold_idx$lambda$0\u00bb(with_state_anchor!(4, old(a)), _j_6, with_state_anchor!(0, old(v1)), n) + with_state_anchor!(0, old(v1))[n - 1 - _j_6] > MAX_U64 || \u00abspec_fold_idx$lambda$0\u00bb(with_state_anchor!(4, old(b)), _j_6, with_state_anchor!(0, old(v2)), n) + with_state_anchor!(0, old(v2))[n - 1 - _j_6] > MAX_U64)) is not preserved by an iteration` and `the specification clause aborts_if false is not established`); `wrong` carries `pragma heartbeats = 340` (271,228 maxHeartbeats measured) so its intended `ensures result == 6` error at line 67 is still reported."
     },
     {
       "package": "move-prover-lean",
@@ -1723,9 +1723,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 7,
-      "errors_now": 11,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: both `ensures` of `mirror_keys` and one of `set_both` fail, and `set_both` now burns its 1000000-heartbeat budget after 2002 leaves instead of 304."
+      "errors_now": 10,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: both `ensures` of `mirror_keys` and one of `set_both` fail, and `set_both` stops at the 250,000 default verex.verifyHeartbeats budget after 19 leaves (previously burned its 1,000,000-heartbeat budget after 2002 leaves instead of 304)."
     },
     {
       "package": "move-prover-lean",
@@ -2182,14 +2182,14 @@
         "third_party/move/move-prover/tests/sources/functional/closures/inline/vector_hofs_noncopy_receiver.move"
       ],
       "baseline": "third_party/move/move-prover/tests/sources/functional/closures/inline/vector_hofs_noncopy_receiver.lean_exp",
-      "class": "baseline-added",
+      "class": "same",
       "source_status": "identical",
       "baseline_at_reference": "absent",
-      "baseline_now": "present",
+      "baseline_now": "absent",
       "errors_at_reference": null,
-      "errors_now": 3,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared because `clear_all` now exceeds its 50000-heartbeat budget with a whnf timeout."
+      "errors_now": null,
+      "introduced_at": "same",
+      "reason": ""
     },
     {
       "package": "move-prover-lean",
@@ -2891,9 +2891,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 23,
-      "errors_now": 23,
-      "introduced_at": "9d015f41b27",
-      "reason": "message-change: same 23 errors, with the nominal spelling of the struct, `MemoryInvariants` renamed `DataInvariants` and `AbortsOf` renamed `AbortsOfEntries`."
+      "errors_now": 25,
+      "introduced_at": "worktree",
+      "reason": "message-change: 23 pre-existing error lines now use the nominal spelling of the struct, with `MemoryInvariants` renamed `DataInvariants` and `AbortsOf` renamed `AbortsOfEntries`; postponed at G1 (P): `config_aware_increment` (`aborts_if_1`) dual `nameSomeReads` witness at a global read; due at G2a."
     },
     {
       "package": "move-prover-lean",
@@ -2971,9 +2971,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 3,
-      "errors_now": 5,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `no_violation` now fails the data invariant `invariant value != 0` where a mutation ends; the obligation was also renamed from `stored_invariant` to `data_invariant_1`."
+      "errors_now": 3,
+      "introduced_at": "worktree",
+      "reason": "message-change: `no_violation` verifies cleanly again; in `violation_1`, `does not hold for a value written to memory` (`stored_invariant`) was renamed to `does not hold where a mutation ends` (`data_invariant_1`)."
     },
     {
       "package": "move-prover-lean",
@@ -3083,9 +3083,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 7,
-      "errors_now": 9,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the data invariant `invariant this.x > 20` now fails where a mutation ends, leaving a residual obligation in the enum's field borrow."
+      "errors_now": 10,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: the data invariant `invariant this.x > 20` fails where a mutation ends (and `test_data_invariant` reports both semantic data-invariant errors before stopping at the 250,000 default budget); postponed at G1 (P): `test_enum_vector` (`assert_2`) element `NTy.Holds` recovery across vector indexing; due at G2a."
     },
     {
       "package": "move-prover-lean",
@@ -3179,9 +3179,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 3,
-      "errors_now": 7,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `add_one_if_first_ok` and one more target now owe `a data invariant where a mutable parameter's loan ends, at the function's exit`."
+      "errors_now": 3,
+      "introduced_at": "worktree",
+      "reason": "message-change: `add_one_if_first_ok` verifies cleanly again; in `sub_one_if_second_fail`, `the specification clause invariant this.bar > 0 is not established` was replaced by `the data invariant invariant this.bar > 0 does not hold where a mutation ends` (`data_invariant_1`)."
     },
     {
       "package": "move-prover-lean",
@@ -3403,9 +3403,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 21,
-      "errors_now": 23,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the module invariant on `Storage<u64, Bool>` at @0x22 no longer holds for `good`."
+      "errors_now": 21,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; three new info lines say `0x2::S::publish_u64_y`, `0x2::S::publish_x_bool`, and `0x2::S::publish_x_y` fall back to concrete verification for storage (`good` verifies cleanly again)."
     },
     {
       "package": "move-prover-lean",
@@ -3436,8 +3436,8 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 5,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: `bp_mk` now fails the data invariants `f : Fn(u64) -> BpS has Copy, Drop` and the behavioral invariant where a value is constructed, and `ensures result` leaves a residual obligation."
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `bp_exploit` (at its inlined `bp_mk` construction) now fails the data invariants `f : Fn(u64) -> BpS has Copy, Drop` and `invariant \u2200 (v : u64; r : BpS), ensures_of<f>(v, r) ==> r == bp_make_one()` where a value is constructed, and leaves a residual obligation."
     },
     {
       "package": "move-prover-lean",
@@ -4070,14 +4070,14 @@
         "third_party/move/move-prover/tests/sources/functional/intrinsic_map_insertion_order.move"
       ],
       "baseline": "third_party/move/move-prover/tests/sources/functional/intrinsic_map_insertion_order.lean_exp",
-      "class": "baseline-changed",
+      "class": "same",
       "source_status": "identical",
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 5,
-      "errors_now": 7,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `ensures result` of `self_equal` no longer verifies."
+      "errors_now": 5,
+      "introduced_at": "same",
+      "reason": ""
     },
     {
       "package": "move-prover-lean",
@@ -4460,7 +4460,7 @@
       "baseline_now": "present",
       "errors_at_reference": 43,
       "errors_now": 54,
-      "introduced_at": "78dcaf9df45",
+      "introduced_at": "worktree",
       "reason": "carriers-regression: `bump_counter`'s caller leaves new residual obligations at the loop step (43 to 54 error lines)."
     },
     {
@@ -5580,7 +5580,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 5,
-      "introduced_at": "78dcaf9df45",
+      "introduced_at": "worktree",
       "reason": "carriers-regression: `move_from_addr_to_sender` leaves a residual obligation that the sender's resource is absent."
     },
     {
@@ -5675,9 +5675,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 5,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with `aborts_if account.address != @0x1`, `aborts_if exists<Info<Token>>(@0x1)` and `ensures exists<Info<Token>>(@0x1)` of `main` failing."
+      "errors_now": 0,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; the baseline appeared only to record that `main` falls back to concrete verification for storage (0 errors; `main` verifies cleanly)."
     },
     {
       "package": "move-prover-lean",
@@ -6076,7 +6076,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 3,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same three errors, with the nominal spelling of the struct, a `continues` case name and the mutable's final value moved into the tuple."
     },
     {
@@ -6118,14 +6118,14 @@
         "third_party/move/move-prover/tests/sources/functional/state_labels/generic_spec_fun_old.move"
       ],
       "baseline": "third_party/move/move-prover/tests/sources/functional/state_labels/generic_spec_fun_old.lean_exp",
-      "class": "baseline-changed",
+      "class": "same",
       "source_status": "identical",
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 3,
-      "errors_now": 6,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: `ensures balance_increased::<USD>(addr)` and `::<EUR>(addr)` of `increment_both` no longer verify."
+      "errors_now": 3,
+      "introduced_at": "same",
+      "reason": ""
     },
     {
       "package": "move-prover-lean",
@@ -6556,7 +6556,7 @@
       "baseline_now": "present",
       "errors_at_reference": 13,
       "errors_now": 13,
-      "introduced_at": "78dcaf9df45",
+      "introduced_at": "worktree",
       "reason": "message-change: same 13 errors, with the nominal spelling of `0x42::M`, `FrameOf` carrying `[BinderKind.typeArg]` and a Given info line."
     },
     {
@@ -6635,9 +6635,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 3,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with the module invariant `[suspendable] exists<R3<u64>>(@0x2) ==> exists<R3<u64>>(@0x3)` failing after a call in `call_publish_r3`."
+      "errors_now": 0,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; the baseline appeared only to record that `publish_r3` falls back to concrete verification for storage (`call_publish_r3` verifies cleanly)."
     },
     {
       "package": "move-prover-lean",
@@ -6700,8 +6700,8 @@
       "baseline_now": "present",
       "errors_at_reference": 27,
       "errors_now": 34,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: `ensures result == 3`/`== 2` of `refind_after_invalidate`, `vector_same_element` and `preserved_wrapper_ok` no longer verify; preconditions were also renamed from `at call 1` to `at this call`."
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `ensures result == 3` of `refind_after_invalidate` and `ensures result == 2` of `vector_same_element` and `preserved_wrapper_ok` no longer verify, and `refind_after_invalidate` also stops after 1 leaf at the 250,000 default `verex.verifyHeartbeats` budget (previously finished at `ensures result == 3` without budget stop under the 1,000,000 base budget); preconditions were renamed from `at call 1` to `at this call` (`stale_borrow_mut_fails` and `generic_stale_fails` return to their intended precondition errors)."
     },
     {
       "package": "move-prover-lean",
@@ -6747,9 +6747,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 6,
-      "errors_now": 20,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: `after_add` and the `ensures` of `borrow_mut`, `add_R` and `borrow_mut_R` no longer verify (6 to 20 error lines)."
+      "errors_now": 15,
+      "introduced_at": "9d015f41b27",
+      "reason": "carriers-regression: the `ensures` clauses of `borrow_mut` (`ensures_1`..`ensures_4`) and `borrow_mut_R` (`ensures_1`..`ensures_3`) no longer verify (`add_fail_exists` and `add_R` verify cleanly again; 6 to 15 error lines)."
     },
     {
       "package": "move-prover-lean",
@@ -6763,9 +6763,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 26,
-      "errors_now": 67,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: the `ensures` of `verify_model_push_back`, `borrow_mut`, `pop_back`, `swap`, `reverse` and more no longer verify (26 to 67 error lines)."
+      "errors_now": 64,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: the `ensures` of `verify_model_push_back`, `borrow_mut`, `pop_back`, `swap`, `reverse`, `append`, and `remove`, additional loop/ensures clauses of `verify_append` and `verify_remove`, and the proof scripts of `verify_swap_remove` and `verify_model_swap_remove` no longer verify, and `verify_append_with_unroll` stops at the 250,000 default `verex.verifyHeartbeats` budget (previously failed without budget stop at `the bound pragma unroll = 3 of a loop is not established`; `verify_model_index_of` verifies cleanly again; 26 to 64 error lines)."
     },
     {
       "package": "move-prover-lean",
@@ -6779,9 +6779,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 4,
-      "errors_now": 7,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: both module invariants bounding `Wrapper<..>` to @0x123 now fail after a write of memory they read, in `initialize`."
+      "errors_now": 4,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; a new info line says `install` falls back to concrete verification for storage (`initialize` verifies cleanly again)."
     },
     {
       "package": "move-prover-lean",
@@ -7740,7 +7740,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 3,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same three errors, with the nominal spelling of the struct and the locals typed `NTy.plainOf Carriers.toPlain`."
     },
     {
@@ -8662,14 +8662,14 @@
         "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean"
       ],
       "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.exp",
-      "class": "baseline-added",
-      "source_status": "changed",
+      "class": "fixture-removed",
+      "source_status": "removed",
       "baseline_at_reference": "absent",
-      "baseline_now": "present",
+      "baseline_now": "absent",
       "errors_at_reference": null,
-      "errors_now": 12,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with whnf timeouts at 180000 and 300000 heartbeats for `add` and `insert`, and `invariant sorted_keys(entries)` failing, although the authored proof was updated."
+      "errors_now": null,
+      "introduced_at": "worktree",
+      "reason": "moved to bench/lean/OrderedMap.lean: benchmark problem left the check suite and is run by verex-bench alone"
     },
     {
       "package": "verex-e2e-tests",
@@ -8795,9 +8795,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 2,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with `ensures result == exists<Vault<u64>>(address)` of `has_u64_vault` failing."
+      "errors_now": 0,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; the baseline appeared only to record that `publish_generic`, `has_generic`, and `take_generic` fall back to concrete verification for storage (`has_u64_vault` verifies cleanly)."
     },
     {
       "package": "verex-e2e-tests",
@@ -10124,8 +10124,8 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 6,
-      "introduced_at": "78dcaf9df45",
-      "reason": "carriers-regression: the baseline appeared with `Tactic apply failed` unifying `OwnAtArguments` at `dataOwn.case1` for `publish_echo`'s reader."
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: the baseline appeared with `Tactic apply failed` unifying `OwnAtArguments` at `dataOwn.case1` in `publish_echo` and `publish`, `ensures result` failing in `same`, and concrete-verification fallback notes on all three targets."
     },
     {
       "package": "verex-e2e-tests",
@@ -10139,9 +10139,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 2,
-      "errors_now": 8,
-      "introduced_at": "d5b620edea0",
-      "reason": "carriers-regression: `deposit` and `deposit_twice` now leave residual obligations over the resolved nominal resource (2 to 8 error lines)."
+      "errors_now": 2,
+      "introduced_at": "9d015f41b27",
+      "reason": "feature: Given frame; two new info lines say `deposit` and `deposit_twice` fall back to concrete verification for storage (both verify cleanly again, back to the reference's 2 error lines)."
     },
     {
       "package": "verex-e2e-tests",
@@ -10268,7 +10268,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 14,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "soundness-fix: the new fixture of 9d015f41b27 records `the data invariant invariant count > 0 does not hold where a mutation ends` for its deliberate `zero`/`zero_field`."
     },
     {
@@ -10778,8 +10778,8 @@
       "baseline_now": "absent",
       "errors_at_reference": null,
       "errors_now": null,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust: the harness gained whole-crate Rust verification (`verifyCrate`) and an error-fixture guard."
+      "introduced_at": "worktree",
+      "reason": "rust: the harness gained whole-crate Rust verification (`verifyCrate`), an error-fixture guard, and per-fixture child-process worker execution (`verifyInChildren`) with duration/failure queue ordering and timeouts."
     },
     {
       "package": "verex-e2e-tests",
@@ -10794,6 +10794,20 @@
       "errors_now": 1,
       "introduced_at": "d5b620edea0",
       "reason": "rust: the baseline of the new Rust crate fixture, recording an unspecified native of its dependency."
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/MoveStdlib",
+      "sources": [],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/MoveStdlib.exp",
+      "class": "baseline-added",
+      "source_status": "none",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 3,
+      "introduced_at": "worktree",
+      "reason": "recorded by exception: `std::bit_vector::shift_left_for_verification_only` (399,880 maxHeartbeats measured; verifies cleanly with `pragma heartbeats = 500`) stops after 35 leaves at the 250,000 default `verex.verifyHeartbeats` budget with `invariant length == bit_field.length` unestablished."
     },
     {
       "package": "verex-e2e-tests",
@@ -10990,7 +11004,7 @@
       "baseline_now": "present",
       "errors_at_reference": 2,
       "errors_now": 2,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same two errors, with the nominal spelling of the struct, an added `registry` hypothesis and `AbortsOf` renamed `AbortsOfEntries`."
     },
     {
@@ -11006,7 +11020,7 @@
       "baseline_now": "present",
       "errors_at_reference": 2,
       "errors_now": 2,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same two errors with the nominal spelling; the authored script was updated to `simp_all [vir_denote_norm]`."
     },
     {
@@ -11038,9 +11052,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 15,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 14,
+      "introduced_at": "worktree",
+      "reason": "rust; BitVector::shift_left carries pragma heartbeats = 870 (689,000 maxHeartbeats needed for complete verdict; ensures_2 first reported at 289,000) and finishes without budget stop, rejected at ensures_2 (spec.lean:24, spec.lean:23 before adding the pragma) and invariant_4_of_loop_1_step (spec.lean:30; invariant_5_of_loop_1_step now passes, and the positive twin bench/rust/bit_vector::BitVector::shift_left verifies the true ensures clause)"
     },
     {
       "package": "verex-e2e-tests",
@@ -11089,9 +11103,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 23,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 22,
+      "introduced_at": "worktree",
+      "reason": "rust; SimpleMap::find budget stop updated from 1,000,000 to 250,000 default verex.verifyHeartbeats"
     },
     {
       "package": "verex-e2e-tests",
@@ -11472,7 +11486,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 18,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -11504,8 +11518,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 37,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 38,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -11652,9 +11666,26 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 25,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 9,
+      "introduced_at": "worktree",
+      "reason": "rust; transfer cases split into SourceVerify/cursor_transfer_errors"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/cursor_transfer_errors",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/cursor_transfer_errors.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/cursor_transfer_errors.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/cursor_transfer_errors.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 16,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/cursor_errors"
     },
     {
       "package": "verex-e2e-tests",
@@ -11970,9 +12001,43 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 42,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 12,
+      "introduced_at": "worktree",
+      "reason": "rust; ref and slot cases split into enum_holders_ref_errors and enum_holders_slot_errors; under Phase 1 positive helpers (`opt_by_value_caller`, `opt_returned`) verify cleanly and `opt_by_value_caller_false` finishes without a budget stop under 250,000"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_ref_errors",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_ref_errors.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_ref_errors.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_ref_errors.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 12,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/enum_holders_errors; under Phase 1 positive helper `opt_none_on_one_path` verifies cleanly and `opt_none_on_one_path_false` finishes without a budget stop under 250,000"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_slot_errors",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_slot_errors.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_slot_errors.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/enum_holders_slot_errors.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 6,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/enum_holders_errors; under Phase 1 `slot_repointed` finishes under 250,000 without its former 1,000,000 budget stop (still failing `ensures c ==> spec.result[0] == a && spec.result[1] == (v + 1) % 256`)"
     },
     {
       "package": "verex-e2e-tests",
@@ -12055,7 +12120,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 21,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -12121,7 +12186,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 13,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -12516,9 +12581,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 4,
-      "errors_now": 18,
-      "introduced_at": "d5b620edea0",
-      "reason": "carriers-regression: `mint` and its callers leave residual obligations over the resolved nominal resource (4 to 18 error lines)."
+      "errors_now": 6,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `ensures global<\u00abGhost$minted\u00bb<B>>(@0x0).v == old(global<\u00abGhost$minted\u00bb<B>>(@0x0).v)` (`ensures_2`) of `count_twice` no longer verifies (`mint_twice`, `mint_a`, and `mint_keeps_registry` verify cleanly again; 4 to 6 error lines)."
     },
     {
       "package": "verex-e2e-tests",
@@ -12965,10 +13030,10 @@
       "class": "fixture-new",
       "source_status": "new",
       "baseline_at_reference": "absent",
-      "baseline_now": "present",
+      "baseline_now": "absent",
       "errors_at_reference": null,
-      "errors_now": 2,
-      "introduced_at": "d5b620edea0",
+      "errors_now": null,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13087,7 +13152,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 3,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13103,8 +13168,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 17,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 19,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13137,8 +13202,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 4,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 5,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13290,9 +13355,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 3,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 2,
+      "introduced_at": "worktree",
+      "reason": "rust; postponed at G1 (P): last_or (invariant_2_step) dual carrier/plain spelling at the loop step; due at G2a (ensures_1 and invariant_3_step now verify)."
     },
     {
       "package": "verex-e2e-tests",
@@ -13307,9 +13372,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 50,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 14,
+      "introduced_at": "worktree",
+      "reason": "rust; rev_* and enumerate_* split into library_iter_rev and library_iter_enumerate; find_entry and last_position stop at the 250,000 default budget (previously stopped at 1,000,000); postponed at G1 (P): find_entry's invariant_1_step and ensures_2 fail on the Var.selectCertified/NTy.forget and Option.map Entry.forget round-trips over NTy.slice Entry (due at G2a), while invariant_3_step compounds that P round-trip over the inherited O range-step split (0 <= k < pos + 1) already open on u32 in library_iter_enumerate::position"
     },
     {
       "package": "verex-e2e-tests",
@@ -13324,9 +13389,43 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 61,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 14,
+      "introduced_at": "worktree",
+      "reason": "rust; rev_* and enumerate_* split into library_iter_rev_errors and library_iter_enumerate_errors; find_entry carries pragma heartbeats = 730 (580,204 maxHeartbeats measured) and is rejected at ensures_2 (spec.lean:7, spec.lean:6 before adding the pragma, plus invariant_1_step and invariant_3_step); the positive twin (library_iter_adapters::find_entry) fails ensures_2 too (class P), so G2a must demonstrate that it discriminates; last_position has pragma heartbeats = 400 (318,077 maxHeartbeats measured) to preserve its intended ensures error clause"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 10,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/library_iter_adapters; `position` still reports `the loop invariant \u2200 (k in 0 .. iter.iter.pos), values[k] != target is not preserved by an iteration` and now also stops at the 250,000 default budget (previously finished at that clause without budget stop)"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate_errors",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate_errors.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate_errors.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_enumerate_errors.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 25,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/library_iter_adapters_errors; position has pragma heartbeats = 480 (380,144 maxHeartbeats measured) so its intended ensures error clause is reported under the 250,000 default budget"
     },
     {
       "package": "verex-e2e-tests",
@@ -13341,9 +13440,9 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 19,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "errors_now": 20,
+      "introduced_at": "worktree",
+      "reason": "rust; postponed at G1 (P): last_or (invariant_2_step) dual carrier/plain spelling at the loop step; due at G2a."
     },
     {
       "package": "verex-e2e-tests",
@@ -13356,10 +13455,10 @@
       "class": "fixture-new",
       "source_status": "new",
       "baseline_at_reference": "absent",
-      "baseline_now": "present",
+      "baseline_now": "absent",
       "errors_at_reference": null,
-      "errors_now": 1,
-      "introduced_at": "d5b620edea0",
+      "errors_now": null,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13376,8 +13475,42 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 1,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 9,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/library_iter_adapters; rev_slice_count now verifies cleanly under Phase 1"
+    },
+    {
+      "package": "verex-e2e-tests",
+      "fixture": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev_errors",
+      "sources": [
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev_errors.rs",
+        "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean"
+      ],
+      "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/library_iter_rev_errors.exp",
+      "class": "fixture-new",
+      "source_status": "new",
+      "baseline_at_reference": "absent",
+      "baseline_now": "present",
+      "errors_at_reference": null,
+      "errors_now": 15,
+      "introduced_at": "worktree",
+      "reason": "rust; split from SourceVerify/library_iter_adapters_errors"
     },
     {
       "package": "verex-e2e-tests",
@@ -13409,8 +13542,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 12,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 14,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13611,10 +13744,10 @@
       "class": "fixture-new",
       "source_status": "new",
       "baseline_at_reference": "absent",
-      "baseline_now": "present",
+      "baseline_now": "absent",
       "errors_at_reference": null,
-      "errors_now": 1,
-      "introduced_at": "d5b620edea0",
+      "errors_now": null,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -13631,8 +13764,8 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 2,
-      "introduced_at": "d5b620edea0",
-      "reason": "rust"
+      "introduced_at": "worktree",
+      "reason": "rust: preserved fails at its marked clause ensures i < old(values).length ==> values[i] == old(values)[i] (spec.lean:10), while its quantified frame clause (spec.lean:9) and both clauses of increment verify cleanly"
     },
     {
       "package": "verex-e2e-tests",
@@ -14536,7 +14669,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 5,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -14638,7 +14771,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 42,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -15779,7 +15912,7 @@
       "baseline_now": "present",
       "errors_at_reference": 18,
       "errors_now": 17,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: context hypotheses renamed (`bounds` split into `named_lower`/`named_upper`), locals typed `plainOf`, `requires_1_of_same_at_call_1` renamed `requires_1_of_same`; one error fewer."
     },
     {
@@ -15795,7 +15928,7 @@
       "baseline_now": "present",
       "errors_at_reference": 18,
       "errors_now": 17,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: context hypotheses renamed (`bounds` split into `named_lower`/`named_upper`), locals typed `plainOf`, `requires_1_of_same_at_call_1` renamed `requires_1_of_same`; one error fewer."
     },
     {
@@ -15843,7 +15976,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 3,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same three errors; the context gained `CarriersNonempty` and lost the `MemoryInvariants` hypothesis."
     },
     {
@@ -15859,7 +15992,7 @@
       "baseline_now": "present",
       "errors_at_reference": 3,
       "errors_now": 3,
-      "introduced_at": "9d015f41b27",
+      "introduced_at": "worktree",
       "reason": "message-change: same three errors; the context gained `CarriersNonempty` and lost the `MemoryInvariants` hypothesis."
     },
     {
@@ -16733,7 +16866,7 @@
       "baseline_now": "present",
       "errors_at_reference": null,
       "errors_now": 14,
-      "introduced_at": "d5b620edea0",
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -16766,8 +16899,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 12,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 13,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -16800,8 +16933,8 @@
       "baseline_at_reference": "absent",
       "baseline_now": "present",
       "errors_at_reference": null,
-      "errors_now": 8,
-      "introduced_at": "d5b620edea0",
+      "errors_now": 10,
+      "introduced_at": "worktree",
       "reason": "rust"
     },
     {
@@ -16911,14 +17044,14 @@
         "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/table_stored_resource.move"
       ],
       "baseline": "third_party/move/lean/verex-e2e-tests/VerexE2ETests/SourceVerify/table_stored_resource.exp",
-      "class": "baseline-changed",
+      "class": "same",
       "source_status": "identical",
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 6,
-      "errors_now": 8,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `write` now owes the data invariant `intrinsic_map` where a mutable reference is passed to a call, an obligation absent at the reference."
+      "errors_now": 6,
+      "introduced_at": "same",
+      "reason": ""
     },
     {
       "package": "verex-e2e-tests",
@@ -17068,9 +17201,9 @@
       "baseline_at_reference": "present",
       "baseline_now": "present",
       "errors_at_reference": 4,
-      "errors_now": 17,
-      "introduced_at": "9d015f41b27",
-      "reason": "carriers-regression: `after_decode`/`after_name_of` and the `aborts_if`/`ensures` of `unpacked` and `extract` no longer verify (4 to 17 error lines)."
+      "errors_now": 8,
+      "introduced_at": "worktree",
+      "reason": "carriers-regression: `ensures !spec_contains(global<Pending>(@0x1).configs, key)` (`ensures_2`) of `unpacked` and `extract` no longer verifies, plus concrete-verification fallback notes on `unpacked`, `extract`, and `extract_wrong` (4 to 8 error lines)."
     },
     {
       "package": "verex-e2e-tests",

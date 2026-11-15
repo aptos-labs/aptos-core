@@ -10,10 +10,10 @@ spec preserved where
   ensures i < old(values).length ==>
     values[i] == old(values)[i] -- error: the write through the reference lands
 
--- Reading through the yielded reference before writing is not yet related to
--- the element automatically: the untouched positions are derived, the written
--- one is not.
+-- Reading through the yielded reference before writing relates both the
+-- untouched positions and the written one to the element automatically, so
+-- `increment` verifies cleanly beside the refuted `preserved` above.
 spec increment where
   ensures ∀ (k in 0 .. values.length), k != i ==> values[k] == old(values)[k]
   ensures i < old(values).length ==>
-    values[i] == (old(values)[i] + 1) % 4294967296 -- error: not yet derived
+    values[i] == (old(values)[i] + 1) % 4294967296

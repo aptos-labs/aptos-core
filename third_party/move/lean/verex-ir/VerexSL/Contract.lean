@@ -1376,6 +1376,37 @@ private def heldReferenceParts (carriers referent value : Lean.Expr) :
   return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) plain prophecy value,
     mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) plain prophecy value)
 
+/-- Mark a clause with its source range only when a non-empty range is given.
+Folded `NTy.Holds` obligations carry no outer range because opening
+`Carriers.own` exposes each declared clause with its own `Obligation` marker. -/
+private def markObligation? (range? : Option ObligationRange) (clause : Lean.Expr) : Lean.Expr :=
+  match range? with
+  | some range => if range.startByte < range.endByte then markObligation range clause else clause
+  | none => clause
+
+mutual
+/-- Whether a native type holds a mutable reference whose referent carries a
+certificate: what an outer value's own subtype does not certify while lent. -/
+def hasLentCertificate : VerexIR.Proofs.Denote.NTy → Bool
+  | .ref referent => !referent.certificateFree
+  | .sliceRef element => hasLentCertificate element
+  | .tuple elements => rowHasLentCertificate elements
+  | .struct _ _ fields => rowHasLentCertificate fields
+  | .enum _ _ _ rows _ => rowsHaveLentCertificate rows
+  | .slice element | .vector element | .array element _ => hasLentCertificate element
+  | .table key value => hasLentCertificate key || hasLentCertificate value
+  | .ghost slot | .observed slot => hasLentCertificate slot
+  | _ => false
+
+def rowHasLentCertificate : VerexIR.Proofs.Denote.NRow → Bool
+  | .nil => false
+  | .cons τ rest => hasLentCertificate τ || rowHasLentCertificate rest
+
+def rowsHaveLentCertificate : VerexIR.Proofs.Denote.NRows → Bool
+  | .nil => false
+  | .cons fields rest => rowHasLentCertificate fields || rowsHaveLentCertificate rest
+end
+
 /-- The data invariants of a native value of a type, at any depth, as the
 Move Prover assumes them: the type's declared invariants; for an intrinsic
 map, its discipline's validity and the invariants of its values; the
@@ -1392,9 +1423,9 @@ private partial def deepInvariantTerms (context : Context)
     (carried : Array VerexIR.StructHandle) (ty : IrTy) (arguments : Array Scoped)
     (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (depth : Nat)
     (fallback : ObligationRange := {}) (includePlainDeep : Bool := false) :
-    MetaM (Array (Lean.Expr × ObligationRange)) := do
+    MetaM (Array (Lean.Expr × Option ObligationRange)) := do
   unless carriesInvariant context.unit ty arguments depth ||
-      (includePlainDeep && !τ.certificateFree) do return #[]
+      hasLentCertificate τ || (includePlainDeep && !τ.certificateFree) do return #[]
   let carriers ← context.carriers
   -- The deep invariant of a value the walk cannot take apart: a parameter
   -- of the enclosing function, or a representation the arms do not know.
@@ -1403,34 +1434,54 @@ private partial def deepInvariantTerms (context : Context)
   -- a `&mut`, plain while lent (`NTy.Holds`; the opener reads it where the
   -- leaf needs its clauses).
   let whole (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) (range : ObligationRange) :
-      MetaM (Array (Lean.Expr × ObligationRange)) := do
+      MetaM (Array (Lean.Expr × Option ObligationRange)) := do
     unless includePlainDeep do return #[]
     if τ.certificateFree then return #[]
     let quoted ← quoteNTy τ
+    if ← certificateFree carriers quoted then return #[]
     unless ← withNewMCtxDepth (isDefEq (← inferType value) (plainType carriers quoted)) do
       return #[]
-    return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers quoted value, range)]
+    let range? := if τ matches .param _ && range.startByte < range.endByte then
+      some range else none
+    return #[(mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers quoted value, range?)]
   if ty matches .typeParameter _ then return ← whole τ value fallback
   match ty, τ with
   | .reference reference, _ =>
-      let some (referent, scope) := Scoped.resolve context.unit arguments reference.referent
-        | throwError "an invariant-bearing reference has an unresolved referent"
+      let resolved := Scoped.resolve context.unit arguments reference.referent
       -- A holder's current referent is observed at each end of its outer loan.
       -- Shared references erase native loan wrappers, leaving this value directly.
       match τ with
       | .ref inner =>
-          let (current, _) ← heldReferenceParts carriers (← quoteNTy inner) value
-          -- No carrier certifies it: the type of a held reference carries its
-          -- prophecy's invariants only (`NTy.deepHolds`), and no slot names it
-          -- for `Term.assumeCurrent`. Its declarations state theirs here.
-          deepInvariantTerms context #[] referent scope inner current (depth + 1)
-            fallback includePlainDeep
+          let quoted ← quoteNTy inner
+          let (current, _) ← heldReferenceParts carriers quoted value
+          -- No carrier certifies a nested loan's current: emit one folded
+          -- `NTy.Holds` for carried declarations, then recurse keeping `carried`
+          -- so only deeper `.ref` currents and non-carried declarations state
+          -- additional clauses.
+          let mut terms : Array (Lean.Expr × Option ObligationRange) := #[]
+          if !(inner matches .ref _) && !(← certificateFree carriers quoted) then
+            let range? := if inner matches .param _ && fallback.startByte < fallback.endByte then
+              some fallback else none
+            terms := terms.push
+              (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers quoted current, range?)
+          match resolved with
+          | some (referent, scope) =>
+              return terms ++ (← deepInvariantTerms context carried referent scope inner current
+                (depth + 1) fallback (includePlainDeep := false))
+          | none => return terms
       | .sliceRef element =>
-          deepInvariantTerms context carried referent scope (.vector element)
-            (← sliceReferenceContents value) (depth + 1) fallback includePlainDeep
+          let contents ← sliceReferenceContents value
+          match resolved with
+          | some (referent, scope) =>
+              deepInvariantTerms context carried referent scope (.vector element)
+                contents (depth + 1) fallback includePlainDeep
+          | none => whole (.vector element) contents fallback
       | _ =>
-          deepInvariantTerms context carried referent scope τ value (depth + 1)
-            fallback includePlainDeep
+          match resolved with
+          | some (referent, scope) =>
+              deepInvariantTerms context carried referent scope τ value (depth + 1)
+                fallback includePlainDeep
+          | none => whole τ value fallback
   | .slice element, .slice elementType
   | .slice element, .vector elementType
   | .vector element _, .vector elementType =>
@@ -1443,11 +1494,12 @@ private partial def deepInvariantTerms (context : Context)
       withLocalDeclD `element carrier fun elementValue => do
         let terms ← deepInvariantTerms context carried elementIr scope elementType elementValue
           (depth + 1) fallback includePlainDeep
-        let some (_, range) := terms[0]? | return #[]
+        if terms.isEmpty then return #[]
         let member ← mkAppM ``Membership.mem
           #[← mkAppM ``VerexIR.SpecVector.values #[value], elementValue]
-        let body ← mkArrow member (← conjunction (terms.map (·.1)))
-        return #[(← mkForallFVars #[elementValue] body, range)]
+        terms.mapM fun (term, range?) => do
+          let body ← mkArrow member term
+          pure (← mkForallFVars #[elementValue] body, range?)
   | .tuple elements, .tuple row =>
       -- The invariants of each component of a multi-value result.
       let components ← nativeComponents carriers (← quoteNTy τ) value
@@ -1472,7 +1524,9 @@ private partial def deepInvariantTerms (context : Context)
       -- states; the walk goes on into what it holds, where a declaration
       -- whose invariant is not carried states its own.
       let states := !carried.contains owner
-      let mut terms ← if states then declaredInvariantTerms context ty scope τ value
+      let mut terms : Array (Lean.Expr × Option ObligationRange) ←
+        if states then
+          (·.map fun (t, r) => (t, some r)) <$> declaredInvariantTerms context ty scope τ value
         else pure #[]
       if let some model := mapModel? context.unit ty then
         let some intrinsic := ns.intrinsics.find? (·.owner == declaration.name) | return terms
@@ -1482,7 +1536,7 @@ private partial def deepInvariantTerms (context : Context)
         let owned ← nativeOwner carriers τ value
         let table := owned.typed
         if states then
-          terms := terms.push (← owned.valid model, range)
+          terms := terms.push (← owned.valid model, some range)
           -- A lent owner's table contains plain keys and values. Its map
           -- discipline does not certify either, so a loop must also preserve
           -- the entries' deep invariants across its havoc.
@@ -1495,11 +1549,12 @@ private partial def deepInvariantTerms (context : Context)
             let held := TypedTable.nativeOf table.values (← table.valueAt key)
             let inner ← deepInvariantTerms context carried valueIr valueScope valueType held
               (depth + 1) range includePlainDeep
-            let some (_, range) := inner[0]? | return none
+            if inner.isEmpty then return #[]
             let present ← mkEq (← table.hasKey key) (mkConst ``Bool.true)
-            let body ← mkArrow present (← conjunction (inner.map (·.1)))
-            return some (← mkForallFVars #[key] body, range)
-          if let some term := stored then terms := terms.push term
+            inner.mapM fun (term, range?) => do
+              let body ← mkArrow present term
+              pure (← mkForallFVars #[key] body, range?)
+          terms := terms ++ stored
         return terms
       let quoted ← quoteNTy τ
       let components ← if declaration.variants.isEmpty then nativeComponents carriers quoted value
@@ -1511,7 +1566,7 @@ private partial def deepInvariantTerms (context : Context)
         for (field, index) in fields.zipIdx do
           let resolved := Scoped.resolve context.unit scope (ns.typeId field.type.typeId)
           let fieldTerms (fieldType : VerexIR.Proofs.Denote.NTy) (selected : Lean.Expr) :
-              MetaM (Array (Lean.Expr × ObligationRange)) := do
+              MetaM (Array (Lean.Expr × Option ObligationRange)) := do
             let mut inner ← match resolved with
               | some (fieldIr, fieldScope) =>
                   deepInvariantTerms context carried fieldIr fieldScope fieldType selected
@@ -1519,7 +1574,7 @@ private partial def deepInvariantTerms (context : Context)
               | none => whole fieldType selected (locRange ns field.loc)
             if states && VerexIR.Proofs.Denote.fieldKeepsMemory ns field then
               inner := inner.push (← fieldFrameTerm context owner.namespaceId declaration index
-                scope τ value fieldType selected, locRange ns field.loc)
+                scope τ value fieldType selected, some (locRange ns field.loc))
             return inner
           match variant with
           | none =>
@@ -1531,8 +1586,8 @@ private partial def deepInvariantTerms (context : Context)
                 | throwError "internal: a variant's field is out of its native row"
               if let some (_, read) ← typedVariantField? τ #[(name, index)] carriers quoted value then
                 let test ← nativeVariantTest carriers quoted value owner #[name]
-                for (term, range) in ← fieldTerms fieldType read do
-                  terms := terms.push (← mkArrow test term, range)
+                for (term, range?) in ← fieldTerms fieldType read do
+                  terms := terms.push (← mkArrow test term, range?)
               else
                 -- A field of a type without a value to stand for it under
                 -- another variant, such as a function value: the terms of
@@ -1543,8 +1598,8 @@ private partial def deepInvariantTerms (context : Context)
                 let held ← withLocalDeclD `field (carrierType carriers fieldTypeExpr) fun payload => do
                   let inner ← fieldTerms fieldType payload
                   let held ← mkEq selection (← mkAppM ``Option.some #[payload])
-                  inner.mapM fun (term, range) => do
-                    pure (← mkForallFVars #[payload] (← mkArrow held term), range)
+                  inner.mapM fun (term, range?) => do
+                    pure (← mkForallFVars #[payload] (← mkArrow held term), range?)
                 terms := terms ++ held
       return terms
   | _, _ => whole τ value fallback
@@ -1608,7 +1663,7 @@ those of the declarations in `carried` excepted (`deepInvariantTerms`). -/
 private def dataInvariantTerms (context : Context) (ty : IrTy) (τ : VerexIR.Proofs.Denote.NTy)
     (value : Lean.Expr) (carried : Array VerexIR.StructHandle := #[])
     (includePlainDeep : Bool := false) :
-    MetaM (Array (Lean.Expr × ObligationRange)) :=
+    MetaM (Array (Lean.Expr × Option ObligationRange)) :=
   deepInvariantTerms context carried ty #[] τ value 0 (includePlainDeep := includePlainDeep)
 
 /-- Data invariants a boundary states of selected native values of a parameter/result
@@ -1625,10 +1680,10 @@ private def slotDataInvariantTerms (context : Context) (slots : Array Slot)
     (bound : Array SlotBinders)
     (nativeOf : SlotBinders → Option Lean.Expr)
     (carried : Array VerexIR.StructHandle) :
-    MetaM (Array (Lean.Expr × ObligationRange)) := do
+    MetaM (Array (Lean.Expr × Option ObligationRange)) := do
   let mut terms := #[]
   for (slot, binders) in slots.zip bound do
-    unless hasDataInvariant context.unit slot.physical do continue
+    unless hasDataInvariant context.unit slot.physical || hasLentCertificate slot.nty do continue
     let some value := nativeOf binders | continue
     terms := terms ++ (← dataInvariantTerms context slot.physical slot.nty value carried)
   pure terms
@@ -2093,7 +2148,7 @@ def storedInvariantTerm (unit : ValidatedUnit)
             let terms ← try dataInvariantTerms context ty σ value carried catch error =>
               return Sum.inr (← error.toMessageData.toString)
             if terms.isEmpty then return Sum.inl none
-            let held ← conjunction (terms.map fun (term, range) => markObligation range term)
+            let held ← conjunction (terms.map fun (term, range?) => markObligation? range? term)
             return Sum.inl (some (← mkLambdaFVars (leading ++ #[binder, value]) held))
         withLocalDeclD `θ (mkConst ``VerexIR.Proofs.Denote.TypeArgs) fun θ =>
           let runtime := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.runtime) memoryUnit
@@ -2350,7 +2405,9 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     (labeledAnchors : Array (Nat × Array (Option Lean.Expr) × Lean.Expr) := #[])
     (finalLocals oldFinalLocals : Array (Option Lean.Expr) := #[])
     (interpretation : Option TranslationFrame := none)
-    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) : MetaM Lean.Expr := do
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none)
+    (carried : Array VerexIR.StructHandle := #[])
+    (slotValues : Array (Option Lean.Expr) := #[]) : MetaM Lean.Expr := do
   let context : Context := {
     unit, namespaceId, ns, locals, oldLocals, localTypes, localNames, results := #[],
     finalLocals, oldFinalLocals, types, state, oldState := some oldState,
@@ -2368,11 +2425,25 @@ def translateLoopInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.Namesp
     some <$> markObligation (conditionRange ns condition) <$>
       translate context condition.expression
   -- A slot of a type carrying a data invariant binds its native value.
+  let carriers ← context.carriers
   for (slot, τ) in dataInvariantSlots do
-    let some (some value) := locals[slot]? | throwError "a data invariant slot has no binder"
+    let value? := (slotValues[slot]?.join).orElse fun _ => locals[slot]?.join
+    let some value := value? | throwError "a data invariant slot has no binder"
     let some ty := localTypes[slot]? | throwError "a data invariant slot has no type"
-    for (invariant, range) in ← dataInvariantTerms context ty τ value (includePlainDeep := true) do
-      clauses := clauses.push (markObligation range invariant)
+    if kind == .loopInvariant then
+      if !τ.certificateFree then
+        let quoted ← quoteNTy τ
+        if !(← certificateFree carriers quoted) &&
+            (← withNewMCtxDepth (isDefEq (← inferType value) (plainType carriers quoted))) then
+          let fallback := if τ matches .param _ then some (locRange ns block.loc) else none
+          clauses := clauses.push (markObligation? fallback
+            (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers quoted value))
+      for (invariant, range?) in ← dataInvariantTerms context ty τ value
+          (carried := carried) (includePlainDeep := false) do
+        clauses := clauses.push (markObligation? range? invariant)
+    else
+      for (invariant, range?) in ← dataInvariantTerms context ty τ value (includePlainDeep := true) do
+        clauses := clauses.push (markObligation? range? invariant)
   conjunction clauses
 
 /-- The data invariants of a native value of a physical type and its
@@ -2391,8 +2462,8 @@ def valueDataInvariants (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceI
     localNames := #[], results := #[], types, state := some state,
     oldState := some state, executable,
     typeArgumentTypes := atArgumentTypes atArguments, readAtArguments := atArguments.isSome }
-  conjunction ((← dataInvariantTerms context ty τ value carried).map fun (clause, range) =>
-    markObligation range clause)
+  conjunction ((← dataInvariantTerms context ty τ value carried).map fun (clause, range?) =>
+    markObligation? range? clause)
 
 /-- The native value of type `τ` a specification expression denotes over a
 function's locals and state: what an `update` writes
@@ -3999,8 +4070,8 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
           let exitInvariants ← slotDataInvariantTerms context parameterSlots parameterBound
             (·.exitNative) own.carriers
           let dataInvariantObligations :=
-            (resultInvariants ++ exitInvariants).map fun (clause, range) =>
-              markObligation range clause
+            (resultInvariants ++ exitInvariants).map fun (clause, range?) =>
+              markObligation? range? clause
           let storedInvariants ← if storedInvariant.isNone then pure #[]
             else if assumesStored then pure #[← storedDataInvariants final]
             else pure #[← mkArrow (← storedDataInvariants state) (← storedDataInvariants final)]
@@ -4224,10 +4295,15 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                         (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
                         #[row, sharing, shape, frameTerm, value])
       mkLambdaFVars #[arguments, initial] (← conjunction conjuncts)
+  let validArgsTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
+    mkLambdaFVars #[arguments] (mkConst ``True)
+  let validResultTerm ← withLocalDeclD `result resultType fun result =>
+    mkLambdaFVars #[result] (mkConst ``True)
   let contract ← mkAppOptM ``VerexIR.Proofs.Contract.mk
     #[some runtimeState, some failure, some argumentsType, some resultType,
       some requiresTerm, some assumesTerm, some ensuresTerm, some abortsTerm,
-      some abortConditionTerm, some abortConditionTerm, some frameTerm]
+      some abortConditionTerm, some abortConditionTerm, some frameTerm,
+      some validArgsTerm, some validResultTerm]
   -- Verification is native (`doc/designs/native-verification.md`).
   let name := ((ns.nameOf declaration.name).map (·.name)).getD "a function"
   discard <| VerexIR.Proofs.Denote.reportRuntimeValues m!"the contract of `{name}`" contract

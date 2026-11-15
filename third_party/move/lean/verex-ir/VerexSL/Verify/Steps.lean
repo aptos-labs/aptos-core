@@ -2142,9 +2142,12 @@ private def resultDefinition? (decl : LocalDecl) : MetaM (Option FVarId) := do
 (`m resource key = some v` or `= none`), as a path's split of a storage read
 does. -/
 private def memoryCase? (lhs rhs : Lean.Expr) : MetaM Bool := do
+  unless rhs.isAppOf ``Option.some || rhs.isAppOf ``Option.none do return false
+  let lhs := lhs.consumeMData
+  if lhs.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 then
+    return (lhs.getArg! 6).consumeMData.isFVar
   let .fvar memory := lhs.getAppFn | return false
   unless lhs.getAppNumArgs == 2 do return false
-  unless rhs.isAppOf ``Option.some || rhs.isAppOf ``Option.none do return false
   return (← whnfR (← memory.getType)).isAppOf ``VerexIR.Proofs.Denote.Memory
 
 /-- The rules of the block's normal form at a goal, besides `except`. -/
@@ -2691,14 +2694,19 @@ private def nameSomeReads (goal : MVarId) (fact : FVarId) : MetaM (MVarId × Boo
   for (proof, part) in parts do
     let some (_, lhs, rhs) := part.eq? | continue
     unless rhs.isConstOf ``Bool.true && lhs.isAppOfArity ``Option.isSome 2 do continue
-    let read := lhs.appArg!
-    let isMemoryRead ← goal.withContext do
-      let .fvar memory := read.getAppFn | return false
-      unless read.getAppNumArgs == 2 do return false
-      return (← whnfR (← memory.getType)).isAppOf ``VerexIR.Proofs.Denote.Memory
-    unless isMemoryRead do continue
-    let witness ← goal.withContext do
-      mkAppM ``Iff.mp #[← mkAppOptM ``Option.isSome_iff_exists #[none, read], proof]
+    let read := lhs.appArg!.consumeMData
+    let witness? ← goal.withContext do
+      if read.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 &&
+          (read.getArg! 6).consumeMData.isFVar then
+        let iffProof := mkAppN
+          (mkConst ``VerexIR.Proofs.Denote.Skolems.isSome_plainAt_iff_exists_carrier)
+          read.getAppArgs
+        return some (← mkAppM ``Iff.mp #[iffProof, proof])
+      let .fvar memory := read.getAppFn | return none
+      unless read.getAppNumArgs == 2 do return none
+      unless (← whnfR (← memory.getType)).isAppOf ``VerexIR.Proofs.Denote.Memory do return none
+      return some (← mkAppM ``Iff.mp #[← mkAppOptM ``Option.isSome_iff_exists #[none, read], proof])
+    let some witness := witness? | continue
     let (stated, next) ← (← goal.assert `read_some (← goal.withContext (inferType witness))
       witness).intro1P
     let subgoals ← next.cases stated #[{ varNames := [`read_value, `read_case] }]
@@ -3420,6 +3428,14 @@ private def conjunctionParts (goal : MVarId) (fuel : Nat := 64) : MetaM (List MV
     replaceMainGoal []
     return
   let target ← goal.withContext do whnfR (← instantiateMVars (← goal.getType))
+  if target.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 then
+    evalTactic (← `(tactic| verex_holds))
+    for sub in ← getGoals do
+      let some sub ← normalizeFact sub none | continue
+      setGoals [sub]
+      evalTactic (← blockDecide)
+    setGoals []
+    return
   -- The order is a cost: a refutation is mostly arithmetic, a goal reading a
   -- map's positions or values mostly an instance of a quantified fact.
   let readsMap := (target.find? fun term =>

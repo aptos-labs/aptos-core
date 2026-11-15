@@ -86,8 +86,23 @@ verify 0x42::given_adt_source::nested by
 verify 0x42::given_adt_source::swap_values by
   on _ { compute }
 
+private def forbiddenStepSubstrings : List String := [
+  "exceeded its budget", "exceeded its heartbeat budget", "maxHeartbeats",
+  "maximum number of heartbeats", "heartbeats", "stopped by the budget",
+  "deterministic timeout", "(deterministic) timeout",
+  "maximum recursion depth", "deep recursion",
+  "unknown identifier", "unknown constant", "unknown function",
+  "no Verex module declares", "no denotation for",
+  "given verification is unsupported", "given verification concrete transfer failed",
+  "pragma verify = manual",
+  "type mismatch", "application type mismatch", "failed to synthesize",
+  "no goals to be solved", "is not in scope",
+  "kernel", "PANIC at", "internal exception"
+]
+
 private def expectGivenRejection (base : Name) (command : TSyntax `command) : CommandElabM Unit := do
   let saved ← get
+  let priorCount := saved.messages.toList.length
   let some unit := registeredUnit? saved.env base.getPrefix
     | throwError "missing rejection test module"
   let some (namespaceIndex, _, functionIndex, declaration) := findFunction? unit base.getString!
@@ -97,25 +112,50 @@ private def expectGivenRejection (base : Name) (command : TSyntax `command) : Co
     | throwError "rejection fixture failed source compilation"
   unless isGeneric declaration && (givenUnsupported? unit handle compiled).isNone do
     throwError "rejection fixture is outside the Given path"
+  -- The quoted commands name existing source declarations, not hygienic locals.
+  let command := Id.run <| command.raw.replaceM fun stx =>
+    pure <| if stx.isIdent then some (mkIdentFrom stx stx.getId.eraseMacroScopes) else none
   let thrown ← try
-    -- The quoted commands name existing source declarations, not hygienic locals.
-    let command := Id.run <| command.raw.replaceM fun stx =>
-      pure <| if stx.isIdent then some (mkIdentFrom stx stx.getId.eraseMacroScopes) else none
     elabCommand command
     pure none
-  catch error => pure (some (← error.toMessageData.toString))
-  let state ← get
-  let messages ← state.messages.toList.mapM fun message => message.data.toString
-  let noProof := !state.env.contains (base ++ `givenTypedVerified) &&
-    !state.env.contains (base ++ `typedVerified) &&
-    !state.env.contains (base ++ `givenTransfer) &&
-    ((givenProofArtifacts.getState state.env).find? base).isNone
-  let expectedFailure := (messages ++ thrown.toList).any fun message =>
-    message.startsWith "verex verification failed: " &&
-      message.contains s!"`{base.getString!}`"
-  set saved
-  unless noProof && expectedFailure do
-    throwError "expected an invariant rejection in the Given body, with no proof artifact: {base}"
+  catch error =>
+    pure (some (error.isMaxHeartbeat || error.isMaxRecDepth, ← error.toMessageData.toString))
+  let attempted ← get
+  let curNs ← getCurrNamespace
+  let fresh := attempted.messages.toList.drop priorCount
+  let freshErrors := fresh.filter (·.severity == .error)
+  let hasHeartbeatTag := fresh.any (·.data.hasTag (· == `runtime.maxHeartbeats))
+  let freshTexts ← fresh.mapM fun message => message.data.toString
+  let errorTexts := (← freshErrors.mapM fun message => message.data.toString) ++
+    (thrown.map (·.2)).toList
+  let noProof := !attempted.env.contains (base ++ `verified) &&
+    !attempted.env.contains (curNs ++ base ++ `verified) &&
+    !attempted.env.contains (base ++ `givenTypedVerified) &&
+    !attempted.env.contains (curNs ++ base ++ `givenTypedVerified) &&
+    !attempted.env.contains (base ++ `typedVerified) &&
+    !attempted.env.contains (curNs ++ base ++ `typedVerified) &&
+    !attempted.env.contains (base ++ `givenTransfer) &&
+    !attempted.env.contains (curNs ++ base ++ `givenTransfer) &&
+    ((givenProofArtifacts.getState attempted.env).find? base).isNone &&
+    ((givenProofArtifacts.getState attempted.env).find? (curNs ++ base)).isNone
+  modify fun _ => saved
+  unless noProof do
+    throwError "expected no proof artifact for rejected Given body: {base}"
+  if thrown.any (·.1) || hasHeartbeatTag then
+    throwError "unexpected heartbeat/recursion limit in `{base}`: {errorTexts}"
+  if let some fallback := freshTexts.find? (·.contains "uses concrete verification") then
+    throwError "unexpected concrete fallback in `{base}`: {fallback}"
+  if let some bad := errorTexts.find? (fun text => forbiddenStepSubstrings.any (text.contains ·)) then
+    throwError "unexpected budget or infrastructure failure in `{base}`: {bad}"
+  let summary := s!"verex verification failed: the proof of `{base.getString!}` does not establish its specification"
+  let hasDecideRefusal := errorTexts.any (·.startsWith "`decide` does not close the obligation from the block's facts:")
+  let hasSummary := errorTexts.contains summary
+  let allExpected := errorTexts.all fun text =>
+    text == summary ||
+    text.startsWith "`decide` does not close the obligation from the block's facts:" ||
+    text.startsWith "unsolved goals"
+  unless !errorTexts.isEmpty && hasDecideRefusal && hasSummary && allExpected do
+    throwError "expected an invariant rejection in the Given body ({base}), got: {errorTexts}"
 
 run_cmd do
   expectGivenRejection `«0x42».given_adt_source.pack_bad

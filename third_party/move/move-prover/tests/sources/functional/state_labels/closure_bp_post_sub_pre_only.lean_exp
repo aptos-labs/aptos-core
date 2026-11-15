@@ -22,7 +22,7 @@ assumed :
     (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
       VerexIR.Proofs.Denote.NRow.nil)
     { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f
-permitted invariantHolds✝ : True
+permitted : True
 x_value_lower : 0 ≤ x_value.val
 x_value_upper : x_value.val ≤ 18446744073709551615
 ⊢ VerexIR.Proofs.wp

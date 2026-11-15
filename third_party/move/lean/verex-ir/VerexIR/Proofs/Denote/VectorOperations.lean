@@ -69,6 +69,26 @@ def swapBounded {α : Type} (v : SpecVector α) (i j : Nat) : SpecVector α :=
 @[vir_denote_norm] theorem swapBounded_values {α : Type} (v : SpecVector α) (i j : Nat) :
     (swapBounded v i j).values = v.values.swapIfInBounds i j := rfl
 
+theorem NTy.Holds.swapBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (i j : Nat) :
+    NTy.Holds (.vector τ) (Denote.swapBounded vector i j) := by
+  rw [NTy.holds_vector, swapBounded_values]
+  intro _ member
+  by_cases hi : i < vector.values.size
+  · by_cases hj : j < vector.values.size
+    · rw [Array.swapIfInBounds_def, dif_pos hi, dif_pos hj] at member
+      obtain ⟨k, hk, rfl⟩ := Array.getElem_of_mem member
+      rw [Array.getElem_swap]
+      split
+      · exact held.of_getElem j hj
+      · split
+        · exact held.of_getElem i hi
+        · exact held.of_getElem k (by simpa only [Array.size_swap] using hk)
+    · rw [Array.swapIfInBounds_def, dif_pos hi, dif_neg hj] at member
+      exact held.of_mem member
+  · rw [Array.swapIfInBounds_def, dif_neg hi] at member
+    exact held.of_mem member
+
 /-- Removing an element preserves representability, even for an empty vector. -/
 def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
   ⟨v.values.eraseIdxIfInBounds i, by
@@ -118,6 +138,12 @@ def eraseBounded {α : Type} (v : SpecVector α) (i : Nat) : SpecVector α :=
 
 @[vir_denote_norm] theorem eraseBounded_values {α : Type} (v : SpecVector α) (i : Nat) :
     (eraseBounded v i).values = v.values.eraseIdxIfInBounds i := rfl
+
+theorem NTy.Holds.eraseBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).plain}
+    (held : NTy.Holds (.vector τ) vector) (i : Nat) :
+    NTy.Holds (.vector τ) (Denote.eraseBounded vector i) := by
+  rw [NTy.holds_vector, eraseBounded_values]
+  exact held.of_eraseIdxIfInBounds i
 
 -- Keep the certified constructors folded; their projections have normalization rules.
 attribute [irreducible] swapBounded eraseBounded

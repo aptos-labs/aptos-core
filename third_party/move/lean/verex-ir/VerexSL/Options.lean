@@ -5,13 +5,13 @@ import Lean
 
 /-- The heartbeat budget of a generated verification theorem, in the same
 thousands-of-heartbeats units as `maxHeartbeats`. A target that does not
-verify fails within it rather than searching without bound; the default
-is the check driver's cap, which every checked target meets, and a target
+verify fails within it rather than searching without bound, and a target
 that needs more raises it for itself. -/
 register_option verex.verifyHeartbeats : Nat := {
-  defValue := 1000000
-  descr := "heartbeat budget of the automatic verification of one function (thousands); \
-    about thirty seconds of elaboration, past which a proof is asked for"
+  defValue := 250000
+  descr := "heartbeat budget of the automatic verification of one function, in \
+    thousands of heartbeats as `maxHeartbeats` counts them; a target that does not \
+    verify fails within it, and one that needs more raises it for itself"
 }
 
 /-- Verify every function automatically, its authored proof and `pragma verify =

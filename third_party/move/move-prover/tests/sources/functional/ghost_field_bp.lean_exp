@@ -13,15 +13,7 @@ self_bp_mk : VerexIR.Proofs.Denote.HList bp_mk.params → VerexIR.Proofs.Denote.
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed permitted invariantHolds✝ left✝² : True
-left✝¹ :
-  (VerexIR.Proofs.Denote.NTy.function
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [false], results := [false] }
-        (VerexIR.Proofs.Denote.NRow.cons 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰
-          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
-    (FunctionValue.site0 ())
-right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ()
+assumed permitted : True
 left✝ :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (v : Int) (fits : 0 ≤ v ∧ v ≤ 18446744073709551615)
     (r : 0x42.ghost_field_bp.unit.nominal.namespace.0.declaration✝⁻⁰.carrier),

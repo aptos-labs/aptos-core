@@ -224,7 +224,7 @@ file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/Quick
 [[problem]]
 name = "OrderedMap"
 kind = "lean"
-file = "third_party/move/lean/verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean"
+file = "third_party/move/lean/bench/lean/OrderedMap.lean"
 
 [[problem]]
 name = "VectorOperations"

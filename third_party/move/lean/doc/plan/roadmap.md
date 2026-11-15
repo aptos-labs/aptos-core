@@ -194,7 +194,7 @@ Designs: [`denotation.md`](../designs/denotation.md),
     imply a proportional saving; a closure from the goal and the names the
     proof reads must keep the omitted facts explicitly reachable.
   - **OrderedMap costs two to four times main per target.** Of the 17
-    targets of `verex-e2e-tests/VerexE2ETests/Check/Examples/OrderedMap.lean`,
+    targets of `bench/lean/OrderedMap.lean`,
     measured uncapped at 821af8289ba against main 7a89e8311c5: `empty` 2.7×,
     `borrow_key_at` 3.0×, `lower_bound` 2.0×, `add` 3.0× (243M),
     `remove` 2.4×, `missing_scenario` 3.4×, `absent_lookup_scenario` 3.0×

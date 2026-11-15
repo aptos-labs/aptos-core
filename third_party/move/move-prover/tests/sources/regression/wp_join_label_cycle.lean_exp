@@ -28,11 +28,8 @@ assumed :
     { parameters := [false], results := [false] } (VerexIR.Proofs.Denote.ResultShape.one VerexIR.Proofs.Denote.NTy.bool)
     f
 permitted : True
-verexInvariant✝¹ verexInvariant✝ : ↑st_ids_vec.values.size ≤ 1
-verexInvariant :
-  dataOwn.case0
-    ⟨VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false).vector VerexIR.Proofs.Denote.NRow.nil, ⋯⟩
-    st_final.val.fst
+verexInvariant✝ : ↑st_final.val.fst.fst.values.size ≤ 1
+verexInvariant : ↑st_ids_vec.values.size ≤ 1
 bounds : st_ids_vec.values.size < 18446744073709551616
 st_n_lower : 0 ≤ st_n.val
 st_n_upper : st_n.val ≤ 18446744073709551615

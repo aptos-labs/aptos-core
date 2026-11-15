@@ -123,6 +123,10 @@ structure Contract.RelationalTransfer
   mustAbort : ∀ args givenArgs initial givenInitial,
     argsRel args givenArgs → stateRel initial givenInitial →
     concrete.mustAbort args initial → given.mustAbort givenArgs givenInitial
+  validArgs : ∀ args givenArgs,
+    argsRel args givenArgs → concrete.validArgs args → given.validArgs givenArgs
+  validResult : ∀ result givenResult,
+    resultRel result givenResult → given.validResult givenResult → concrete.validResult result
 
 /-- A given contract establishes a concrete contract only with an explicit
 refinement, contract compatibility, and coverage of every permitted concrete
@@ -142,34 +146,37 @@ theorem Contract.satisfies_of_relationalRefines
       admissible concrete given)
     (compatible : Contract.RelationalTransfer argsRel stateRel resultRel errorRel
       concreteContract givenContract)
-    (admissibleStarts : ∀ args initial, concreteContract.assumes args initial →
+    (admissibleStarts : ∀ args initial, concreteContract.validArgs args →
+      concreteContract.assumes args initial →
       concreteContract.requires args initial → admissible args initial)
-    (relatedStarts : ∀ args initial, concreteContract.assumes args initial →
+    (relatedStarts : ∀ args initial, concreteContract.validArgs args →
+      concreteContract.assumes args initial →
       concreteContract.requires args initial →
       ∃ givenArgs givenInitial, argsRel args givenArgs ∧ stateRel initial givenInitial)
     (verified : Satisfies given givenContract) : Satisfies concrete concreteContract := by
-  intro args initial assumed permitted
+  intro args initial valid assumed permitted
   obtain ⟨givenArgs, givenInitial, relatedArgs, relatedInitial⟩ :=
-    relatedStarts args initial assumed permitted
+    relatedStarts args initial valid assumed permitted
   have refined := refines args givenArgs initial givenInitial relatedArgs relatedInitial
-    (admissibleStarts args initial assumed permitted)
+    (admissibleStarts args initial valid assumed permitted)
   have established := verified givenArgs givenInitial
+    (compatible.validArgs args givenArgs relatedArgs valid)
     (compatible.assumes args givenArgs initial givenInitial relatedArgs relatedInitial assumed)
     (compatible.requires args givenArgs initial givenInitial relatedArgs relatedInitial permitted)
   refine wp_of_relationalRefinesAt refined ?_ ?_ established
   · intro result givenResult final givenFinal relatedResult relatedFinal supplied
-    refine ⟨?_, ?_, ?_⟩
+    refine ⟨compatible.validResult result givenResult relatedResult supplied.1, ?_, ?_, ?_⟩
     · intro noAbort
       apply compatible.ensures args givenArgs initial givenInitial result givenResult final givenFinal
         relatedArgs relatedInitial relatedResult relatedFinal
-      apply supplied.1
+      apply supplied.2.1
       intro excuse
       exact noAbort (compatible.mayAbort args givenArgs initial givenInitial
         relatedArgs relatedInitial excuse)
     · exact compatible.frame args givenArgs initial givenInitial result givenResult final givenFinal
-        relatedArgs relatedInitial relatedResult relatedFinal supplied.2.1
+        relatedArgs relatedInitial relatedResult relatedFinal supplied.2.2.1
     · intro mustAbort
-      exact supplied.2.2 (compatible.mustAbort args givenArgs initial givenInitial
+      exact supplied.2.2.2 (compatible.mustAbort args givenArgs initial givenInitial
         relatedArgs relatedInitial mustAbort)
   · intro error givenError relatedError supplied
     exact compatible.aborts args givenArgs initial givenInitial error givenError
@@ -194,9 +201,11 @@ structure Contract.RelationalCertificate
     admissible concrete given
   compatible : Contract.RelationalTransfer argsRel stateRel resultRel errorRel
     concreteContract givenContract
-  admissibleStarts : ∀ args initial, concreteContract.assumes args initial →
+  admissibleStarts : ∀ args initial, concreteContract.validArgs args →
+    concreteContract.assumes args initial →
     concreteContract.requires args initial → admissible args initial
-  relatedStarts : ∀ args initial, concreteContract.assumes args initial →
+  relatedStarts : ∀ args initial, concreteContract.validArgs args →
+    concreteContract.assumes args initial →
     concreteContract.requires args initial →
     ∃ givenArgs givenInitial, argsRel args givenArgs ∧ stateRel initial givenInitial
 

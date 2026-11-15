@@ -94,11 +94,11 @@ def identityContract [Carriers] (State : Type) :
 theorem identity_verified [C : Carriers] {State : Type}
     (unit : VerexIR.Validation.ValidatedUnit) (ops : InterpreterOps unit C State) :
     Satisfies ((identity unit).denoteIn ops) (identityContract State) := by
-  intro args initial _ _
+  intro args initial _ _ _
   obtain ⟨value, tail⟩ := args
   cases tail
   rw [identity_denote]
-  exact ⟨fun _ _ execution => ⟨fun _ => execution.1, execution.2, id⟩,
+  exact ⟨fun _ _ execution => ⟨trivial, fun _ => execution.1, execution.2, id⟩,
     fun _ impossible => impossible, fun impossible => impossible⟩
 
 /-- The whole-value swap has no precondition about the representations of
@@ -114,11 +114,11 @@ def swappedContract [Carriers] (State : Type) :
 theorem swapped_verified [C : Carriers] {State : Type}
     (unit : VerexIR.Validation.ValidatedUnit) (ops : InterpreterOps unit C State) :
     Satisfies ((swapped unit).denoteIn ops) (swappedContract State) := by
-  intro args initial _ _
+  intro args initial _ _ _
   obtain ⟨left, right, tail⟩ := args
   cases tail
   rw [swapped_denote]
-  exact ⟨fun _ _ execution => ⟨fun _ => execution.1, execution.2, id⟩,
+  exact ⟨fun _ _ execution => ⟨trivial, fun _ => execution.1, execution.2, id⟩,
     fun _ impossible => impossible, fun impossible => impossible⟩
 
 /-- Concrete identity execution is related to actual Given execution by any
@@ -240,7 +240,7 @@ theorem identity_concrete_from_given {unit : VerexIR.Validation.ValidatedUnit}
       args givenArgs initial givenInitial (congrArg Prod.fst related) relatedStores admissible
   apply Contract.satisfies_of_relationalRefines refines
     (same_contract_transfer (identityContract (Memory unit)))
-    (fun _ _ _ _ => trivial) (fun args initial _ _ => ⟨args, initial, rfl, rfl⟩)
+    (fun _ _ _ _ _ => trivial) (fun args initial _ _ _ => ⟨args, initial, rfl, rfl⟩)
   exact @identity_verified (abstractParameters Θ.toCarriers).toCarriers (Memory unit) unit givenOps
 
 /-- The same concrete export for whole-value swap, using the two separately
@@ -265,7 +265,7 @@ theorem swapped_concrete_from_given {unit : VerexIR.Validation.ValidatedUnit}
     exact Prod.ext components.1 (Prod.ext components.2 (@Subsingleton.elim Unit _ _ _))
   apply Contract.satisfies_of_relationalRefines refines
     (same_contract_transfer (swappedContract (Memory unit)))
-    (fun _ _ _ _ => trivial) (fun args initial _ _ => ⟨args, initial, rfl, rfl⟩)
+    (fun _ _ _ _ _ => trivial) (fun args initial _ _ _ => ⟨args, initial, rfl, rfl⟩)
   exact @swapped_verified (abstractParameters Θ.toCarriers).toCarriers (Memory unit) unit givenOps
 
 namespace ConcreteCompatibility
@@ -302,12 +302,14 @@ theorem global_read {ρ : ResultShape} {Γ : NRow} {κ τ : NTy}
           match memory (Skolems.resource τ arguments) (κ.storageKey k) with
           | none => abortAt site (Failure.ofInts .abort #[])
           | some value => Spec.pure (.value (Skolems.ofRuntime τ value) env) := by
-  simp only [Term.denote, Term.denoteIn, Meanings.interpreterOps]
+  simp only [Term.denote, Term.denoteIn, Meanings.interpreterOps, Skolems.plainAt_def]
   congr 1
   funext k env
   congr 1
   funext memory
-  cases memory (Skolems.resource τ arguments) (κ.storageKey k) <;> rfl
+  cases memory (Skolems.resource τ arguments) (κ.storageKey k) with
+  | none => rfl
+  | some value => simp only [Option.map_some, Option.bind_some, NTy.ofPlain?_forget]
 
 end ConcreteCompatibility
 

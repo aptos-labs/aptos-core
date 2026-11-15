@@ -1,2 +1,9 @@
-VerexE2ETests/SourceVerify/library_slice_get_mut_errors.rs:5:22: error: no denotation for `preserved`: a dereference of a place that is not a mutable reference is not carried by the denotation
-VerexE2ETests/SourceVerify/library_slice_get_mut_errors.rs:11:22: error: no denotation for `increment`: a dereference of a place that is not a mutable reference is not carried by the denotation
+VerexE2ETests/SourceVerify/library_slice_get_mut_errors.spec.lean:10:3: error: the specification clause `ensures i < old(values).length ==>
+      values[i] == old(values)[i]` is not established
+VerexE2ETests/SourceVerify/library_slice_get_mut_errors.spec.lean:8:6: error: verex verification failed: the automatic verification of `preserved` failed; provide a proof in the module:
+  verify preserved by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -270,6 +270,11 @@ certificate costs nothing and the walk's size follows what the program uses
     certifyingAt (State := State) site kind .bytes value = Spec.pure value :=
   certifying_eq_pure trivial fun _ => rfl
 
+@[simp] theorem certifyingAt_char (site : Nat) (kind : CertifyKind)
+    (value : (NTy.char).plain) :
+    certifyingAt (State := State) site kind .char value = Spec.pure value :=
+  certifying_eq_pure trivial fun _ => rfl
+
 @[simp] theorem certifyingAt_function (site : Nat) (kind : CertifyKind)
     (parameters : NRow) (shared : Sharing) (results : NRow)
     (value : (NTy.function parameters shared results).plain) :
@@ -1662,8 +1667,9 @@ rebuilt with the reference's final current is certified where the loan dies.
 A borrow of global memory, and a mutable parameter at an exit, name no
 local: the slot holds the referent, so the current itself is certified
 there.  A reborrow is a place through a dereference, whose owner is another
-reference's plain current: rebuilding it certifies nothing, and the outer
-loan's death owes the rest (`doc/designs/data-invariants.md`). -/
+reference's plain current: the reborrow's own current is certified where it
+dies, and the levels around it where the outer loan dies
+(`doc/designs/data-invariants.md`). -/
 inductive Lender (Γ : NRow) (σ : NTy) : Type where
   | slot : Lender Γ σ
   | place {τ : NTy} (owner : Var Γ τ) (path : Proj τ σ) : Lender Γ σ
@@ -1672,8 +1678,8 @@ inductive Lender (Γ : NRow) (σ : NTy) : Type where
   from borrows of different owners carries no record of the owner it came
   from.  The owner rebuilt with this current is certified, as `place`
   certifies it, and no prophecy equation is stated, because this holder
-  need not hold this loan; the equation is stated once beside these, by a
-  `slot` resolve of the same holder (`deathEffect`). -/
+  need not hold this loan; the equation is stated once beside these, by
+  `equation`, after `referent` (`holderResolves`). -/
   | candidate {τ : NTy} (owner : Var Γ τ) (path : Proj τ σ) : Lender Γ σ
   /-- The obligation of a dying loan that no local lends, where the holder
   may hold another loan's reference instead: the referent's current, as
@@ -1685,12 +1691,30 @@ inductive Lender (Γ : NRow) (σ : NTy) : Type where
   with the reference's prophecy at the path (`Term.borrowPlace`), so this one
   equation is the relation every one of those lenders states. -/
   | equation : Lender Γ σ
+  | seq (first second : Lender Γ σ) : Lender Γ σ
 
-/-- A row of one type repeated: the elements of a vector literal. -/
-abbrev NRow.replicate : Nat → NTy → NRow
-  | 0, _ => .nil
-  | count + 1, τ => .cons τ (NRow.replicate count τ)
-
+/-- What a dying mutable slice loan writes back to, mirroring `Lender` across
+the three backing shapes a fixed-extent slice borrow may take: a fixed-length
+array (`borrowArraySlice`), a growable vector (`borrowVectorSlice`), or an
+enclosing mutable slice (`reborrowSlice`), together with their joined-holder
+candidate forms (`sliceHolderResolves`). -/
+inductive SliceLender (Γ : NRow) (σ : NTy) : Type where
+  | slot : SliceLender Γ σ
+  | array {τ : NTy} {length : Nat} (owner : Var Γ τ) (path : Proj τ (.array σ length)) :
+      SliceLender Γ σ
+  | vector {τ : NTy} (owner : Var Γ τ) (path : Proj τ (.vector σ)) :
+      SliceLender Γ σ
+  | slice {τ : NTy} (owner : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
+      SliceLender Γ σ
+  | candidateArray {τ : NTy} {length : Nat} (owner : Var Γ τ) (path : Proj τ (.array σ length)) :
+      SliceLender Γ σ
+  | candidateVector {τ : NTy} (owner : Var Γ τ) (path : Proj τ (.vector σ)) :
+      SliceLender Γ σ
+  | candidateSlice {τ : NTy} (owner : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
+      SliceLender Γ σ
+  | referent : SliceLender Γ σ
+  | equation : SliceLender Γ σ
+  | seq (first second : SliceLender Γ σ) : SliceLender Γ σ
 /-- The elements of a uniform row, in order. -/
 def HList.toListOf {τ : NTy} : (count : Nat) → HList (NRow.replicate count τ) → List τ.carrier
   | 0, _ => []
@@ -2241,19 +2265,20 @@ inductive Term (unit : Validation.ValidatedUnit) (ρ : ResultShape) : NRow → N
   | vectorSlice {Γ : NRow} {τ : NTy} (value : Term unit ρ Γ (.vector τ)) :
       Term unit ρ Γ (.slice τ)
   | borrowArraySlice {Γ : NRow} {τ σ : NTy} {length : Nat}
-      (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.array σ length)) :
+      (site : Nat) (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.array σ length)) :
       Term unit ρ Γ (.sliceRef σ)
   | borrowVectorSlice {Γ : NRow} {τ σ : NTy}
-      (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.vector σ)) :
+      (site : Nat) (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.vector σ)) :
       Term unit ρ Γ (.sliceRef σ)
   | reborrowSlice {Γ : NRow} {τ σ : NTy}
-      (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
+      (site : Nat) (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
       Term unit ρ Γ (.sliceRef σ)
   | takeSliceAt {Γ : NRow} {τ σ : NTy}
-      (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
+      (site : Nat) (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) :
       Term unit ρ Γ (.sliceRef σ)
   | resolveSliceAt {Γ : NRow} {τ σ : NTy}
-      (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) : Term unit ρ Γ .unit
+      (site : Nat) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) (lender : SliceLender Γ σ) :
+      Term unit ρ Γ .unit
   /-- A vector of listed elements. -/
   | vectorLit {Γ : NRow} {τ : NTy} (count : Nat) (elements : Args unit ρ Γ (NRow.replicate count τ)) :
       Term unit ρ Γ (.vector τ)
@@ -2460,13 +2485,126 @@ inductive Mutables (Γ : NRow) : Type where
   | sliceAt {τ σ : NTy} (x : Var Γ τ) (path : Proj τ (.sliceRef σ))
       (rest : Mutables Γ) : Mutables Γ
 
+theorem Var.selectPlain_updatePlain : {Γ : NRow} → {τ : NTy} → (x : Var Γ τ) →
+    (value : τ.plain) → (values : HListPlain Γ) →
+    x.selectPlain (x.updatePlain value values) = value
+  | _, _, .here, _, _ => rfl
+  | _, _, .there rest, value, values => rest.selectPlain_updatePlain value values.2
+
+theorem Choices.update?_deepHolds {names : List String} {rows : NRows} {τ : NTy} :
+    (choices : Choices names rows τ) → (replacement : τ.plain) →
+    (value rebuilt : variantPlain names rows) →
+    choices.update? replacement value = some rebuilt →
+    variantPlain.deepHolds names rows rebuilt → NTy.deepHolds τ replacement
+  | .nil, _, _, _, written, _ => by simp [Choices.update?] at written
+  | .cons choice x rest, replacement, value, rebuilt, written, held => by
+      simp only [Choices.update?] at written
+      split at written
+      · rename_i fields projected
+        cases Option.some.inj written
+        have projected' : choice.project? (choice.inject (x.updatePlain replacement fields)) =
+            some (x.updatePlain replacement fields) :=
+          (choice.project?_eq_some_iff _ _).2 rfl
+        have row := choice.project?_deepHolds _ held _ projected'
+        have := x.selectPlain_deepHolds _ row
+        rwa [Var.selectPlain_updatePlain] at this
+      · exact rest.update?_deepHolds replacement value rebuilt written held
+
+/-- A write along a path that begins at a reference's current leaves the
+reference's data invariants as they are: they are its prophecy's
+(`NTy.deepHolds_ref`), which the write does not touch. -/
+theorem Proj.set?_deref_deepHolds {Γ : NRow} (env : HEnv Γ) {υ σ : NTy} (rest : Proj υ σ)
+    (replacement : σ.plain) (held : (NTy.ref υ).carrier) (rebuilt : (NTy.ref υ).plain)
+    (written : (Proj.deref rest).set? env replacement (NTy.forget (.ref υ) held) = some rebuilt) :
+    NTy.deepHolds (.ref υ) rebuilt := by
+  rw [Proj.set?_deref] at written
+  cases current : rest.set? env replacement (NTy.forget (.ref υ) held).1 with
+  | none => rw [current] at written; simp at written
+  | some current =>
+      rw [current] at written
+      simp only [Option.map_some] at written
+      cases Option.some.inj written
+      exact NTy.deepHolds_forget υ held.2
+
+/-- The component written along a path that stays inside the owner has the
+data invariants the rebuilt owner has: the converse reading of
+`Proj.get?_deepHolds`. -/
+theorem Proj.deepHolds_of_set? {Γ : NRow} (env : HEnv Γ) :
+    {τ σ : NTy} → (path : Proj τ σ) → path.hasDeref = false → (replacement : σ.plain) →
+    (value rebuilt : τ.plain) → path.set? env replacement value = some rebuilt →
+    NTy.deepHolds τ rebuilt → NTy.deepHolds σ replacement
+  | _, _, .nil, _, replacement, _, rebuilt, written, holds => by
+      cases Option.some.inj written
+      exact holds
+  | _, _, .deref _, open_, _, _, _, _, _ => by simp at open_
+  | _, _, .sliceIndex _ _, open_, _, _, _, _, _ => by simp [Proj.hasDeref] at open_
+  | _, _, .field x rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_field, Option.map_eq_some_iff] at written
+      obtain ⟨component, written, equation⟩ := written
+      cases equation
+      exact rest.deepHolds_of_set? env inside replacement (x.selectPlain value) component written
+        (by have := x.selectPlain_deepHolds _ holds.2
+            rwa [Var.selectPlain_updatePlain] at this)
+  | _, _, .element x rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_element, Option.map_eq_some_iff] at written
+      obtain ⟨component, written, equation⟩ := written
+      cases equation
+      exact rest.deepHolds_of_set? env inside replacement (x.selectPlain value) component written
+        (by have := x.selectPlain_deepHolds _ holds
+            rwa [Var.selectPlain_updatePlain] at this)
+  | _, _, .ghost rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_ghost] at written
+      exact rest.deepHolds_of_set? env inside replacement value rebuilt written holds
+  | _, _, .variant choices rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_variant, Option.bind_eq_some_iff] at written
+      obtain ⟨field, selected, updated, written, rebuild⟩ := written
+      exact rest.deepHolds_of_set? env inside replacement field updated written
+        (choices.update?_deepHolds updated value rebuilt rebuild holds.2)
+  | _, _, .index position rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_index, Option.bind_eq_some_iff, Option.map_eq_some_iff] at written
+      obtain ⟨index, resolved, element, found, updated, written, equation⟩ := written
+      refine rest.deepHolds_of_set? env inside replacement element updated written ?_
+      cases equation
+      exact holds updated (by
+        obtain ⟨bound, _⟩ := Array.getElem?_eq_some_iff.mp found
+        apply Array.mem_of_getElem? (i := index)
+        rw [SpecVector.values_set, Array.set!_eq_setIfInBounds,
+          Array.getElem?_setIfInBounds_self, if_pos bound])
+  | _, _, .arrayIndex position rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_arrayIndex, Option.bind_eq_some_iff, Option.map_eq_some_iff] at written
+      obtain ⟨index, resolved, element, found, updated, written, equation⟩ := written
+      refine rest.deepHolds_of_set? env inside replacement element updated written ?_
+      cases equation
+      exact holds updated (by
+        obtain ⟨bound, _⟩ := Array.getElem?_eq_some_iff.mp found
+        apply Array.mem_of_getElem? (i := index)
+        rw [SpecVector.values_set, Array.set!_eq_setIfInBounds,
+          Array.getElem?_setIfInBounds_self, if_pos bound])
+  | _, _, .sliceElement position rest, inside, replacement, value, rebuilt, written, holds => by
+      simp only [Proj.set?_sliceElement, Option.bind_eq_some_iff, Option.map_eq_some_iff] at written
+      obtain ⟨index, resolved, element, found, updated, written, equation⟩ := written
+      refine rest.deepHolds_of_set? env inside replacement element updated written ?_
+      cases equation
+      exact holds updated (by
+        obtain ⟨bound, _⟩ := Array.getElem?_eq_some_iff.mp found
+        apply Array.mem_of_getElem? (i := index)
+        rw [SpecVector.values_set, Array.set!_eq_setIfInBounds,
+          Array.getElem?_setIfInBounds_self, if_pos bound])
+
 /-- The death of a loan.  Where a local lends the referent, the owner
 rebuilt with the reference's final current is certified first — its data
 invariants at every depth, which is the bottom-up `PackRefDeep` by the
 structure of `NTy.deepHolds` — and only then are the prophecies' equations
 assumed, so a run that breaks an invariant has no outcome before an equation
 could prune it.  Where no local lends it, the current itself is certified
-(`doc/designs/data-invariants.md`). -/
+(`doc/designs/data-invariants.md`).
+
+No equation with a certified side is assumed before the check of its plain
+side: the owner rebuilt before the write-back, the reference's current
+before the prophecy's equation, the latter by its own step wherever a
+dereference takes it out of the owner's certificate.  `equation` alone
+checks nothing; the compiler states it only after `referent`
+(`holderResolves`). -/
 noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
     (env : HEnv Γ) (reference : (NTy.ref σ).carrier) : Lender Γ σ →
     Spec State Failure (Flow ρ Γ Unit)
@@ -2479,16 +2617,17 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
       | some held =>
           match path.set? env reference.1 (NTy.forget τ held) with
           | some rebuilt =>
-              -- A write-back into a reference's current owes nothing: the
-              -- prophecy the owner keeps is certified already and the
-              -- current is certified where the owner's own loan dies, as a
-              -- write through a reference owes nothing (`Proj.setOwner?`).
-              -- An owner that is a root owes its data invariants at every
-              -- depth.
+              -- Each equation's plain side is certified before it.  The
+              -- owner rebuilt covers the reference's current where the path
+              -- stays inside the owner's certificate (`Proj.deepHolds_of_set?`);
+              -- below a dereference it does not, so the current is certified
+              -- itself, first, and the owner's cut has its fact.
               if path.hasDeref then
-                Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
-                  Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
-                    Spec.pure (.value () env)
+                Spec.bind (certifyingAt site .mutationEnd σ reference.1) fun _ =>
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
+                        Spec.pure (.value () env)
               else
                 Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
                   Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
@@ -2505,15 +2644,15 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
       -- holder that does hold the loan owes and a holder that does not owes
       -- of a value that cannot arise, never fewer than `place` owes.  A
       -- path the owner cannot take is no candidate and owes nothing;
-      -- `Spec.bottom` would discharge every obligation instead.
+      -- `Spec.bottom` would discharge every obligation instead.  The
+      -- referent's current is `referent`'s to certify, once, before the
+      -- equation (`holderResolves`).
       match owner.get env with
       | some held =>
           match path.set? env reference.1 (NTy.forget τ held) with
           | some rebuilt =>
-              if path.hasDeref then Spec.pure (.value () env)
-              else
-                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
-                  Spec.pure (.value () env)
+              Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                Spec.pure (.value () env)
           | none => Spec.pure (.value () env)
       | none => Spec.pure (.value () env)
   | .referent =>
@@ -2522,6 +2661,9 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
   | .equation =>
       Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
         Spec.pure (.value () env)
+  | .seq first second =>
+      Flow.bind (first.resolve site env reference) fun _ env =>
+        second.resolve site env reference
 
 @[simp] theorem Lender.resolve_slot {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
     (env : HEnv Γ) (reference : (NTy.ref σ).carrier) :
@@ -2538,9 +2680,11 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
           match path.set? env reference.1 (NTy.forget τ held) with
           | some rebuilt =>
               if path.hasDeref then
-                Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
-                  Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
-                    Spec.pure (.value () env)
+                Spec.bind (certifyingAt site .mutationEnd σ reference.1) fun _ =>
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
+                        Spec.pure (.value () env)
               else
                 Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
                   Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
@@ -2559,12 +2703,213 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
       | some held =>
           match path.set? env reference.1 (NTy.forget τ held) with
           | some rebuilt =>
-              if path.hasDeref then Spec.pure (.value () env)
-              else
-                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
-                  Spec.pure (.value () env)
+              Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                Spec.pure (.value () env)
           | none => Spec.pure (.value () env)
       | none => Spec.pure (.value () env) := rfl
+
+/-- A reborrow through a reference: the owner rebuilt has the owner's data
+invariants (`Proj.set?_deref_deepHolds`), so its certification is discharged
+and the death owes the referent's current. -/
+@[simp high] theorem Lender.resolve_place_deref {ρ : ResultShape} {Γ : NRow} {σ υ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier) (owner : Var Γ (.ref υ))
+    (rest : Proj υ σ) :
+    (Lender.place owner (.deref rest)).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match (Proj.deref rest).set? env reference.1 (NTy.forget (.ref υ) held) with
+          | some rebuilt =>
+              Spec.bind (certifyingAt site .mutationEnd σ reference.1) fun _ =>
+                Spec.bind (Spec.assume (rebuilt = NTy.forget (.ref υ) held)) fun _ =>
+                  Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
+                    Spec.pure (.value () env)
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd σ reference.1) fun _ =>
+            Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
+              Spec.pure (.value () env) := by
+  rw [Lender.resolve_place]
+  cases got : owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases written : (Proj.deref rest).set? env reference.1 (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some rebuilt =>
+          dsimp only
+          simp only [Proj.hasDeref_deref, ↓reduceIte]
+          have holds : NTy.deepHolds (.ref υ) rebuilt :=
+            Proj.set?_deref_deepHolds env rest reference.1 held rebuilt written
+          have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+              Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+            certifying_eq_pure holds (fun _ => rfl)
+          rw [cert, Spec.pure_bind]
+
+/-- A candidate reborrow through a reference owes nothing: the owner
+rebuilt is certified by `Proj.set?_deref_deepHolds`, and a candidate states
+no equation. -/
+@[simp high] theorem Lender.resolve_candidate_deref {ρ : ResultShape} {Γ : NRow} {σ υ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier) (owner : Var Γ (.ref υ))
+    (rest : Proj υ σ) :
+    (Lender.candidate owner (.deref rest)).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases got : owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases written : (Proj.deref rest).set? env reference.1 (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some rebuilt =>
+          dsimp only
+          have holds : NTy.deepHolds (.ref υ) rebuilt :=
+            Proj.set?_deref_deepHolds env rest reference.1 held rebuilt written
+          have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+              Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+            certifying_eq_pure holds (fun _ => rfl)
+          rw [cert, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_unit {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .unit) (path : Proj .unit σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .unit held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_unit, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_bool {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .bool) (path : Proj .bool σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .bool held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_bool, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_int {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (width : Nat) (signed : Bool) (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ (.int width signed)) (path : Proj (.int width signed) σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget (.int width signed) held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_int, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_num {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .num) (path : Proj .num σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .num held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_num, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_address {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .address) (path : Proj .address σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .address held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_address, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_signer {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .signer) (path : Proj .signer σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .signer held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_signer, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_string {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .string) (path : Proj .string σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .string held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_string, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_bytes {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .bytes) (path : Proj .bytes σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .bytes held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_bytes, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_char {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ .char) (path : Proj .char σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget .char held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_char, Spec.pure_bind]
+
+@[simp high] theorem Lender.resolve_candidate_function {ρ : ResultShape} {Γ : NRow} {σ : NTy}
+    (parameters : NRow) (shared : Sharing) (results : NRow)
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.ref σ).carrier)
+    (owner : Var Γ (.function parameters shared results))
+    (path : Proj (.function parameters shared results) σ) :
+    (Lender.candidate owner path).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [Lender.resolve_candidate]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases path.set? env reference.1 (NTy.forget (.function parameters shared results) held) with
+      | none => rfl
+      | some rebuilt => simp only [certifyingAt_function, Spec.pure_bind]
 
 @[simp] theorem Lender.resolve_referent {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
     (env : HEnv Γ) (reference : (NTy.ref σ).carrier) :
@@ -2577,6 +2922,501 @@ noncomputable def Lender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site
     (Lender.equation : Lender Γ σ).resolve (State := State) (ρ := ρ) site env reference =
       Spec.bind (Spec.assume (reference.1 = NTy.forget σ reference.2)) fun _ =>
         Spec.pure (.value () env) := rfl
+
+@[simp] theorem Lender.resolve_seq {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.ref σ).carrier) (first second : Lender Γ σ) :
+    (Lender.seq first second).resolve (State := State) (ρ := ρ) site env reference =
+      Flow.bind (first.resolve site env reference) fun _ env =>
+        second.resolve site env reference := rfl
+
+/-- The death of a mutable slice loan: rebuilds and certifies the backing
+owner (if any) and certifies the slice's current elements before assuming the
+prophecy settlement equations, matching `Lender.resolve`. -/
+noncomputable def SliceLender.resolve {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) : SliceLender Γ σ →
+    Spec State Failure (Flow ρ Γ Unit)
+  | .slot =>
+      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+        Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+          Spec.pure (.value () env)
+  | .array (τ := τ) (length := length) owner path =>
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match path.set? env ⟨reference.currentVector, sized⟩ (NTy.forget τ held) with
+            | some rebuilt =>
+                if path.hasDeref then
+                  Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                    Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                      Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                        Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                          Spec.pure (.value () env)
+                else
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                        Spec.pure (.value () env)
+            | none => Spec.bottom
+          else Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env)
+  | .vector (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.currentVector (NTy.forget τ held) with
+          | some rebuilt =>
+              if path.hasDeref then
+                Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                        Spec.pure (.value () env)
+              else
+                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                  Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                    Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                      Spec.pure (.value () env)
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env)
+  | .slice (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.get? env (NTy.forget τ held) with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                    (NTy.forget τ held) with
+                | some rebuilt =>
+                    if path.hasDeref then
+                      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                        Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                          Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                              Spec.pure (.value () env)
+                    else
+                      Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                        Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                          Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                            Spec.pure (.value () env)
+                | none => Spec.bottom
+              else Spec.bottom
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env)
+  | .candidateArray (τ := τ) (length := length) owner path =>
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match path.set? env ⟨reference.currentVector, sized⟩ (NTy.forget τ held) with
+            | some rebuilt =>
+                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                  Spec.pure (.value () env)
+            | none => Spec.pure (.value () env)
+          else Spec.pure (.value () env)
+      | none => Spec.pure (.value () env)
+  | .candidateVector (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.currentVector (NTy.forget τ held) with
+          | some rebuilt =>
+              Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                Spec.pure (.value () env)
+          | none => Spec.pure (.value () env)
+      | none => Spec.pure (.value () env)
+  | .candidateSlice (τ := τ) owner path =>
+      match owner.get env with
+      | some held =>
+          match path.get? env (NTy.forget τ held) with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                    (NTy.forget τ held) with
+                | some rebuilt =>
+                    Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                      Spec.pure (.value () env)
+                | none => Spec.pure (.value () env)
+              else Spec.pure (.value () env)
+          | none => Spec.pure (.value () env)
+      | none => Spec.pure (.value () env)
+  | .referent =>
+      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+        Spec.pure (.value () env)
+  | .equation =>
+      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+        Spec.pure (.value () env)
+  | .seq first second =>
+      Flow.bind (first.resolve site env reference) fun _ env =>
+        second.resolve site env reference
+
+@[simp] theorem SliceLender.resolve_slot {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) :
+    (SliceLender.slot : SliceLender Γ σ).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+        Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+          Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_array {ρ : ResultShape} {Γ : NRow} {σ τ : NTy} {length : Nat}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (owner : Var Γ τ)
+    (path : Proj τ (.array σ length)) :
+    (SliceLender.array owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match path.set? env ⟨reference.currentVector, sized⟩ (NTy.forget τ held) with
+            | some rebuilt =>
+                if path.hasDeref then
+                  Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                    Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                      Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                        Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                          Spec.pure (.value () env)
+                else
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                        Spec.pure (.value () env)
+            | none => Spec.bottom
+          else Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_vector {ρ : ResultShape} {Γ : NRow} {σ τ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (owner : Var Γ τ)
+    (path : Proj τ (.vector σ)) :
+    (SliceLender.vector owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.currentVector (NTy.forget τ held) with
+          | some rebuilt =>
+              if path.hasDeref then
+                Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                  Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                    Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                        Spec.pure (.value () env)
+              else
+                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                  Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                    Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                      Spec.pure (.value () env)
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_slice {ρ : ResultShape} {Γ : NRow} {σ τ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (owner : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) :
+    (SliceLender.slice owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match path.get? env (NTy.forget τ held) with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                    (NTy.forget τ held) with
+                | some rebuilt =>
+                    if path.hasDeref then
+                      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                        Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                          Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                              Spec.pure (.value () env)
+                    else
+                      Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                        Spec.bind (Spec.assume (rebuilt = NTy.forget τ held)) fun _ =>
+                          Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                            Spec.pure (.value () env)
+                | none => Spec.bottom
+              else Spec.bottom
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_candidateArray {ρ : ResultShape} {Γ : NRow} {σ τ : NTy}
+    {length : Nat} (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ τ) (path : Proj τ (.array σ length)) :
+    (SliceLender.candidateArray owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match path.set? env ⟨reference.currentVector, sized⟩ (NTy.forget τ held) with
+            | some rebuilt =>
+                Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                  Spec.pure (.value () env)
+            | none => Spec.pure (.value () env)
+          else Spec.pure (.value () env)
+      | none => Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_candidateVector {ρ : ResultShape} {Γ : NRow} {σ τ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (owner : Var Γ τ)
+    (path : Proj τ (.vector σ)) :
+    (SliceLender.candidateVector owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match path.set? env reference.currentVector (NTy.forget τ held) with
+          | some rebuilt =>
+              Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                Spec.pure (.value () env)
+          | none => Spec.pure (.value () env)
+      | none => Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_candidateSlice {ρ : ResultShape} {Γ : NRow} {σ τ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (owner : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) :
+    (SliceLender.candidateSlice owner path).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match path.get? env (NTy.forget τ held) with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match path.set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                    (NTy.forget τ held) with
+                | some rebuilt =>
+                    Spec.bind (certifyingAt site .mutationEnd τ rebuilt) fun _ =>
+                      Spec.pure (.value () env)
+                | none => Spec.pure (.value () env)
+              else Spec.pure (.value () env)
+          | none => Spec.pure (.value () env)
+      | none => Spec.pure (.value () env) := rfl
+
+@[simp high] theorem SliceLender.resolve_array_deref {ρ : ResultShape} {Γ : NRow} {σ υ : NTy}
+    {length : Nat} (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.array σ length)) :
+    (SliceLender.array owner (.deref rest)).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          if sized : reference.currentVector.values.size = length then
+            match (Proj.deref rest).set? env ⟨reference.currentVector, sized⟩
+                (NTy.forget (.ref υ) held) with
+            | some rebuilt =>
+                Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                  Spec.bind (Spec.assume (rebuilt = NTy.forget (.ref υ) held)) fun _ =>
+                    Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                      Spec.pure (.value () env)
+            | none => Spec.bottom
+          else Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_array]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      split
+      · rename_i sized
+        cases written : (Proj.deref rest).set? env ⟨reference.currentVector, sized⟩
+            (NTy.forget (.ref υ) held) with
+        | none => rfl
+        | some rebuilt =>
+            dsimp only
+            simp only [Proj.hasDeref_deref, ↓reduceIte]
+            have holds : NTy.deepHolds (.ref υ) rebuilt :=
+              Proj.set?_deref_deepHolds env rest ⟨reference.currentVector, sized⟩ held rebuilt written
+            have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+                Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+              certifying_eq_pure holds (fun _ => rfl)
+            rw [cert, Spec.pure_bind]
+      · rfl
+
+@[simp high] theorem SliceLender.resolve_vector_deref {ρ : ResultShape} {Γ : NRow} {σ υ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.vector σ)) :
+    (SliceLender.vector owner (.deref rest)).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match (Proj.deref rest).set? env reference.currentVector
+              (NTy.forget (.ref υ) held) with
+          | some rebuilt =>
+              Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                Spec.bind (Spec.assume (rebuilt = NTy.forget (.ref υ) held)) fun _ =>
+                  Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                    Spec.pure (.value () env)
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_vector]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases written : (Proj.deref rest).set? env reference.currentVector
+          (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some rebuilt =>
+          dsimp only
+          simp only [Proj.hasDeref_deref, ↓reduceIte]
+          have holds : NTy.deepHolds (.ref υ) rebuilt :=
+            Proj.set?_deref_deepHolds env rest reference.currentVector held rebuilt written
+          have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+              Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+            certifying_eq_pure holds (fun _ => rfl)
+          rw [cert, Spec.pure_bind]
+
+@[simp high] theorem SliceLender.resolve_slice_deref {ρ : ResultShape} {Γ : NRow} {σ υ : NTy}
+    (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.sliceRef σ)) :
+    (SliceLender.slice owner (.deref rest)).resolve (State := State) (ρ := ρ) site env reference =
+      match owner.get env with
+      | some held =>
+          match (Proj.deref rest).get? env (NTy.forget (.ref υ) held) with
+          | some heldSlice =>
+              if sized : reference.currentVector.values.size = heldSlice.extent then
+                match (Proj.deref rest).set? env (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                    (NTy.forget (.ref υ) held) with
+                | some rebuilt =>
+                    Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+                      Spec.bind (Spec.assume (rebuilt = NTy.forget (.ref υ) held)) fun _ =>
+                        Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+                          Spec.pure (.value () env)
+                | none => Spec.bottom
+              else Spec.bottom
+          | none => Spec.bottom
+      | none =>
+          Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_slice]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases (Proj.deref rest).get? env (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some heldSlice =>
+          dsimp only
+          split
+          · rename_i sized
+            cases written : (Proj.deref rest).set? env
+                (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                (NTy.forget (.ref υ) held) with
+            | none => rfl
+            | some rebuilt =>
+                dsimp only
+                simp only [Proj.hasDeref_deref, ↓reduceIte]
+                have holds : NTy.deepHolds (.ref υ) rebuilt :=
+                  Proj.set?_deref_deepHolds env rest
+                    (heldSlice.withCurrent ⟨reference.currentVector, sized⟩) held rebuilt written
+                have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+                    Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+                  certifying_eq_pure holds (fun _ => rfl)
+                rw [cert, Spec.pure_bind]
+          · rfl
+
+@[simp high] theorem SliceLender.resolve_candidateArray_deref {ρ : ResultShape} {Γ : NRow}
+    {σ υ : NTy} {length : Nat} (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.array σ length)) :
+    (SliceLender.candidateArray owner (.deref rest)).resolve
+      (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_candidateArray]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      split
+      · rename_i sized
+        cases written : (Proj.deref rest).set? env ⟨reference.currentVector, sized⟩
+            (NTy.forget (.ref υ) held) with
+        | none => rfl
+        | some rebuilt =>
+            dsimp only
+            have holds : NTy.deepHolds (.ref υ) rebuilt :=
+              Proj.set?_deref_deepHolds env rest ⟨reference.currentVector, sized⟩ held rebuilt written
+            have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+                Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+              certifying_eq_pure holds (fun _ => rfl)
+            rw [cert, Spec.pure_bind]
+      · rfl
+
+@[simp high] theorem SliceLender.resolve_candidateVector_deref {ρ : ResultShape} {Γ : NRow}
+    {σ υ : NTy} (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.vector σ)) :
+    (SliceLender.candidateVector owner (.deref rest)).resolve
+      (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_candidateVector]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases written : (Proj.deref rest).set? env reference.currentVector
+          (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some rebuilt =>
+          dsimp only
+          have holds : NTy.deepHolds (.ref υ) rebuilt :=
+            Proj.set?_deref_deepHolds env rest reference.currentVector held rebuilt written
+          have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+              Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+            certifying_eq_pure holds (fun _ => rfl)
+          rw [cert, Spec.pure_bind]
+
+@[simp high] theorem SliceLender.resolve_candidateSlice_deref {ρ : ResultShape} {Γ : NRow}
+    {σ υ : NTy} (site : Nat) (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain)
+    (owner : Var Γ (.ref υ)) (rest : Proj υ (.sliceRef σ)) :
+    (SliceLender.candidateSlice owner (.deref rest)).resolve
+      (State := State) (ρ := ρ) site env reference =
+      Spec.pure (.value () env) := by
+  rw [SliceLender.resolve_candidateSlice]
+  cases owner.get env with
+  | none => rfl
+  | some held =>
+      dsimp only
+      cases (Proj.deref rest).get? env (NTy.forget (.ref υ) held) with
+      | none => rfl
+      | some heldSlice =>
+          dsimp only
+          split
+          · rename_i sized
+            cases written : (Proj.deref rest).set? env
+                (heldSlice.withCurrent ⟨reference.currentVector, sized⟩)
+                (NTy.forget (.ref υ) held) with
+            | none => rfl
+            | some rebuilt =>
+                dsimp only
+                have holds : NTy.deepHolds (.ref υ) rebuilt :=
+                  Proj.set?_deref_deepHolds env rest
+                    (heldSlice.withCurrent ⟨reference.currentVector, sized⟩) held rebuilt written
+                have cert : certifyingAt (State := State) site .mutationEnd (.ref υ) rebuilt =
+                    Spec.pure (NTy.ofDeepHolds (.ref υ) rebuilt holds) :=
+                  certifying_eq_pure holds (fun _ => rfl)
+                rw [cert, Spec.pure_bind]
+          · rfl
+
+@[simp] theorem SliceLender.resolve_referent {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) :
+    (SliceLender.referent : SliceLender Γ σ).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.bind (certifyingAt site .mutationEnd (.slice σ) reference.currentVector) fun _ =>
+        Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_equation {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) :
+    (SliceLender.equation : SliceLender Γ σ).resolve (State := State) (ρ := ρ) site env reference =
+      Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+        Spec.pure (.value () env) := rfl
+
+@[simp] theorem SliceLender.resolve_seq {ρ : ResultShape} {Γ : NRow} {σ : NTy} (site : Nat)
+    (env : HEnv Γ) (reference : (NTy.sliceRef σ).plain) (first second : SliceLender Γ σ) :
+    (SliceLender.seq first second).resolve (State := State) (ρ := ρ) site env reference =
+      Flow.bind (first.resolve site env reference) fun _ env =>
+        second.resolve site env reference := rfl
 
 /-- Resolve every mutable reference the function still holds where it
 leaves, a parameter's in its slot or in a local it was moved into, then
@@ -2605,10 +3445,14 @@ noncomputable def Mutables.resolve {Γ : NRow} {α : Type} (site : Nat) :
             Spec.bind (Spec.assume (reference.1 = reference.2)) fun _ =>
               rest.resolve site env next
       | none => rest.resolve site env next
-  | .sliceAt (τ := τ) x path rest, env, next =>
+  | .sliceAt (τ := τ) (σ := σ) x path rest, env, next =>
       match (x.get env).bind fun held => path.get? env (NTy.forget τ held) with
-      | some reference => Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
-          rest.resolve site env next
+      | some reference =>
+          let continues :=
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              rest.resolve site env next
+          if σ.certificateFree then continues
+          else Spec.bind (certifyingAt site .exit (.slice σ) reference.currentVector) fun _ => continues
       | none => rest.resolve site env next
 
 @[simp] theorem Mutables.resolve_nil {Γ : NRow} {α : Type} (site : Nat) (env : HEnv Γ)
@@ -2651,9 +3495,26 @@ noncomputable def Mutables.resolve {Γ : NRow} {α : Type} (site : Nat) :
     (env : HEnv Γ) (next : Spec State Failure α) :
     (Mutables.sliceAt x path rest).resolve site env next =
       match (x.get env).bind fun held => path.get? env (NTy.forget τ held) with
-      | some reference => Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
-          rest.resolve site env next
-      | none => rest.resolve site env next := rfl
+      | some reference =>
+          Spec.bind (certifyingAt site .exit (.slice σ) reference.currentVector) fun _ =>
+            Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
+              rest.resolve site env next
+      | none => rest.resolve site env next := by
+  simp only [Mutables.resolve]
+  cases h : ((x.get env).bind fun held => path.get? env (NTy.forget τ held)) with
+  | none => rfl
+  | some reference =>
+      by_cases free : σ.certificateFree = true
+      · simp only [free, ↓reduceIte]
+        have freeSlice : (NTy.slice σ).certificateFree = true := free
+        have cert : certifyingAt (State := State) site .exit (.slice σ) reference.currentVector =
+            Spec.pure (NTy.ofDeepHolds (.slice σ) reference.currentVector
+              (NTy.deepHolds_of_certificateFree (.slice σ) freeSlice reference.currentVector)) :=
+          certifying_eq_pure
+            (NTy.deepHolds_of_certificateFree (.slice σ) freeSlice reference.currentVector)
+            (fun _ => rfl)
+        rw [cert, Spec.pure_bind]
+      · simp only [free, Bool.false_eq_true, ↓reduceIte]
 
 /-- Resolving scalar references introduces only their prophecy equations;
 there is no certificate to establish. The fast path is definitionally pure. -/
@@ -3480,9 +4341,12 @@ structure InterpreterOps (unit : Validation.ValidatedUnit) (carriers : Carriers)
     Spec State Failure (@NTy.carrier carriers
       (.function (NRow.subst arguments.1 supplied) shared (shape.subst arguments.1).row))
   read : (type : NTy) → (arguments : NRow) → StorageKey → State →
-    Option (@NTy.carrier carriers type)
+    Option (@NTy.plain carriers type)
+  read_holds : ∀ (type : NTy) (arguments : NRow) (key : StorageKey) (state : State)
+    (value : @NTy.plain carriers type),
+    read type arguments key state = some value → @NTy.Holds carriers type value
   write : (type : NTy) → (arguments : NRow) → StorageKey →
-    Option (@NTy.carrier carriers type) → State → State
+    Option (@NTy.plain carriers type) → State → State
   assumption : Nat → Option ((locals : NRow) × (@HEnv carriers locals → State → Prop))
   ghost : Nat → Option ((locals : NRow) × (type : NTy) ×
     (@HEnv carriers locals → State → Option (@NTy.carrier carriers type)))
@@ -3493,6 +4357,37 @@ structure InterpreterOps (unit : Validation.ValidatedUnit) (carriers : Carriers)
   atInstance : (handle : FunctionHandle) → Array GenericArgument → (arguments : TypeArgs) →
     (parameters : NRow) → (shape : ResultShape) →
     @HList carriers parameters → Spec State Failure (@ResultShape.carrier carriers shape)
+
+@[reducible] noncomputable def InterpreterOps.readCarrier? {unit : Validation.ValidatedUnit}
+    {carriers : Carriers} {State : Type} (ops : InterpreterOps unit carriers State)
+    (τ : NTy) (arguments : NRow) (key : StorageKey) (state : State) :
+    Option (@NTy.carrier carriers τ) :=
+  (ops.read τ arguments key state).bind (@NTy.ofPlain? carriers τ)
+
+@[simp] theorem InterpreterOps.isSome_bind_ofPlain?_read {unit : Validation.ValidatedUnit}
+    {carriers : Carriers} {State : Type} (ops : InterpreterOps unit carriers State)
+    (τ : NTy) (arguments : NRow) (key : StorageKey) (state : State) :
+    ((ops.read τ arguments key state).bind (@NTy.ofPlain? carriers τ)).isSome =
+      (ops.read τ arguments key state).isSome :=
+  @NTy.isSome_bind_ofPlain?_of_holds carriers τ _ fun _ h =>
+    ops.read_holds τ arguments key state _ h
+
+@[simp] theorem InterpreterOps.bind_ofPlain?_read_eq_none {unit : Validation.ValidatedUnit}
+    {carriers : Carriers} {State : Type} (ops : InterpreterOps unit carriers State)
+    (τ : NTy) (arguments : NRow) (key : StorageKey) (state : State) :
+    (ops.read τ arguments key state).bind (@NTy.ofPlain? carriers τ) = none ↔
+      ops.read τ arguments key state = none :=
+  @NTy.bind_ofPlain?_eq_none_of_holds carriers τ _ fun _ h =>
+    ops.read_holds τ arguments key state _ h
+
+@[simp] theorem InterpreterOps.bind_ofPlain?_read_eq_some {unit : Validation.ValidatedUnit}
+    {carriers : Carriers} {State : Type} (ops : InterpreterOps unit carriers State)
+    (τ : NTy) (arguments : NRow) (key : StorageKey) (state : State)
+    (c : @NTy.carrier carriers τ) :
+    (ops.read τ arguments key state).bind (@NTy.ofPlain? carriers τ) = some c ↔
+      ops.read τ arguments key state = some (@NTy.forget carriers τ c) :=
+  @NTy.bind_ofPlain?_eq_some_of_holds carriers τ _
+    (fun _ h => ops.read_holds τ arguments key state _ h) c
 
 
 section LocalComputations
@@ -3958,13 +4853,48 @@ The generic boundary transports once, here, into and out of the callee frame. -/
         handle values (closureOfGeneric_typed meanings.typeInstantiation typeArgs θ weave shape
           rows sharing below frame))
   read := fun τ arguments key memory =>
-    (memory (Skolems.resource τ arguments) key).map (Skolems.ofRuntime τ)
+    Skolems.plainAt τ arguments key memory
+  read_holds := fun τ arguments key memory _ h =>
+    Skolems.holds_plainAt τ arguments key memory h
   write := fun τ arguments key value memory =>
-    memory.set (Skolems.resource τ arguments) key (value.map (Skolems.toRuntime τ))
+    Skolems.writePlain τ arguments key value memory
   assumption := meanings.assumption
   ghost := meanings.ghost
   ghostInit := meanings.ghostInit
   atInstance := meanings.atInstance
+
+/-- `Skolems.writePlain` on a certified value's plain projection equals the raw
+`Memory.set` of its runtime transport. -/
+theorem Skolems.writePlain_some_forget [Θ : Skolems unit]
+    (τ : NTy) (arguments : NRow) (key : StorageKey)
+    (value : τ.carrier) (memory : Memory unit) :
+    Skolems.writePlain τ arguments key (some (NTy.forget τ value)) memory =
+      memory.set (Skolems.resource τ arguments) key (some (Θ.toRuntime τ value)) := by
+  rw [Skolems.writePlain_of_holds τ arguments key (some (NTy.forget τ value)) memory
+    (NTy.holds_forget τ value), NTy.slotOfHolds_some]
+  have same : NTy.ofHolds τ (NTy.forget τ value) (NTy.holds_forget τ value) = value :=
+    NTy.forget_injective τ (NTy.forget_ofDeepHolds τ (NTy.forget τ value) _)
+  rw [same, Option.map_some]
+
+/-- `Meanings.interpreterOps` reads stored values through the exact plain image
+of the raw transported cell (`Skolems.plainAt_def`). -/
+theorem Meanings.interpreterOps_read_eq
+    {executable : Validation.ExecutableUnit unit} [Θ : Skolems unit]
+    (meanings : Meanings executable) (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (memory : Memory unit) :
+    meanings.interpreterOps.read τ arguments key memory =
+      ((memory (Skolems.resource τ arguments) key).map (Θ.ofRuntime τ)).map (NTy.forget τ) :=
+  Skolems.plainAt_def τ arguments key memory
+
+/-- `Meanings.interpreterOps` writes a certified value's plain projection to the
+exact raw `Memory.set` of its runtime transport (`Skolems.writePlain_some_forget`). -/
+theorem Meanings.interpreterOps_write_some_forget
+    {executable : Validation.ExecutableUnit unit} [Θ : Skolems unit]
+    (meanings : Meanings executable) (τ : NTy) (arguments : NRow)
+    (key : StorageKey) (value : τ.carrier) (memory : Memory unit) :
+    meanings.interpreterOps.write τ arguments key (some (NTy.forget τ value)) memory =
+      memory.set (Skolems.resource τ arguments) key (some (Θ.toRuntime τ value)) :=
+  Skolems.writePlain_some_forget τ arguments key value memory
 
 /-- The outcome of a place or selection that resolves nothing: the profile's
 throw, or else undefined, which a proof must rule out by the check before it. -/
@@ -3978,76 +4908,204 @@ def mismatchOutcome {State α : Type} : Option Failure → Spec State Failure α
     (mismatchOutcome none : Spec State Failure α) = Spec.stuck := rfl
 
 /-- Fixed-extent slice operation, factored out of the recursive term evaluator. -/
-def borrowArraySliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ σ : NTy} {length : Nat}
-    (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.array σ length)) (env : HEnv Γ) :
+noncomputable def borrowArraySliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} {length : Nat} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.array σ length)) (env : HEnv Γ) :
     Spec State Failure (Flow ρ Γ (NTy.sliceRef σ).carrier) :=
   match x.get env with
   | some value => match path.get? env (NTy.forget τ value) with
     | some current =>
-        Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
-          Spec.bind (Spec.assume (∃ final : SpecArray σ.plain length,
-              NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays current final ∧
-                path.set? env final (NTy.forget τ value) = some (NTy.forget τ chosen.2))) fun _ =>
-            Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        let body :=
+          Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+            Spec.bind (Spec.assume (∃ final : SpecArray σ.plain length,
+                NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays current final ∧
+                  path.set? env final (NTy.forget τ value) = some (NTy.forget τ chosen.2))) fun _ =>
+              Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        if path.hasDeref then
+          Spec.bind (certifyingAt site .handOver (.array σ length) current) fun _ => body
+        else body
     | none => mismatchOutcome mismatch
   | none => Spec.bottom
 
+theorem borrowArraySliceAt_eq_certifying [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} {length : Nat} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.array σ length)) (env : HEnv Γ) :
+    borrowArraySliceAt (State := State) (ρ := ρ) site mismatch x path env =
+      match x.get env with
+      | some value => match path.get? env (NTy.forget τ value) with
+        | some current =>
+            Spec.bind (certifyingAt site .handOver (.array σ length) current) fun _ =>
+              Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+                Spec.bind (Spec.assume (∃ final : SpecArray σ.plain length,
+                    NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays current final ∧
+                      path.set? env final (NTy.forget τ value) = some (NTy.forget τ chosen.2))) fun _ =>
+                  Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        | none => mismatchOutcome mismatch
+      | none => Spec.bottom := by
+  simp only [borrowArraySliceAt]
+  cases x.get env with
+  | none => rfl
+  | some value =>
+      dsimp only
+      cases read : path.get? env (NTy.forget τ value) with
+      | none => rfl
+      | some current =>
+          dsimp only
+          cases open_ : path.hasDeref with
+          | true => simp only [↓reduceIte]
+          | false =>
+              simp only [Bool.false_eq_true, ↓reduceIte]
+              have holds : NTy.deepHolds (.array σ length) current :=
+                path.get?_deepHolds env open_ (NTy.forget τ value) (NTy.deepHolds_forget τ value)
+                  current read
+              have cert : certifyingAt (State := State) site .handOver (.array σ length) current =
+                  Spec.pure (NTy.ofDeepHolds (.array σ length) current holds) :=
+                certifying_eq_pure holds (fun _ => rfl)
+              rw [cert, Spec.pure_bind]
+
 /-- Fixed-extent slice operation, factored out of the recursive term evaluator. -/
-def borrowVectorSliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
-    (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.vector σ)) (env : HEnv Γ) :
+noncomputable def borrowVectorSliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.vector σ)) (env : HEnv Γ) :
     Spec State Failure (Flow ρ Γ (NTy.sliceRef σ).carrier) :=
   match x.get env with
   | some value => match path.get? env (NTy.forget τ value) with
     | some current =>
-        Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
-          Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.values.size,
-              NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays ⟨current, rfl⟩ final ∧
-                path.set? env final.vector (NTy.forget τ value) =
-                  some (NTy.forget τ chosen.2))) fun _ =>
-            Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        let body :=
+          Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+            Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.values.size,
+                NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays ⟨current, rfl⟩ final ∧
+                  path.set? env final.vector (NTy.forget τ value) =
+                    some (NTy.forget τ chosen.2))) fun _ =>
+              Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        if path.hasDeref then
+          Spec.bind (certifyingAt site .handOver (.vector σ) current) fun _ => body
+        else body
     | none => mismatchOutcome mismatch
   | none => Spec.bottom
 
+theorem borrowVectorSliceAt_eq_certifying [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.vector σ)) (env : HEnv Γ) :
+    borrowVectorSliceAt (State := State) (ρ := ρ) site mismatch x path env =
+      match x.get env with
+      | some value => match path.get? env (NTy.forget τ value) with
+        | some current =>
+            Spec.bind (certifyingAt site .handOver (.vector σ) current) fun _ =>
+              Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+                Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.values.size,
+                    NTy.forget (.sliceRef σ) chosen.1 = SpecSliceRef.ofArrays ⟨current, rfl⟩ final ∧
+                      path.set? env final.vector (NTy.forget τ value) =
+                        some (NTy.forget τ chosen.2))) fun _ =>
+                  Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        | none => mismatchOutcome mismatch
+      | none => Spec.bottom := by
+  simp only [borrowVectorSliceAt]
+  cases x.get env with
+  | none => rfl
+  | some value =>
+      dsimp only
+      cases read : path.get? env (NTy.forget τ value) with
+      | none => rfl
+      | some current =>
+          dsimp only
+          cases open_ : path.hasDeref with
+          | true => simp only [↓reduceIte]
+          | false =>
+              simp only [Bool.false_eq_true, ↓reduceIte]
+              have holds : NTy.deepHolds (.vector σ) current :=
+                path.get?_deepHolds env open_ (NTy.forget τ value) (NTy.deepHolds_forget τ value)
+                  current read
+              have cert : certifyingAt (State := State) site .handOver (.vector σ) current =
+                  Spec.pure (NTy.ofDeepHolds (.vector σ) current holds) :=
+                certifying_eq_pure holds (fun _ => rfl)
+              rw [cert, Spec.pure_bind]
+
 /-- Fixed-extent slice operation, factored out of the recursive term evaluator. -/
-def reborrowSliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
-    (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
+noncomputable def reborrowSliceAt [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
     Spec State Failure (Flow ρ Γ (NTy.sliceRef σ).carrier) :=
   match x.get env with
   | some value => match path.get? env (NTy.forget τ value) with
     | some current =>
-        Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
-          Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.extent,
-              NTy.forget (.sliceRef σ) chosen.1 =
-                  SpecSliceRef.ofArrays current.current final ∧
-                path.set? env (current.withCurrent final) (NTy.forget τ value) =
-                  some (NTy.forget τ chosen.2))) fun _ =>
-            Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        let body :=
+          Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+            Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.extent,
+                NTy.forget (.sliceRef σ) chosen.1 =
+                    SpecSliceRef.ofArrays current.current final ∧
+                  path.set? env (current.withCurrent final) (NTy.forget τ value) =
+                    some (NTy.forget τ chosen.2))) fun _ =>
+              Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        if path.hasDeref then
+          Spec.bind (certifyingAt site .handOver (.slice σ) current.currentVector) fun _ => body
+        else body
     | none => mismatchOutcome mismatch
   | none => Spec.bottom
 
+theorem reborrowSliceAt_eq_certifying [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
+    reborrowSliceAt (State := State) (ρ := ρ) site mismatch x path env =
+      match x.get env with
+      | some value => match path.get? env (NTy.forget τ value) with
+        | some current =>
+            Spec.bind (certifyingAt site .handOver (.slice σ) current.currentVector) fun _ =>
+              Spec.bind (prophecyOf (α := (NTy.sliceRef σ).carrier × τ.carrier) x path) fun chosen =>
+                Spec.bind (Spec.assume (∃ final : SpecArray σ.plain current.extent,
+                    NTy.forget (.sliceRef σ) chosen.1 =
+                        SpecSliceRef.ofArrays current.current final ∧
+                      path.set? env (current.withCurrent final) (NTy.forget τ value) =
+                        some (NTy.forget τ chosen.2))) fun _ =>
+                  Spec.pure (.value chosen.1 (x.set chosen.2 env))
+        | none => mismatchOutcome mismatch
+      | none => Spec.bottom := by
+  simp only [reborrowSliceAt]
+  cases x.get env with
+  | none => rfl
+  | some value =>
+      dsimp only
+      cases read : path.get? env (NTy.forget τ value) with
+      | none => rfl
+      | some current =>
+          dsimp only
+          cases open_ : path.hasDeref with
+          | true => simp only [↓reduceIte]
+          | false =>
+              simp only [Bool.false_eq_true, ↓reduceIte]
+              have holds : NTy.deepHolds (.slice σ) current.currentVector :=
+                (path.get?_deepHolds env open_ (NTy.forget τ value) (NTy.deepHolds_forget τ value)
+                  current read).1
+              have cert :
+                  certifyingAt (State := State) site .handOver (.slice σ) current.currentVector =
+                    Spec.pure (NTy.ofDeepHolds (.slice σ) current.currentVector holds) :=
+                certifying_eq_pure holds (fun _ => rfl)
+              rw [cert, Spec.pure_bind]
+
 /-- Fixed-extent slice operation, factored out of the recursive term evaluator. -/
-def takeSliceAtValue [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
-    (mismatch : Option Failure) (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
+noncomputable def takeSliceAtValue [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (mismatch : Option Failure) (x : Var Γ τ)
+    (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
     Spec State Failure (Flow ρ Γ (NTy.sliceRef σ).carrier) :=
   match x.get env with
   | some value => match path.getCertified? env value with
     | some reference =>
-        let settled := NTy.forget (.sliceRef σ) reference
-        Spec.bind (prophecyOf (α := τ.carrier) x path) fun cleared =>
-          Spec.bind (Spec.assume (path.set? env
-              (SpecSliceRef.ofArrays settled.final settled.final) (NTy.forget τ value) =
-                some (NTy.forget τ cleared))) fun _ =>
-            Spec.pure (.value reference (x.set cleared env))
+        let settled : (NTy.sliceRef σ).carrier :=
+          SpecSliceRef.ofArrays reference.final reference.final
+        match path.setOwner? env site settled value with
+        | some written =>
+            Spec.bind written fun cleared => Spec.pure (.value reference (x.set cleared env))
+        | none => mismatchOutcome mismatch
     | none => mismatchOutcome mismatch
   | none => Spec.bottom
 
 /-- Fixed-extent slice operation, factored out of the recursive term evaluator. -/
-def resolveSliceAtValue [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow} {τ σ : NTy}
-    (x : Var Γ τ) (path : Proj τ (.sliceRef σ)) (env : HEnv Γ) :
+noncomputable def resolveSliceAtValue [Carriers] {State : Type} {ρ : ResultShape} {Γ : NRow}
+    {τ σ : NTy} (site : Nat) (x : Var Γ τ) (path : Proj τ (.sliceRef σ))
+    (lender : SliceLender Γ σ) (env : HEnv Γ) :
     Spec State Failure (Flow ρ Γ Unit) :=
   match (x.get env).bind fun value => path.get? env (NTy.forget τ value) with
-  | some reference => Spec.bind (Spec.assume (reference.current = reference.final)) fun _ =>
-      Spec.pure (.value () env)
+  | some reference => lender.resolve site env reference
   | none => Spec.pure (.value () env)
 
 mutual
@@ -4363,11 +5421,16 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
   | _, _, .sliceCurrent value, env =>
       Flow.bind (value.denoteIn meanings env) fun value env =>
         Spec.pure (.value value.currentVector env)
-  | _, _, .borrowArraySlice mismatch x path, env => borrowArraySliceAt mismatch x path env
-  | _, _, .borrowVectorSlice mismatch x path, env => borrowVectorSliceAt mismatch x path env
-  | _, _, .reborrowSlice mismatch x path, env => reborrowSliceAt mismatch x path env
-  | _, _, .takeSliceAt mismatch x path, env => takeSliceAtValue mismatch x path env
-  | _, _, .resolveSliceAt x path, env => resolveSliceAtValue x path env
+  | _, _, .borrowArraySlice site mismatch x path, env =>
+      borrowArraySliceAt site mismatch x path env
+  | _, _, .borrowVectorSlice site mismatch x path, env =>
+      borrowVectorSliceAt site mismatch x path env
+  | _, _, .reborrowSlice site mismatch x path, env =>
+      reborrowSliceAt site mismatch x path env
+  | _, _, .takeSliceAt site mismatch x path, env =>
+      takeSliceAtValue site mismatch x path env
+  | _, _, .resolveSliceAt site x path lender, env =>
+      resolveSliceAtValue site x path lender env
   | _, _, .vectorLit count elements, env =>
       Flow.bind (elements.denoteIn meanings env) fun values env =>
         match SpecVector.ofArray? (HList.toListOf count values).toArray with
@@ -4507,7 +5570,7 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
   | _, τ, @Term.globalRead _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
         Spec.bind Spec.get fun memory =>
-          match meanings.read τ arguments (κ.storageKey k) memory with
+          match (meanings.read τ arguments (κ.storageKey k) memory).bind (NTy.ofPlain? τ) with
           | none => abortAt site (Failure.ofInts .abort #[])
           | some value => Spec.pure (.value value env)
   | _, _, @Term.globalContains _ _ _ κ τ arguments key, env =>
@@ -4522,9 +5585,9 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
           | none => abortAt site (Failure.ofInts .abort #[])
           | some value =>
               Spec.bind Spec.choose fun prophecy =>
-                Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some prophecy) memory))
+                Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some (NTy.forget τ prophecy)) memory))
                   fun _ => Spec.pure
-                    (.value (NTy.forget τ value, prophecy) env)
+                    (.value (value, prophecy) env)
   | _, _, @Term.globalPublish _ _ _ κ τ site arguments key value, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
         Flow.bind (value.denoteIn meanings env) fun v env =>
@@ -4533,20 +5596,20 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
             match meanings.read τ arguments (κ.storageKey k) memory with
             | some _ => abortAt site (Failure.ofInts .abort #[])
             | none =>
-                Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
+                Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some (NTy.forget τ v)) memory))
                   fun _ => Spec.pure (.value () env)
   | _, _, @Term.ghostStore _ _ _ κ τ site arguments key value, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
         Flow.bind (value.denoteIn meanings env) fun v env =>
         Flow.bind (anchorAt site env) fun _ env =>
           Spec.bind Spec.get fun memory =>
-            Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some v) memory))
+            Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) (some (NTy.forget τ v)) memory))
               fun _ => Spec.pure (.value () env)
   | _, τ, @Term.globalTake _ _ _ κ _ site arguments key, env =>
       Flow.bind (key.denoteIn meanings env) fun k env =>
       Flow.bind (anchorAt site env) fun _ env =>
         Spec.bind Spec.get fun memory =>
-          match meanings.read τ arguments (κ.storageKey k) memory with
+          match (meanings.read τ arguments (κ.storageKey k) memory).bind (NTy.ofPlain? τ) with
           | none => abortAt site (Failure.ofInts .abort #[])
           | some value =>
               Spec.bind (Spec.set (meanings.write τ arguments (κ.storageKey k) none memory))
@@ -5021,6 +6084,27 @@ omit [Carriers] in
 /-- The weakest precondition through a verified callee: what its theorem
 assumes and its precondition, its postcondition and frame under the
 continuation, and its failures under the permitted failures. -/
+theorem wp_call_valid {Args Result : Type} {function : Args → Spec State Failure Result}
+    {contract : Contract (State) Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    (verified : Satisfies function contract)
+    (valid : contract.validArgs args)
+    (assumed : contract.assumes args initial)
+    (permitted : contract.requires args initial)
+    (post : ∀ result final, contract.validResult result →
+      (¬contract.mayAbort args initial → contract.ensures args initial result final) →
+      contract.frame args initial result final → ¬contract.mustAbort args initial →
+      ensures result final)
+    (failing : ∀ error, contract.aborts args initial error → aborts error) :
+    wp (function args) ensures aborts initial :=
+  ⟨fun result final execution =>
+      let established := (verified args initial valid assumed permitted).1 result final execution
+      post result final established.1 established.2.1 established.2.2.1 established.2.2.2,
+    fun error execution =>
+      failing error ((verified args initial valid assumed permitted).2.1 error execution),
+    (verified args initial valid assumed permitted).2.2⟩
+
+omit [Carriers] in
 theorem wp_call {Args Result : Type} {function : Args → Spec State Failure Result}
     {contract : Contract (State) Failure Args Result} {args : Args}
     {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
@@ -5031,14 +6115,12 @@ theorem wp_call {Args Result : Type} {function : Args → Spec State Failure Res
       (¬contract.mayAbort args initial → contract.ensures args initial result final) →
       contract.frame args initial result final → ¬contract.mustAbort args initial →
       ensures result final)
-    (failing : ∀ error, contract.aborts args initial error → aborts error) :
+    (failing : ∀ error, contract.aborts args initial error → aborts error)
+    (valid : contract.validArgs args := by trivial) :
     wp (function args) ensures aborts initial :=
-  ⟨fun result final execution =>
-      let established := (verified args initial assumed permitted).1 result final execution
-      post result final established.1 established.2.1 established.2.2,
-    fun error execution =>
-      failing error ((verified args initial assumed permitted).2.1 error execution),
-    (verified args initial assumed permitted).2.2⟩
+  wp_call_valid verified valid assumed permitted
+    (fun result final _ ensured framed refuted => post result final ensured framed refuted)
+    failing
 
 /-! ## Weakest preconditions of the flow combinators
 
@@ -5431,6 +6513,14 @@ attribute [vir_denote] Flow.pure_shortCircuit_and Flow.pure_shortCircuit_or
 attribute [vir_denote] Which.project?_eq_some_iff
 attribute [vir_denote, vir_denote_norm] Which.projectCertified?_eq_some_iff
 attribute [vir_denote, vir_denote_norm] Which.projectCertified?_eq_none_iff
+attribute [vir_denote, vir_denote_norm] NTy.ofPlain?_forget NTy.ofPlain?_eq_some_iff
+  NTy.bind_ofPlain?_unit NTy.bind_ofPlain?_bool NTy.bind_ofPlain?_int NTy.bind_ofPlain?_num
+  NTy.bind_ofPlain?_address NTy.bind_ofPlain?_signer NTy.bind_ofPlain?_string
+  NTy.bind_ofPlain?_bytes NTy.bind_ofPlain?_char
+  Skolems.writePlain_allocationResource Skolems.writePlain_allocationResource_fun
+attribute [vir_denote, vir_denote_norm high]
+  Skolems.isSome_bind_ofPlain?_plainAt
+  InterpreterOps.isSome_bind_ofPlain?_read
 
 -- The denotation rewrites by its equations; unfolding remains the fallback
 -- where an equation's type indices do not match the term's at reducible
@@ -5466,12 +6556,18 @@ attribute [vir_denote] Term.denote Args.denote Arms.denote Term.denoteIn Args.de
   Proj.setOwner?_nil Proj.setOwner?_deref Proj.setOwner?_field Proj.setOwner?_index
   Proj.setOwner?_element Proj.setOwner?_arrayIndex Proj.setOwner?_sliceElement
   Proj.setOwner?_sliceIndex Proj.setOwner?_variant Proj.setOwner?_ghost
-  arbitraryIn ghostInitAt GhostInits.initialize Lender.resolve
+  arbitraryIn ghostInitAt GhostInits.initialize
   GhostInits.initialize_nil GhostInits.initialize_cons
   Lender.resolve_slot Lender.resolve_place Lender.resolve_candidate
-  Lender.resolve_referent Lender.resolve_equation
+  Lender.resolve_referent Lender.resolve_equation Lender.resolve_seq
+  SliceLender.resolve_slot SliceLender.resolve_array SliceLender.resolve_vector
+  SliceLender.resolve_slice SliceLender.resolve_candidateArray
+  SliceLender.resolve_candidateVector SliceLender.resolve_candidateSlice
+  SliceLender.resolve_referent SliceLender.resolve_equation SliceLender.resolve_seq
+  Proj.hasDeref Proj.hasDeref_nil Proj.hasDeref_deref
   certifyingAt_unit certifyingAt_bool certifyingAt_int certifyingAt_num certifyingAt_address
-  certifyingAt_signer certifyingAt_string certifyingAt_bytes certifyingAt_function
+  certifyingAt_signer certifyingAt_string certifyingAt_bytes certifyingAt_char
+  certifyingAt_function
   borrowArraySliceAt borrowVectorSliceAt reborrowSliceAt takeSliceAtValue resolveSliceAtValue
   Choices.update?_nil Choices.update?_cons PlaceIndex.resolve?_literal
   PlaceIndex.resolve?_slot PlaceIndex.resolve?_fromEnd HEnv.slotInt?_int_zero HEnv.slotInt?_succ
@@ -5499,6 +6595,15 @@ attribute [vir_denote_norm] Which.inject_here Which.inject_there Which.project?_
   Which.project?_here_inr Which.project?_there_inl Which.project?_there_inr variantPlainName_inl
   variantPlainName_inr Choices.select?_nil Choices.select?_cons Var.select_here Var.select_there
   Var.selectPlain_here Var.selectPlain_there namedIn_nil namedIn_cons
+attribute [vir_denote high, vir_denote_norm high]
+  Lender.resolve_place_deref Lender.resolve_candidate_deref
+  Lender.resolve_candidate_unit Lender.resolve_candidate_bool Lender.resolve_candidate_int
+  Lender.resolve_candidate_num Lender.resolve_candidate_address Lender.resolve_candidate_signer
+  Lender.resolve_candidate_string Lender.resolve_candidate_bytes Lender.resolve_candidate_char
+  Lender.resolve_candidate_function
+  SliceLender.resolve_array_deref SliceLender.resolve_vector_deref SliceLender.resolve_slice_deref
+  SliceLender.resolve_candidateArray_deref SliceLender.resolve_candidateVector_deref
+  SliceLender.resolve_candidateSlice_deref
 attribute [vir_denote_norm high] Choices.select?_single
 attribute [vir_denote_norm high] Choices.selectCertified?_single_unit
   Choices.selectCertified?_single_bool Choices.selectCertified?_single_int
@@ -5647,11 +6752,11 @@ partial def Term.describe {ρ : ResultShape} : {Γ : NRow} → {τ : NTy} → Te
   | _, _, .sliceCurrent value => s!"slice current {value.describe}"
   | _, _, .sliceVector value => s!"slice contents {value.describe}"
   | _, _, .vectorSlice value => s!"shared slice {value.describe}"
-  | _, _, .borrowArraySlice _ x _ => s!"&mut array slice local{x.index}.path"
-  | _, _, .borrowVectorSlice _ x _ => s!"&mut vector slice local{x.index}.path"
-  | _, _, .reborrowSlice _ x _ => s!"&mut slice local{x.index}.path"
-  | _, _, .takeSliceAt _ x _ => s!"move slice local{x.index}.path"
-  | _, _, .resolveSliceAt x _ => s!"resolve slice local{x.index}.path"
+  | _, _, .borrowArraySlice _ _ x _ => s!"&mut array slice local{x.index}.path"
+  | _, _, .borrowVectorSlice _ _ x _ => s!"&mut vector slice local{x.index}.path"
+  | _, _, .reborrowSlice _ _ x _ => s!"&mut slice local{x.index}.path"
+  | _, _, .takeSliceAt _ _ x _ => s!"move slice local{x.index}.path"
+  | _, _, .resolveSliceAt _ x _ _ => s!"resolve slice local{x.index}.path"
   | _, _, .take x => s!"move local{x.index}"
   | _, _, .resolve _ x _ => s!"resolve local{x.index}"
   | _, _, .resolveAt _ x _ _ => s!"resolve local{x.index}.path"

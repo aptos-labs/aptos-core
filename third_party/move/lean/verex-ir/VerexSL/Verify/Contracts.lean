@@ -208,7 +208,7 @@ def quoteProj : {τ σ : NTy} → Proj τ σ → MetaM Lean.Expr
 
 /-- Where a reference's prophecy is held while it is lent: a local slot, or
 the component of a local a path reaches (`Lender`). -/
-def quoteLender {Γ : NRow} {σ : NTy} : Lender Γ σ → MetaM Lean.Expr
+partial def quoteLender {Γ : NRow} {σ : NTy} : Lender Γ σ → MetaM Lean.Expr
   | .slot => return mkApp2 (mkConst ``Lender.slot) (← quoteRow Γ) (← quoteNTy σ)
   | @Lender.place _ _ τ owner path =>
       return mkAppN (mkConst ``Lender.place)
@@ -218,6 +218,40 @@ def quoteLender {Γ : NRow} {σ : NTy} : Lender Γ σ → MetaM Lean.Expr
         #[← quoteRow Γ, ← quoteNTy σ, ← quoteNTy τ, ← quoteVar owner, ← quoteProj path]
   | .referent => return mkApp2 (mkConst ``Lender.referent) (← quoteRow Γ) (← quoteNTy σ)
   | .equation => return mkApp2 (mkConst ``Lender.equation) (← quoteRow Γ) (← quoteNTy σ)
+  | .seq first second =>
+      return mkAppN (mkConst ``Lender.seq)
+        #[← quoteRow Γ, ← quoteNTy σ, ← quoteLender first, ← quoteLender second]
+
+partial def quoteSliceLender {Γ : NRow} {σ : NTy} (context σExpr : Lean.Expr) :
+    SliceLender Γ σ → MetaM Lean.Expr
+  | .slot => return mkApp2 (mkConst ``SliceLender.slot) context σExpr
+  | @SliceLender.array _ _ ownerTy length owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.array)
+        #[context, σExpr, ← quoteNTy ownerTy, Lean.toExpr length,
+          ← quoteVar owner, ← quoteProj ownerPath]
+  | @SliceLender.vector _ _ ownerTy owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.vector)
+        #[context, σExpr, ← quoteNTy ownerTy, ← quoteVar owner, ← quoteProj ownerPath]
+  | @SliceLender.slice _ _ ownerTy owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.slice)
+        #[context, σExpr, ← quoteNTy ownerTy, ← quoteVar owner, ← quoteProj ownerPath]
+  | @SliceLender.candidateArray _ _ ownerTy length owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.candidateArray)
+        #[context, σExpr, ← quoteNTy ownerTy, Lean.toExpr length,
+          ← quoteVar owner, ← quoteProj ownerPath]
+  | @SliceLender.candidateVector _ _ ownerTy owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.candidateVector)
+        #[context, σExpr, ← quoteNTy ownerTy, ← quoteVar owner, ← quoteProj ownerPath]
+  | @SliceLender.candidateSlice _ _ ownerTy owner ownerPath =>
+      return mkAppN (mkConst ``SliceLender.candidateSlice)
+        #[context, σExpr, ← quoteNTy ownerTy, ← quoteVar owner, ← quoteProj ownerPath]
+  | .referent => return mkApp2 (mkConst ``SliceLender.referent) context σExpr
+  | .equation => return mkApp2 (mkConst ``SliceLender.equation) context σExpr
+  | .seq first second =>
+      return mkAppN (mkConst ``SliceLender.seq)
+        #[context, σExpr,
+          ← quoteSliceLender context σExpr first,
+          ← quoteSliceLender context σExpr second]
 
 /-- The ghost slots a pack initializes, each by its site and the slot of
 the packed row it fills (`GhostInits`). -/
@@ -590,9 +624,7 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | .ref τ, @Term.returned _ _ _ _ site reference =>
       return mkAppN (mkConst ``Term.returned) #[unitExpr, shape, context, ← toExpr τ,
         Lean.toExpr site, ← quoteTerm unitExpr reference]
-  -- `resolveAt` carries its site and lender as `resolve` does; a slice
-  -- reference's death certifies nothing (`NTy.carrier`, `.sliceRef`), so
-  -- `resolveSliceAt` stays without one.
+  -- `resolveAt` and `resolveSliceAt` carry their site and lender as `resolve` does.
   | .unit, @Term.resolveAt _ _ _ τ σ site x path lender =>
       return mkAppN (mkConst ``Term.resolveAt) #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
         Lean.toExpr site, ← quoteVar x, ← quoteProj path, ← quoteLender lender]
@@ -605,25 +637,28 @@ partial def quoteTerm {unit : ValidatedUnit} (unitExpr : Lean.Expr) {ρ : Result
   | .slice τ, .sliceCurrent value =>
       return mkAppN (mkConst ``Term.sliceCurrent)
         #[unitExpr, shape, context, ← toExpr τ, ← quoteTerm unitExpr value]
-  | .sliceRef σ, @Term.borrowArraySlice _ _ _ τ _ length mismatch x path =>
+  | .sliceRef σ, @Term.borrowArraySlice _ _ _ τ _ length site mismatch x path =>
       return mkAppN (mkConst ``Term.borrowArraySlice)
         #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ, Lean.toExpr length,
-          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
-  | .sliceRef σ, @Term.borrowVectorSlice _ _ _ τ _ mismatch x path =>
+          Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.borrowVectorSlice _ _ _ τ _ site mismatch x path =>
       return mkAppN (mkConst ``Term.borrowVectorSlice)
         #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
-          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
-  | .sliceRef σ, @Term.reborrowSlice _ _ _ τ _ mismatch x path =>
+          Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.reborrowSlice _ _ _ τ _ site mismatch x path =>
       return mkAppN (mkConst ``Term.reborrowSlice)
         #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
-          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
-  | .sliceRef σ, @Term.takeSliceAt _ _ _ τ _ mismatch x path =>
+          Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .sliceRef σ, @Term.takeSliceAt _ _ _ τ _ site mismatch x path =>
       return mkAppN (mkConst ``Term.takeSliceAt)
         #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ,
-          Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
-  | .unit, @Term.resolveSliceAt _ _ _ τ σ x path =>
+          Lean.toExpr site, Lean.toExpr mismatch, ← quoteVar x, ← quoteProj path]
+  | .unit, @Term.resolveSliceAt _ _ _ τ σ site x path lender => do
+      let σExpr ← quoteNTy σ
+      let lenderExpr ← quoteSliceLender context σExpr lender
       return mkAppN (mkConst ``Term.resolveSliceAt)
-        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ, ← quoteVar x, ← quoteProj path]
+        #[unitExpr, shape, context, ← toExpr τ, ← toExpr σ, Lean.toExpr site,
+          ← quoteVar x, ← quoteProj path, lenderExpr]
   | .vector τ, .vectorLit count elements =>
       return mkAppN (mkConst ``Term.vectorLit) #[unitExpr, shape, context, ← toExpr τ, Lean.toExpr count,
         ← quoteArgs unitExpr elements]
@@ -942,7 +977,8 @@ def _root_.VerexIR.Proofs.Denote.Term.rowCalls {unit : ValidatedUnit} {ρ : Resu
     {τ : NTy} (atRow : FunctionHandle → TypeArgs → Bool) (term : Term unit ρ Γ τ)
     (found : Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs)) :
     Array (FunctionHandle × Array VerexIR.GenericArgument × TypeArgs) :=
-  term.foldNodes (fun handle typeArgs θ found => match θ with
+  term.foldNodes
+    (fun handle typeArgs θ found => match θ with
       | some θ =>
           if atRow handle θ &&
               !found.any (fun other => other.1 == handle && other.2.2.1 == θ.1) then
@@ -1881,7 +1917,8 @@ private def contractConditions : Array Name :=
   #[``VerexIR.Proofs.Contract.requires, ``VerexIR.Proofs.Contract.assumes,
     ``VerexIR.Proofs.Contract.ensures, ``VerexIR.Proofs.Contract.aborts,
     ``VerexIR.Proofs.Contract.mayAbort, ``VerexIR.Proofs.Contract.mustAbort,
-    ``VerexIR.Proofs.Contract.frame]
+    ``VerexIR.Proofs.Contract.frame, ``VerexIR.Proofs.Contract.validArgs,
+    ``VerexIR.Proofs.Contract.validResult]
 
 /-- The contract `generic`, specialized at type arguments `θ` of a
 caller's frame (`doc/designs/native-verification.md`, "Specialized
@@ -2976,7 +3013,8 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
     (params : NRow) (row : NRow) (types : Option Lean.Expr)
     (storedInvariant : Option Lean.Expr) (restated : NTy → Bool)
     (interpretation : Option Contract.TranslationFrame := none)
-    (atArguments : Option NRow := none) :
+    (atArguments : Option NRow := none)
+    (carried : Array VerexIR.StructHandle := #[]) :
     TermElabM (Array (Nat × Lean.Expr × Bool)) := do
   let .structured root := declaration.body | return #[]
   -- The body's site space: the namespace's, or the one its reading at type
@@ -3090,12 +3128,12 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
         let dataInvariantSlots := changed.filterMap fun (slot, _) =>
           if header.any (·.index == slot) &&
               (localTypes[slot]?.any (Contract.hasDataInvariant unit ·) ||
-                row[slot]?.any (fun τ => match τ with
-                  | .ref referent => !referent.certificateFree
-                  | _ => false)) then
+                row[slot]?.any Contract.hasLentCertificate) then
             match row[slot]? with
             | some (.sliceRef element) =>
-                if restated (.vector element) then some (slot, .vector element) else none
+                if restated (.vector element) || Contract.hasLentCertificate (.vector element) then
+                  some (slot, .vector element)
+                else none
             | some (.ref referent) =>
                 -- The current of a loan straddling the loop is the one value
                 -- whose type does not carry its invariant while lent: the
@@ -3104,7 +3142,8 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
                 -- iteration's own cuts.
                 if restated referent || !referent.certificateFree then some (slot, referent)
                 else none
-            | some τ => if restated τ then some (slot, τ) else none
+            | some τ =>
+                if restated τ || Contract.hasLentCertificate τ then some (slot, τ) else none
             | none => none
           else none
         let referenced := block.conditions.foldl (fun found condition =>
@@ -3183,11 +3222,17 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
                       | some entryBinder => logicalFinal τ entryBinder
                       | none => pure none
                   else pure none)
+            let mut slotValues : Array (Option Lean.Expr) := #[]
+            for ((τ, binder), index) in (row.toArray.zip binders).zipIdx do
+              slotValues := slotValues.push (← match τ, binder with
+                | .ref _, some binder => some <$> mkAppM ``Prod.fst #[binder]
+                | _, _ => pure (locals[index]?.join))
             translateLoopInvariants unit namespaceId ns block locals localTypes types
               (declaration.locals.map (·.name)) oldLocals startState
               dataInvariantSlots entryLocals (some initial) (some state) executable
               (finalLocals := finalLocals) (oldFinalLocals := oldFinalLocals)
               (interpretation := interpretation) (atArguments := atArguments)
+              (carried := carried) (slotValues := slotValues)
         let authored ← authoredOver 0 #[] #[]
         -- The store the body leaves alone keeps its entry value; one it
         -- changes keeps the data invariants of its stored resources, where

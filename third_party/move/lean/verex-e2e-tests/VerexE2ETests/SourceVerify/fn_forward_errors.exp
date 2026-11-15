@@ -20,7 +20,7 @@ VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:34:6: error: verex verifi
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:38:3: error: `no panic when aborts at op 1` is not established: the operation `value + x` at VerexE2ETests/SourceVerify/fn_forward_errors.rs:28:38 may panic
-  from: (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds self_value; VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit; ¬(0 ≤ self_value.val + x.val ∧ self_value.val + x.val ≤ 18446744073709551615)
+  from: (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 2 } VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)).deepHolds (self_value, PUnit.unit); ¬(0 ≤ self_value.val + x.val ∧ self_value.val + x.val ≤ 18446744073709551615)
 VerexE2ETests/SourceVerify/fn_forward_errors.spec.lean:38:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call` failed; provide a proof in the module:
   verify «panicking::{closure#0}»::call by lean =>
     verex_obligations

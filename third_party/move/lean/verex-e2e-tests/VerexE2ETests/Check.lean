@@ -8,6 +8,7 @@ import VerexIR.TestInfra
 -- hands those processes; without it every check fails to import on a clean
 -- checkout, where no earlier build left one behind.
 import VerexE2ETests.CheckSupport
+import VerexE2ETests.Workers
 
 /-!
 # VerexSL checks
@@ -23,7 +24,8 @@ expectation.  `UB=1` writes or removes the file, as compiler-v2's baseline
 tests do.
 
 Each check runs under a heartbeat cap, so a proof that silently falls
-back to search surfaces as a diff instead of a slow suite.
+back to search surfaces as a diff instead of a slow suite, and under the
+pool's timeout, so one that stops making progress costs its own process.
 -/
 
 namespace VerexE2ETests.Check
@@ -43,57 +45,64 @@ private def heartbeatCap : Nat := 180000
 
 /-- Elaborate one check in its own process, invoked on the package-relative
 path so the paths in its messages are stable across machines. A module's
-targets are proved `jobs` at a time in it: the processes share the threads. -/
-private def elaborate (source : System.FilePath) (jobs : Nat) : IO String := do
-  let output ← IO.Process.output {
+targets are proved `jobs` at a time in it: the processes share the threads.
+`lake` and the `lean` it starts are killed together at the expiry of
+`timeout`. -/
+private def elaborate (source : System.FilePath) (jobs timeout : Nat) : IO Workers.Run :=
+  Workers.runUnderTimeout timeout {
     cmd := "lake"
     args := #["env", "lean", s!"-DmaxHeartbeats={heartbeatCap}",
       s!"-Dweak.verex.verifyHeartbeats={heartbeatCap}", s!"-Dverex.jobs={jobs}",
       source.toString] }
-  pure (output.stdout ++ output.stderr)
 
-/-- The number of checks elaborated at once: `VEREX_E2E_JOBS`, or half the
-hardware threads, since each check is a whole Lean process of its own. -/
-private def jobs : IO Nat := do
-  if let some value ← IO.getEnv "VEREX_E2E_JOBS" then
-    match value.toNat? with
-    | some count => if count > 0 then return count
-    | none => pure ()
-    throw <| IO.userError s!"VEREX_E2E_JOBS must be a positive number, not `{value}`"
-  return max 1 ((System.Platform.Internal.getHardwareConcurrency ()).toNat / 2)
+/-- The standing record of the checks known to differ from their baselines,
+their file stems comma-separated on one line, so that
+`VEREX_E2E_FILTER=$(cat .lake/check-failed)` reruns them. A run removes the
+checks that matched and adds the ones that differed; the checks it did not run
+stay. -/
+private def failedFile : System.FilePath :=
+  ".lake/check-failed"
 
 /-- Elaborate every check, `workers` at a time, from one queue that starts the
-largest sources first, so that the longest checks do not end the run alone.
-The outputs come back in the order of `sources`. -/
-private def elaborateAll (sources : Array System.FilePath) (workers : Nat) :
-    IO (Array String) := do
+checks of `recorded` and then the largest sources, so that what is known to
+differ is reported early and the longest checks do not end the run alone.
+The runs come back in the order of `sources`. -/
+private def elaborateAll (sources : Array System.FilePath) (workers : Nat)
+    (recorded : Array String) : IO (Array Workers.Run) := do
   let sizes ← sources.mapM fun source => return (← source.metadata).byteSize
-  let order := (Array.range sources.size).qsort fun a b => sizes[a]! > sizes[b]!
-  let next ← IO.mkRef 0
-  let workers := max 1 (min workers sources.size)
-  let threads := max 1 ((System.Platform.Internal.getHardwareConcurrency ()).toNat / 2)
-  let jobs := max 1 (threads / workers)
-  let tasks ← (List.range workers).toArray.mapM fun _ =>
-    IO.asTask (prio := .dedicated) do
-      let mut done : Array (Nat × String) := #[]
-      repeat
-        let position ← next.modifyGet fun position => (position, position + 1)
-        let some index := order[position]? | break
-        done := done.push (index, ← elaborate sources[index]! jobs)
-      return done
-  let mut outputs := Array.replicate sources.size ""
-  for task in tasks do
-    match ← IO.wait task with
-    | .ok done => for (index, output) in done do outputs := outputs.set! index output
-    | .error error => throw error
-  return outputs
+  let isRecorded (index : Nat) : Bool := recorded.contains (sources[index]!.fileStem.getD "")
+  let order := (Array.range sources.size).qsort fun a b =>
+    if isRecorded a != isRecorded b then isRecorded a else sizes[a]! > sizes[b]!
+  let jobs := Workers.targetJobs (min workers sources.size)
+  let timeout ← Workers.timeoutSeconds
+  Workers.runQueue sources.size workers order fun index =>
+    elaborate sources[index]! jobs timeout
 
 def testBaselines : IO Unit := do
   let sources ← Baseline.sourceFilesRecursive checkDir ".lean"
   unless !sources.isEmpty do
     throw <| IO.userError s!"no checks found under {checkDir}"
-  let outputs ← elaborateAll sources (← jobs)
-  for source in sources, output in outputs do
-    Baseline.checkOutput (source.withExtension "exp") output
+  let recorded ← Workers.readFailures failedFile
+  let runs ← elaborateAll sources (← Workers.workerCount) recorded
+  -- Every differing check is reported: one run of the suite names them all.
+  let mut mismatches : Array String := #[]
+  let mut failed : Array String := #[]
+  for source in sources, run in runs do
+    match run with
+    | .timedOut seconds =>
+        -- A check that was killed produced no output to compare, so its
+        -- baseline is left as it is, `UB=1` or not, and the run fails.
+        mismatches := mismatches.push s!"{source} timed out after {seconds} s"
+        failed := failed.push (source.fileStem.getD "")
+    | .ended _ output =>
+        if let .error error ←
+            (Baseline.checkOutput (source.withExtension "exp") output).toBaseIO then
+          mismatches := mismatches.push (toString error)
+          failed := failed.push (source.fileStem.getD "")
+  Workers.writeFailures failedFile recorded (sources.map (·.fileStem.getD "")) failed
+  unless mismatches.isEmpty do
+    throw <| IO.userError <|
+      s!"{mismatches.size} of {sources.size} checks did not pass:\n"
+        ++ "\n".intercalate mismatches.toList
 
 end VerexE2ETests.Check

@@ -17,6 +17,19 @@ cb_settle :
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
       { parameters := [false, false, false], results := [false] }
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+cb_property✝ :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 1 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons
+          (VerexIR.Proofs.Denote.NTy.function
+            (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+              (VerexIR.Proofs.Denote.NRow.cons
+                0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
+                (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+                  VerexIR.Proofs.Denote.NRow.nil)))
+            { parameters := [false, false, false], results := [false] }
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil))
+          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
+    (cb_settle, PUnit.unit)
 taker_account :
   VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain VerexIR.Proofs.Denote.NTy.address
 taker_client_id_vec :
@@ -24,6 +37,15 @@ taker_client_id_vec :
     0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector
 taker_price :
   VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+taker_property✝ :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons
+            (0x42.behavioral_spliced_congruence.unit.nominal.namespace.2.declaration✝⁻⁰
+              0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)))).deepHolds
+    (taker_account, (taker_client_id_vec, PUnit.unit), taker_price, PUnit.unit)
 maker_account :
   VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain VerexIR.Proofs.Denote.NTy.address
 maker_client_id_vec :
@@ -31,6 +53,15 @@ maker_client_id_vec :
     0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector
 maker_price :
   VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+maker_property✝ :
+  (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } VerexIR.Proofs.Denote.NRow.nil
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons
+            (0x42.behavioral_spliced_congruence.unit.nominal.namespace.2.declaration✝⁻⁰
+              0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+              VerexIR.Proofs.Denote.NRow.nil)))).deepHolds
+    (maker_account, (maker_client_id_vec, PUnit.unit), maker_price, PUnit.unit)
 size : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed : True
@@ -41,27 +72,10 @@ permitted :
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
     { parameters := [false, false, false], results := [false] }
     (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
-left✝¹⁶ left✝¹⁴ left✝¹² : True
-left✝¹¹ :
-  (VerexIR.Proofs.Denote.NTy.function
-        (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
-          (VerexIR.Proofs.Denote.NRow.cons 0x42.behavioral_spliced_congruence.unit.nominal.namespace.0.declaration✝⁻⁰
-            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
-        { parameters := [false, false, false], results := [false] }
-        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
-          VerexIR.Proofs.Denote.NRow.nil)).deepHolds
-    cb_settle
-right✝⁵ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
-left✝¹⁰ : VerexIR.Proofs.Denote.NTy.address.deepHolds taker_account
-left✝⁹ : VerexIR.Proofs.Denote.NTy.address.deepHolds maker_account
-left✝⁶ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds taker_price
-right✝⁴ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
-left✝³ : (VerexIR.Proofs.Denote.NTy.int 64 false).deepHolds maker_price
-right✝³ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
-left✝² : 0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds taker_client_id_vec
-right✝² : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
-left✝¹ : 0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.deepHolds maker_client_id_vec
-right✝¹ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil PUnit.unit
+verexInvariant✝² :
+  0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.Holds taker_client_id_vec
+verexInvariant✝¹ :
+  0x42.behavioral_spliced_congruence.unit.nominal.namespace.1.declaration✝⁻⁰.vector.Holds maker_client_id_vec
 verexInvariant✝ : ↑taker_client_id_vec.values.size ≤ 1
 verexInvariant : ↑maker_client_id_vec.values.size ≤ 1
 bounds✝ : taker_client_id_vec.values.size < 18446744073709551616
@@ -101,8 +115,8 @@ right✝ :
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
       { parameters := [false, false, false], results := [false] }
       (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) cb_settle
-      (⟨(taker_account, (taker_client_id_vec, ()), taker_price, ()), ⋯⟩,
-        ⟨(maker_account, (maker_client_id_vec, ()), maker_price, ()), ⋯⟩, size, ()))
+      (⟨(taker_account, (taker_client_id_vec, ()), taker_price, ()), taker_property✝⟩,
+        ⟨(maker_account, (maker_client_id_vec, ()), maker_price, ()), maker_property✝⟩, size, ()))
     (fun result final =>
       (¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
               (VerexIR.Proofs.Denote.NRow.cons

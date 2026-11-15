@@ -58,6 +58,12 @@ private structure Message where
   isError : Bool
   text : String
 
+/-- The heartbeat budget (`1,000,000` `maxHeartbeats`, written in thousands as in
+`pragma heartbeats`) under which the benchmark's reference figures were
+measured, kept independent of `verex.verifyHeartbeats`'s default; a target's own
+`pragma heartbeats` still overrides it. -/
+private def benchmarkHeartbeats : Nat := 1000
+
 /-- Elaborate a Lean file with the imports of its header, as `lean` does,
 but natively. -/
 private unsafe def elaborateFile (path : System.FilePath) : IO (Array Message) := do
@@ -72,7 +78,8 @@ private unsafe def elaborateFile (path : System.FilePath) : IO (Array Message) :
   -- Verified as on the command line: unset, `verex.skip_verify` means the
   -- language server.
   let options ← VerexSL.SourceVerify.environmentOptions
-    (({} : Options).setBool `verex.skip_verify false)
+    (verex.verifyHeartbeats.set (({} : Options).setBool `verex.skip_verify false)
+      (benchmarkHeartbeats * 1000))
   let state ← Elab.IO.processCommands inputCtx parserState
     (Elab.Command.mkState environment messages options)
   state.commandState.messages.toList.toArray.filterMapM fun message => do
@@ -90,10 +97,18 @@ private def verifySource (request : Request) : IO (Array Message) := do
       | "move" => do
           if request.modules.isEmpty then throw <| IO.userError "a move problem names --modules"
           VerexMove.SourceVerify.verifySource environment request.source output
+            (heartbeats := some benchmarkHeartbeats)
             (modules := request.modules) (dev := request.dev)
-      | _ =>
-          VerexIR.Rust.SourceVerify.verifyFile environment request.source request.specFile
-            output
+      | _ => do
+          let (unit, companions) ← Perf.withPhase .frontend do
+            let unit ← IO.FS.withTempDir fun exportDir =>
+              return (← VerexIR.Rust.Driver.importRustFile {
+                source := request.source, output := exportDir / "unit.raw.json" }).unit
+            let specs ← VerexIR.Rust.SourceVerify.specsFor unit request.source request.specFile
+            pure (unit, specs ++
+              (← VerexIR.Rust.SourceVerify.libraryCompanions unit (specs.filterMap (·.text))))
+          VerexSL.SourceVerify.run environment
+            { unit, companions, output, heartbeats := some benchmarkHeartbeats }
     return reports.map fun report =>
       { isError := report.severity == .error, text := report.render }
 

@@ -154,7 +154,11 @@ than the proof. Results mark failed targets, and the suite totals are
 summed over the problems that verify completely, with the others counted
 beside them.
 
-Runs use the verifier's default options. The profiler is never on: its
+`verex-bench` runs targets under a `1,000,000` `maxHeartbeats` budget
+(`pragma heartbeats = 1000`, the budget under which the reference figures
+were measured, independent of `verex.verifyHeartbeats`'s `250,000` default;
+a target's `pragma heartbeats` overrides it), and otherwise uses the
+verifier's default options. The profiler is never on: its
 own counting inflates heartbeats and adds time. Before the first problem,
 the driver loads the environment once untimed (`verex-bench warmup`), so
 the first problem does not pay for a cold file cache.

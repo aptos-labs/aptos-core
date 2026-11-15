@@ -332,14 +332,18 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
     (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
       (@ResultShape.carrier (Carriers.runtime unit) shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
-      Satisfies (propheticRun executable typeInstantiation handle σs shape) contract) :
+      Satisfies (propheticRun executable typeInstantiation handle σs shape) contract)
+    (validArgs : letI : Skolems unit := Skolems.runtime unit
+      ∀ args, HListPlain.Holds σs (HList.forget σs args) → contract.validArgs args := by
+        intros; trivial) :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
       (contract.prophetic unit σs shape) := by
   letI : Skolems unit := Skolems.runtime unit
-  intro arguments initial assumed permitted
+  intro arguments initial _ assumed permitted
   obtain ⟨⟨loans, args, admissible, lent⟩, ⟨memory, encoded⟩, required⟩ := permitted
-  have established := verified args memory (assumed memory encoded loans args lent)
+  have established := verified args memory (validArgs args (HList.holds_forget σs args))
+    (assumed memory encoded loans args lent)
     (required memory encoded loans args lent)
   refine ⟨?_, ?_, fun obligation => obligation⟩
   · intro results final execution
@@ -364,10 +368,11 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
           memory' :=
       ⟨initial, loans, arguments, results, final, correspondence, encoded, admissible,
         lentResolved, execution, boundary, encodedCorrespondence, agree⟩
-    obtain ⟨ensured, framed, notMust⟩ :=
-      (verified resolved memory (assumed memory encoded loans resolved lentResolved)
+    obtain ⟨_, ensured, framed, notMust⟩ :=
+      (verified resolved memory (validArgs resolved (HList.holds_forget σs resolved))
+        (assumed memory encoded loans resolved lentResolved)
         (required memory encoded loans resolved lentResolved)).1 result _ outcome
-    refine ⟨fun notMay => ?_,
+    refine ⟨trivial, fun notMay => ?_,
       ⟨memory, memory', loans, resolved, result, correspondence, encoded, encodedCorrespondence,
         lentResolved, boundary, framed⟩,
       fun must => notMust (must memory encoded loans resolved lentResolved)⟩
@@ -377,6 +382,33 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
     obtain ⟨failure, rfl⟩ := integral handle typeInstantiation initial arguments error failed
     exact ⟨memory, loans, args, failure, encoded, lent, rfl,
       established.2.1 failure ⟨initial, loans, arguments, encoded, admissible, lent, failed⟩⟩
+
+/-- Discharge `contract.validArgs` automatically when it reduces to `fun _ => True`. -/
+class TrivialValidArgs {α : Type} (validArgs : α → Prop) : Prop where
+  holds : ∀ args, validArgs args
+
+instance {α : Type} : TrivialValidArgs (fun _ : α => True) :=
+  ⟨fun _ => True.intro⟩
+
+theorem satisfies_prophetic_valid {unit : ValidatedUnit} [FunctionCarriers unit]
+    [@CarriersNonempty (Carriers.runtime unit)]
+    (executable : ExecutableUnit unit)
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
+    (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
+    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
+      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (verified : letI : Skolems unit := Skolems.runtime unit
+      Satisfies (propheticMeaning executable #[] handle σs shape) contract)
+    (validArgs : ∀ args, contract.validArgs args) :
+    letI : Skolems unit := Skolems.runtime unit
+    SatisfiesFunction executable handle (contract.prophetic unit σs shape) := by
+  letI : Skolems unit := Skolems.runtime unit
+  refine satisfies_run_at executable preserved integral handle #[] σs shape contract ?_
+    (validArgs := fun args _ => validArgs args)
+  have meaning : propheticMeaning executable #[] handle σs shape =
+      propheticRun executable #[] handle σs shape :=
+    funext (propheticMeaning_of_coherent (coherent_runtime unit handle) σs shape)
+  rwa [meaning] at verified
 
 /-- A contract satisfied by the prophetic meaning at the runtime frame and
 the empty instantiation holds of the big-step meaning in its runtime form,
@@ -388,15 +420,43 @@ theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit] [@Car
     (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
       (@ResultShape.carrier (Carriers.runtime unit) shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
-      Satisfies (propheticMeaning executable #[] handle σs shape) contract) :
+      Satisfies (propheticMeaning executable #[] handle σs shape) contract)
+    [validArgs : TrivialValidArgs contract.validArgs] :
     letI : Skolems unit := Skolems.runtime unit
-    SatisfiesFunction executable handle (contract.prophetic unit σs shape) := by
+    SatisfiesFunction executable handle (contract.prophetic unit σs shape) :=
+  satisfies_prophetic_valid executable preserved integral handle σs shape contract verified
+    validArgs.holds
+
+theorem satisfies_generic_at_valid {unit : ValidatedUnit} [FunctionCarriers unit]
+    [@CarriersNonempty (Carriers.runtime unit)]
+    (executable : ExecutableUnit unit)
+    (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
+    (handle : FunctionHandle) (θ : TypeArgs)
+    (free : θ.1.refFree = true) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
+    (shape : ResultShape)
+    (contract : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      Contract (Memory unit) Failure (HList σs) shape.carrier)
+    (coherent : @Coherent unit _ (Skolems.instantiate θ (Skolems.runtime unit)) handle
+      typeInstantiation)
+    (verified : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract)
+    (validArgs : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      ∀ args, contract.validArgs args) :
+    letI : Skolems unit := Skolems.runtime unit
+    SatisfiesFunctionAt executable handle typeInstantiation
+      ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) := by
   letI : Skolems unit := Skolems.runtime unit
-  refine satisfies_run_at executable preserved integral handle #[] σs shape contract ?_
-  have meaning : propheticMeaning executable #[] handle σs shape =
-      propheticRun executable #[] handle σs shape :=
-    funext (propheticMeaning_of_coherent (coherent_runtime unit handle) σs shape)
-  rwa [meaning] at verified
+  refine satisfies_run_at executable preserved integral handle typeInstantiation _ _ _ ?_
+    (validArgs := fun args _ => validArgs (HList.toSkolem θ σs args))
+  have meaning : @propheticMeaning _ _ executable (Skolems.instantiate θ (Skolems.runtime unit))
+        typeInstantiation handle σs shape =
+      @propheticRun _ _ executable (Skolems.instantiate θ (Skolems.runtime unit)) typeInstantiation
+        handle σs shape :=
+    funext (@propheticMeaning_of_coherent _ _ _ (Skolems.instantiate θ (Skolems.runtime unit)) _ _
+      coherent σs shape)
+  rw [meaning] at verified
+  exact satisfies_run_ofSkolem executable θ free typeInstantiation handle σs shape contract
+    verified
 
 /-- A generic function's contract, satisfied by its prophetic meaning at the
 frame type arguments induce over the runtime family, holds, read at the
@@ -413,21 +473,14 @@ theorem satisfies_generic_at {unit : ValidatedUnit} [FunctionCarriers unit] [@Ca
     (coherent : @Coherent unit _ (Skolems.instantiate θ (Skolems.runtime unit)) handle
       typeInstantiation)
     (verified : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
-      Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract) :
+      Satisfies (propheticMeaning executable typeInstantiation handle σs shape) contract)
+    [validArgs : letI : Skolems unit := Skolems.instantiate θ (Skolems.runtime unit)
+      TrivialValidArgs contract.validArgs] :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
-      ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) := by
-  letI : Skolems unit := Skolems.runtime unit
-  refine satisfies_run_at executable preserved integral handle typeInstantiation _ _ _ ?_
-  have meaning : @propheticMeaning _ _ executable (Skolems.instantiate θ (Skolems.runtime unit))
-        typeInstantiation handle σs shape =
-      @propheticRun _ _ executable (Skolems.instantiate θ (Skolems.runtime unit)) typeInstantiation
-        handle σs shape :=
-    funext (@propheticMeaning_of_coherent _ _ _ (Skolems.instantiate θ (Skolems.runtime unit)) _ _
-      coherent σs shape)
-  rw [meaning] at verified
-  exact satisfies_run_ofSkolem executable θ free typeInstantiation handle σs shape contract
-    verified
+      ((contract.ofSkolem θ).prophetic unit (NRow.subst θ.1 σs) (shape.subst θ.1)) :=
+  satisfies_generic_at_valid executable preserved integral handle θ free typeInstantiation σs shape
+    contract coherent verified validArgs.holds
 
 end Public
 

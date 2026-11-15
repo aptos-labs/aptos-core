@@ -485,6 +485,7 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
     let vectorSize := mkIdent `VerexIR.Proofs.Denote.vectorCertificateSize
     let (ctx, simprocs, _) ← rulesSimpContext (← `(tactic| simp only
       [Array.size_swapIfInBounds, $vectorSize:ident,
+      VerexIR.SpecSliceRef.currentVector_size, VerexIR.SpecSliceRef.finalVector_size,
       VerexIR.Proofs.Denote.eraseBounded_values, Array.getElem?_setIfInBounds_ne, Array.getElem?_setIfInBounds_self_of_lt,
       Array.getElem_setIfInBounds_ne, Array.getElem_setIfInBounds_self,
       VerexIR.Proofs.Denote.eraseIdxIfInBounds_of_lt,
@@ -495,7 +496,8 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
       VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_gt, Array.getElem?_insertIdx_self])) #[]
     let discharge ← goalDischarge goal
     let (sizeContext, sizeSimprocs, _) ← rulesSimpContext (← `(tactic| simp only
-      [Array.size_swapIfInBounds, $vectorSize:ident])) #[]
+      [Array.size_swapIfInBounds, $vectorSize:ident,
+      VerexIR.SpecSliceRef.currentVector_size, VerexIR.SpecSliceRef.finalVector_size])) #[]
     let dischargeSizes : Simp.Discharge := fun condition => do
       if let some proof ← discharge condition then return some proof
       -- A guarded write can ask for a size before that observation exists
@@ -1790,18 +1792,28 @@ elab "verex_split_range" : tactic => focusGoal do
   let (cases, goal) ← (← goal.assert `range disjunction proof).intro1P
   replaceMainGoal (← splitValueCases goal cases certified)
 
-/-- The Boolean locals a fact tests in its propositional structure, as
+private partial def isFlagExpr (e : Lean.Expr) : Bool :=
+  let e := e.consumeMData
+  if e.isFVar then true
+  else if let .proj _ _ s := e then isFlagExpr s
+  else if e.isAppOfArity ``Prod.fst 3 || e.isAppOfArity ``Prod.snd 3 ||
+      e.isAppOfArity ``Subtype.val 3 then
+    isFlagExpr e.appArg!
+  else false
+
+/-- The Boolean locals or projections a fact tests in its propositional structure, as
 `b = true → q` or `¬(b = false ∧ p)`. Omega reads no Boolean, so it drops such a fact
 whole, whatever it says of integers. -/
-private partial def testedFlags (fact : Lean.Expr) : Array FVarId :=
+private partial def testedFlags (fact : Lean.Expr) : Array Lean.Expr :=
   let fact := fact.consumeMData
   if fact.isAppOfArity ``And 2 || fact.isAppOfArity ``Or 2 then
     testedFlags (fact.getArg! 0) ++ testedFlags (fact.getArg! 1)
   else if fact.isAppOfArity ``Not 1 then testedFlags fact.appArg!
   else if fact.isArrow then testedFlags fact.bindingDomain! ++ testedFlags fact.bindingBody!
   else match fact.eq? with
-    | some (type, .fvar flag, value) =>
-        if type.isConstOf ``Bool && (value.isConstOf ``true || value.isConstOf ``false) then
+    | some (type, flag, value) =>
+        if type.isConstOf ``Bool && !flag.hasLooseBVars && isFlagExpr flag &&
+            (value.isConstOf ``true || value.isConstOf ``false) then
           #[flag]
         else #[]
     | _ => #[]
@@ -1809,13 +1821,13 @@ private partial def testedFlags (fact : Lean.Expr) : Array FVarId :=
 /-- At most this many flags are split, each doubling a leaf's cases. -/
 private def flagLimit : Nat := 3
 
-/-- Split on a Boolean local that guards a conditional fact: the fact then says what it
-says of integers, or nothing. Fails with no such local or with more than a few, since
-the cases multiply. -/
+/-- Split on a Boolean local or field projection that guards a conditional fact:
+the fact then says what it says of integers, or nothing. Fails with no such
+guard or with more than a few, since the cases multiply. -/
 elab "verex_split_flag" : tactic => focusGoal do
   let goal ← getMainGoal
   let flags ← goal.withContext do
-    let mut flags : Array FVarId := #[]
+    let mut flags : Array Lean.Expr := #[]
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let type ← instantiateMVars decl.type
@@ -1825,7 +1837,18 @@ elab "verex_split_flag" : tactic => focusGoal do
     return flags
   let some flag := flags[0]? | throwError "no fact tests a Boolean local"
   if flags.size > flagLimit then throwError "the leaf tests too many Boolean locals"
-  replaceMainGoal ((← goal.cases flag).toList.map (·.mvarId))
+  if let .fvar fvarId := flag.consumeMData then
+    replaceMainGoal ((← goal.cases fvarId).toList.map (·.mvarId))
+  else
+    let hyps ← hypothesesWhere goal fun type => (type.find? (· == flag)).isSome
+    let (_, reverted) ← goal.revert hyps (preserveOrder := true)
+    let (newVars, generalized) ← reverted.generalize #[{ expr := flag, xName? := some `flag }]
+    let some flagFVar := newVars[0]? | throwError "failed to generalize Boolean flag"
+    let branches ← generalized.cases flagFVar
+    let goals ← branches.toList.mapM fun sub => do
+      let (_, g) ← sub.mvarId.introNP hyps.size
+      pure g
+    replaceMainGoal goals
 
 /-- Decide a leaf case by case over the Boolean locals its conditional facts test
 (`verex_split_flag`), each case normalized, a further flag split in turn. -/
@@ -2135,12 +2158,18 @@ elab "verex_check_native " what:str : tactic => focusGoal do
 /-- The preparation steps, with `normalize` the normalization of the context,
 `bounds` the bounds of the obligation and `derive` the facts its terms read. -/
 syntax "verex_prepare_steps " tactic ppSpace tactic ppSpace tactic : tactic
+syntax "verex_frames" : tactic
 
 /-- The normalization every leaf receives before a decision: the leaf an
-authored proof takes over is left in this form. -/
+authored proof takes over is left in this form. A read through `Skolems.plainAt`
+is opaque to the context's simp rules, so the frame equation is applied by
+`verex_frames`, here as in the two other closers. -/
 macro "verex_prepare_leaf" : tactic => `(tactic| verex_prepare_steps verex_normalize_context
   (verex_timed "p-bounds" verex_bounds)
-  (verex_timed "p-lookups" verex_lookups_after_writes; verex_timed "p-positions" verex_map_positions))
+  ((try verex_timed "p-frames" verex_frames)
+   all_goals verex_timed "p-lookups" verex_lookups_after_writes
+   all_goals (try verex_timed "p-elements" verex_observed_elements)
+   all_goals verex_timed "p-positions" verex_map_positions))
 
 /-- The preparation a completed path's clauses share: its structural steps,
 which substitute only locals no clause reads (`verex.keepTargetLocals`). The
@@ -2451,6 +2480,12 @@ private def splitFirst (variants : Bool) : TacticM Unit := focusGoal do
     let splittable ← goal.withContext do
       let target ← instantiateMVars (← goal.getType)
       if (← findSplit? target).isSome then return true
+      let hasPlainRead := (target.find? fun e =>
+        (e.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 &&
+          (e.getArg! 6).consumeMData.isFVar) ||
+        (e.isAppOfArity ``VerexIR.Proofs.Denote.InterpreterOps.read 8 &&
+          (e.getArg! 7).consumeMData.isFVar)).isSome
+      if hasPlainRead then return true
       -- The variables applied to two arguments, as a memory is read.
       let collect : StateT FVarIdSet MetaM Unit := target.forEach fun e => do
         if e.getAppNumArgs == 2 && e.getAppFn.isFVar then modify (·.insert e.getAppFn.fvarId!)
@@ -2492,10 +2527,11 @@ elab "verex_memory_aliases" : tactic => focusGoal do
   let goal ← getMainGoal
   let candidate ← goal.withContext do
     let target ← instantiateMVars (← goal.getType)
-    let reads ← (sitesWhere (fun e => e.getAppNumArgs == 2 && e.getAppFn.isFVar)
-      #[target]).filterM fun read => do
-        return (← whnfR (← inferType read.getAppFn)).isAppOfArity
-          ``VerexIR.Proofs.Denote.Memory 2
+    let reads ← (sitesWhere (fun e =>
+        (e.getAppNumArgs == 2 && e.getAppFn.isFVar) ||
+        e.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 ||
+        e.isAppOfArity ``VerexIR.Proofs.Denote.InterpreterOps.read 8)
+      #[target]).filterM fun e => do isStorageReadLHS e
     if reads.isEmpty then return none
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
@@ -2818,11 +2854,23 @@ private partial def pointLocals (value : Lean.Expr) :
 
 /-- Whether a binder's domain is one a state label binds: a memory, or a
 copy of a mutable parameter at its clause domain (an integer's `Int`, a
-Boolean's `Bool`, a textual scalar's `String`, any other value's carrier). -/
-private def labelDomain (domain : Lean.Expr) : Bool :=
-  domain.isAppOf ``VerexIR.Proofs.Denote.Memory || domain.isConstOf ``Int ||
-    domain.isConstOf ``Bool || domain.isConstOf ``String ||
-    domain.isAppOf ``VerexIR.Proofs.Denote.NTy.carrier || domain.isAppOf ``VerexIR.Proofs.Denote.HList
+Boolean's `Bool`, a textual scalar's `String`, any other value's plain or
+carrier domain). -/
+private def labelDomain (domain : Lean.Expr) : MetaM Bool := do
+  let d := domain.consumeMData
+  if d.isAppOf ``VerexIR.Proofs.Denote.Memory || d.isConstOf ``Int ||
+      d.isConstOf ``Bool || d.isConstOf ``String ||
+      d.isAppOf ``VerexIR.Proofs.Denote.NTy.carrier || d.isAppOf ``VerexIR.Proofs.Denote.HList ||
+      d.isAppOf ``VerexIR.Proofs.Denote.NTy.plain || d.isAppOf ``VerexIR.Proofs.Denote.NTy.plainOf ||
+      d.isAppOf ``VerexIR.Proofs.Denote.HListPlain || (plainSpelling? d).isSome then
+    return true
+  let reduced ← whnfR d
+  return reduced.isAppOf ``VerexIR.Proofs.Denote.NTy.carrier ||
+    reduced.isAppOf ``VerexIR.Proofs.Denote.HList ||
+    reduced.isAppOf ``VerexIR.Proofs.Denote.NTy.plain ||
+    reduced.isAppOf ``VerexIR.Proofs.Denote.NTy.plainOf ||
+    reduced.isAppOf ``VerexIR.Proofs.Denote.HListPlain ||
+    (plainSpelling? reduced).isSome
 
 /-- The value of a local as a contract reads it in a binder's domain: an
 integer's value, any other value itself, a reference's by its referent's
@@ -2889,7 +2937,16 @@ private def decideInstance (stated : Lean.Expr) (premise : Lean.TSyntax `tactic)
   let saved ← saveState
   try
     let instantiated ← mkFreshExprMVar stated
-    setGoals [instantiated.mvarId!]
+    let mut mainGoal := instantiated.mvarId!
+    if normalize then
+      let target ← mainGoal.withContext (instantiateMVars (← mainGoal.getType))
+      let reduced ← mainGoal.withContext <| Core.transform target (post := fun e => do
+        match ← reduceProjection? e with
+        | some reduced => return .visit reduced
+        | none => return .continue)
+      if reduced != target then
+        mainGoal ← mainGoal.replaceTargetDefEq reduced
+    setGoals [mainGoal]
     if normalize then
       evalTactic (← `(tactic| try simp only [vir_denote, vir_denote_norm, vir_denote_eval,
         Prod.fst, Prod.snd]))
@@ -2959,7 +3016,7 @@ conjunct by conjunct. -/
 private partial def ledgerWitness (goal : MVarId) (domain target : Lean.Expr) : TacticM Bool := do
   -- Only a label's binders: a memory, or a copy of a mutable parameter in
   -- the domain its contract reads it in.
-  unless labelDomain domain do return false
+  unless ← labelDomain domain do return false
   for (value, state) in ← programPoints do
     let some (chosen, body) ← pointWitness? value state target | continue
     if chosen.isEmpty then continue
@@ -3186,22 +3243,40 @@ update lemmas and stated inequalities participate; no context normalization
 or entry relation is needed once the relevant memory has been linked. -/
 def closeFrameWrites (goal : MVarId) : MetaM Bool := do
   let target ← goal.withContext (instantiateMVars (← goal.getType))
-  unless (target.find? (·.isAppOf ``Memory.set)).isSome do return false
+  unless (target.find? fun e =>
+      e.isAppOf ``Memory.set || e.isAppOf ``Skolems.writePlain).isSome do
+    return false
   let saved ← saveState
   try
     let (goal, _) ← introduceThroughMarkers goal
     let mut theorems : SimpTheorems := {}
     for lemma in #[``VerexIR.Proofs.Obligation_eq, ``Memory.set_same,
-        ``Memory.set_other, ``Memory.set_other_resource, ``if_neg, ``ite_false,
+        ``Memory.set_other, ``Memory.set_other_resource,
+        ``Skolems.writePlain_ne_key, ``Skolems.plainAt_writePlain_ne_key,
+        ``Skolems.writePlain_other_key, ``Skolems.writePlain_other_key_of_eq,
+        ``Skolems.writePlain_other_resource, ``Skolems.writePlain_other_resource_apply,
+        ``Skolems.writePlain_allocationResource, ``Skolems.writePlain_allocationResource_fun,
+        ``if_neg, ``ite_false,
         ``eq_self, ``implies_true, ``and_true, ``true_and] do
       theorems ← theorems.addConst lemma
     let ctx ← Simp.mkContext { contextual := true } #[theorems] {}
     let discharge : Simp.Discharge := fun condition => do
+      let condition := condition.consumeMData
+      if let some (_, lhs, rhs) := condition.eq? then
+        if ← withDefault (isDefEq lhs rhs) then
+          return some (← mkExpectedTypeHint (← mkEqRefl lhs) condition)
+        return none
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
         let type ← instantiateMVars decl.type
         unless type.isAppOf ``Not || type.isAppOf ``Ne do continue
         if ← withReducible (isDefEq type condition) then return some decl.toExpr
+      if condition.isAppOfArity ``Ne 3 then
+        let (α, lhs, rhs) := (condition.getArg! 0, condition.getArg! 1, condition.getArg! 2)
+        if α.isConstOf ``VerexIR.StorageKey then
+          if let some p ← distinctStorageKeyProof? lhs rhs then return some p
+        else if α.isConstOf ``VerexIR.Proofs.Denote.ResourceType then
+          if let some p ← distinctResourceProof? lhs rhs then return some p
       return none
     let (result, _) ← goal.withContext <|
       simpGoal goal ctx #[] (some discharge) (fvarIdsToSimp := #[])
@@ -4294,6 +4369,7 @@ elab_rules : tactic
         setGoals [goal]
         simpMainAt (← `(tactic| simp only [Option.map_some, Option.getD_some, vir_denote_norm]))
           #[factVar.fvarId!] mentioning true
+        if (← getGoals).isEmpty then return
         goal ← getMainGoal
         named := true
       catch ex =>
@@ -4842,6 +4918,14 @@ macro_rules
      | verex_timed "wl-omega" verex_omega_unsplit
      | verex_timed "wl-instance" verex_instance
      | verex_timed "wl-range" verex_range_instance)
+  | (verex_timed "w-name" verex_name_lookups
+     verex_intro_negation
+     verex_subst_vars
+     first
+     | done
+     | verex_omega_unsplit
+     | verex_instance
+     | (exfalso; verex_instance))
   | (verex_timed "w-positions" (verex_intro_negation; verex_instantiate_positions)
      first
      | done
@@ -4888,12 +4972,28 @@ elab "verex_prepared_applies" : tactic => focusGoal do
   unless applies do
     throwError "the leaf has no position hypothesis, vector write, or search"
 
+private partial def targetStatesUnopenedHolds (e : Lean.Expr) : Bool :=
+  let e := (StatedFacts.unmarked e).consumeMData
+  if e.isAppOfArity ``NTy.Holds 3 then true
+  else if e.isAppOfArity ``NoAbort 1 then targetStatesUnopenedHolds (e.getArg! 0)
+  else if e.isAppOfArity ``And 2 then
+    targetStatesUnopenedHolds (e.getArg! 0) || targetStatesUnopenedHolds (e.getArg! 1)
+  else if e.isAppOfArity ``Option.elim 5 then
+    let someFn := (e.getArg! 4).consumeMData
+    if someFn.isAppOfArity ``NTy.Holds 2 then true
+    else match someFn with
+      | .lam _ _ body _ => targetStatesUnopenedHolds body
+      | _ => false
+  else false
+
 /-- Whether a leaf holds terms omega reads as atoms that `grind` relates:
 observations of a map value (`hasKey`, `valueAt`, `keyAt`, `size`, `rank`),
 which the map lemmas relate, behavioral predicates (`ensures_of`, `aborts_of`,
-`result_of`, `state_of`), whose lemmas the contracts and invariants state, or
+`result_of`, `state_of`), whose lemmas the contracts and invariants state,
 applications of a recursive specification function (`f.spec`), equal at
-equal arguments. -/
+equal arguments, or a top-level `NTy.Holds` obligation left unopened before
+context normalization (such as under a join `Option.elim` or at a type
+parameter). -/
 elab "verex_has_atoms" : tactic => focusGoal do
   let goal ← getMainGoal
   let env ← getEnv
@@ -4907,11 +5007,27 @@ elab "verex_has_atoms" : tactic => focusGoal do
       (match e with
         | .const name _ => (specDefinition? env name).isSome
         | _ => false)
-    if ((← instantiateMVars (← goal.getType)).find? isAtom).isSome then return true
+    let target ← instantiateMVars (← goal.getType)
+    if (target.find? isAtom).isSome || targetStatesUnopenedHolds target then return true
     (← getLCtx).anyM fun decl => do
       if decl.isImplementationDetail then return false
       return ((← instantiateMVars decl.type).find? isAtom).isSome
   unless found do throwError "the leaf observes no map and applies no recursive specification function"
+
+private def isFrameMemoryExpr (e : Lean.Expr) : Bool :=
+  let e := e.consumeMData
+  e.isFVar || e.isAppOfArity ``VerexIR.Proofs.StateOf 10
+
+private def splitMemoryAccess? (e : Lean.Expr) : Option (Lean.Expr × Array Lean.Expr) :=
+  let e := e.consumeMData
+  if isFrameMemoryExpr e then some (e, #[])
+  else match e with
+  | .app m a =>
+      if isFrameMemoryExpr m then some (m, #[a])
+      else match m.consumeMData with
+      | .app m0 r => if isFrameMemoryExpr m0 then some (m0, #[r, a]) else none
+      | _ => none
+  | _ => none
 
 /-- The memory after a call, where a hypothesis is a frame of the call: global
 memory reads the same after it as before, at every key or resource type it
@@ -4919,21 +5035,25 @@ ranges over, or everywhere. -/
 private def frameAfter? (type : Lean.Expr) : MetaM (Option Lean.Expr) :=
   forallTelescope type fun _ body => do
     let_expr Eq _ after before := body | return none
-    let afterHead := after.getAppFn
-    let beforeHead := before.getAppFn
-    unless afterHead.isFVar && beforeHead.isFVar && afterHead != beforeHead &&
-        after.getAppArgs == before.getAppArgs do
+    let some (afterMem, afterArgs) := splitMemoryAccess? after | return none
+    let some (beforeMem, beforeArgs) := splitMemoryAccess? before | return none
+    unless afterMem != beforeMem && afterArgs == beforeArgs do return none
+    unless (← whnfR (← inferType afterMem)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do
       return none
-    unless (← whnfR (← inferType afterHead)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do
-      return none
-    return some afterHead
+    return some afterMem
 
 /-- Decide that two memory slots differ, from the context. -/
 macro "verex_keys_differ" : tactic => `(tactic| verex_focus ( (
   -- A disequality of variables has no constructors to take apart: the
   -- context states it, as `symmetricDisequalities` does either way round.
-  try simp only [ne_eq, VerexIR.Proofs.Denote.TableMemory.value_ne_allocationResource,
+  try simp only [ne_eq, VerexIR.Proofs.Denote.nominalDeclarationEquality,
+    VerexIR.Proofs.Denote.Skolems.resolve_runtime,
+    VerexIR.Proofs.Denote.Skolems.resolve_instantiate,
+    VerexIR.Proofs.Denote.Skolems.resolve_paramFree,
+    VerexIR.Proofs.Denote.TableMemory.value_ne_allocationResource,
     VerexIR.Proofs.Denote.TableMemory.allocationResource_ne_value,
+    VerexIR.Proofs.Denote.Skolems.resource_ne_allocationResource,
+    VerexIR.Proofs.Denote.Skolems.allocationResource_ne_resource,
     VerexIR.Proofs.Denote.ResourceType.mk.injEq, VerexIR.Proofs.Denote.NTy.struct.injEq,
     VerexIR.Proofs.Denote.NTy.enum.injEq,
     VerexIR.Proofs.Denote.NRow.cons.injEq, VerexIR.StructHandle.mk.injEq,
@@ -4963,34 +5083,102 @@ private def rememberingDischarge (discharge : Simp.Discharge) : MetaM Simp.Disch
       decided.modify (·.insert condition result)
     return result
 
+private partial def substNTyArg? (types ty : Lean.Expr) (top : Bool) : MetaM (Option Lean.Expr) := do
+  let t := ty.consumeMData
+  if t.isConstOf ``NTy.unit || t.isConstOf ``NTy.bool || t.isConstOf ``NTy.num ||
+      t.isConstOf ``NTy.address || t.isConstOf ``NTy.signer || t.isConstOf ``NTy.string ||
+      t.isConstOf ``NTy.bytes || t.isConstOf ``NTy.char || t.isAppOfArity ``NTy.int 2 then
+    return some ty
+  if t.isAppOfArity ``NTy.param 1 then
+    let mapped ← withReducible (whnf (mkApp types (t.getArg! 0)))
+    return some (if top then mapped else mkApp (mkConst ``NTy.unmark) mapped)
+  for unary in #[``NTy.vector, ``NTy.slice, ``NTy.ref, ``NTy.sliceRef, ``NTy.ghost, ``NTy.observed] do
+    if t.isAppOfArity unary 1 then
+      let some inner ← substNTyArg? types (t.getArg! 0) false | return none
+      return some (mkApp (mkConst unary) inner)
+  if t.isAppOfArity ``NTy.array 2 then
+    let some inner ← substNTyArg? types (t.getArg! 0) false | return none
+    return some (mkApp2 (mkConst ``NTy.array) inner (t.getArg! 1))
+  if t.isAppOfArity ``NTy.table 2 then
+    let some k ← substNTyArg? types (t.getArg! 0) false | return none
+    let some v ← substNTyArg? types (t.getArg! 1) false | return none
+    return some (mkApp2 (mkConst ``NTy.table) k v)
+  return none
+
+private partial def mapArgsRow (types argFn row : Lean.Expr) : MetaM Lean.Expr := do
+  let r := row.consumeMData
+  if r.isConstOf ``NRow.nil then return r
+  else if r.isAppOfArity ``NRow.cons 2 then
+    let head := r.getArg! 0
+    let mappedHead ← match ← substNTyArg? types head true with
+      | some reduced => pure reduced
+      | none => withReducible (whnf (mkApp argFn head))
+    return mkApp2 (mkConst ``NRow.cons) mappedHead (← mapArgsRow types argFn (r.getArg! 1))
+  else
+    withReducible (whnf (mkApp2 (mkConst ``NRow.map) argFn row))
+
+/-- Rewrite `Skolems.plainAt` across a call's `slotFrame` hypothesis (`verex_frames`) without
+unfolding `Skolems.plainAt` or exposing nominal field layouts (`Skolems.plainAt_eq_of_eq`). -/
+simproc_decl framePlainAt (@VerexIR.Proofs.Denote.Skolems.plainAt _ ?functions ?frame _ _ _ _) := fun e => do
+  let_expr VerexIR.Proofs.Denote.Skolems.plainAt unit functions frame σ args k m := e
+    | return .continue
+  let m := m.consumeMData
+  unless isFrameMemoryExpr m do return .continue
+  let isRuntime := frame.consumeMData.isAppOfArity ``Skolems.runtime 3
+  let types := mkApp3 (mkConst ``Skolems.argument) unit functions frame
+  let argFn := mkApp (mkConst ``NTy.argumentWith) types
+  let mappedArgs ← if isRuntime then pure args else mapArgsRow types argFn args
+  let resolvedTy := if isRuntime then σ
+    else mkApp4 (mkConst ``Skolems.resolve) unit functions frame σ
+  let rawRes := mkApp3 (mkConst ``ResourceType.mk) resolvedTy mappedArgs
+    (mkConst ``ResourceKind.value)
+  let rawSlot := mkApp2 m rawRes k
+  let r ← Simp.simp rawSlot
+  if r.expr == rawSlot then return .continue
+  let some (m0, #[_, _]) := splitMemoryAccess? r.expr | return .continue
+  if m0 == m then return .continue
+  let slotEq ← r.getProof
+  let resExpr := mkApp5 (mkConst ``Skolems.resource) unit functions frame σ args
+  let expectedSlotEq ← mkEq (mkApp2 m resExpr k) (mkApp2 m0 resExpr k)
+  unless ← withDefault (isDefEq (← inferType slotEq) expectedSlotEq) do return .continue
+  let hint ← mkExpectedTypeHint slotEq expectedSlotEq
+  let rhs := mkAppN (mkConst ``Skolems.plainAt) #[unit, functions, frame, σ, args, k, m0]
+  let proof := mkAppN (mkConst ``Skolems.plainAt_eq_of_eq)
+    #[unit, functions, frame, σ, args, k, m, m0, hint]
+  return .visit { expr := rhs, proof? := some (← mkExpectedTypeHint proof (← mkEq e rhs)) }
+
 /-- Read each global a call leaves alone at the state before the call: the
 frames of the calls rewrite the goal, and what the leaf states of the memory
 after a call, where the context decides that a key is not one the callee
 modifies. -/
-elab "verex_frames" : tactic => focusGoal do
-  let goal ← getMainGoal
-  goal.withContext do
-    let mut lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) := #[]
-    let mut later : Array Lean.Expr := #[]
-    let mut facts : Array Lean.LocalDecl := #[]
-    for declaration in ← getLCtx do
-      if declaration.isImplementationDetail then continue
-      let type ← instantiateMVars declaration.type
-      if let some after ← frameAfter? type then
-        lemmas := lemmas.push
-          (← `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax declaration.toExpr):term))
-        later := later.push after
-      else if ← isProp type then
-        facts := facts.push declaration
-    if lemmas.isEmpty then throwError "the leaf has no frame of a call"
-    let reading := facts.filter fun declaration =>
-      (declaration.type.find? fun e => e.isApp && later.contains e.getAppFn).isSome
-    let { ctx, simprocs, dischargeWrapper, .. } ← mkSimpContext
-      (← `(tactic| simp (disch := verex_keys_differ) only [$lemmas,*])) (eraseLocal := false)
-    let (result, _) ← dischargeWrapper.with fun discharge? => do
-      let remembering ← discharge?.mapM (fun discharge => (rememberingDischarge discharge : MetaM _))
-      simpGoal goal ctx simprocs remembering (fvarIdsToSimp := reading.map (·.fvarId))
-    replaceMainGoal (result.toList.map (·.2))
+elab_rules : tactic
+  | `(tactic| verex_frames) => focusGoal do
+      let goal ← getMainGoal
+      goal.withContext do
+        let mut lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) := #[]
+        let mut later : Array Lean.Expr := #[]
+        let mut facts : Array (Lean.LocalDecl × Lean.Expr) := #[]
+        for declaration in ← getLCtx do
+          if declaration.isImplementationDetail then continue
+          let type ← instantiateMVars declaration.type
+          if let some after ← frameAfter? type then
+            lemmas := lemmas.push
+              (← `(Lean.Parser.Tactic.simpLemma| $(← Lean.Elab.Term.exprToSyntax declaration.toExpr):term))
+            later := later.push after
+          else if ← isProp type then
+            facts := facts.push (declaration, type)
+        if lemmas.isEmpty then throwError "the leaf has no frame of a call"
+        let reading := facts.filterMap fun (declaration, type) =>
+          let mentions := later.any fun m =>
+            if m.isFVar then type.containsFVar m.fvarId!
+            else (type.find? fun sub => sub.consumeMData == m).isSome
+          if mentions then some declaration else none
+        let { ctx, simprocs, dischargeWrapper, .. } ← mkSimpContext
+          (← `(tactic| simp (disch := verex_keys_differ) only [framePlainAt, $lemmas,*])) (eraseLocal := false)
+        let (result, _) ← dischargeWrapper.with fun discharge? => do
+          let remembering ← discharge?.mapM (fun discharge => (rememberingDischarge discharge : MetaM _))
+          simpGoal goal ctx simprocs remembering (fvarIdsToSimp := reading.map (·.fvarId))
+        replaceMainGoal (result.toList.map (·.2))
 
 /-- The facts a proof states: its conjuncts, recursively, each with its
 type. -/
@@ -5769,6 +5957,28 @@ elab "verex_data_invariants" : tactic => focusGoal do
         goal.assign proof
         return []
       let written := target.getArg! 3
+      if written.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.writePlain 8 then
+        let value := (written.getArg! 6).consumeMData
+        if value.isAppOfArity ``Option.none 1 then
+          let [holds] ← goal.apply (mkConst ``VerexIR.Proofs.Denote.DataInvariants.writePlain_none)
+            | throwError "the removal lemma did not leave its obligation"
+          return ← establish holds fuel
+        if value.isAppOfArity ``Option.some 2 then
+          let inner := (value.getArg! 1).consumeMData
+          if inner.isAppOfArity ``VerexIR.Proofs.Denote.NTy.forget 3 then
+            let [holds, stored] ← goal.apply
+              (mkConst ``VerexIR.Proofs.Denote.DataInvariants.writePlain_forget)
+              | throwError "the write lemma did not leave its two obligations"
+            return (← establish holds fuel) ++ [stored]
+          let [holds, stored] ← goal.apply
+            (mkConst ``VerexIR.Proofs.Denote.DataInvariants.writePlain_some)
+            | throwError "the write lemma did not leave its two obligations"
+          let (_, stored) ← stored.intro1P
+          return (← establish holds fuel) ++ [stored]
+        let [holds, stored] ← goal.apply
+          (mkConst ``VerexIR.Proofs.Denote.DataInvariants.writePlain)
+          | throwError "the write lemma did not leave its two obligations"
+        return (← establish holds fuel) ++ [stored]
       unless written.isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 6 do
         throwError "no hypothesis states the stored invariants of the memory written"
       let value := written.getArg! 5
@@ -5812,7 +6022,8 @@ elab "verex_data_invariants" : tactic => focusGoal do
 def writesStoredInvariants (goal : MVarId) : MetaM Bool := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   return target.isAppOfArity ``VerexIR.Proofs.Denote.DataInvariants 4 &&
-    (target.getArg! 3).isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 6
+    ((target.getArg! 3).isAppOfArity ``VerexIR.Proofs.Denote.Memory.set 6 ||
+      (target.getArg! 3).isAppOfArity ``VerexIR.Proofs.Denote.Skolems.writePlain 8)
 
 /-- Whether a leaf states the stored invariants of a memory it reads. -/
 -- Retired with doc/plan/data-and-global-invariants.md, "The stored-invariant layer
@@ -5849,12 +6060,26 @@ elab "verex_stored_reads" : tactic => focusGoal do
       if declaration.isImplementationDetail then continue
       let type ← instantiateMVars declaration.type
       let_expr Eq _ read held := type | continue
-      unless held.isAppOfArity ``Option.some 2 && read.getAppNumArgs == 2 do continue
-      let memory := read.appFn!.appFn!
-      unless (← whnfR (← inferType memory)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 do continue
-      let some holds ← storedInvariantsProof? memory | continue
-      let fact ← normalized
-        (← mkAppM ``VerexIR.Proofs.Denote.DataInvariants.read #[holds, declaration.toExpr])
+      unless held.isAppOfArity ``Option.some 2 do continue
+      let read := read.consumeMData
+      let rawFact? ← if read.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 then do
+          let memory := read.getArg! 6
+          let some holds ← storedInvariantsProof? memory | pure none
+          let inner := (held.getArg! 1).consumeMData
+          let lemma := if inner.isAppOfArity ``VerexIR.Proofs.Denote.NTy.forget 3 then
+              ``VerexIR.Proofs.Denote.DataInvariants.read_plainAt_forget
+            else ``VerexIR.Proofs.Denote.DataInvariants.read_plainAt
+          try some <$> mkAppM lemma #[holds, declaration.toExpr] catch _ => pure none
+        else if read.getAppNumArgs == 2 then do
+          let memory := read.appFn!.appFn!
+          if !(← whnfR (← inferType memory)).isAppOfArity ``VerexIR.Proofs.Denote.Memory 2 then
+            pure none
+          else do
+            let some holds ← storedInvariantsProof? memory | pure none
+            some <$> mkAppM ``VerexIR.Proofs.Denote.DataInvariants.read #[holds, declaration.toExpr]
+        else pure none
+      let some rawFact := rawFact? | continue
+      let fact ← normalized rawFact
       -- The selected case, at the resource's own type arguments.
       let case ← whnfR (← inferType fact)
       match ← storedCase? case (direct := true) with
@@ -6029,6 +6254,11 @@ handled by `verex_observed_row_fields`. -/
 private partial def certifiedCongruenceObservation (term : Lean.Expr)
     (payload : Bool := false) : MetaM Bool := do
   let term := term.consumeMData
+  if term.isAppOfArity ``plainFallback 2 then
+    let result := (term.getArg! 0).consumeMData
+    if result.isAppOfArity ``NTy.plainOf 2 || result.isAppOfArity ``NTy.plain 2 then
+      return !(← isCertificateFreeNTy result.appArg!)
+    return false
   if term.isAppOf ``NTy.ofDeepHolds || term.isAppOf ``Var.selectCertified ||
       term.isAppOf ``ParamPlain.certify || term.isAppOf ``ParamPlain.of ||
       term.isAppOf ``NTy.plainInhabitantOf || term.isAppOf ``NTy.plainInhabitant ||
@@ -6231,7 +6461,11 @@ macro_rules
       (try (verex_timed "p-unfold specs" verex_unfold_specs
             verex_timed "p-map positions" verex_map_positions))
       all_goals (try verex_timed "p-determined" verex_determined_variants)
-      all_goals (first | verex_assumption | verex_decide_prepared_goal | verex_leaf_fallbacks))))
+      all_goals (first
+        | verex_assumption
+        | (verex_holds; all_goals verex_prepared_decide)
+        | verex_decide_prepared_goal
+        | verex_leaf_fallbacks))))
 
 macro_rules
   | `(tactic| verex_prepared_case) => `(tactic| verex_focus verex_prepared_decide)
@@ -6400,11 +6634,13 @@ macro "verex_leaf_decide" : tactic => `(tactic| verex_focus (
    first
    | verex_assumption
    | (verex_split_hypotheses
-      verex_decide_bounded)
+      try verex_timed "decide frames" verex_frames
+      all_goals verex_decide_bounded)
    | verex_budgeted
       (verex_intro
        verex_split_hypotheses
-       verex_decide_bounded)
+       try verex_timed "decide frames" verex_frames
+       all_goals verex_decide_bounded)
    -- The deciders failed on the goal as stated and, where it states a
    -- binder or a premise, under it.  Without this arm the reported failure
    -- is the strict `verex_intro`'s of the arm above, which says the goal
@@ -6467,7 +6703,37 @@ private def rawEntryMemberships (goal : MVarId) : TacticM (List MVarId) := do
         let entry := type.getArg! 4
         for invariant in context do
           if invariant.isImplementationDetail then continue
-          let .forallE _ _ (.forallE _ _ body _) _ := invariant.type | continue
+          let invType := (← instantiateMVars invariant.type).consumeMData
+          if invType.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 then
+            let view ← (try nativeTypeView (invType.getArg! 1) catch _ => pure (invType.getArg! 1))
+            if view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.table 2 then
+              let tbl := (invType.getArg! 2).consumeMData
+              let coll := (type.getArg! 3).consumeMData
+              let cand? := match coll with
+                | .proj _ _ s => some s
+                | .app _ a => some a
+                | _ => none
+              let sameTbl ← match cand? with
+                | some cand => withReducible (withNewMCtxDepth (isDefEq cand tbl))
+                | none => pure false
+              if sameTbl then
+                for (reading, elemTy) in #[(``VerexIR.Proofs.Denote.NTy.Holds.of_mem_table_key, view.getArg! 0),
+                                           (``VerexIR.Proofs.Denote.NTy.Holds.of_mem_table_value, view.getArg! 1)] do
+                  if ← isCertificateFreeNTy elemTy then continue
+                  let args := #[some (invType.getArg! 0), none, none, none,
+                    some invariant.toExpr, none, some member.toExpr]
+                  if let some proof ← observing? (withNewMCtxDepth do
+                      let p ← mkAppOptM reading args
+                      let p ← instantiateMVars p
+                      if p.hasExprMVar then failure
+                      unless ← isTypeCorrect p do failure
+                      pure p) then
+                    let statement ← inferType proof
+                    unless (← context.anyM fun decl => withNewMCtxDepth (withReducible (isDefEq decl.type statement))) ||
+                        (← facts.anyM fun other => do withReducible (isDefEq (← inferType other) statement)) do
+                      facts := facts.push proof
+            continue
+          let .forallE _ _ (.forallE _ _ body _) _ := invType | continue
           unless body.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 7 do continue
           let proof? ← (try
             let proof ← mkAppM' invariant.toExpr #[entry, member.toExpr]
@@ -6481,14 +6747,22 @@ private def rawEntryMemberships (goal : MVarId) : TacticM (List MVarId) := do
               facts := facts.push proof
       return facts
     let mut next := goal
+    let mut addedHolds := false
     for proof in facts do
-      next ← next.withContext do
+      let (next', isHolds) ← next.withContext do
         let type ← inferType proof
+        let isHolds := type.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3
         let (statement, proof) ← match ← selectedOwnClauses?
             (fun statement => return (← canonicalFamilyResult statement).expr) type proof with
           | some observed => pure observed
           | none => pure (type, proof)
-        return (← (← next.assert `entryInvariant statement proof).intro1P).2
+        return ((← (← next.assert `entryInvariant statement proof).intro1P).2, isHolds)
+      next := next'
+      if isHolds then addedHolds := true
+    if addedHolds then
+      setGoals [next]
+      assertCertifiedClauses (fun statement => return (← canonicalFamilyResult statement).expr)
+      if let some updated := (← getGoals).head? then next := updated
     finished := finished ++ [next]
   return finished
 
@@ -6763,6 +7037,10 @@ private def clauseFailure (origin : Option Provenance) (snippet : String) : Mess
       m!"the data invariant `{snippet}` does not hold where a value is constructed"
   | some .handOver =>
       m!"the data invariant `{snippet}` does not hold where a mutable reference is passed to a call"
+  | some (.joinPremise value none) =>
+      m!"the data invariant `{snippet}` of `{value}` does not hold at a join"
+  | some (.joinPremise value (some join)) =>
+      m!"the data invariant `{snippet}` of `{value}` does not hold at join {join}"
   | some .memoryWritten =>
       m!"the module invariant `{snippet}` does not hold after a write of memory it reads"
   | some .callReturned =>
@@ -6980,8 +7258,9 @@ macro_rules
           all_goals try verex_timed "determined" (verex_residual_budgeted verex_determined_variants)
           try verex_timed "map contradiction" verex_map_contradiction
           try verex_timed "key instances" verex_key_instances
-          try verex_timed "frames" verex_frames
-          try verex_timed "map positions" (verex_residual_budgeted verex_map_positions)
+          all_goals try verex_timed "frames" verex_frames
+          all_goals try verex_timed "elements" verex_observed_elements
+          all_goals try verex_timed "map positions" (verex_residual_budgeted verex_map_positions)
           -- A goal its literal inputs decide, before the implications'
           -- premises are decided one by one.
           try verex_timed "ground" (verex_ground_inputs; ((try simp only [VerexIR.Proofs.Obligation_eq,
@@ -7028,20 +7307,26 @@ its binders and premises introduced, the positions it reads stated, then
 the deciders over the instance. -/
 macro_rules
   | `(tactic| verex_leaf_instance) => `(tactic|
-          (verex_intro
-           verex_split_hypotheses
-           try verex_timed "frames3" verex_frames
-           verex_timed "map positions3" verex_map_positions
-           first
-           | verex_timed "cheap3" verex_decide_cheap
-           -- An instance of a quantified hypothesis, such as a loop
-           -- invariant, at the position or one past its range.
-           | verex_timed "instance3" verex_instance
-           | verex_timed "range3" verex_range_instance_stated
-           | verex_timed "prepared3" verex_open_prepared
-           | verex_timed "pipeline3" verex_pipeline
-           | (verex_timed "cases3" verex_split_disjunction
+          (first
+           | (verex_timed "holds3" verex_holds
               all_goals verex_leaf_attempt)
-           | verex_trivial))
+           | (verex_intro
+              verex_split_hypotheses
+              all_goals verex_subst_vars
+              all_goals verex_reduce_projections
+              all_goals try verex_timed "frames3" verex_frames
+              all_goals try verex_timed "elements3" verex_observed_elements
+              all_goals verex_timed "map positions3" verex_map_positions
+              all_goals (first
+                | verex_timed "cheap3" verex_decide_cheap
+                -- An instance of a quantified hypothesis, such as a loop
+                -- invariant, at the position or one past its range.
+                | verex_timed "instance3" verex_instance
+                | verex_timed "range3" verex_range_instance_stated
+                | verex_timed "prepared3" verex_open_prepared
+                | verex_timed "pipeline3" verex_pipeline
+                | (verex_timed "cases3" verex_split_disjunction
+                   all_goals verex_leaf_attempt)
+                | verex_trivial))))
 
 end VerexIR.Proofs.Denote

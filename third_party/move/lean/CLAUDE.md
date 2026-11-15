@@ -132,15 +132,23 @@ instead, `--no-exe` skips the executable and the two items needing it. Green
 smoke is not the commit gate; the four suites and the Move Prover's lean gate
 are.
 
+The commit gate is run once on the tree to be committed, not between fixes: a
+fix made after it started is not in its result. A gate's table is taken from
+one run on one tree, with the counts read from that run's records. A row from
+an earlier run of a tree since edited is not a result of the gate.
+
 While iterating, build libraries, not executables: `lake build` in `verex-ir`,
-`lake build VerexMove` in `verex-move`, and `lake build VerexE2ETests` in
-`verex-e2e-tests`. The default targets of the last two also build the
+`lake build VerexMove` in `verex-move`, `lake build VerexRust` in `verex-rust`,
+and `lake build VerexE2ETests` in `verex-e2e-tests`. The default targets of
+`verex-move` and `verex-e2e-tests` also build the
 `verex-move` executable and the e2e driver, whose C compilation and linking the
 Lean fixtures do not need (10–30 s after an edit of one part of the solver). The
 smoke suite builds the executable beside its Lean fixtures. To verify a Move
 package while iterating,
 `scripts/verify-modules.py <package> [--filter <part>]` runs one `verex-move
 verify` process per module, several at a time.
+
+### Performance and build iteration
 
 For repeated verifier measurements, build the native executable once per source
 revision and use `verex-move elaborate <file>` or
@@ -151,6 +159,27 @@ with `scripts/isolate-target.py <file> <module> <target> -o <out>` and run
 [`doc/designs/performance.md`](doc/designs/performance.md) for profiling and
 measurement details.
 
+When iterating without a live language server (CLI runs or background agents),
+do not edit-and-rebuild multi-thousand-line modules (`Denote/Types.lean`,
+`Denote/Term.lean`, `Solve/{Base,Decide}.lean`) or multi-module test files on
+every attempt: each edit re-elaborates from the edit point or re-runs dozens of
+earlier `verex module` / `verify` blocks. Prove new lemmas and develop new
+`verex module` controls first in a small standalone scratch `.lean` file that
+`import`s the already-built target module (`lake env lean <probe>.lean`,
+seconds per check), then move the finished code into its home file, remove the
+scratch file, and run a single `lake build` pass.
+
+A test suite builds in parallel per module, and one file is elaborated on one
+core. Keep a test file to one topic that elaborates in well under a minute; a
+file that has become the last one running in `lake test` is split along its
+sections, each part a root of the package's test library. Tactics or lemmas
+that several parts use go in a support module they import, so they are
+compiled once. The same holds for a fixture of the e2e suites and for a
+function in one: a fixture finishes within the driver's timeout
+(`VEREX_E2E_TIMEOUT`, 240 seconds) and a target within its budget
+(`verex.verifyHeartbeats`). One that does not is split, a file into files and
+a function into functions that each state part of what it tested.
+
 The solver, the contract generator and `verify` are split into parts for build
 time, listed in [`doc/designs/performance.md`](doc/designs/performance.md)
 ("Modules split for edits"); the last part of each keeps the original module
@@ -160,14 +189,15 @@ boundaries: `Solve.Normal` and `Solve.Decide` independent of each other, and
 `Verify.Contracts` free of the solver, so that an edit of one rebuilds neither
 the other nor that part.
 
-When writing or extending large metaprogram functions, prefer coherent helper
-functions over a single growing body. Smaller functions can reduce optimization
-and code-generation work in both Lean and the C compiler; this is a build-time
-consideration as well as a readability choice. Profile before refactoring for
-speed, and measure Lean compilation, C compilation, and verifier runtime
-separately: inlining can undo the split, and function boundaries can affect
-runtime performance. Splitting functions within a module does not by itself
-enable parallel compilation or finer incremental rebuilds; those benefits
+When writing or extending large metaprogram functions or large `mutual def`
+interpreters (such as `Term.denoteIn`), prefer coherent helper functions over a
+single growing body. Smaller functions reduce equation-lemma generation,
+optimization, and code-generation work in both Lean and the C compiler; this is
+a build-time consideration as well as a readability choice. Profile before
+refactoring for speed, and measure Lean compilation, C compilation, and verifier
+runtime separately: inlining can undo the split, and function boundaries can
+affect runtime performance. Splitting functions within a module does not by
+itself enable parallel compilation or finer incremental rebuilds; those benefits
 require suitable module boundaries and independent dependencies.
 
 ### Parallel agents on one worktree
