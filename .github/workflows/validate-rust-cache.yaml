@@ -35,7 +35,7 @@ jobs:
         with:
           shared-key: cache-contract-${{ github.run_id }}
           env-vars: APTOS_BUILD_ENV
-          cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+          cmd-format: bash "${{ github.workspace }}/.github/actions/rust-prebuilt-setup/cache-command.sh" {0}
           workspaces: cache-fixture -> target
           cache-workspace-crates: "false"
           cache-bin: "false"
@@ -67,7 +67,7 @@ jobs:
         with:
           shared-key: cache-contract-${{ github.run_id }}
           env-vars: APTOS_BUILD_ENV
-          cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+          cmd-format: bash "${{ github.workspace }}/.github/actions/rust-prebuilt-setup/cache-command.sh" {0}
           workspaces: cache-fixture -> target
           cache-workspace-crates: "false"
           cache-bin: "false"

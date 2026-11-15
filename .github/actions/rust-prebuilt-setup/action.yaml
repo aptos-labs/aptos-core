@@ -51,7 +51,7 @@ runs:
       with:
         key: ${{ inputs.cache-key }}
         env-vars: APTOS_BUILD_ENV
-        cmd-format: bash .github/actions/rust-prebuilt-setup/cache-command.sh {0}
+        cmd-format: bash "${{ github.workspace }}/.github/actions/rust-prebuilt-setup/cache-command.sh" {0}
         cache-workspace-crates: "false"
         save-if: ${{ inputs.save-cache == 'true' }}
     - name: Install checkout dependencies when required
