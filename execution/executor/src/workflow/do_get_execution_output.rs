@@ -580,7 +580,17 @@ impl Parser {
         to_commit: &TransactionsToKeep,
         base_state_view: &CachedStateView,
     ) -> Result<EpochState> {
-        ensure!(!to_commit.is_empty(), "to_commit is empty.");
+        // The epoch must be bumped by the last transaction, which ends the epoch.
+        let last_write_set = to_commit
+            .transaction_outputs
+            .last()
+            .ok_or_else(|| anyhow!("to_commit is empty."))?
+            .write_set();
+        let configuration_key = StateKey::on_chain_config::<ConfigurationResource>()?;
+        ensure!(
+            last_write_set.get_write_op(&configuration_key).is_some(),
+            "Configuration resource not written by the last transaction on epoch change"
+        );
 
         let write_set_view = WriteSetStateView {
             updates: to_commit.state_update_refs(),
