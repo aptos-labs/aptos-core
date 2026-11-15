@@ -591,7 +591,7 @@ impl fmt::Display for CallError<'_, '_> {
 }
 
 /// The [`ModuleId`] naming a frame's module, or [`None`] for a script frame.
-fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
+pub(crate) fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
     (!is_script_module_id(module_id)).then(|| module_id_of(module_id))
 }
 
@@ -668,8 +668,28 @@ unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalE
 }
 
 /// Returns the callers of the frame identified by `regs`, most recent caller
-/// first, each at its call instruction. Excludes the current frame, so the
-/// root frame has an empty trace.
+/// first, each at its call instruction. See [`walk_callers`].
+///
+/// # Safety
+///
+/// Same as [`walk_callers`], with `regs.fp` as the frame pointer.
+#[cold]
+unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+    // SAFETY: forwarded from the caller.
+    let callers = unsafe { walk_callers(stack, regs.fp)? };
+    Ok(callers
+        .into_iter()
+        .map(|(caller, offset)| CallFrame {
+            module: frame_module(caller.module_id),
+            function: caller.def_idx,
+            offset,
+        })
+        .collect())
+}
+
+/// Returns the callers of the frame at `fp`, most recent caller first, each
+/// with the bytecode offset of its call instruction. Excludes the frame at
+/// `fp` itself, so the root frame has no callers.
 ///
 /// Each callee frame starts at a higher address than its caller. Bounds and
 /// ordering checks require each caller's frame pointer to be lower than its
@@ -678,18 +698,20 @@ unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalE
 ///
 /// # Safety
 ///
-/// `regs.fp` must point to the root frame of `stack`, or to a frame from its
-/// last run with the stack unchanged since. The metadata chain must be the one
-/// written by the call protocol, and every function it references must still
-/// be alive.
+/// `fp` must point to the root frame of `stack`, to a live frame of the
+/// current run, or to a frame from its last run with the stack unchanged since.
+/// The metadata chain must be the one written by the call protocol, and every
+/// function it references must stay alive while `stack` is borrowed.
 // TODO(completeness): consider including the current frame. It is excluded to
 // match V1, and because the error or abort location already records it.
 #[cold]
-unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+pub(crate) unsafe fn walk_callers(
+    stack: &MemoryRegion,
+    mut fp: *mut u8,
+) -> VMResult<Vec<(&Function, BytecodeOffset)>> {
     let lowest = root_frame_base(stack);
     let highest = stack.as_ptr().wrapping_add(stack.len());
     let mut frames = Vec::new();
-    let mut fp = regs.fp;
     loop {
         if !(lowest..highest).contains(&fp) {
             invariant_violation!(Unreachable(
@@ -706,7 +728,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
         let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
         // The saved pc is the return address, one past the call micro-op.
         let (return_pc, _) = unsafe { saved_return_pc(fp) };
-        let Some((function, offset)) = return_pc
+        let Some((_, offset)) = return_pc
             .checked_sub(1)
             .and_then(|call_pc| bytecode_origin(caller, call_pc))
         else {
@@ -715,11 +737,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
                 caller.name()
             )));
         };
-        frames.push(CallFrame {
-            module: frame_module(caller.module_id),
-            function,
-            offset,
-        });
+        frames.push((caller, offset));
         let caller_fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
         if caller_fp >= fp {
             invariant_violation!(Unreachable(
@@ -766,6 +784,8 @@ pub struct InterpreterContext<'guard> {
     /// Per-session reentrancy checker state.
     reentrancy: ReentrancyState,
     rng: StdRng,
+    /// See [`InterpreterOptions::enable_debugging`].
+    enable_debugging: bool,
 }
 
 /// Construction options for an [`InterpreterContext`].
@@ -775,12 +795,23 @@ pub struct InterpreterContext<'guard> {
 pub struct InterpreterOptions {
     /// The VM heap's capacity in bytes.
     pub heap_size: usize,
+    /// Debug mode. It only affects the debug natives: `0x1::debug::native_print`
+    /// prints to stdout, and `0x1::debug::native_stack_trace` returns the
+    /// caller's call stack. Outside debug mode, the first does nothing and the
+    /// second returns an empty string. Nothing else changes.
+    ///
+    /// Enable it only for local testing, such as unit tests and test harnesses,
+    /// where V1 enables its `testing` feature. Never enable it on validators or
+    /// wherever execution must be deterministic: the stack trace is a value
+    /// visible to Move code, so nodes in different modes can diverge.
+    pub enable_debugging: bool,
 }
 
 impl Default for InterpreterOptions {
     fn default() -> Self {
         Self {
             heap_size: DEFAULT_HEAP_SIZE,
+            enable_debugging: false,
         }
     }
 }
@@ -853,6 +884,7 @@ impl<'guard> InterpreterContext<'guard> {
             read_write_set: ResourceReadWriteSet::new(),
             reentrancy: ReentrancyState::new(),
             rng: StdRng::seed_from_u64(0),
+            enable_debugging: options.enable_debugging,
         }
     }
 
@@ -1038,6 +1070,7 @@ impl<'guard> InterpreterContext<'guard> {
             mut read_write_set,
             reentrancy: _,
             rng: _,
+            enable_debugging: _,
         } = self;
 
         // The call stack is gone and every handle is scoped to one allocation,
@@ -3703,6 +3736,7 @@ impl InterpreterContext<'_> {
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,
+                self.enable_debugging.then_some(&self.stack),
             );
             func(&ctx)
         };
