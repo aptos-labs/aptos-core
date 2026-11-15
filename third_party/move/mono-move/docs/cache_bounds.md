@@ -1,238 +1,186 @@
 # Cache Bounds
 
-How MonoMove bounds the memory held by code-derived data: interned identifiers and types, loaded modules, lowered and monomorphized functions, layouts and descriptors.
+How MonoMove bounds the memory held by code-derived data, and the interning redesign that makes the bound simple.
 
 Value memory (stacks, heaps, frozen heaps, the per-block resource arena) is a separate budget, see `heap_and_gc.md`.
 
 ## 1. Problem
 
-`GlobalContext` holds one shared `Context` and one bump arena per worker. Everything in it grows monotonically until `MaintenanceGuard::reset_arena_pool` drops all of it:
+`GlobalContext` holds one shared `Context` and one bump arena per worker. Identifiers, types, modules, lowered functions, layouts and descriptors all grow monotonically until `MaintenanceGuard::reset_arena_pool` drops everything. In production the context is owned by `AptosModuleCacheManager` (`aptos-move/block-executor`), handed to every block, and never reset.
 
-| Structure | Grows when |
-|---|---|
-| `identifiers`, `module_ids`, `types`, `type_lists`, `function_refs` (maps + arena bytes) | anything is interned for the first time, including user-supplied type arguments |
-| `module_cache` (`ModuleSlot` + `LoadedModule`) | a module is loaded, or a slot is created for a name that is looked up |
-| `LoadedModule::functions`, `LoadedModule::instantiated_functions` | a function is lowered, or a generic function meets new type arguments |
-| `script_cache` | a script with new bytes runs |
-| `descriptors`, `layouts` (append-only tables + by-type maps) | a new type needs a layout or a GC descriptor |
+Two things make it hard to bound as it stands:
 
-In production the context is owned by `AptosModuleCacheManager` (`aptos-move/block-executor/src/code_cache_global_manager.rs`) as an `Arc<GlobalContext>` with `concurrency_level` arenas. It is handed to every block and never reset; nothing measures it. (`reset_arena_pool` is only called by the test harness.)
+- **Everything is one lifetime.** Types live in arenas shared by all modules, so nothing can be freed without freeing everything.
+- **Everything is identity.** Pointer equality on interned types is used as type equality, and those pointers are baked into block state: `UnsyncMap` keys embed an `InternedType`, heap object headers carry a `DescriptorId`. So nothing can be made local to a transaction without breaking what other transactions see.
 
-The goal is a hard bound of the form
+Most interned types need neither property. Separating the ones that do from the ones that do not is the redesign.
 
-```
-code memory  <=  W + N * E
-```
+## 2. What types are used for
 
-where `N` is the number of executors, `E` the most code memory one transaction can cause to be built, and `W` a watermark for the cache.
+From the specializer, loader and runtime:
 
-## 2. Goals and non-goals
-
-- **Hard bound**, independent of what transactions do.
-- **Determinism.** Cache state differs between validators. Nothing a transaction observes (status, gas, outputs) may depend on it.
-- **Simple, and free in the common case.** A cache well below its bound costs one extra add per first use of a module, and one comparison per transaction.
-- **Graceful when full.** A full cache makes execution slower, never wrong and never stuck.
-- Non-goal: an eviction policy. There is no LRU and no per-entry eviction; the only way to reclaim is to drop the whole context.
-
-## 3. The design on one page
-
-Three numbers:
-
-1. **Weight.** Every cacheable object has a deterministic weight in bytes, an upper bound on what it occupies.
-2. **`T`, the per-transaction limit (deterministic).** A transaction is charged the weight of every module, instantiation and type it uses for the first time, hit or miss, exactly like load gas. Above `T` it aborts with a deterministic status. With the framework's weight `F` (exempt from `T`, §4.2), no transaction can cause more than `E = T + F` to be built.
-3. **`S`, the size of the cache (node-local).** One atomic counter, incremented by the weight of everything actually inserted. It only goes up between flushes.
-
-One check, made by the block executor **before it starts any transaction**:
-
-```
-if S + N * E > max_code_memory:
-    flush            # sequential execution: drop the context here, between two transactions
-```
-
-and one more at block start, to keep the first from firing in normal operation: flush if `S >= W_flush`.
-
-That is the whole mechanism for sequential execution, which is what MonoMove runs today (`MonoTransactionExecutor::execute` rejects `ViewMode::Parallel`). With `W = max_code_memory - N * E`, a transaction starts only while `S <= W`, each running transaction adds at most `E`, so `S <= W + N * E`.
-
-Nothing inside the VM changes behavior: no fallible interner, no second lookup level, no new error path. The VM gains the accounting and the `T` meter; the policy lives in the block executor.
-
-Parallel execution cannot flush between transactions. §4.6 covers what it does instead.
-
-## 4. Details
-
-### 4.1 Weights
-
-A weight is a deterministic function of on-chain inputs only (bytecode, type arguments), never of cache state, and is at least the number of bytes the object and everything built with it retain.
-
-| Object | Weight | Covers |
+| Where a type appears | Example | Needs identity across modules and transactions? |
 |---|---|---|
-| Module (or script) | `BASE_MODULE + K_MODULE * bytecode_len` | slot, interned ID and identifiers, `CompiledModule`, IR, interned signature types, lowered code of all its non-generic functions, layouts and descriptors of its closed types |
-| Generic instantiation `f<τ>` | `BASE_INST + K_FUNCTION * ir_len(f) + K_LAYOUT * layout_closure(τ)` | lowered code, substituted types, layouts and descriptors in the closure of its types |
-| Type from a `TypeTag` (transaction type arguments) | `K_TYPE * nodes + identifier_bytes` | type nodes, type lists, identifiers, module IDs |
-| Resource type published outside lowered code | `K_LAYOUT * layout_closure(ty)` | layouts and descriptors |
-| Failed module lookup | `BASE_MODULE` | the slot and interned name left behind |
+| A module's pools: signatures, field types, instantiation signatures, IR operands (`PreparedModule::build`, destack) | `vector<T>`, `&Coin<T>`, `T` | No. Read as a template; compared only inside the module (e.g. type-keyed slot recycling). |
+| Substitution intermediates during lowering (`try_build_context`) | substituted home-slot list, callee parameter list | No. Used once to compute slot sizes. The current code interns whole lists just to pass them to `subst_type_list` (there is a `TODO(perf)` on it). |
+| Type arguments of a call, native call or closure (`CallByName`, `CallNative`, `FunctionRef`) | `[Coin<APT>]` | Yes. Key of the monomorphization cache. |
+| Resource, table-value and event types (`Exists`, `BorrowGlobal`, `MoveTo`, `InMemoryStorageKey`) | `CoinStore<APT>` | Yes. Key into block state. |
+| Types that have a layout or a GC descriptor (`Layouts::by_ty`, `Descriptors::*`) | `vector<Coin<APT>>` | Yes. The IDs end up in heap objects other transactions read. |
 
-`layout_closure` counts every nominal instantiation in the closure, not only those missing from the cache.
+Everything in the "yes" rows is a closed type: no type parameters. Everything with a type parameter is in a "no" row.
 
-A built object stores its weight next to its gas cost (`LoadedModule::cost` today), so a hit charges without recomputing.
+Today all of these go through the same interner. `PreparedModule::build` interns a module's entire signature pool, type parameters and references included, into the shared maps at load time.
 
-The constants are calibrated: tests build modules and instantiations under a counting allocator and assert `weight >= measured bytes`, over mainnet modules and adversarial ones. An underestimate is not a consensus problem, since weights are deterministic either way; it only means the real bound is looser than the configured one by the gap.
+## 3. Three spaces
 
-### 4.2 The per-transaction limit `T`
+```
+   code:   LoadedModule ── owns ──> module space (terms)
+           lowered Function
+              │
+              │ points to
+              ▼
+   key space:  names, ground types, type lists, function refs,
+               layouts, descriptors, module slots
+              ▲
+              │ points to
+   values: heap objects (descriptor ids, closure function refs),
+           block state keys
+```
 
-A counter next to the `GasMeter`, charged at the same first-use events as load gas and recorded in the same per-transaction read-set:
+**Module space.** The types written in a module's bytecode, open or closed, as *terms*. Interned in an arena the `LoadedModule` owns, with a plain single-threaded map: deduplicated within the module, meaningless outside it. Freed with the module.
 
-- first access to a module in this transaction: wherever `gas_meter.charge(module.cost())` is today;
-- first use of a generic instantiation: wherever deterministic lowering gas will be charged (`TODO(metering)` in `Loader::lower_function_with_ty_args`);
-- interning of user-supplied type arguments.
+**Key space.** Canonical *ground* (closed) types, plus the other things that are identity: identifiers and module IDs, type-argument lists, function refs, the layout and descriptor tables, module slots. Shared by all workers, as the interner is today. Small per entry.
 
-Exceeding `T` is a deterministic abort, kept and charged like out-of-gas. `T` is consensus-relevant and lives in the on-chain gas schedule. It generalizes the legacy VM's `max_num_dependencies` and `max_total_dependency_size`.
+**Code.** Modules and lowered functions. The bulk of the memory.
 
-Requirements:
+One rule about pointers: **code and values point into key space; key space points only to itself; nothing points into code except the transaction running it.** That rule is what the bounds below rest on.
 
-- **Charge before build.** On a miss, charge the weight as soon as the bytes are fetched and before deserializing, one module at a time. Today a mandatory set is fully built and inserted, then charged as a sum. The abort decision is the same either way; charging first is what keeps the memory actually built within `T`.
-- **Framework modules are exempt**, as they are from load gas and as special addresses are from the legacy dependency limits. Their total weight `F` is a per-epoch constant, and enters the bound through `E = T + F`. Instantiations of framework generics with arbitrary type arguments are not exempt.
-- **Always on.** The block executor currently runs MonoMove with `without_metering()`. The `T` meter must be enforced regardless of whether gas is.
-- **Pay before growing.** User type arguments are interned before the prologue (`user_txn/execute.rs`), so a transaction that is then discarded grows the cache for free. Intern them after the prologue.
+### 3.1 Interning
 
-### 4.3 Accounting
+`PreparedModule::build` and `destack` are already generic over `Interner`, so the split is mostly a second implementation:
 
-`Context` gains `used: AtomicUsize` (`S`). Every insert path of `ExecutionGuard` adds to it: exact bytes for arena allocations (including the duplicates an interning race leaks), stored weights for boxed objects, a fixed per-entry constant for map and table entries. A guard batches its increments and publishes them when it is dropped, at the end of the transaction, so the shared counter is not written on every allocation.
+- A **module interner** (bump arena + `UnorderedMap`) is passed to `build`. Terms, type parameters, references and the partially substituted instantiation signatures all stay in the module. Names it delegates to key space. Loading a module no longer touches the shared type maps.
+- The **key-space interner** is the existing `DashMap`-based one, holding ground types only.
+- One bridge: `instantiate(term, ty_args: &[Ty]) -> Ty`. It reads a term from any module and interns the ground result in key space. This replaces `subst_type` at the points that produce keys.
 
-Debug builds assert, per transaction, that the weight inserted through its guard does not exceed the weight charged to it.
+What lowering `f<τ>` puts into key space is then exactly what something is keyed by:
 
-### 4.4 Flushing between transactions (sequential execution)
+- the type-argument list of each call, native call and closure it contains;
+- the resource types of its global-storage ops;
+- the vector and nominal types among its slots and fields, because their layouts are looked up by type.
 
-`execute_transactions_sequential` runs one transaction, applies its writes to the block's `UnsyncMap`, and materializes its output before the next one starts. So between two transactions no session is alive, and a flush is possible, provided everything in the block that still points into the context is dealt with. Reading the wiring, that is:
+It does not intern references, parameter and return lists, or anything open. Those are computed into a scratch buffer for the duration of the lowering. `Function::param_tys` and `return_tys`, the one place substituted signatures are kept, become owned data on the function: a ground type plus a by-value / `&` / `&mut` marker.
 
-| Holder | What it holds | On flush |
+Terms and ground types get distinct Rust types (`Term`, `Ty`), with no `==` between them; `instantiate` and structural matching (as `SignatureTokenKey` does today) are the only ways across. A pointer comparison between spaces does not compile.
+
+### 3.2 What the split buys
+
+- **A module is self-contained.** Nothing outside a module points into its arena: after lowering, a function holds ground types, IDs and names only. So a `LoadedModule` can be owned by a single transaction and dropped at its end, or evicted from the cache on its own, without tracing anything. Other modules reach it only through its slot, which already handles being empty.
+- **Identity is small.** Key space holds no IR, no bytecode and no templates, so it can afford to be always shared.
+- **Local code does not fork identity.** A transaction running a module nobody else has cached still produces the same ground types, layout IDs and descriptor IDs as everyone else. Block state needs no second representation.
+
+## 4. Bounds
+
+Two budgets, because the two spaces fail differently: code is big but can be local; keys are small but cannot.
+
+```
+code memory  <=  K_max  +  W_code  +  N * E
+```
+
+### 4.1 Weights and per-transaction limits
+
+Every first use of a module or of an instantiation `f<τ>` in a transaction is an event with two deterministic weights, computed from on-chain inputs only and stored on the built object next to its gas cost:
+
+| | Code weight | Key weight |
 |---|---|---|
-| `UnsyncMap::resource_map` | `MonoValue` heap pointers under `InMemoryStorageKey` keys (which embed an `InternedType`) | cleared |
-| `UnsyncMap::arena` (`SharedArena`) | base values decoded with the context's layouts; object headers carry `DescriptorId`s | replaced with a fresh arena |
-| `UnsyncMap::groups` | group members as bytes under `StateKey` | kept |
-| committed outputs (`ret`) | materialized `TransactionOutput`s | kept |
-| `BlockGasLimitProcessor` | in-memory keys kept until the epilogue, where `materialize_storage_key` converts them | converted to `StateKey` before the flush |
-| `MonoTransactionExecutor` | an `Arc<GlobalContext>` clone; guards are taken per call | dropped and re-created, so the flush has exclusive access |
+| Module | bytecode, IR, term arena, lowered non-generic functions | identifier pool, module IDs, slot |
+| Instantiation `f<τ>` | lowered code | ground types and lists it instantiates, layouts and descriptors in their closure |
+| User type arguments, failed lookups | none | type nodes and names |
 
-Clearing `resource_map` also drops the writes of earlier transactions in this block, which later transactions must still see. They survive as bytes: on a flush, the writes of the outputs committed since the previous flush are folded into a `StateKey -> Option<StateValue>` delta, and `BlockSTMSequentialProvider` reads `resource_map`, then the delta, then `base_view`. Entries in `resource_map` are always newer than the delta, so the order is correct without any invalidation. In a block that never flushes, the delta is never built.
+A transaction is charged both, hit or miss, at the sites where load gas is charged, and aborts deterministically above `T_code` or `T_key`. Both live in the gas schedule. They generalize the legacy `max_num_dependencies` and `max_total_dependency_size`.
 
-After a flush `S` is back to what a reset leaves behind, and the next transaction reloads what it needs.
+Weights must upper-bound real bytes; tests check them against a counting allocator. On a miss the charge comes before the build, one module at a time (today a mandatory set is built, inserted, then charged as a sum).
 
-### 4.5 Flushing at block start
+### 4.2 Code: shared up to `W_code`, then local
 
-`AptosModuleCacheManager::try_lock` is where the legacy caches are size-checked and flushed per block, and where a `TODO(correctness)` already asks for the MonoMove context to be reset or version-checked. The MonoMove check goes there: flush if `S >= W_flush`.
+A built module or function is published to the shared cache only if its weight fits: reserve against an atomic counter, publish on success. Otherwise the transaction keeps it and frees it when it ends:
 
-`W_flush` sits below `W` by a headroom larger than what a normal block adds, so a block that starts below `W_flush` does not flush in the middle.
+- the read-set entry for a module becomes shared-reference or owned;
+- a function lowered for a shared module but not publishable goes in a per-transaction table keyed by its function ref.
 
-Both flushes need `&mut GlobalContext`, and the manager holds an `Arc` that it clones to executors. Either take it with `Arc::get_mut`, which succeeds exactly when no executor holds a clone, or keep the context under the manager's existing mutex.
+No transaction can build more than `E = T_code`, so code memory is at most `W_code + N * E`. The framework is preloaded and lowered at reset, counted in `W_code`, never evicted, and exempt from `T_code` as it is from load gas.
 
-When the manager's lock cannot be taken, `try_lock_inner` builds a fresh context for that block. The per-transaction check applies to it unchanged, and it is dropped with the block.
+A module can be local in one transaction and shared in the next; nothing depends on which. The read-set already pins one copy per transaction.
 
-### 4.6 Parallel execution
+At block start, if the cache is near `W_code`, drop code and keep key space. Since modules are self-contained this is safe per module, so the framework and any modules worth keeping stay; no tier or tracing is needed.
 
-MonoMove does not run in parallel yet, so this is a requirement on that work, not on today's code. The check is the same, made by each worker before it starts an incarnation; what differs is what a failed check can do, because other workers hold guards and the `MVHashMap` holds pointers.
+### 4.3 Keys: a deterministic limit per block
 
-A flush is impossible while any worker is inside a transaction, or while the `MVHashMap`, the outputs and the read sets of uncommitted transactions exist. So under concurrency a flush always means stopping every worker and giving up the speculative work past the committed prefix. There are three ways to proceed, in order of preference:
+Key space cannot be local and cannot be reclaimed while a block runs. So bound what a block can add, deterministically:
 
-- **Cut at the committed prefix and resume in parallel.** The worker whose check fails halts the scheduler, as the block gas limit already does (`scheduler.halt()`). Workers finish the incarnation they are in (the `N * E` term). The committed prefix finishes materializing, which still needs the context. Then the `MVHashMap`, and the outputs and read sets of everything uncommitted, are dropped; the context is flushed; and a fresh Block-STM run executes the remaining transactions on top of `base_view` plus the prefix's writes as bytes, the same delta as §4.4. The first transaction of each run reads only committed state, so it always commits, and every cut makes progress. Cost: the speculative work past the prefix, and a cold cache. What is new in the block executor is resuming on a suffix while carrying the block-level state across (block limit processor, delayed-field counter, output vector, epilogue index).
-- **Fall back.** Stop the parallel attempt and re-run the whole block on the sequential path, which can flush. This is the existing parallel-to-sequential fallback in `execute_block`, so it costs nothing to build, but it discards the committed prefix too and loses the block's parallelism.
-- **Private mode**, to never stop at all. The worker runs the transaction against a context it owns alone, materializes the output, and resets that context. This keeps the block parallel and is the "stop caching globally, cache per executor, free at the end" scheme. It needs a path for values to cross as bytes, because the `MVHashMap` would be keyed by `InMemoryStorageKey` and hold `MonoValue` pointers, and neither means anything to a second context (§5.2).
+- **`X_key`, a block limit like the gas limit.** At commit, in order, each transaction's first-use events are added to the block's set; an event counts once per block. When the summed key weight exceeds `X_key`, the block is cut and the rest is retried later, through the existing `BlockGasLimitProcessor`. Counting once per block is what makes the limit usable: transactions in a block share almost all of their instantiations, so honest blocks sit far below it, while a per-transaction sum would count every hit.
+- A stamp on the shared object (module slot, function ref) makes "first in this block" one compare-and-set at commit. Events with no such object, like user type arguments, are counted every time.
 
-Either way the bound is unchanged: an incarnation starts only while `S <= W`, and each of the `N` running ones adds at most `E`.
+Sequentially, every executed transaction is committed, so a block grows key space by at most `X_key + T_key`, whatever the cache held.
 
-### 4.7 Why the bound holds
+In parallel, aborted incarnations and transactions past the cut also intern. That part is not deterministic, so it gets a node-local guard: an incarnation starts only while this block's growth is below `G`; past it, the attempt halts and the block falls back to the existing sequential path, which is bounded as above. A block therefore adds at most
 
-- A transaction starts only if `S + N * E <= max_code_memory`, i.e. `S <= W`.
-- At most `N` transactions run at once, and each causes at most `E` to be built, whether those objects are already inserted (counted in `S`) or still under construction.
-- So code memory `<= W + N * E = max_code_memory`.
+```
+X_block = G + X_key + (N + 1) * T_key
+```
 
-Not covered, and bounded separately: transient working memory of deserializing and verifying one module, and value memory.
+At block start, in `AptosModuleCacheManager::try_lock`: if `K + X_block > K_max`, reset everything. That is the only time key space is reclaimed, and it is a point where nothing is running. There is no flush in the middle of a block, no private context and no bytes path for block state.
 
-### 4.8 Cost of an attack
+### 4.4 Cost of an attack
 
-Filling the cache means touching `W - S` worth of distinct on-chain code. The effect is a flush, after which hot modules are reloaded once. Memory never exceeds the bound and no result changes.
+- Filling the code cache makes the attacker's own transactions run uncached. Everyone else's cached code keeps working.
+- Reaching `X_key` cuts the block, as reaching the gas limit does, so key weight has to be priced like block capacity. Each instantiation's key weight should carry gas accordingly.
+- Reaching `K_max` over many blocks forces a reset at a block boundary, after which the framework is preloaded and hot modules reload once.
 
-How cheap that is depends on load gas. With legacy-style pricing, where the per-transaction dependency limit rather than gas is what binds, forcing a flush every block is affordable, so recovery from a flush should be made cheap rather than assumed rare: preload the framework after a reset (already a `TODO(completeness)` in `try_lock`), and see §5.3.
+## 5. Safety rules
 
-## 5. Types and interning
+The pointer rule of §3 has to be true of the code. Where it is not today:
 
-Interned types are the hard part of any bounded design, because pointer equality is used as type equality everywhere, and because types form a DAG across modules.
-
-### 5.1 In this design
-
-There is one interner. A flush drops types together with the code that embeds them, the tables indexed by IDs, and (§4.4) the block state that uses them as keys. Nothing can dangle and interning does not change.
-
-### 5.2 If a second interner is ever added (private mode)
-
-Pointer equality only holds inside one identity space, so a transaction must use exactly one interner from start to finish: all of its types are private, or all are shared. The same type may then exist in both, as two different pointers, and no transaction sees both.
-
-The consequence is at the block level. Today block state is kept in the shared identity space: `UnsyncMap` keys embed an `InternedType`, and its values are heap objects whose headers carry `DescriptorId`s and which can contain function pointers. A private transaction can neither look up nor store there.
-
-**Keys are the easy half.** `StateKey` is itself interned, in a process-wide registry that has nothing to do with `GlobalContext`: equality is `Arc::ptr_eq`, the hash is precomputed, and entries are weak, so the registry shrinks as keys are dropped and is not another cache to bound. A `StateKey` therefore means the same thing in every context and survives every flush. If block state is keyed by `StateKey` (as it is for the legacy VM, and already for MonoMove's resource groups), a private transaction looks up the same map as everyone else, and a flush has no keys to convert. The price is building the `StateKey` from `(address, InternedType)`: a `StructTag` plus a registry lookup under a read lock, once per key a transaction touches for the first time, since later accesses hit its own working map. Caching the `StructTag` on the type (the `TODO(perf)` on `nominal_tag`) removes most of that.
-
-**Values are the hard half.** A heap pointer is only valid in the context that built it. So a map entry needs two forms, a heap value or bytes, and a reader that meets the form it cannot use converts: a private reader serializes a heap value with the shared layouts (the entry must carry its type or layout for that) and decodes it with its own; a shared reader decodes bytes into the block arena. A private transaction's writes go in as bytes.
-
-That is one map with a two-form value, converted lazily on read, and it is what private mode costs. It is the reason private mode is not in Stage 1.
-
-A read-through variant (read the shared cache, write new entries to a local layer) has the same block-level problem for every key or value that involves a local type, plus two lookup levels in every cache and a standing invariant that no shared object ever stores a local pointer.
-
-### 5.3 Types owned by their defining module
-
-The idea: store each instantiation of `0x23::aggregator::Aggregator` on the `aggregator` module slot, so evicting a module frees its types, and interning stays O(1).
-
-It is sound only if a type never outlives anything it points to, and ownership by defining module does not give that:
-
-- `Option<Aggregator<u64>>` would live on `option` and point into `aggregator`. Evicting `aggregator` leaves it dangling. The type arguments of a generic have no relation to the module dependency graph, so no eviction order fixes this.
-- `Table<a::K, b::V>` points into two unrelated modules.
-- `vector<T>`, references, function types and type lists have no defining module.
-
-Evicting one module therefore needs the reverse closure of everything mentioning its types: other modules' types, layouts and descriptors (append-only tables indexed by ID), monomorphized functions keyed by type lists, call sites patched to `CallByPtr`, mandatory-set slot pointers. That is a tracing collector for code.
-
-The useful core of the idea is that **ownership should follow lifetime**: a type must live in the shortest-lived region among its components, and regions must have nested lifetimes. Per-module regions are not nested. A small fixed set of tiers is, and one extra tier is enough to be worth having:
-
-- **Pinned tier**: the framework modules and everything derived from them alone (IR, non-generic lowered code, the closed types that appear in them, their layouts and descriptors). Built only in the maintenance phase, immutable during execution, dropped only on a framework upgrade.
-- The context looks up pinned first, then itself, and may point into it.
-
-Because pinned never changes while anyone executes, there is exactly one pointer per type in view and no race to handle; because it is built only from the framework, it never points to anything shorter-lived and its content does not depend on what users send. ID tables split by range: pinned takes `[0, P)`, the context numbers from `P`. Instantiations of framework generics with non-pinned types must then be stored in the context, not inside the pinned `LoadedModule`.
-
-With it a flush keeps the framework, which is most of what a flush costs. It is a follow-up: Stage 1 is correct and bounded without it.
+1. **Closures memoize a function pointer into the heap object.** `CallClosure` flips an `Unresolved` closure to `Resolved` after the first call. That value can be written to storage and read by a later transaction, after a local function is freed. Memoize only pointers to shared functions; resolve the rest through a per-transaction cache.
+2. **Call-site patching.** `CallByPtr` is not emitted yet. When it is, shared code may be patched only to shared targets, and cross-module patching makes per-module eviction unsafe. Keep cross-module calls by name with a per-transaction inline cache.
+3. **Publishing is the only way into the shared cache**, and what is published may reference only key space and its own arena. A module or function satisfies this by construction once terms are module-local.
+4. **Pay before growing key space.** User type arguments are interned before the prologue (`user_txn/execute.rs`), so a discarded transaction grows key space for free. Intern them after.
+5. **The limits are always on.** The block executor runs MonoMove with `without_metering()` today. `T_code` and `T_key` must hold regardless.
 
 ## 6. Configuration
 
 | Parameter | Where | Meaning |
 |---|---|---|
-| `T` | on-chain gas schedule | per-transaction code-memory limit (deterministic) |
-| `K_*`, `BASE_*` | on-chain gas schedule | weight constants |
-| `max_code_memory` | `BlockExecutorModuleCacheLocalConfig` → `MaintenanceConfig` | the hard bound `W + N * E` |
-| `flush_headroom` | same | `W - W_flush` |
+| `T_code`, `T_key` | gas schedule | per-transaction limits |
+| `X_key` | on-chain block limits | distinct key weight per block |
+| weight constants | gas schedule | §4.1 |
+| `W_code`, `K_max`, `G` | `BlockExecutorModuleCacheLocalConfig` | node-local sizes |
 
-Derived at startup: `E = T + F`, `N = concurrency_level`, `W = max_code_memory - N * E`. The budget must leave `W > F`, or every transaction flushes.
-
-The node-local values can differ between validators without affecting results.
+`N = concurrency_level`. Node-local values can differ between validators without affecting results.
 
 ## 7. Implementation order
 
-Each step is useful on its own.
-
-1. **Accounting.** Weights on `LoadedModule` and `FunctionSlot`; byte counts in `GlobalArenaShard::alloc*`; `Context::used`; metrics. No behavior change.
-2. **Flush at block start** in `AptosModuleCacheManager::try_lock`, with a real `MaintenanceConfig`. Bounds growth across blocks.
-3. **Per-transaction limit.** Memory meter beside `GasMeter`; charges at first-use sites in `loader.rs`; charge-before-build in `get_verified_module_from_storage`; new deterministic error kind; type arguments interned after the prologue.
-4. **Flush between transactions** in `execute_transactions_sequential`: the check, the `UnsyncMap` reset, the bytes delta in `BlockSTMSequentialProvider`. Completes the hard bound.
-5. With parallel MonoMove execution: the prefix cut of §4.6, or the fallback until it exists.
-6. Optional: pinned tier (§5.3), private mode (§4.6).
+1. **Module interner.** `ModuleInterner`, `Term` / `Ty`, `instantiate`; `PreparedModule::build` on the module interner; lowering instantiates keys and uses scratch for the rest; owned `param_tys`. No behavior change, and module loads stop contending on the shared type maps.
+2. **Accounting.** Weights, counters for code and keys, metrics.
+3. **Reset at block start** in `try_lock`. Bounds growth across blocks.
+4. **Per-transaction limits**, charge-before-build, rule 4.
+5. **Local code** (§4.2), rules 1–3.
+6. **`X_key`** in `BlockGasLimitProcessor`; the guard `G` with parallel execution.
 
 ## 8. Alternatives considered
 
 | Alternative | Why not |
 |---|---|
-| Private per-executor context once the cache is full | Not needed while execution is sequential, where a flush between transactions does the job with one interner. For parallel execution it is an optimization over falling back, with the block-level cost in §5.2. |
-| Read-through overlay | §5.2. |
-| Check on every insert inside the VM instead of before each transaction | Makes interning fallible and adds an error path through the VM, for a tighter threshold that the `N * E` term already covers. |
-| Per-module or LRU eviction | Needs the reverse closure in §5.3. |
-| Flush only at block start | One block can add far more than `W`. |
-| Bound by gas alone, no `T` | Couples a memory bound to gas pricing. An explicit limit is what the legacy VM does too. |
+| Keys local to a transaction when the key space is full | Types, layout IDs and descriptor IDs are identity inside a block. Local ones need a freeze protocol so a type cannot be both local and shared, a split ID space, block-state keys by `StateKey`, and values exchanged as bytes whenever they contain a local descriptor. |
+| Private context per executor | Forks all identity, not only code; same block-state cost. |
+| Flush key space mid-block (between transactions, or at the committed prefix in parallel) | Works without a consensus rule, but needs block state rebuilt as bytes and, in parallel, resuming a block after a cut. It is the fallback if `X_key` is not wanted. |
+| Types owned by their defining module | `Option<Aggregator<u64>>` on `option` points into `aggregator`; `Table<a::K, b::V>` into two modules; `vector<T>` has none. Evicting a module would need the reverse closure. The split above gets the benefit differently: a module owns its terms, and ground types belong to no module. |
+| Deterministic block limit for code as well | Honest blocks touch a lot of distinct code, aborted incarnations can each load megabytes, and a cheap way to cut blocks is a worse failure than running uncached. |
+| Bound keys by gas alone | A per-transaction sum counts hits, so either the bound is useless or every transaction pays for instantiations that are already cached. |
 
 ## 9. Open questions
 
-- **Module upgrades.** The context is never invalidated today, so an upgrade leaves a stale translation cached. That needs its own answer; the flush hook in `try_lock` is where a coarse one (reset on publish) would go.
-- **Charging the framework.** Exempting it (§4.2) follows precedent and keeps framework growth from eating into `T`. Charging it would remove `F` from the formulas at the cost of transactions near the limit failing after an upgrade.
-- **Zaptos.** A flush needs a point where no block is executing against the context. With pipelined blocks sharing one context, that point has to be made, not assumed.
+- **Names.** Identifiers are interned into key space when a module is built, so a module's identifier pool is part of its key weight even when its code stays local. If that dominates `T_key`, intern names lazily, when they first appear in a ground type or a by-name call, and key a module's own function table by string.
+- **Module upgrades.** Layouts in key space outlive the module version they were computed from. The coarse answer is to reset on publish at the next block start; a real one is part of the versioning design.
+- **Parallel guard.** `G` trades wasted parallel attempts against reserved headroom, and needs measuring once MonoMove runs in parallel.
+- **Zaptos.** A reset needs a point where no block is executing against the context.
