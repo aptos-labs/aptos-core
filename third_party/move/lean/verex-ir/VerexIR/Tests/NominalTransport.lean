@@ -74,8 +74,8 @@ run_meta do
     let args := mkApp4 (mkConst ``Subtype.mk [Level.one]) (mkConst ``NRow)
       (typeArgs.getArg! 1) row (← mkEqRefl (mkConst ``Bool.true))
     withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
-      withLocalDeclD `nonempty (mkApp (mkConst ``CarriersNonempty) outer) fun nonempty => do
-        let family := mkApp3 (mkConst ``Carriers.instantiate) args outer nonempty
+      do
+        let family := mkApp2 (mkConst ``Carriers.instantiate) args outer
         let carried := mkApp2 (mkConst ``NTy.carrier) family generic
         let expected := mkApp2 (mkConst ``NTy.carrier) outer instantiated
         unless (← FamilyTransport.respellInducedFamily carried) == expected do
@@ -111,8 +111,8 @@ run_meta do
           unless ← isDefEq source expected do throwError "environment carriers do not convert"
           -- A reflexivity proof at the canonical type must also certify the
           -- original type equality in the kernel, under an arbitrary family.
-          let theoremType ← mkForallFVars #[outer, nonempty] (← mkEq source expected)
-          let proof ← mkLambdaFVars #[outer, nonempty] (← mkEqRefl expected)
+          let theoremType ← mkForallFVars #[outer] (← mkEq source expected)
+          let proof ← mkLambdaFVars #[outer] (← mkEqRefl expected)
           let suffix := if fields == nil then "nil" else if fields == cons boolean nil
             then "bool" else "heterogeneous"
           addDecl (.thmDecl {
@@ -126,3 +126,32 @@ run_meta do
     let unknown := mkConst `UnregisteredDescriptor
     unless (FamilyTransport.substituteNTy row unknown (some env)).isNone do
       throwError "arbitrary constant accepted"
+
+-- `NTy.plainFallback` stays noncomputable and equates across `Carriers.instantiate`
+-- by kernel definitional equality (`rfl`): carrier types convert definitionally,
+-- and proof irrelevance equates the two `Nonempty` witnesses.
+section PlainFallbackInstantiateDefEq
+private def fallbackArgs : TypeArgs := ⟨.cons (.int 64 false) .nil, rfl⟩
+
+example [outer : Carriers] :
+    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer) (.param 0) rfl =
+      @NTy.plainFallback outer (.int 64 false) rfl := rfl
+
+example [outer : Carriers] :
+    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer)
+      (.struct ⟨⟨0⟩, 0⟩ (.cons (.param 0) .nil) (.cons (.param 0) .nil)) rfl =
+      @NTy.plainFallback outer
+        (.struct ⟨⟨0⟩, 0⟩ (.cons (.int 64 false) .nil) (.cons (.int 64 false) .nil)) rfl := rfl
+
+example [outer : Carriers] :
+    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer)
+      (.enum ⟨⟨0⟩, 0⟩ (.cons (.param 0) .nil) ["Only"]
+        (.cons (.cons (.param 0) .nil) .nil) (by decide)) rfl =
+      @NTy.plainFallback outer
+        (.enum ⟨⟨0⟩, 0⟩ (.cons (.int 64 false) .nil) ["Only"]
+          (.cons (.cons (.int 64 false) .nil) .nil) (by decide)) rfl := rfl
+
+example [outer : Carriers] :
+    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer) (.vector (.param 0)) rfl =
+      @NTy.plainFallback outer (.vector (.int 64 false)) rfl := rfl
+end PlainFallbackInstantiateDefEq

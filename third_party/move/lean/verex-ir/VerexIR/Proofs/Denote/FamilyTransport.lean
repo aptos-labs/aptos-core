@@ -53,16 +53,13 @@ def encodingEq (family outer arguments type substituted : Lean.Expr) : MetaM Lea
   let carrier := mkApp2 (mkConst ``NTy.carrier) family type
   let outerCarrier := mkApp2 (mkConst ``NTy.carrier) outer substituted
   unless ← isDefEq carrier outerCarrier do throwError "family carriers do not convert"
-  let nonempty ← if family.isAppOfArity ``Carriers.instantiate 3 then
-      pure (family.getArg! 2)
-    else synthInstance (mkApp (mkConst ``CarriersNonempty) outer)
   let pointwise ← withLocalDeclD `value carrier fun value => do
     let transported ← mkAppOptM ``NTy.ofSkolem
-      #[some outer, some nonempty, some arguments, some type, some value]
+      #[some outer, some arguments, some type, some value]
     let same ← mkFreshExprMVar (← mkEq transported value)
     identity same.mvarId!
     let encoded ← mkAppOptM ``NTy.encode_ofSkolem
-      #[some outer, some nonempty, some arguments, some type, some value]
+      #[some outer, some arguments, some type, some value]
     let outerEncode := mkApp2 (mkConst ``NTy.encode) outer substituted
     let proof ← mkEqTrans (← mkEqSymm encoded) (← mkCongrArg outerEncode (← instantiateMVars same))
     mkLambdaFVars #[value] proof
@@ -80,9 +77,9 @@ def pointwiseIdentity (carrier : Lean.Expr) (transport : Lean.Expr → Lean.Expr
 
 /-- That carrying a caller's value into the callee's view returns it, at the
 caller's `carrier` (`pointwiseIdentity`). -/
-def toSkolemIdentity (outer nonempty arguments type carrier : Lean.Expr) : MetaM Lean.Expr :=
+def toSkolemIdentity (outer arguments type carrier : Lean.Expr) : MetaM Lean.Expr :=
   pointwiseIdentity carrier fun value =>
-    mkAppN (mkConst ``NTy.toSkolem) #[outer, nonempty, arguments, type, value]
+    mkAppN (mkConst ``NTy.toSkolem) #[outer, arguments, type, value]
 
 /-! ## Induced families
 
@@ -102,13 +99,12 @@ at one of them is the operation at the other exactly where it reads the
 family through its type.  A step that exchanges the families must therefore
 check that much and take the equality from here, rather than claim the
 exchange as a conversion. -/
-theorem inhabitantOf_instantiate_heq {Θ : Carriers} [CarriersNonempty Θ]
+theorem inhabitantOf_instantiate_heq {Θ : Carriers}
     (θ : TypeArgs) (τ : NTy) (inhabitable : τ.inhabitable = true)
     (substituted : (τ.subst θ.1).inhabitable = true) :
     HEq
-      (@NTy.inhabitantOf (Carriers.instantiate θ Θ) (CarriersNonempty.instantiate θ Θ) τ
-        inhabitable)
-      (@NTy.inhabitantOf Θ _ (τ.subst θ.1) substituted) := by
+      (@NTy.inhabitantOf (Carriers.instantiate θ Θ) τ inhabitable)
+      (@NTy.inhabitantOf Θ (τ.subst θ.1) substituted) := by
   rw [NTy.inhabitantOf_instantiate]
   exact NTy.toSkolem_heq θ τ _
 
@@ -116,10 +112,7 @@ theorem inhabitantOf_instantiate_heq {Θ : Carriers} [CarriersNonempty Θ]
 arguments induce, in either spelling: as carriers, or as the carriers of an
 induced frame. -/
 def inducedCarriers? (family : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
-  -- An induced family takes the outer family's inhabitants as well
-  -- (`Carriers.instantiate`), so it is spelled with three arguments.
-  if family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 3 ||
-      family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 2 then
+  if family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 2 then
     some (family.getArg! 0, family.getArg! 1)
   else if family.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 then
     let frame := family.getArg! 2
@@ -315,16 +308,10 @@ def respellIndex? (env : Environment) (row e : Lean.Expr) : Option Lean.Expr := 
   respellIndexArgument? env row e
 
 /-- The induced representation family an operation is at: native carriers,
-their plain-family view, or the frame after its unit and function values.
+or the frame after its unit and function values.
 Its position, type arguments, and corresponding outer representation family. -/
 def operationFamily? (args : Array Lean.Expr) : Option (Nat × Lean.Expr × Lean.Expr) :=
-  let nativeFamily? := args[0]?.bind fun family => do
-    let family := family.consumeMData
-    if family.isAppOfArity ``Carriers.toPlain 1 then
-      let (θ, outer) ← inducedCarriers? family.appArg!.consumeMData
-      return (θ, mkApp (mkConst ``Carriers.toPlain) outer)
-    inducedCarriers? family
-  match nativeFamily? with
+  match args[0]?.bind (fun family => inducedCarriers? family.consumeMData) with
   | some (θ, outer) => some (0, θ, outer)
   | none => do
       let frame := (← args[2]?).consumeMData
@@ -345,7 +332,7 @@ def respelledOperation? (t : Lean.Expr) : MetaM (Option (Lean.Expr × Nat)) := d
   -- These constructors name a family, rather than an operation at one.
   -- Induced and outer families remain distinct; their indexed native
   -- representations are what can acquire the substituted spelling.
-  if head == ``Carriers.toPlain || head == ``Skolems.toCarriers then return none
+  if head == ``Skolems.toCarriers then return none
   let args := t.getAppArgs
   let some (position, θ, outer) := operationFamily? args | return none
   let some row := substitutionRow? θ | return none
@@ -354,24 +341,13 @@ def respelledOperation? (t : Lean.Expr) : MetaM (Option (Lean.Expr × Nat)) := d
     | some name => isNominalType env e ||
         (env.isConstructor name && [``NTy, ``NRow, ``NRows].contains name.getPrefix)
     | none => false
-  -- An instance of the family's inhabitants (`CarriersNonempty`) belongs to
-  -- the family it was synthesized for: its type names that family, and the
-  -- two families are equal under the application they instantiate, not as
-  -- terms.  An argument carrying the inner family's inhabitants is
-  -- therefore replaced by the outer family's own, synthesized here, as
-  -- every transport of a value takes them (`Solve.transportAt?`); the
-  -- operation is not respelled where the outer family has none, so that no
-  -- application is built at two families.
-  let dependentAtOuter? (arg : Lean.Expr) : MetaM (Option (Option Lean.Expr)) := do
-    if arg.hasLooseBVars then return none
+  -- A recognized index whose constructor chain could not be substituted
+  -- cannot remain beside the operation's already-substituted rows. This
+  -- also catches an opaque index supplied directly as an argument.
+  let isOpaqueIndex (arg : Lean.Expr) : MetaM Bool := do
+    if arg.hasLooseBVars then return false
     let type ← whnfR (← inferType arg)
-    -- A recognized index whose constructor chain could not be substituted
-    -- cannot remain beside the operation's already-substituted rows. This
-    -- also catches an opaque index supplied directly as an argument.
-    if type.getAppFn.constName?.any indexFamilies.contains then return some none
-    let some family := type.app1? ``CarriersNonempty | return none
-    if family.consumeMData == outer.consumeMData then return none
-    return some (← synthInstance? (mkApp (mkConst ``CarriersNonempty) outer))
+    return type.getAppFn.constName?.any indexFamilies.contains
   let mut rebuiltArgs := (args.extract 0 position).push outer
   let mut typed := position + 1
   for arg in args.extract (position + 1) args.size do
@@ -387,10 +363,8 @@ def respelledOperation? (t : Lean.Expr) : MetaM (Option (Lean.Expr × Nat)) := d
     else if let some index := respellIndex? env row arg then
       rebuiltArgs := rebuiltArgs.push index
       typed := rebuiltArgs.size
-    else if let some nonempty? ← dependentAtOuter? arg then
-      let some nonempty := nonempty? | return none
-      rebuiltArgs := rebuiltArgs.push nonempty
-      typed := rebuiltArgs.size
+    else if ← isOpaqueIndex arg then
+      return none
     else rebuiltArgs := rebuiltArgs.push arg
   return some (mkAppN t.getAppFn rebuiltArgs, typed)
 
@@ -437,17 +411,13 @@ def respellInducedNode (e : Lean.Expr)
       if let some row ← spelled row then
         if let some rows' := substituteNRows row rows (some env) then return .done rows'
       return .continue
-  | ``NTy.ofSkolem, #[_, _, _, τ, value] =>
+  | ``NTy.ofSkolem, #[_, _, τ, value] =>
       if τ.consumeMData.isAppOfArity ``NTy.param 1 then return .done value
       return .continue
   | _, _ => pure ()
   let some family := args[0]? | return .continue
-  -- The plain layer names its family at the lent layer of a `Carriers`
-  -- (`Carriers.toPlain`), so the family to respell is that one's.
-  let carriers := if family.isAppOfArity ``Carriers.toPlain 1 then family.appArg! else family
-  let some (θ, outer) := inducedCarriers? carriers | return .continue
+  let some (θ, outer) := inducedCarriers? family.consumeMData | return .continue
   let some row := substitutionRow? θ | return .continue
-  let plain := mkApp (mkConst ``Carriers.toPlain) outer
   let carrier (τ : Lean.Expr) : Option Lean.Expr :=
     (substituteNTy row τ (some env)).map (mkApp2 (mkConst ``NTy.carrier) outer)
   let respelled : Option Lean.Expr ← match name, args with
@@ -460,22 +430,6 @@ def respellInducedNode (e : Lean.Expr)
         pure ((substituteNRow row fields (some env)).map (mkApp2 (mkConst ``HEnv) outer))
     | ``variantCarrier, #[_, names, rows] =>
         pure ((substituteNRows row rows (some env)).map (mkApp3 (mkConst ``variantCarrier) outer names))
-    -- The plain rows and variants a certified struct or enum carries
-    -- (`NTy.carrier`): a field row and a variant's payload are spelled at
-    -- the induced family too, in the one canonical spelling of the plain
-    -- layer (`PlainSpelling`) whichever spelling the term carried.
-    | ``NTy.plain, #[_, τ] =>
-        pure ((substituteNTy row τ (some env)).map (mkApp2 (mkConst ``NTy.plainOf) plain))
-    | ``NTy.plainOf, #[_, τ] =>
-        pure ((substituteNTy row τ (some env)).map (mkApp2 (mkConst ``NTy.plainOf) plain))
-    | ``HListPlain, #[_, fields] =>
-        pure ((substituteNRow row fields (some env)).map (mkApp2 (mkConst ``HListPlainOf) plain))
-    | ``HListPlainOf, #[_, fields] =>
-        pure ((substituteNRow row fields (some env)).map (mkApp2 (mkConst ``HListPlainOf) plain))
-    | ``variantPlain, #[_, names, rows] =>
-        pure ((substituteNRows row rows (some env)).map (mkApp3 (mkConst ``variantPlainOf) plain names))
-    | ``variantPlainOf, #[_, names, rows] =>
-        pure ((substituteNRows row rows (some env)).map (mkApp3 (mkConst ``variantPlainOf) plain names))
     | ``Carriers.carrier, #[_, index] =>
         pure do carrier (← rowEntry? row (← index.nat? <|> index.rawNatLit?))
     | ``ResultShape.carrier, #[_, shape] => do
@@ -499,16 +453,11 @@ def respellInducedNode (e : Lean.Expr)
             pure (some reduced)
           else pure (some order)
         else pure (some order)
-    | ``NTy.inhabitantOf, #[_, _, τ, _] => do
+    | ``NTy.inhabitantOf, #[_, τ, _] => do
         let some substituted := substituteNTy row τ (some env) | pure none
         let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
           (← mkEq (mkApp (mkConst ``NTy.inhabitable) substituted) (mkConst ``Bool.true))
-        -- The outer family's inhabitants, which the induced family's are
-        -- derived from (`CarriersNonempty.instantiate`): the term being
-        -- respelled could not exist without them.
-        let some nonempty ← synthInstance? (mkApp (mkConst ``CarriersNonempty) outer)
-          | pure none
-        pure (some (mkApp4 (mkConst ``NTy.inhabitantOf) outer nonempty substituted decided))
+        pure (some (mkApp3 (mkConst ``NTy.inhabitantOf) outer substituted decided))
     | _, _ => pure none
   -- A respelling of a VALUE the family decides is not a conversion: the
   -- two defaults of a type, and the two orders of a parameter, are one

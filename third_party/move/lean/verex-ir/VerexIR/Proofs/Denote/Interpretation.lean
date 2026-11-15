@@ -6,7 +6,7 @@ import VerexIR.Proofs.Denote.Types
 /-!
 # Carrier and state interpretations
 
-The local certifying operation depends on a carrier family and a state type,
+The local checking operation depends on a carrier family and a state type,
 not on a total transport to runtime values. The shared term interpreter in
 `Term` extends this interface with explicit external operations. A given frame
 alone does not transport a generic theorem to runtime; that requires explicit
@@ -24,13 +24,12 @@ structure Interpretation where
 abbrev Interpretation.Comp (interpretation : Interpretation) (α : Type) :=
   Spec interpretation.State Failure α
 
-/-- Certification needs no runtime-frame bijection. Declared invariants and
-structural certificates are still supplied by the chosen carrier family. -/
-noncomputable def Interpretation.certifying (interpretation : Interpretation)
-    (τ : NTy) (value : @NTy.plain interpretation.carriers τ) :
-    interpretation.Comp (@NTy.carrier interpretation.carriers τ) :=
-  Spec.certified (Invariant := @NTy.deepHolds interpretation.carriers τ value)
-    (@NTy.ofDeepHolds interpretation.carriers τ value)
+/-- Checking needs no runtime-frame bijection. Declared invariants and
+parameter predicates are still supplied by the chosen carrier family. -/
+def Interpretation.checking (interpretation : Interpretation)
+    (τ : NTy) (value : @NTy.carrier interpretation.carriers τ) :
+    interpretation.Comp PUnit :=
+  Spec.certified (Invariant := @NTy.Holds interpretation.carriers τ value) (fun _ => ())
 
 /-- The existing concrete denotation's interpretation. Its state remains
 certified runtime memory; its family retains every concrete invariant. -/
@@ -39,17 +38,16 @@ certified runtime memory; its family retains every concrete invariant. -/
   carriers := Θ.toCarriers
   State := Memory unit
 
-/-- The concrete adapter is exactly the existing certifying computation. -/
-theorem Interpretation.certifying_concrete {unit : Validation.ValidatedUnit}
-    [FunctionCarriers unit] [Skolems unit] (τ : NTy) (value : τ.plain) :
-    (Interpretation.concrete unit).certifying τ value =
-      (Spec.certified (Invariant := NTy.deepHolds τ value)
-        (NTy.ofDeepHolds τ value) : VerexIR.Proofs.Denote.Comp unit τ.carrier) := rfl
+/-- The concrete adapter is exactly the concrete checking computation. -/
+theorem Interpretation.checking_concrete {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] [Skolems unit] (τ : NTy) (value : τ.carrier) :
+    (Interpretation.concrete unit).checking τ value =
+      (Spec.certified (Invariant := NTy.Holds τ value) (fun _ => ()) :
+        VerexIR.Proofs.Denote.Comp unit PUnit) := rfl
 
-/-- A given parameter is one uninterpreted sort. The plain and certified
-API roles use this same representation because a generic body neither opens
+/-- A given parameter is one uninterpreted sort. A generic body neither opens
 nor constructs a parameter value. Concrete parameter views and nominal ADT
-certificates are separate and are related to this frame explicitly. -/
+invariants are separate and are related to this frame explicitly. -/
 structure GivenFrame where
   operations : Carriers
 
@@ -80,33 +78,15 @@ is introduced into generic clauses. -/
     exact { compare := (Carriers.orders index).order rank,
             lawful := inferInstance, trans := inferInstance }
 
-/-- Choose the canonical representation of each given parameter. The source
-operations' potentially invariant-bearing lent layer is not inherited. -/
+/-- Choose the canonical representation of each given parameter. While the
+Given route is parked (`U2`), parameter well-formedness in the frame stays
+`True`; the relational transfer boundary (`RelationalTransfer.lean`,
+`GivenTransfer.lean`) still requires explicit `validArgs`/`validResult`
+evidence before exporting a concrete theorem. -/
 @[reducible] def GivenFrame.toCarriers (frame : GivenFrame) : Carriers :=
   { frame.operations with
     reads := frame.parameterReads
-    lent := fun index => {
-      carrier := frame.operations.carrier index
-      codec := frame.operations.codec index
-      decEq := frame.operations.decEq index
-      inhabited := frame.operations.inhabited index
-      tight := frame.operations.tight index
-      plain := frame.operations.plain index
-      orders := frame.operations.orders index
-      erasures := frame.operations.erasures index
-      of := id
-      encode_of := fun _ => rfl
-      holds := fun _ => True
-      holds_of := fun _ => trivial
-      certify := fun value _ => value
-      of_certify := fun _ _ => rfl
-      certify_of := fun _ => rfl }
-    plainRead := fun index => ⟨id, fun value => by
-      change value = (frame.operations.reads index).unread
-        ((frame.operations.reads index).back ((frame.operations.codec index).encode value))
-      rw [← (frame.operations.reads index).write_read value,
-        (frame.operations.reads index).back_write,
-        (frame.operations.reads index).unread_read]⟩ }
+    holds := fun _ _ => True }
 
 /-- A given interpretation can choose its state independently of runtime
 memory. Relating that state to concrete memory is separate work. -/
@@ -114,10 +94,16 @@ memory. Relating that state to concrete memory is separate work. -/
   carriers := frame.toCarriers
   State := state
 
-/-- Parameter well-formedness has no obligation in a given frame. -/
+/-- Parameter well-formedness has no obligation in a parked given frame. -/
 theorem GivenFrame.deepHolds_param (frame : GivenFrame) (index : Nat)
-    (value : @NTy.plain frame.toCarriers (.param index)) :
+    (value : @NTy.carrier frame.toCarriers (.param index)) :
     @NTy.deepHolds frame.toCarriers (.param index) value = True := rfl
+
+@[simp] theorem GivenFrame.holds_param (frame : GivenFrame) (index : Nat)
+    (value : @NTy.carrier frame.toCarriers (.param index)) :
+    @NTy.Holds frame.toCarriers (.param index) value :=
+  letI : Carriers := frame.toCarriers
+  ⟨trivial⟩
 
 /-- Choosing given parameter sorts does not erase an ADT's declared invariant. -/
 theorem GivenFrame.own_eq (frame : GivenFrame) (source : StructHandle)
@@ -125,18 +111,18 @@ theorem GivenFrame.own_eq (frame : GivenFrame) (source : StructHandle)
     @Carriers.own frame.toCarriers source arguments value =
       frame.operations.own source arguments value := rfl
 
-/-- A parameter cut preserves the canonical abstract value and asks for no
-parameter invariant. -/
-theorem GivenFrame.certifying_param (frame : GivenFrame) (state : Type) (index : Nat)
-    (value : @NTy.plain frame.toCarriers (.param index)) :
-    (frame.interpretation state).certifying (.param index) value =
-      Spec.pure value := by
-  simp only [Interpretation.certifying, Spec.certified, Spec.pure, Spec.mk.injEq]
+/-- A parameter check asks for no parameter invariant in a parked given frame. -/
+theorem GivenFrame.checking_param (frame : GivenFrame) (state : Type) (index : Nat)
+    (value : @NTy.carrier frame.toCarriers (.param index)) :
+    (frame.interpretation state).checking (.param index) value =
+      Spec.pure () := by
+  letI : Carriers := frame.toCarriers
+  simp only [Interpretation.checking, Spec.certified, Spec.pure, Spec.mk.injEq]
   refine ⟨?_, trivial, ?_⟩
   · funext initial result final
     exact propext ⟨fun ⟨_, result_eq, final_eq⟩ => ⟨result_eq, final_eq⟩,
-      fun ⟨result_eq, final_eq⟩ => ⟨trivial, result_eq, final_eq⟩⟩
+      fun ⟨result_eq, final_eq⟩ => ⟨⟨trivial⟩, result_eq, final_eq⟩⟩
   · funext _
-    exact propext ⟨fun fails => fails trivial, False.elim⟩
+    exact propext ⟨fun fails => fails ⟨trivial⟩, False.elim⟩
 
 end VerexIR.Proofs.Denote

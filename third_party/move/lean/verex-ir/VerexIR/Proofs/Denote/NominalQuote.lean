@@ -273,8 +273,8 @@ def quoteResolvedNativeType (types : Lean.Expr) (type : NTy) : MetaM Lean.Expr :
   quoteNativeCore (fun index => pure ((mkApp types (toExpr index)).headBeta)) false [] type
 
 mutual
-/-- Syntactic `NTy.certificateFree` check avoiding `whnf` unfolding of nominal descriptors. -/
-partial def syntacticCertificateFree? (env : Environment) (e : Lean.Expr) : Option Bool :=
+/-- Syntactic `NTy.invariantFree` check avoiding `whnf` unfolding of nominal descriptors. -/
+partial def syntacticInvariantFree? (env : Environment) (e : Lean.Expr) : Option Bool :=
   let e := e.consumeMData
   if isNominalType env e then some false
   else match e.getAppFn with
@@ -293,52 +293,52 @@ partial def syntacticCertificateFree? (env : Environment) (e : Lean.Expr) : Opti
             (name == ``NTy.array && n == 2) || (name == ``NTy.ref && n == 1) ||
             (name == ``NTy.sliceRef && n == 1) || (name == ``NTy.observed && n == 1) ||
             (name == ``NTy.ghost && n == 1) then
-          syntacticCertificateFree? env (e.getArg! 0)
+          syntacticInvariantFree? env (e.getArg! 0)
         else if name == ``NTy.table && n == 2 then
-          match syntacticCertificateFree? env (e.getArg! 0) with
+          match syntacticInvariantFree? env (e.getArg! 0) with
           | some false => some false
-          | some true => syntacticCertificateFree? env (e.getArg! 1)
+          | some true => syntacticInvariantFree? env (e.getArg! 1)
           | none =>
-              if syntacticCertificateFree? env (e.getArg! 1) == some false then some false else none
+              if syntacticInvariantFree? env (e.getArg! 1) == some false then some false else none
         else if name == ``NTy.tuple && n == 1 then
-          syntacticRowCertificateFree? env (e.getArg! 0)
+          syntacticRowInvariantFree? env (e.getArg! 0)
         else none
     | _ => none
 
-partial def syntacticRowCertificateFree? (env : Environment) (e : Lean.Expr) : Option Bool :=
+partial def syntacticRowInvariantFree? (env : Environment) (e : Lean.Expr) : Option Bool :=
   let e := e.consumeMData
   match e.getAppFn with
   | .const name _ =>
       let n := e.getAppNumArgs
       if name == ``NRow.nil && n == 0 then some true
       else if name == ``NRow.cons && n == 2 then
-        match syntacticCertificateFree? env (e.getArg! 0) with
+        match syntacticInvariantFree? env (e.getArg! 0) with
         | some false => some false
-        | some true => syntacticRowCertificateFree? env (e.getArg! 1)
+        | some true => syntacticRowInvariantFree? env (e.getArg! 1)
         | none =>
-            if syntacticRowCertificateFree? env (e.getArg! 1) == some false then some false else none
+            if syntacticRowInvariantFree? env (e.getArg! 1) == some false then some false else none
       else none
   | _ => none
 end
 
-/-- Shared `NTy.certificateFree` check: syntactic fast-path first, falling back to `whnf` only on
+/-- Shared `NTy.invariantFree` check: syntactic fast-path first, falling back to `whnf` only on
 unclassified closed type expressions. -/
-def isCertificateFreeNTy (τ : Lean.Expr) : MetaM Bool := do
+def isInvariantFreeNTy (τ : Lean.Expr) : MetaM Bool := do
   if τ.hasFVar || τ.hasMVar || (τ.find? (·.isAppOf ``NTy.param)).isSome then return false
-  match syntacticCertificateFree? (← getEnv) τ with
+  match syntacticInvariantFree? (← getEnv) τ with
   | some result => return result
   | none =>
-      let cf := mkApp (mkConst ``NTy.certificateFree) τ
+      let cf := mkApp (mkConst ``NTy.invariantFree) τ
       return (← (try withDefault (whnf cf) catch _ => pure cf)).isConstOf ``Bool.true
 
-/-- Shared `NRow.certificateFree` check: syntactic fast-path first, falling back to `whnf` only on
+/-- Shared `NRow.invariantFree` check: syntactic fast-path first, falling back to `whnf` only on
 unclassified closed row expressions. -/
-def isCertificateFreeNRow (Γ : Lean.Expr) : MetaM Bool := do
+def isInvariantFreeNRow (Γ : Lean.Expr) : MetaM Bool := do
   if Γ.hasFVar || Γ.hasMVar || (Γ.find? (·.isAppOf ``NTy.param)).isSome then return false
-  match syntacticRowCertificateFree? (← getEnv) Γ with
+  match syntacticRowInvariantFree? (← getEnv) Γ with
   | some result => return result
   | none =>
-      let cf := mkApp (mkConst ``NRow.certificateFree) Γ
+      let cf := mkApp (mkConst ``NRow.invariantFree) Γ
       return (← (try withDefault (whnf cf) catch _ => pure cf)).isConstOf ``Bool.true
 
 /-- Find a hypothesis in the local context proving `expected` (`NTy.Holds ...`),
@@ -354,77 +354,6 @@ def findHoldsHypothesis? (expected : Lean.Expr) : MetaM (Option Lean.Expr) := do
     unless ty.isAppOfArity ``NTy.Holds 3 do continue
     if ← withNewMCtxDepth (isDefEq ty expected) then
       return some decl.toExpr
-  return none
-
-/-- Peel `Prod.fst` and `Prod.snd` projections applied to explicit `Prod.mk` pairs. -/
-private partial def peelProdProjections (e : Lean.Expr) : Lean.Expr :=
-  let e := e.consumeMData.headBeta
-  if e.isAppOfArity ``Prod.fst 3 then
-    let pair := peelProdProjections (e.getArg! 2)
-    if pair.isAppOfArity ``Prod.mk 4 then peelProdProjections (pair.getArg! 2) else e
-  else if e.isAppOfArity ``Prod.snd 3 then
-    let pair := peelProdProjections (e.getArg! 2)
-    if pair.isAppOfArity ``Prod.mk 4 then peelProdProjections (pair.getArg! 3) else e
-  else match e with
-    | .proj ``Prod 0 s =>
-        let pair := peelProdProjections s
-        if pair.isAppOfArity ``Prod.mk 4 then peelProdProjections (pair.getArg! 2) else e
-    | .proj ``Prod 1 s =>
-        let pair := peelProdProjections s
-        if pair.isAppOfArity ``Prod.mk 4 then peelProdProjections (pair.getArg! 3) else e
-    | _ => e
-
-/-- Close `NTy.Holds carriers τ value` in O(1) when stated by a local hypothesis or when `value`
-is `NTy.forget` or a certified `NTy.carrier` / `Subtype` value (including eta-expanded projections
-such as `(c.val.fst, ())` after `vir_denote` normalizes `NTy.forget τ c`). -/
-def trivialHoldsProof? (carriers τ value : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let expected := mkApp3 (mkConst ``NTy.Holds) carriers τ value
-  if let some proof ← findHoldsHypothesis? expected then
-    return some proof
-  let val := peelProdProjections value
-  let hintIfNeeded (raw : Lean.Expr) : MetaM (Option Lean.Expr) := do
-    if val == value.consumeMData.headBeta then return some raw
-    observing? (mkExpectedTypeHint raw expected)
-  if val.isAppOfArity ``NTy.forget 3 then
-    if ← withNewMCtxDepth (isDefEq (val.getArg! 0) carriers <&&> isDefEq (val.getArg! 1) τ) then
-      if let some p ← hintIfNeeded (mkApp3 (mkConst ``NTy.holds_forget) carriers τ (val.getArg! 2)) then
-        return some p
-  if val.isAppOfArity ``Subtype.val 3 then
-    let c := val.getArg! 2
-    let cTy := (← whnfR (← instantiateMVars (← inferType c))).consumeMData
-    if cTy.isAppOfArity ``NTy.carrier 2 then
-      if ← withNewMCtxDepth (isDefEq (cTy.getArg! 0) carriers <&&> isDefEq (cTy.getArg! 1) τ) then
-        if let some hinted ← observing?
-            (mkExpectedTypeHint (mkApp3 (mkConst ``NTy.holds_forget) carriers τ c) expected) then
-          return some hinted
-    let p := (val.getArg! 1).consumeMData
-    let matchesDeep ← withLocalDeclD `row (val.getArg! 0) fun row => do
-      let body := (p.beta #[row]).consumeMData
-      if body.isAppOfArity ``NTy.deepHolds 3 && body.appArg! == row then
-        withNewMCtxDepth (isDefEq (body.getArg! 0) carriers <&&> isDefEq (body.getArg! 1) τ)
-      else pure false
-    if matchesDeep then
-      let prop := mkApp3 (mkConst ``Subtype.property) (val.getArg! 0) p c
-      if let some p ← hintIfNeeded (mkApp4 (mkConst ``NTy.Holds.intro) carriers τ val prop) then
-        return some p
-  let fvars := (collectFVars {} val).fvarIds
-  if fvars.size > 0 && fvars.size ≤ 4 then
-    let matchesType (cTau : Lean.Expr) : MetaM Bool := do
-      if ← withReducible (withNewMCtxDepth (isDefEq cTau τ)) then return true
-      let v1 ← (try nativeTypeView cTau catch _ => pure cTau)
-      let v2 ← (try nativeTypeView τ catch _ => pure τ)
-      withNewMCtxDepth (isDefEq v1 v2)
-    for fvarId in fvars do
-      if ((← getLCtx).find? fvarId).isNone then continue
-      let cTy := (← whnfR (← instantiateMVars (← fvarId.getType))).consumeMData
-      if cTy.isAppOfArity ``NTy.carrier 2 then
-        if ← withNewMCtxDepth (isDefEq (cTy.getArg! 0) carriers) <&&> matchesType (cTy.getArg! 1) then
-          let cTau := cTy.getArg! 1
-          let forgotten := mkApp3 (mkConst ``NTy.forget) (cTy.getArg! 0) cTau (mkFVar fvarId)
-          if ← withDefault (withNewMCtxDepth (isDefEq val forgotten)) then
-            let raw := mkApp3 (mkConst ``NTy.holds_forget) (cTy.getArg! 0) cTau (mkFVar fvarId)
-            if let some hinted ← observing? (withDefault (mkExpectedTypeHint raw expected)) then
-              return some hinted
   return none
 
 end VerexIR.Proofs.Denote
