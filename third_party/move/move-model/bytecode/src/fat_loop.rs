@@ -19,6 +19,7 @@ use crate::{
     graph::{Graph, NaturalLoop},
     stackless_bytecode::{AttrId, BorrowNode, Bytecode, Label, Operation, PropKind},
     stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
+    system_address_analysis::system_address_bound,
     usage_analysis,
 };
 use anyhow::bail;
@@ -841,12 +842,14 @@ impl FatLoopBuilder<'_> {
             }
         }
         // The world memory stands for every memory (see `GlobalEnv::world_memory`); the
-        // accessed footprint is added as well so that its well-formedness is re-assumed.
+        // accessed footprint is added as well so that its well-formedness is re-assumed, except
+        // a memory code outside the program cannot write: only the body's own writes change it.
         if touches_world {
             for mem in usage_analysis::get_memory_usage(func_target)
                 .accessed
                 .all
                 .iter()
+                .filter(|mem| !system_address_bound(env, &mem.to_qualified_id()))
             {
                 add(mem.clone());
             }

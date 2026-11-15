@@ -1,0 +1,28 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:23:9
+   │
+23 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:20: run
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:22: run (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:20: run
+   =         fw = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:23: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:46:9
+   │
+46 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:43: gated_invoke
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:45: gated_invoke (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:43: gated_invoke
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_unchecked.move:46: gated_invoke (spec)

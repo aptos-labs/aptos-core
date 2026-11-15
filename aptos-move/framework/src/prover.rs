@@ -128,6 +128,11 @@ pub struct ProverOptions {
     #[clap(long)]
     pub no_infer_lambda_specs: bool,
 
+    /// Whether code a function value runs is trusted to hold no signer for a fixed system
+    /// address; see the prover option of the same name. On unless set to `false`.
+    #[clap(long, require_equals = true)]
+    pub trust_system_address_signers: Option<bool>,
+
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
@@ -338,6 +343,9 @@ impl ProverOptions {
                 skip_loop_analysis: self.keep_loops || base_opts.prover.skip_loop_analysis,
                 no_infer_lambda_specs: self.no_infer_lambda_specs
                     || base_opts.prover.no_infer_lambda_specs,
+                trust_system_address_signers: self
+                    .trust_system_address_signers
+                    .unwrap_or(base_opts.prover.trust_system_address_signers),
                 ..base_opts.prover.clone()
             },
             backend: move_prover_boogie_backend::options::BoogieOptions {

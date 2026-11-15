@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_struct.move:41:9
+   │
+41 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_struct.move:38: gated_invoke
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_struct.move:40: gated_invoke (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_struct.move:38: gated_invoke
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_struct.move:41: gated_invoke (spec)

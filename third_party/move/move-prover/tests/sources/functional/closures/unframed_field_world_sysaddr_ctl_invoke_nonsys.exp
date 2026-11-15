@@ -1,0 +1,6 @@
+warning: WP could not characterize the aborts of `account::__lambda__1__resource_signer` exactly, so its emitted `aborts_if` clauses are a lower bound and the specification carries `aborts_if_is_partial`. Complete the abort behavior and remove that pragma before relying on the contract. Reasons:
+  = callee `0x1::create_signer::create_signer` has no trusted complete abort summary
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_ctl_invoke_nonsys.move:22:38
+   │
+22 │         let f: |vector<u8>| signer = |s| create_signer::create_signer(create_resource_address(&@0x1, s));
+   │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

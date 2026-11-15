@@ -45,7 +45,7 @@ error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/closures/unframed_field_reentrancy.move:59:5
    │
 24 │     public fun dispatched(x: u64): u64 acquires Hook { run_hook(x) }
-   │                                                        ----------- abort happened here with code 0x5
+   │                                                        ----------- abort happened here with code 0x6
    ·
 59 │     spec check_aborts { aborts_if false; }
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

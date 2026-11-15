@@ -26,7 +26,10 @@ use move_prover_bytecode_pipeline::{
     number_operation::GlobalNumberOperationState,
     pipeline_factory,
 };
-use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
+use move_stackless_bytecode::{
+    function_target_pipeline::FunctionTargetsHolder,
+    system_address_analysis::set_trust_system_address_signers,
+};
 use std::{
     fs,
     path::Path,
@@ -247,6 +250,7 @@ fn run_move_prover_with_model_v2_internal<W: WriteColor>(
 
     // Function values may touch state no verification root translates.
     env.add_world_memory_if_needed();
+    set_trust_system_address_signers(env, options.prover.trust_system_address_signers);
 
     // Populate initial number operation state for each function and struct based on the pragma
     create_init_num_operation_state(env);

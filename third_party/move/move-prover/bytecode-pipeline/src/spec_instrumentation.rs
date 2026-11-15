@@ -41,6 +41,7 @@ use move_stackless_bytecode::{
         AbortAction, AssignKind, AttrId, BorrowEdge, BorrowNode, Bytecode, HavocKind, Label,
         Operation, PropKind,
     },
+    system_address_analysis::system_address_bound,
     usage_analysis,
     usage_analysis::{ReachedEffects, UsageState},
     COMPILED_MODULE_AVAILABLE,
@@ -3005,7 +3006,8 @@ impl<'a> Instrumenter<'a> {
     }
 
     /// Havocs the world memory, which the backend expands to every memory, then the memory
-    /// this function accesses again, to re-assume its well-formedness.
+    /// this function accesses again, to re-assume its well-formedness. Neither touches a memory
+    /// code outside the program cannot write (`system_address_bound`).
     fn emit_world_havoc(&mut self) {
         let env = self.builder.global_env();
         if let Some(world) = env.world_memory() {
@@ -3018,7 +3020,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter(|mem| {
                 let qid = mem.to_qualified_id();
-                !env.is_world_memory(&qid)
+                !env.is_world_memory(&qid) && !system_address_bound(env, &qid)
             })
             .cloned()
             .collect_vec();

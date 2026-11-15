@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:25:9
+   │
+25 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:22: go
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:24: go (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:22: go
+   =         fw = <redacted>
+   =         h = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:18: apply
+   =         h = <redacted>
+   =         x = <redacted>
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:25: go (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:48:9
+   │
+48 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:45: gated_invoke
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:47: gated_invoke (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:45: gated_invoke
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_generic.move:48: gated_invoke (spec)

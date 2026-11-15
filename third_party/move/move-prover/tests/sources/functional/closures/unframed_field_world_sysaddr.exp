@@ -1,0 +1,317 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:338:44
+    │
+338 │     public fun peruser_any(c: &Cb, x: u64, a: address): u64 { (c.f)(x) }
+    │                                            ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:352:47
+    │
+352 │     public fun unasserted_any(c: &Cb, x: u64, a: address): u64 { (c.f)(x) }
+    │                                               ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:394:49
+    │
+394 │     public fun other_signer_any(c: &Cb, x: u64, a: address): u64 { (c.f)(x) }
+    │                                                 ^
+
+warning: Unused value of parameter `a`. Consider removing the parameter, or prefixing with an underscore (e.g., `_a`), or binding to `_`
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:457:42
+    │
+457 │     public fun maybe_any(c: &Cb, x: u64, a: address): u64 { (c.f)(x) }
+    │                                          ^
+
+warning: opaque call to `sa_cycle::a` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:152:5
+    │
+152 │     spec a { pragma opaque; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: opaque call to `sa_cycle::b` has an incomplete modifies frame; verification weakens its summary by havocing every address of 1 resource type
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:153:5
+    │
+153 │     spec b { pragma opaque; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:324:9
+    │
+324 │         ensures false;
+    │         ^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:321: gated_false
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:323: gated_false (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:321: gated_false
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:324: gated_false (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:334:9
+    │
+334 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:328: gated_own_write
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:333: gated_own_write (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:328: gated_own_write
+    =         fw = <redacted>
+    =         c = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:329: gated_own_write
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:29: set
+    =         fw = <redacted>
+    =         v = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:30: set
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:9: assert_aptos_framework
+    =         s = <redacted>
+    =     at ../move-stdlib/sources/signer.move:30: address_of
+    =         s = <redacted>
+    =     at ../move-stdlib/sources/signer.move:31: address_of
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:9: assert_aptos_framework
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:31: set
+    =     at ../move-stdlib/sources/signer.move:30: address_of
+    =         s = <redacted>
+    =     at ../move-stdlib/sources/signer.move:31: address_of
+    =         result = <redacted>
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:29: set
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:330: gated_own_write
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:328: gated_own_write
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:334: gated_own_write (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:341:9
+    │
+341 │         ensures global<sa_peruser::R>(a) == old(global<sa_peruser::R>(a));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:338: peruser_any
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:340: peruser_any (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:338: peruser_any
+    =         c = <redacted>
+    =         x = <redacted>
+    =         a = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:341: peruser_any (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:348:9
+    │
+348 │         ensures global<sa_peruser::R>(@0x1) == old(global<sa_peruser::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:345: peruser_fw
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:347: peruser_fw (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:345: peruser_fw
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:348: peruser_fw (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:355:9
+    │
+355 │         ensures global<sa_unasserted::R>(a) == old(global<sa_unasserted::R>(a));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:352: unasserted_any
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:354: unasserted_any (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:352: unasserted_any
+    =         c = <redacted>
+    =         x = <redacted>
+    =         a = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:355: unasserted_any (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:362:9
+    │
+362 │         ensures global<sa_unasserted::R>(@0x1) == old(global<sa_unasserted::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:359: unasserted_fw
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:361: unasserted_fw (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:359: unasserted_fw
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:362: unasserted_fw (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:383:9
+    │
+383 │         ensures global<sa_const_public::R>(@0x1) == old(global<sa_const_public::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:380: const_public_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:382: const_public_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:380: const_public_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:383: const_public_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:390:9
+    │
+390 │         ensures global<sa_native::R>(@0x1) == old(global<sa_native::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:387: native_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:389: native_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:387: native_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:390: native_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:397:9
+    │
+397 │         ensures global<sa_other_signer::R>(a) == old(global<sa_other_signer::R>(a));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:394: other_signer_any
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:396: other_signer_any (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:394: other_signer_any
+    =         c = <redacted>
+    =         x = <redacted>
+    =         a = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:397: other_signer_any (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:404:9
+    │
+404 │         ensures global<sa_checked::R>(@0x1) == old(global<sa_checked::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:401: past_gate_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:403: past_gate_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:401: past_gate_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:404: past_gate_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:411:9
+    │
+411 │         ensures global<sa_minted_pub::R>(@0x1) == old(global<sa_minted_pub::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:408: minted_pub_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:410: minted_pub_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:408: minted_pub_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:411: minted_pub_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:425:9
+    │
+425 │         ensures global<sa_cycle::R>(@0x1) == old(global<sa_cycle::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:422: cycle_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:424: cycle_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:422: cycle_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:425: cycle_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:432:9
+    │
+432 │         ensures global<sa_closure::R>(@0x1) == old(global<sa_closure::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:429: closure_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:431: closure_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:429: closure_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:432: closure_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:446:9
+    │
+446 │         ensures global<sa_inline_user::R>(@0x60) == old(global<sa_inline_user::R>(@0x60));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:443: inline_user_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:445: inline_user_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:443: inline_user_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:446: inline_user_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:460:9
+    │
+460 │         ensures global<sa_maybe::R>(a) == old(global<sa_maybe::R>(a));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:457: maybe_any
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:459: maybe_any (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:457: maybe_any
+    =         c = <redacted>
+    =         x = <redacted>
+    =         a = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:460: maybe_any (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:474:9
+    │
+474 │         ensures global<sa_gov_unchecked::R>(@0x1) == old(global<sa_gov_unchecked::R>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:471: gov_unchecked_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:473: gov_unchecked_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:471: gov_unchecked_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:474: gov_unchecked_invoke (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr.move:488:9
+    │
+488 │         ensures global<sa_cap::S>(@0x1) == old(global<sa_cap::S>(@0x1));
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:485: cap_open_invoke
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:487: cap_open_invoke (spec)
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:485: cap_open_invoke
+    =         c = <redacted>
+    =         x = <redacted>
+    =         <redacted> = <redacted>
+    =         result = <redacted>
+    =     at tests/sources/functional/closures/unframed_field_world_sysaddr.move:488: cap_open_invoke (spec)

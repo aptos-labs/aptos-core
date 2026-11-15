@@ -120,6 +120,25 @@ pub struct ProverOptions {
     /// instead of creating Identical temps.
     #[arg(long, default_value_t = false)]
     pub inline_spec_lets: bool,
+    /// Whether code a function value runs is trusted to obtain (receive or keep) no signer for a
+    /// fixed system address (@0x0, @0x1..@0xa, @core_resources); signers the program mints and
+    /// consumes internally are covered by the analysis of where they go. Then a memory every write
+    /// of which is at such an address, behind a check on a signer that code would have to supply,
+    /// is left unchanged where such code runs. Rests on a trusted fact: object and
+    /// resource-account signers are hash-derived and never equal a system address, and the
+    /// framework paths returning a framework signer (`aptos_governance::resolve` and the others
+    /// the analysis lists as trusted signer sources) are gated: a proposal on the transaction's
+    /// script hash, so no approved governance script may run third-party code before resolving
+    /// its proposal. Opt out with `--trust-system-address-signers=false`.
+    #[arg(
+        long,
+        default_value_t = true,
+        action = clap::ArgAction::Set,
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "true"
+    )]
+    pub trust_system_address_signers: bool,
 }
 
 // add custom struct for mutation options
@@ -149,6 +168,7 @@ impl Default for ProverOptions {
             borrow_natives: vec![],
             verify_exclude: vec![],
             inline_spec_lets: false,
+            trust_system_address_signers: true,
         }
     }
 }

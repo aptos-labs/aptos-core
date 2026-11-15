@@ -79,6 +79,7 @@ use move_stackless_bytecode::{
         AbortAction, AttrId, BorrowEdge, BorrowNode, Bytecode, Constant, HavocKind, IndexEdgeKind,
         Operation, PropKind,
     },
+    system_address_analysis::system_address_bound,
     usage_analysis,
 };
 use std::{
@@ -1861,10 +1862,11 @@ impl<'env> BoogieTranslator<'env> {
     /// Havocs `memory` in an `$apply` branch, keeping existence where
     /// `havoc_keeps_existence` says so. The pre-havoc value goes to the `_$frame` local, which
     /// the procedure declares for every memory; frame conditions emitted after this read the
-    /// same pre-havoc value. A spec variable no unknown code can reach an update of is not
-    /// havoced. A locked memory is kept only when the code is unknown: the summary of a
-    /// `known_target` writes what the target writes, and the caller turns a write of a locked
-    /// memory into an abort.
+    /// same pre-havoc value. A memory no invoked function value can write
+    /// (`system_address_bound`: neither code outside the program nor a closure target), and a
+    /// spec variable no unknown code can reach an update of, are not havoced. A locked memory is
+    /// kept only when the code is unknown: the summary of a `known_target` writes what the
+    /// target writes, and the caller turns a write of a locked memory into an abort.
     fn emit_apply_memory_havoc(
         &self,
         memory: &[(QualifiedInstId<StructId>, String)],
@@ -1874,8 +1876,9 @@ impl<'env> BoogieTranslator<'env> {
             .iter()
             .filter(|(mem, _)| {
                 let qid = mem.to_qualified_id();
-                !self.env.get_struct(qid).is_ghost_memory()
-                    || self.env.ghost_updatable_by_unknown_code(&qid)
+                !system_address_bound(self.env, &qid)
+                    && (!self.env.get_struct(qid).is_ghost_memory()
+                        || self.env.ghost_updatable_by_unknown_code(&qid))
             })
             .cloned()
             .collect_vec();
@@ -8577,8 +8580,9 @@ impl FunctionTranslator<'_> {
                         let mem = mid
                             .qualified_inst(*sid, inst.to_owned())
                             .instantiate(self.type_inst);
-                        // A havoc of the world memory havocs every memory except spec variables
-                        // unknown code cannot update: no updater it can reach, or only updaters of this
+                        // A havoc of the world memory havocs every memory except memories code
+                        // outside the program cannot write, and spec variables unknown code
+                        // cannot update: no updater it can reach, or only updaters of this
                         // function's module, on the stack, that re-entry aborts (`ghost_kept_in`).
                         // Neither holds in the summary of an opaque callee that reaches an updater
                         // by a plain call: the havoc stands for all the callee runs.
@@ -8595,11 +8599,12 @@ impl FunctionTranslator<'_> {
                         for mem in saved_memory_of(env, mem).into_iter().filter(|mem| {
                             let qid = mem.to_qualified_id();
                             !world
-                                || !(env.get_struct(qid).is_ghost_memory()
+                                || !((env.get_struct(qid).is_ghost_memory()
                                     && !callee_updates(&qid)
                                     && (!env.ghost_updatable_by_unknown_code(&qid)
                                         || root_module
                                             .is_some_and(|m| ghost_kept_in(env, &qid, m))))
+                                    || system_address_bound(env, &qid))
                         }) {
                             let locked = self.parent.lock_flag_memory.contains(&mem);
                             emit_memory_havoc(writer, env, &mem, in_world_havoc, locked);

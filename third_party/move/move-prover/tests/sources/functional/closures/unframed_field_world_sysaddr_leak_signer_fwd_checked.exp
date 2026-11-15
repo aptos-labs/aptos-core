@@ -1,0 +1,37 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:27:9
+   │
+27 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:21: run
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:26: run (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:21: run
+   =         fw = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:22: run
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:5: assert_aptos_framework
+   =         s = <redacted>
+   =     at ../move-stdlib/sources/signer.move:30: address_of
+   =         s = <redacted>
+   =     at ../move-stdlib/sources/signer.move:31: address_of
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:5: assert_aptos_framework
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:23: run
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:27: run (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:50:9
+   │
+50 │         ensures global<sa_gated::R>(@0x1) == old(global<sa_gated::R>(@0x1));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:47: gated_invoke
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:49: gated_invoke (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:47: gated_invoke
+   =         c = <redacted>
+   =         x = <redacted>
+   =         <redacted> = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_sysaddr_leak_signer_fwd_checked.move:50: gated_invoke (spec)
