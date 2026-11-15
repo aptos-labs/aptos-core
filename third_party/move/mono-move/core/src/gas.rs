@@ -53,7 +53,7 @@ pub struct GasMeter {
 
 impl GasMeter {
     pub fn new(budget: u64) -> Self {
-        Self::split(budget, 0)
+        Self::from_balance(budget, 0)
     }
 
     /// Meter with `u64::MAX` budget, for tests and benches that don't
@@ -66,10 +66,10 @@ impl GasMeter {
     /// the interpreter polls for interrupts once per chunk. A `chunk_size` of
     /// 0 turns polling off.
     pub fn with_interrupt_polling(self, chunk_size: u64) -> Self {
-        Self::split(self.balance(), chunk_size)
+        Self::from_balance(self.balance(), chunk_size)
     }
 
-    fn split(balance: u64, chunk_size: u64) -> Self {
+    fn from_balance(balance: u64, chunk_size: u64) -> Self {
         let chunk = if chunk_size == 0 {
             balance
         } else {
@@ -123,7 +123,7 @@ impl GasMeter {
             .balance()
             .checked_sub(amount)
             .ok_or(GasExhaustedError)?;
-        *self = Self::split(left, self.chunk_size);
+        *self = Self::from_balance(left, self.chunk_size);
         Ok(())
     }
 
@@ -135,7 +135,7 @@ impl GasMeter {
 
     /// Reset the remaining budget, keeping the chunk size.
     pub fn reset(&mut self, budget: u64) {
-        *self = Self::split(budget, self.chunk_size);
+        *self = Self::from_balance(budget, self.chunk_size);
     }
 }
 
@@ -219,6 +219,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn single_charge_spans_several_chunks() {
+        let mut meter = GasMeter::new(100).with_interrupt_polling(10);
+        assert!(meter.try_charge_in_chunk(4));
+
+        // Takes the 6 units left in the chunk and 29 from the reserve. It
+        // leaves the chunk once, so the interpreter polls once.
+        assert!(!meter.try_charge_in_chunk(35));
+        assert_eq!(meter.charge(35), Ok(()));
+        assert_eq!(meter.balance(), 61);
+        assert_eq!(meter.chunk, 10);
+        assert_eq!(meter.reserve, 51);
     }
 
     #[test]

@@ -189,6 +189,24 @@ fn polling_run_out_of_gas_is_not_interrupted() {
 }
 
 #[test]
+fn jump_spanning_several_chunks_polls_once() {
+    let provider = InterruptAt::new(u64::MAX);
+    let jump_gas = 3 * CHUNK_SIZE + 7;
+    let entry = function(vec![
+        MicroOp::Jump {
+            target: CodeOffset(1),
+            gas: jump_gas,
+        },
+        MicroOp::Return,
+    ]);
+    let ran = run_with(&entry, polling_meter(), &provider, run);
+    assert!(ran.err.is_none(), "{:?}", ran.err);
+    assert!(!ran.interrupted);
+    assert_eq!(provider.polls.get(), 1);
+    assert_eq!(ran.balance, BUDGET - jump_gas);
+}
+
+#[test]
 fn completed_run_is_not_interrupted() {
     let provider = InterruptAt::new(1);
     let entry = function(vec![MicroOp::Return]);
