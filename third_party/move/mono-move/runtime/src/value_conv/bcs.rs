@@ -43,9 +43,9 @@ use mono_move_core::{
     CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET,
-    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE,
-    TRIVIAL_DESCRIPTOR_ID,
+    CLOSURE_FLAGS_OFFSET, CLOSURE_FLAG_PERSISTENT, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
+    FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -108,8 +108,19 @@ pub unsafe fn serialize<T: LayoutProvider + ?Sized>(
     }
 
     // SAFETY: precondition enforced by the caller guarantees safety.
-    unsafe { serialize_impl(layouts, base, layout, &mut out)? };
+    unsafe { serialize_impl(layouts, base, layout, Encoding::Serialize, &mut out)? };
     Ok(out)
+}
+
+/// What a value is encoded for.
+#[derive(Clone, Copy)]
+pub(crate) enum Encoding {
+    /// BCS serialization, which V1 refuses for a closure over a function that
+    /// is not persistent.
+    Serialize,
+    /// Comparing captures as wire bytes. V1 compares closures without
+    /// serializing them, so any closure is encoded.
+    Compare,
 }
 
 /// Implementation of BCS serialization of a value with the given layout.
@@ -122,6 +133,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
     layout: &ValueLayout,
+    encoding: Encoding,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
     // TODO(metering): This walk recurses on struct fields and vector elements; convert it
@@ -154,7 +166,13 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
                 // which holds for well-typed values, as guaranteed by the
                 // safety precondition of this function.
                 unsafe {
-                    serialize_impl(layouts, base.add(field.offset as usize), field_layout, out)?
+                    serialize_impl(
+                        layouts,
+                        base.add(field.offset as usize),
+                        field_layout,
+                        encoding,
+                        out,
+                    )?
                 };
             }
             Ok(())
@@ -199,7 +217,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
                     // SAFETY: element pointer is a valid value of the given
                     // element layout, as guaranteed by the valid `base` value
                     // pointer passed into this function.
-                    unsafe { serialize_impl(layouts, elem_ptr, elem_layout, out)? };
+                    unsafe { serialize_impl(layouts, elem_ptr, elem_layout, encoding, out)? };
                 }
             }
             Ok(())
@@ -223,12 +241,20 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let variant_layout = layouts.layout(variant_id).ok_or(RuntimeError::InvariantViolation(RuntimeInvariantViolation::ValueLayoutNotFound))?;
             // SAFETY: the variant body lives at the specified offset within
             // the object.
-            unsafe { serialize_impl(layouts, obj_ptr.add(ENUM_DATA_OFFSET), variant_layout, out)? };
+            unsafe {
+                serialize_impl(
+                    layouts,
+                    obj_ptr.add(ENUM_DATA_OFFSET),
+                    variant_layout,
+                    encoding,
+                    out,
+                )?
+            };
             Ok(())
         },
         // SAFETY: a function slot holds a closure pointer, as guaranteed by the
         // valid `base` value pointer passed into this function.
-        LayoutKind::Function => unsafe { serialize_closure(layouts, base, out) },
+        LayoutKind::Function => unsafe { serialize_closure(layouts, base, encoding, out) },
         LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable("References cannot be serialized".to_string()),
         ))),
@@ -244,6 +270,8 @@ fn bad_closure(what: String) -> VMInternalError {
 /// The parts of a closure object that serialization and comparison both read.
 pub(crate) struct ClosureParts<'a> {
     pub(crate) func_ref: &'a FunctionRef,
+    /// Whether the target is persistent, so the closure can be serialized.
+    pub(crate) persistent: bool,
     pub(crate) mask: u64,
     /// The captured-data object, null when the mask captures nothing.
     pub(crate) captured_data: *const u8,
@@ -292,8 +320,9 @@ pub(crate) unsafe fn closure_parts<'a>(base: *const u8) -> VMResult<ClosureParts
         tag => return Err(bad_closure(format!("unknown func-ref tag {tag}"))),
     };
 
-    // SAFETY: a closure object carries its mask at a fixed offset, and one with
-    // captures a non-null captured-data pointer.
+    // SAFETY: a closure object carries its flags and mask at fixed offsets,
+    // and one with captures a non-null captured-data pointer.
+    let persistent = unsafe { *closure.add(CLOSURE_FLAGS_OFFSET) } & CLOSURE_FLAG_PERSISTENT != 0;
     let mask = unsafe { read_u64(closure, CLOSURE_MASK_OFFSET) };
     let captured_data = if mask == 0 {
         std::ptr::null()
@@ -306,6 +335,7 @@ pub(crate) unsafe fn closure_parts<'a>(base: *const u8) -> VMResult<ClosureParts
     };
     Ok(ClosureParts {
         func_ref,
+        persistent,
         mask,
         captured_data,
     })
@@ -412,24 +442,24 @@ pub(crate) fn capture_slots<'a, T: LayoutProvider + ?Sized>(
 unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
     layouts: &T,
     base: *const u8,
+    encoding: Encoding,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
-    // TODO(correctness): V1 serializes only closures over persistent functions
-    // (`#[persistent]` or `public`). For any other target, `bcs::to_bytes` and
-    // `bcs::serialized_size` abort with `NFE_BCS_SERIALIZATION_FAILURE`, while
-    // MonoMove returns bytes. These closures lack `store`, so storage is not
-    // affected. The target is usually unresolved here, so the check needs
-    // persistence recorded at lowering. A cross-module target also needs its
-    // module, to tell `public` from `friend`.
-
     // SAFETY: forwarded from this function's contract.
     let parts = unsafe { closure_parts(base)? };
+    // As in V1, only a closure over a persistent function can be serialized,
+    // even when it captures nothing.
+    if matches!(encoding, Encoding::Serialize) && !parts.persistent {
+        return Err(VMInternalError::new(RuntimeError::ValueNotSerializable(
+            "function value over a function that is not persistent",
+        )));
+    }
     serialize_closure_header(parts.func_ref, parts.mask, out)?;
     if parts.captured_data.is_null() {
         return Ok(());
     }
     // SAFETY: the captured-data object is live for as long as the closure is.
-    unsafe { emit_closure_captures(layouts, &parts, out) }
+    unsafe { emit_closure_captures(layouts, &parts, encoding, out) }
 }
 
 /// Writes a closure's `(layout, value)*` capture tail, the part that follows
@@ -442,6 +472,7 @@ unsafe fn serialize_closure<T: LayoutProvider + ?Sized>(
 pub(crate) unsafe fn emit_closure_captures<T: LayoutProvider + ?Sized>(
     layouts: &T,
     parts: &ClosureParts,
+    encoding: Encoding,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
     let captured_data = parts.captured_data;
@@ -459,7 +490,7 @@ pub(crate) unsafe fn emit_closure_captures<T: LayoutProvider + ?Sized>(
         serialize_captured_layout(layouts, id, out)?;
         // SAFETY: the capture lies within the values region, and the layout it
         // was published under describes the bytes there.
-        unsafe { serialize_impl(layouts, captured_data.add(offset), layout, out)? };
+        unsafe { serialize_impl(layouts, captured_data.add(offset), layout, encoding, out)? };
     }
     Ok(())
 }
@@ -1033,11 +1064,14 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
         OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE,
         CLOSURE_DESCRIPTOR_ID,
     )?;
+    // A closure in storage was serialized, so its target was persistent.
+    //
     // SAFETY: the allocation covers a closure's whole data region.
     unsafe {
         write_closure_func_ref_and_mask(
             closure,
             &ClosureFuncRef::Unresolved(func_ref),
+            true,
             mask.bits(),
         );
         write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, captured_data);
@@ -1440,7 +1474,9 @@ mod tests {
         let layout = table.layout(SIGNER_LAYOUT_ID).unwrap();
         let addr = [7u8; 32];
         let mut out = vec![];
-        unsafe { serialize_impl(&table, addr.as_ptr(), layout, &mut out).unwrap() };
+        unsafe {
+            serialize_impl(&table, addr.as_ptr(), layout, Encoding::Serialize, &mut out).unwrap()
+        };
         assert_eq!(out, addr);
     }
 
@@ -2016,7 +2052,9 @@ mod tests {
             // Serialize matches bcs; a padded struct wrongly put on the raw-copy
             // fast path would memcpy its padding and diverge here.
             let mut out = vec![];
-            unsafe { serialize_impl(table, ptr(x), layout, &mut out).unwrap() };
+            unsafe {
+                serialize_impl(table, ptr(x), layout, Encoding::Serialize, &mut out).unwrap()
+            };
             assert_eq!(out, x_bcs);
 
             // Round-trip through the packed bytes, not `dst` directly: the
@@ -2038,7 +2076,10 @@ mod tests {
             };
             assert_eq!(cursor, x_bcs.len());
             let mut reser = vec![];
-            unsafe { serialize_impl(table, dst.as_ptr(), layout, &mut reser).unwrap() };
+            unsafe {
+                serialize_impl(table, dst.as_ptr(), layout, Encoding::Serialize, &mut reser)
+                    .unwrap()
+            };
             assert_eq!(reser, x_bcs);
         }
 
@@ -2250,7 +2291,9 @@ mod tests {
 
             // Re-serializing the deserialized value reproduces its bcs.
             let mut out = vec![];
-            unsafe { serialize_impl(table, dst.as_ptr(), layout, &mut out).unwrap() };
+            unsafe {
+                serialize_impl(table, dst.as_ptr(), layout, Encoding::Serialize, &mut out).unwrap()
+            };
             assert_eq!(out, bytes);
 
             bufs.push(dst);
@@ -2568,6 +2611,7 @@ mod tests {
         // SAFETY: the allocation covers the whole closure data region.
         unsafe {
             *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_UNRESOLVED;
+            *closure.add(CLOSURE_FLAGS_OFFSET) = CLOSURE_FLAG_PERSISTENT;
             write_ptr(
                 closure,
                 CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
@@ -2630,6 +2674,7 @@ mod tests {
                 layouts,
                 closure_slot(&closure),
                 &ValueLayout::function(),
+                Encoding::Serialize,
                 &mut out,
             )
             .unwrap()
@@ -2841,6 +2886,7 @@ mod tests {
                 layouts,
                 closure_slot(&closure),
                 &ValueLayout::function(),
+                Encoding::Serialize,
                 &mut out,
             )
         }
@@ -2920,6 +2966,7 @@ mod tests {
                 &layouts,
                 closure_slot(&closure),
                 &ValueLayout::function(),
+                Encoding::Serialize,
                 &mut out,
             )
         };
@@ -3004,6 +3051,7 @@ mod tests {
                 &layouts,
                 &slot as *const u64 as *const u8,
                 &ValueLayout::function(),
+                Encoding::Serialize,
                 &mut out,
             )
             .unwrap()

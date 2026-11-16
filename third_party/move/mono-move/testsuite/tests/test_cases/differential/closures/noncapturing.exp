@@ -93,7 +93,7 @@ fun call_double_twice() {
   frame_data_size: 32
   entry_gas: 244
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, captured_desc=<none>, captured=[] @0
+    0: PackClosure [8] <- func_ref=Unresolved(double), mask=0, persistent=false, captured_desc=<none>, captured=[] @0
     1: Move8 [16] <- [8] @3
     2: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @3
     3: CallClosure closure=[16], provided_args=[[0](8)] @4
@@ -113,7 +113,7 @@ fun call_identity() {
   frame_data_size: 16
   entry_gas: 125
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[] @0
+    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, persistent=false, captured_desc=<none>, captured=[] @0
     1: CallClosure closure=[8], provided_args=[[0](8)] @4
     2: Move8 [0] <- [40] @5
     3: Return @5

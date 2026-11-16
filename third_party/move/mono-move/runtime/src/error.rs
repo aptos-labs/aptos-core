@@ -117,6 +117,11 @@ pub enum RuntimeError {
     #[error("resource type is too deeply nested to encode as a state key")]
     StateKeyTypeTooDeep,
 
+    /// A value V1 refuses to serialize, such as a closure over a function that
+    /// is not persistent.
+    #[error("BCS serialize: {0}")]
+    ValueNotSerializable(&'static str),
+
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
 
@@ -215,6 +220,7 @@ impl RuntimeError {
             | InvalidAbortMessage { .. }
             | AbortMessageTooLong { .. }
             | StateKeyTypeTooDeep
+            | ValueNotSerializable(_)
             | InvariantViolation(_)
             | ResourceProvider(_)
             | Unsupported(_) => false,
@@ -242,7 +248,8 @@ impl IntoExecutionError for RuntimeError {
             | ResourceAlreadyExists { .. }
             | ReentrancyUnderModuleLock { .. }
             | ResourceAccessDuringReentrancy { .. }
-            | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
+            | EnumVariantMismatch { .. }
+            | ValueNotSerializable(_) => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -461,6 +468,9 @@ pub enum RuntimeInvariantViolation {
 
     #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
     ClosureMaskExceedsParams { mask: u64, num_params: usize },
+
+    #[error("CallClosure: stored closure references non-persistent function `{function}`")]
+    StoredClosureTargetNotPersistent { function: String },
 
     #[error(
         "CallClosure: capture {capture_idx} was packed as ({packed_size}, {packed_align}) but \

@@ -1802,6 +1802,7 @@ impl<'a> LoweringState<'a> {
                     dst: dst_off,
                     func_ref: ClosureFuncRef::Unresolved(info.func_ref),
                     mask: data.mask.bits(),
+                    persistent: info.persistent,
                     captured_data_descriptor_id: info.captured_data_descriptor_id,
                     values_size: info.values_size,
                     captured_layout_id: info.captured_layout_id,

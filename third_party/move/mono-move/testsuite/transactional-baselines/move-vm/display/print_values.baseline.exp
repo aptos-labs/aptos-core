@@ -21,7 +21,13 @@ return values: { 0, 000000000000000000000000000000000000000000000000000000000000
 task 10 lines 106-106:  run 0x42::print_values::return_struct
 Error: enum variants not yet supported by layouts
 task 11 lines 108-108:  run 0x42::print_values::return_anonymous
-return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::__lambda__1__return_anonymous(..)
+Error: Function execution failed with VMError: {
+    major_status: VALUE_SERIALIZATION_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
 task 12 lines 110-110:  run 0x42::print_values::return_add
 return values: 0x0000000000000000000000000000000000000000000000000000000000000042::print_values::sum(..)
 task 13 lines 112-112:  run 0x42::print_values::return_add_first --args 5

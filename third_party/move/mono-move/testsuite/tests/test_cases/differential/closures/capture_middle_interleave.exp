@@ -74,7 +74,7 @@ fun caller() {
   entry_gas: 267
   code:
     0: StoreImm8 [8] <- #7 @0
-    1: PackClosure [0] <- func_ref=Unresolved(g), mask=10, captured_desc=0, captured=[[8](8)] @1
+    1: PackClosure [0] <- func_ref=Unresolved(g), mask=10, persistent=false, captured_desc=0, captured=[[8](8)] @1
     2: CallByNameExempt 0x66::capture_middle_interleave::three_rets @3
     3: Move8 [8] <- [56] @3
     4: Move8 [16] <- [64] @3

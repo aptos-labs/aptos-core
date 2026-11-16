@@ -59,6 +59,7 @@ fn minimal_func() -> Function {
         func_ref: test_func_ref(),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
+        is_persistent: false,
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],

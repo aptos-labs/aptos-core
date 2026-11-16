@@ -465,7 +465,7 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
             V1ErrorInfo::with_no_message(StatusCode::MEMORY_LIMIT_EXCEEDED)
         },
 
-        E::StateKeyTypeTooDeep => {
+        E::StateKeyTypeTooDeep | E::ValueNotSerializable(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::VALUE_SERIALIZATION_ERROR, err)
         },
 

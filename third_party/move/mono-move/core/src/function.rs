@@ -175,6 +175,10 @@ pub struct Function {
     /// Whether `#[module_lock]` requires this function to hold a module lock
     /// until it returns.
     pub has_module_lock: bool,
+    /// Whether this function is persistent: public or `#[persistent]`, and
+    /// not a script function. A closure read from storage may only call a
+    /// persistent function.
+    pub is_persistent: bool,
     pub code: Code,
     /// Gas cost of the entry basic block.
     pub entry_gas: u64,

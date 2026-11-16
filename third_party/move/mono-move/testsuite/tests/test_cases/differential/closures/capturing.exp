@@ -270,7 +270,7 @@ fun adder() {
   frame_data_size: 24
   entry_gas: 153
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(__lambda__1__adder), mask=1, captured_desc=0, captured=[[0](8)] @1
+    0: PackClosure [8] <- func_ref=Unresolved(__lambda__1__adder), mask=1, persistent=false, captured_desc=0, captured=[[0](8)] @1
     1: StoreImm8 [16] <- #8 @3
     2: CallClosure closure=[8], provided_args=[[16](8)] @5
     3: Move8 [0] <- [48] @6
@@ -284,7 +284,7 @@ fun all_captured() {
   frame_data_size: 24
   entry_gas: 151
   code:
-    0: PackClosure [16] <- func_ref=Unresolved(add_u64), mask=11, captured_desc=0, captured=[[0](8), [8](8)] @2
+    0: PackClosure [16] <- func_ref=Unresolved(add_u64), mask=11, persistent=false, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: CallClosure closure=[16], provided_args=[] @3
     2: Move8 [0] <- [48] @4
     3: Return @4
@@ -297,7 +297,7 @@ fun capture_ends() {
   frame_data_size: 32
   entry_gas: 179
   code:
-    0: PackClosure [16] <- func_ref=Unresolved(add3), mask=101, captured_desc=0, captured=[[0](8), [8](8)] @2
+    0: PackClosure [16] <- func_ref=Unresolved(add3), mask=101, persistent=false, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: StoreImm8 [24] <- #100 @4
     2: CallClosure closure=[16], provided_args=[[24](8)] @6
     3: Move8 [0] <- [56] @7
@@ -311,7 +311,7 @@ fun capture_second() {
   frame_data_size: 24
   entry_gas: 153
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(add_u64), mask=10, captured_desc=0, captured=[[0](8)] @1
+    0: PackClosure [8] <- func_ref=Unresolved(add_u64), mask=10, persistent=false, captured_desc=0, captured=[[0](8)] @1
     1: StoreImm8 [16] <- #7 @3
     2: CallClosure closure=[8], provided_args=[[16](8)] @5
     3: Move8 [0] <- [48] @6
@@ -325,7 +325,7 @@ fun capture_two() {
   frame_data_size: 32
   entry_gas: 179
   code:
-    0: PackClosure [16] <- func_ref=Unresolved(add3), mask=11, captured_desc=0, captured=[[0](8), [8](8)] @2
+    0: PackClosure [16] <- func_ref=Unresolved(add3), mask=11, persistent=false, captured_desc=0, captured=[[0](8), [8](8)] @2
     1: StoreImm8 [24] <- #1 @4
     2: CallClosure closure=[16], provided_args=[[24](8)] @6
     3: Move8 [0] <- [56] @7
@@ -339,7 +339,7 @@ fun make_adder() {
   frame_data_size: 16
   entry_gas: 89
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(__lambda__1__make_adder), mask=1, captured_desc=0, captured=[[0](8)] @1
+    0: PackClosure [8] <- func_ref=Unresolved(__lambda__1__make_adder), mask=1, persistent=false, captured_desc=0, captured=[[0](8)] @1
     1: Move8 [0] <- [8] @2
     2: Return @2
   safe_point_layouts:

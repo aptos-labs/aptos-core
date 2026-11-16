@@ -306,9 +306,9 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/more-v1/parser/return_not_binary.move",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/no-v1-comparison/closures/misc_1.move",
-        "function value serialization",
+        "a native abort reports no code offset",
     ),
 ];
 

@@ -8,8 +8,9 @@
 use crate::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use mono_move_core::memory::*;
 use mono_move_core::{
-    ClosureFuncRef, DescriptorId, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET,
-    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+    ClosureFuncRef, DescriptorId, CLOSURE_FLAGS_OFFSET, CLOSURE_FLAG_PERSISTENT,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_TAG_OFFSET, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
 };
 
 /// Reads a vector's length, treating the null pointer as the empty vector.
@@ -48,8 +49,9 @@ pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
     unsafe { write_u64(obj_ptr, ENUM_TAG_OFFSET, tag) }
 }
 
-/// Writes the `func_ref` enum and the capture `mask` into a freshly allocated
-/// closure heap object.
+/// Writes the `func_ref` enum, the closure flags and the capture `mask` into a
+/// freshly allocated closure heap object. `persistent` sets
+/// [`CLOSURE_FLAG_PERSISTENT`].
 ///
 /// # Safety
 ///
@@ -59,6 +61,7 @@ pub unsafe fn write_enum_tag(obj_ptr: *mut u8, tag: u64) {
 pub(crate) unsafe fn write_closure_func_ref_and_mask(
     closure: *mut u8,
     func_ref: &ClosureFuncRef,
+    persistent: bool,
     mask: u64,
 ) {
     let (tag, payload) = match func_ref {
@@ -72,6 +75,11 @@ pub(crate) unsafe fn write_closure_func_ref_and_mask(
     };
     unsafe {
         *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = tag;
+        *closure.add(CLOSURE_FLAGS_OFFSET) = if persistent {
+            CLOSURE_FLAG_PERSISTENT
+        } else {
+            0
+        };
         write_ptr(
             closure,
             CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,

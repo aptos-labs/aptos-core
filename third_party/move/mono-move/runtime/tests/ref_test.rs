@@ -40,6 +40,7 @@ fn ref_self_copy() {
         func_ref: crate::program_func_ref!("test", "test"),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
+        is_persistent: false,
         code: Code::from_vec(code),
         entry_gas: 0,
         param_slots: vec![],

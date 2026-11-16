@@ -4,7 +4,9 @@
 //! Defines a wrapper for [`CompiledModule`] with all its types pre-interned.
 
 use crate::{
-    interner::{InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError},
+    interner::{
+        is_script_module_id, InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError,
+    },
     types::{view_type, view_type_list, InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST},
     ExecutionErrorKind, IntoExecutionError,
 };
@@ -14,8 +16,8 @@ use move_binary_format::{
         ConstantPoolIndex, FieldDefinition, FieldHandleIndex, FunctionAttribute,
         FunctionDefinitionIndex, FunctionHandleIndex, FunctionInstantiationIndex, IdentifierIndex,
         ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
-        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
-        VariantIndex,
+        StructFieldInformation, StructHandle, StructHandleIndex, TableIndex,
+        VariantFieldHandleIndex, VariantIndex, Visibility,
     },
     CompiledModule,
 };
@@ -194,6 +196,44 @@ impl PreparedModule {
     pub fn is_unlocked_local_callee(&self, handle_idx: FunctionHandleIndex) -> bool {
         self.module.function_handle_at(handle_idx).module == self.module.self_handle_idx()
             && !self.handle_has_module_lock(handle_idx)
+    }
+
+    /// Whether this module's function definition `def_idx` is persistent:
+    /// public or `#[persistent]`. Script functions never are.
+    pub fn definition_is_persistent(&self, def_idx: FunctionDefinitionIndex) -> bool {
+        let def = self.module.function_def_at(def_idx);
+        !is_script_module_id(self.id)
+            && (def.visibility == Visibility::Public
+                || self
+                    .module
+                    .function_handle_at(def.function)
+                    .attributes
+                    .contains(&FunctionAttribute::Persistent))
+    }
+
+    /// Whether the function named by `handle_idx` is persistent, so a closure
+    /// over it can be serialized.
+    ///
+    /// A callee in this module is read from its definition. An imported callee
+    /// is read from the handle, whose `Persistent` attribute the compiler sets
+    /// for public and `#[persistent]` functions.
+    //
+    // TODO(correctness): a callee that becomes persistent through an upgrade
+    // after this module was compiled has no `Persistent` attribute on its
+    // handle here, so a closure over it is not serializable, while V1 reads
+    // the callee's current definition and serializes it.
+    pub fn function_handle_is_persistent(&self, handle_idx: FunctionHandleIndex) -> bool {
+        let handle = self.module.function_handle_at(handle_idx);
+        if handle.module != self.module.self_handle_idx() {
+            return handle.attributes.contains(&FunctionAttribute::Persistent);
+        }
+        self.module
+            .function_defs()
+            .iter()
+            .position(|def| def.function == handle_idx)
+            .is_some_and(|idx| {
+                self.definition_is_persistent(FunctionDefinitionIndex(idx as TableIndex))
+            })
     }
 
     fn handle_has_module_lock(&self, handle_idx: FunctionHandleIndex) -> bool {

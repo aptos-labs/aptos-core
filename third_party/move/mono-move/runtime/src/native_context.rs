@@ -231,6 +231,16 @@ impl<'a> ProductionNativeContext<'a> {
     }
 }
 
+/// Maps a serialization V1 refuses, which carries the `InvalidOperation` kind,
+/// to `None`. Heap exhaustion and invariant violations still propagate.
+fn refused_as_none<T>(result: VMResult<T>) -> VMResult<Option<T>> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// Allocates an uninitialized value buffer, rejecting zero sizes because
 /// [`MemoryRegion`] requires a nonempty allocation.
 fn value_region(size: usize) -> VMResult<MemoryRegion> {
@@ -871,15 +881,23 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(true)
     }
 
-    unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<Vec<u8>>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
+        refused_as_none(unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) })
     }
 
-    unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
+    unsafe fn bcs_serialized_size(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<usize>> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) }
+        refused_as_none(unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) })
     }
 
     fn bcs_deserialize_value(
@@ -954,7 +972,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: the ABI keeps arg `i` within the frame, holding a value of type
         // `ty` that stays live for the call.
         let base = unsafe { self.frame_ptr.add(slot.offset as usize) };
-        unsafe { self.bcs_serialize_value(base, ty) }
+        // SAFETY: forwarded from the ABI guarantee above; serialization
+        // performs no VM-heap allocation.
+        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
     }
 
     fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
@@ -1008,12 +1028,13 @@ impl NativeContext for ProductionNativeContext<'_> {
             TopFrame::Native(self.abi),
             CLOSURE_DESCRIPTOR_ID,
         )?;
-        // A resolved function captures nothing, so the mask is empty and the
-        // captured-data pointer stays at the null `alloc_obj` zeroed it to.
+        // A resolved function is public, so the closure is persistent. It
+        // captures nothing, so the mask is empty and the captured-data pointer
+        // stays at the null `alloc_obj` zeroed it to.
         //
         // SAFETY: `obj` is a freshly allocated closure object.
         unsafe {
-            write_closure_func_ref_and_mask(obj, &ClosureFuncRef::Unresolved(func_ref), 0);
+            write_closure_func_ref_and_mask(obj, &ClosureFuncRef::Unresolved(func_ref), true, 0);
         }
         // SAFETY: `obj` is a live heap object.
         Ok(Ok(Boxed::from_handle(unsafe {

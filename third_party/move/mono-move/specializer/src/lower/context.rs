@@ -207,6 +207,8 @@ fn publish_struct_descriptor_for(
 pub struct ClosurePackInfo {
     /// Symbolic target identity, resolved lazily at call time.
     pub func_ref: InternedFunctionRef,
+    /// Whether the target is persistent, so the closure can be serialized.
+    pub persistent: bool,
     /// GC trace descriptor for the captured-data object; `None` for a
     /// non-capturing closure (no captured-data object is allocated).
     pub captured_data_descriptor_id: Option<DescriptorId>,
@@ -719,6 +721,9 @@ pub fn try_build_context<'a>(
                 };
                 closure_pack_sites.push(ClosurePackInfo {
                     func_ref,
+                    persistent: module_ir
+                        .module
+                        .function_handle_is_persistent(data.function_handle),
                     captured_data_descriptor_id,
                     values_size,
                     captured_layout_id,
@@ -1089,6 +1094,7 @@ pub fn try_lower_function(
         func_ref: interner.function_ref_of(module_ir.module.id(), name, ty_args),
         def_idx: func_ir.def_idx,
         has_module_lock: module_ir.module.definition_has_module_lock(func_ir.def_idx),
+        is_persistent: module_ir.module.definition_is_persistent(func_ir.def_idx),
         code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,

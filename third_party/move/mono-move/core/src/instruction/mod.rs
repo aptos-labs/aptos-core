@@ -243,6 +243,9 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
+    /// Whether the target is persistent (public or `#[persistent]`). Only a
+    /// closure over a persistent target can be serialized.
+    pub persistent: bool,
     /// GC trace descriptor for the allocated `ClosureCapturedData`
     /// (Materialized) object. `Some` iff this closure captures at least one
     /// value; otherwise `None` and no captured-data object is allocated. A
@@ -1953,8 +1956,8 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
-                    op.dst.0, op.func_ref, op.mask
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, persistent={}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask, op.persistent
                 )?;
                 match op.captured_data_descriptor_id {
                     Some(id) => write!(f, "{}", id)?,
@@ -2177,8 +2180,12 @@ const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
 //
 //   within func_ref:
 //     offset 0:  tag (u8)   — FUNC_REF_TAG_RESOLVED = 0
-//     offset 1:  padding (7 bytes)
+//     offset 1:  closure flags (u8)
+//     offset 2:  padding (6 bytes)
 //     offset 8:  payload (8-byte pointer)
+//
+// The flags byte describes the closure, not its target, so resolving an
+// `Unresolved` func-ref leaves it unchanged.
 
 /// Reserved size for an inline `ClosureFuncRef` inside a closure heap object.
 /// Sized to accommodate a future `Unresolved` variant without on-disk layout
@@ -2203,6 +2210,13 @@ pub const CLOSURE_DATA_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 32
 pub const FUNC_REF_TAG_OFFSET: usize = 0;
 /// Byte offset of the payload within `func_ref`.
 pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
+
+/// Byte offset of the closure flags (`u8`) within a closure heap object.
+pub const CLOSURE_FLAGS_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + 1;
+
+/// Closure flag: the target is persistent, so the closure can be serialized.
+/// Set for every closure decoded from storage.
+pub const CLOSURE_FLAG_PERSISTENT: u8 = 1;
 
 /// `ClosureFuncRef::Resolved` tag value.
 pub const FUNC_REF_TAG_RESOLVED: u8 = 0;

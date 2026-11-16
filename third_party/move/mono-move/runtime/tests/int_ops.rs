@@ -220,6 +220,7 @@ fn make_func(op: MicroOp, lhs_width: usize, rhs_width: usize) -> Function {
         func_ref: crate::program_func_ref!("test", "op"),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
+        is_persistent: false,
         code: Code::from_vec(vec![op, MicroOp::Return]),
         entry_gas: 0,
         param_slots,

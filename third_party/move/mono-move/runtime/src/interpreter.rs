@@ -38,7 +38,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::{
-        is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
+        is_script_module_id, module_id_of, view_module_id, InternedFunctionRef, InternedIdentifier,
         InternedModuleId,
     },
     native::{
@@ -49,8 +49,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     strip_ref,
     types::{
-        is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
-        Type,
+        is_signer_or_signer_immut_ref, view_name, view_type, view_type_list, InternedType,
+        InternedTypeList, Type,
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
@@ -60,9 +60,10 @@ use mono_move_core::{
     CAPTURED_DATA_LAYOUT_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FLAGS_OFFSET,
+    CLOSURE_FLAG_PERSISTENT, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
+    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
+    MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
@@ -3266,7 +3267,7 @@ impl InterpreterContext<'_> {
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
                 let closure = alloc_obj!(self, fp, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
-                write_closure_func_ref_and_mask(closure, &op.func_ref, op.mask);
+                write_closure_func_ref_and_mask(closure, &op.func_ref, op.persistent, op.mask);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
             }
@@ -3283,7 +3284,12 @@ impl InterpreterContext<'_> {
             // SAFETY: `alloc_obj!` returns a live, freshly-allocated object.
             let closure_root = self.root_pool.root_object(closure_ptr);
 
-            write_closure_func_ref_and_mask(closure_root.ptr(), &op.func_ref, op.mask);
+            write_closure_func_ref_and_mask(
+                closure_root.ptr(),
+                &op.func_ref,
+                op.persistent,
+                op.mask,
+            );
 
             // SAFETY: the verifier guarantees `captured_data_descriptor_id`
             // is `Some` whenever `captured` is non-empty. The values-region
@@ -3435,6 +3441,22 @@ impl InterpreterContext<'_> {
                 // lacks, or the captured-read cursor below would desync.
                 if num_params < 64 && (mask >> num_params) != 0 {
                     invariant_violation!(ClosureMaskExceedsParams { mask, num_params });
+                }
+                // A closure marked persistent, as every closure read from
+                // storage is, must call a persistent function. Only those have
+                // signatures frozen across upgrades, so any other target could
+                // disagree with the stored captures.
+                let persistent = *closure.add(CLOSURE_FLAGS_OFFSET) & CLOSURE_FLAG_PERSISTENT != 0;
+                if persistent && !callee.is_persistent {
+                    let module_id = view_module_id(callee.module_id());
+                    invariant_violation!(StoredClosureTargetNotPersistent {
+                        function: format!(
+                            "{}::{}::{}",
+                            module_id.address().short_str_lossless(),
+                            view_name(module_id.name()),
+                            callee.name()
+                        ),
+                    });
                 }
                 // Memoize: bake the resolved function pointer into the closure
                 // and flip the tag to `Resolved`. The func-ref payload is not

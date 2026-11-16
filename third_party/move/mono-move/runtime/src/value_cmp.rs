@@ -11,7 +11,7 @@ use crate::{
     types::VEC_DATA_OFFSET,
     value_conv::bcs::{
         capture_blob, capture_slots, captured_fields, closure_parts, decode_captures,
-        emit_closure_captures, materialized_layout_id, ClosureParts,
+        emit_closure_captures, materialized_layout_id, ClosureParts, Encoding,
     },
 };
 use mono_move_core::{
@@ -539,7 +539,7 @@ unsafe fn capture_bytes<'a, T: LayoutProvider + ?Sized>(
         }));
     }
     let mut out = vec![];
-    unsafe { emit_closure_captures(layouts, parts, &mut out)? };
+    unsafe { emit_closure_captures(layouts, parts, Encoding::Compare, &mut out)? };
     Ok(CaptureBytes::Emitted(out))
 }
 
