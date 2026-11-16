@@ -3,18 +3,14 @@
 
 //! Cache of loaded modules, keyed by module IDs.
 //!
-//! Each entry is a stable pointer to a slot which stores multiple versions
-//! of loaded modules. A slot can be:
-//!   1. Empty (e.g., cleared by eviction). Readers treat this as a cache
-//!      miss and repopulate the slot.
-//!   2. Non-empty. Readers select correct version of loaded module they need.
+//! Each entry is a stable pointer to a slot holding at most one loaded
+//! module. A slot is created empty (a cache miss; readers load the module
+//! and fill it) and, once filled, never changes: modules are not versioned
+//! and publishes take effect only between blocks.
 //!
-//! Because of upgrades, slot can contain more than 1 version of loaded module
-//! at a time.
-//!
-//! Other loaded modules may point to their dependency slots. Hence, it is
-//! crucial that the eviction from the cache never removes the slots
-//! themselves, unless the whole cache is cleared.
+//! Other loaded modules may point to their dependency slots before those are
+//! filled. Hence, slots and modules are never evicted individually; they are
+//! freed only when the whole cache is cleared.
 
 use crate::context::loaded_module::{LoadedModule, LoadedModuleSlot, ModuleSlot};
 use anyhow::{anyhow, Result};
@@ -23,10 +19,6 @@ use mono_move_alloc::LeakedBoxPtr;
 use mono_move_core::interner::InternedModuleId;
 
 /// Concurrent long-living loaded module cache.
-///
-// TODO(completeness):
-//   1. Revisit upgrade story per block and with Zaptos.
-//   2. Remove any versioning?
 pub(super) struct ModuleCache {
     // Uses fxhash because the keys are already well-distributed arena
     // pointers, so a simple, fast hash is sufficient.
@@ -99,15 +91,12 @@ impl ModuleCache {
         for entry in self.inner.iter() {
             let slot_ptr = *entry.value();
 
-            // SAFETY: caller guarantees no outstanding references.
-            let content = unsafe { slot_ptr.as_ref_unchecked() }.clear();
-            if let Some(content) = content {
-                unsafe {
-                    content.free_unchecked();
-                }
-            }
-
+            // SAFETY: caller guarantees no outstanding references, so the
+            // module and then its slot can be freed.
             unsafe {
+                if let Some(module) = slot_ptr.as_ref_unchecked().get_ptr() {
+                    module.free_unchecked();
+                }
                 slot_ptr.free_unchecked();
             }
         }
