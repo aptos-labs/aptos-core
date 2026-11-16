@@ -44,6 +44,10 @@ pub enum ExecutionErrorKind {
     /// surface as transaction failures with diagnostic detail. Can
     /// also be raised speculatively under parallel execution.
     InvariantViolation,
+    /// Execution was interrupted on request of the block executor. Only
+    /// raised speculatively under parallel execution; the output must be
+    /// discarded and the transaction re-executed.
+    Interrupted,
     /// Placeholder for subsystems that have not yet defined a typed
     /// error. Should be removed once every subsystem maps into one of
     /// the categories above.
@@ -58,6 +62,7 @@ impl fmt::Display for ExecutionErrorKind {
             ExecutionErrorKind::InvalidOperation => write!(f, "InvalidOperation"),
             ExecutionErrorKind::LinkingError => write!(f, "LinkingError"),
             ExecutionErrorKind::InvariantViolation => write!(f, "InvariantViolation"),
+            ExecutionErrorKind::Interrupted => write!(f, "Interrupted"),
             ExecutionErrorKind::Placeholder => write!(f, "Placeholder"),
         }
     }

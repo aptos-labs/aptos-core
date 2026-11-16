@@ -30,9 +30,9 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
     ClosureFuncRef, DescriptorId, DescriptorProvider, ExecutionErrorKind, FormatOptions, Function,
-    GasMeter, Interner, LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner,
-    ResourceProvider, VMResult, CLOSURE_DESCRIPTOR_ID, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE,
-    OBJECT_HEADER_SIZE, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    Interner, LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner, ResourceProvider,
+    VMResult, CLOSURE_DESCRIPTOR_ID, ENUM_DATA_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
@@ -48,19 +48,20 @@ use std::{
 /// erased.
 ///
 /// [`ProductionNativeContext`] carries a single lifetime parameter, so it
-/// cannot name a `&mut ModuleReadSet<'guard>`: `&mut T` is invariant in `T`,
-/// and `'guard` strictly outlives any borrow taken at the dispatch site. A
-/// trait object hides `'guard` and restores the variance.
+/// cannot name a `&mut ModuleReadSet<'guard>` or a `&mut GasMeter<'guard>`:
+/// `&mut T` is invariant in `T`, and `'guard` strictly outlives any borrow
+/// taken at the dispatch site. A trait object hides `'guard` and restores the
+/// variance.
 pub trait LoaderAccess {
     /// The resource-group container `ty` belongs to, or [`None`] if it lives in
     /// its own storage slot.
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>>;
 
     /// Resolves `module_id::func_name` at the function type `expected_ty` into
-    /// the symbolic identity of the instantiation to call.
+    /// the symbolic identity of the instantiation to call, charging the
+    /// transaction's gas meter for the loads.
     fn resolve_function(
         &self,
-        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: &IdentStr,
         expected_ty: InternedType,
@@ -98,10 +99,6 @@ pub struct ProductionNativeContext<'a> {
     /// Start of the native's slot region within the caller's frame. Args are
     /// read and returns written here, within the ABI-verified bounds.
     frame_ptr: *mut u8,
-    /// Gas meter for the current transaction.
-    ///
-    /// TODO(completeness): Expose to native functions.
-    gas: UnsafeCell<&'a mut GasMeter>,
     /// The VM's heap -- used by the natives to allocate new heap objects.
     heap: UnsafeCell<&'a mut Heap>,
     /// The transaction's read write set -- provides global storage access.
@@ -132,7 +129,6 @@ impl<'a> ProductionNativeContext<'a> {
         frame_ptr: *mut u8,
         abi: &'a NativeABI,
         ty_args: &'a [InternedType],
-        gas_meter: &'a mut GasMeter,
         guard: &'a ExecutionGuard<'a>,
         resource_provider: &'a dyn ResourceProvider,
         loader: &'a dyn LoaderAccess,
@@ -148,7 +144,6 @@ impl<'a> ProductionNativeContext<'a> {
             resource_provider,
             loader,
             frame_ptr,
-            gas: UnsafeCell::new(gas_meter),
             heap: UnsafeCell::new(heap),
             rws: UnsafeCell::new(rws),
             extensions,
@@ -992,12 +987,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         // charges for it.
         let module_id = self.guard.module_id_of(&address, module_name);
 
-        // SAFETY: `gas` is reborrowed exclusively here; the callee borrows the
-        // loader and the module read-set, both disjoint from it.
-        let gas = unsafe { &mut **self.gas.get() };
         let func_ref = match self
             .loader
-            .resolve_function(gas, module_id, func_name, expected_ty)?
+            .resolve_function(module_id, func_name, expected_ty)?
         {
             Ok(func_ref) => func_ref,
             Err(err) => return Ok(Err(err)),
