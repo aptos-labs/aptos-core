@@ -179,7 +179,7 @@ Native function capabilities
 
 ## A. Plain primitive natives — the baseline (no list)
 
-Pure functions of primitive inputs that return primitive outputs. They use only argument popping, basic value construction, and `context.charge`. Examples to characterize the shape: `signer::borrow_address`, `account::create_address`, `account::create_signer`, `move_stdlib::hash::sha2_256`/`sha3_256`, `aptos_hash::sip_hash`/`keccak256`/`sha2_512_internal`/`sha3_512_internal`/`ripemd160_internal`/`blake2b_256_internal`, `mem::swap`, `vector::move_range`, `string::internal_check_utf8`/`internal_is_char_boundary`/`internal_sub_string`/`internal_index_of`, `consensus_config::validator_txn_enabled_internal`, `cmp::compare`.
+Pure functions of primitive inputs that return primitive outputs. They use only argument popping, basic value construction, and `context.charge`. Examples to characterize the shape: `signer::borrow_address`, `account::create_address`, `account::create_signer`, `move_stdlib::hash::sha2_256`/`sha3_256`, `aptos_hash::sip_hash`/`keccak256`/`sha2_512_internal`/`sha3_512_internal`/`ripemd160_internal`/`blake2b_256_internal`, `mem::swap`, `vector::move_range`, `string::internal_check_utf8`/`internal_is_char_boundary`/`internal_sub_string`/`internal_index_of`, `consensus_config::validator_txn_enabled_internal`, `hot_state_config::validate_internal`, `cmp::compare`.
 
 There are roughly 25–30 natives of this shape. The new VM interface must support them efficiently — these are the hot path — but they need none of the special capabilities below.
 
