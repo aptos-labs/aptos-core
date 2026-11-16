@@ -487,10 +487,6 @@ name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_from_bytes_value_node_me
 note = "TODO"
 
 [[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_function_value_serialization"
-note = "TODO"
-
-[[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::bcs::test_load_resource_value_node_metering"
 note = "TODO"
 
@@ -586,10 +582,6 @@ note = "TODO"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_fails_while_flag_on"
-note = "TODO"
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::function_value_serialization_restriction::closure_serialization_works_while_flag_off"
 note = "TODO"
 
 [[test]]
