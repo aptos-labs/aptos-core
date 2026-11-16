@@ -37,7 +37,9 @@ static ABORT_LOC_LIMITS_MODULE: LazyLock<AbortLocation> =
 ///
 /// Payload execution starts after the prologue, so the selected status must keep
 /// the transaction and preserve fee charging. It may differ from V1's status
-/// as an explicit choice, but must never cause a discard.
+/// as an explicit choice, but must never cause a discard. The exception is an
+/// interrupt, which maps to a discarding status. An interrupted session never
+/// reaches materialization, so that status only guards against a bug.
 fn internal_error_to_status(err: &VMInternalError) -> VMStatus {
     // The fallback statuses commit and charge, including for invariant
     // violations, which V1 discards: this runs after the prologue, where the
@@ -124,6 +126,9 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
             stage_failure_status(&stage, &format!("{failure:?}"))
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
+        DiscardReason::Interrupted => {
+            invariant_status("an interrupted transaction is never discarded".to_string())
+        },
     }
 }
 

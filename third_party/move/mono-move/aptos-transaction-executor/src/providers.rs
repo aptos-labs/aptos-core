@@ -6,6 +6,7 @@ use bytes::Bytes;
 use mono_move_core::{
     storage::resource_provider::{ResourceProvider, ResourceProviderError},
     types::InternedType,
+    ExecutionErrorKind,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{serialize, InterpreterContext};
@@ -38,9 +39,13 @@ fn read_resource_bytes(
     address: AccountAddress,
     ty: InternedType,
 ) -> Result<Option<Vec<u8>>, ResourceProviderError> {
-    let Some(ptr) = interp
-        .read_resource(address, ty)
-        .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?
+    let Some(ptr) = interp.read_resource(address, ty).map_err(|e| {
+        if matches!(e.kind(), ExecutionErrorKind::Interrupted) {
+            ResourceProviderError::Interrupted
+        } else {
+            ResourceProviderError::InvariantViolation(e.to_string())
+        }
+    })?
     else {
         return Ok(None);
     };

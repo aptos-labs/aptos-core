@@ -3,12 +3,15 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, GasExhaustedError, GasMeter};
+use mono_move_core::{
+    types::EMPTY_TYPE_LIST, Function, GasMeter, InterruptListener, InterruptSource, MeteringError,
+    VMInternalError, INTERRUPT_INTERVAL_GAS_UNITS,
+};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_runtime::{CompletedCall, InterpreterContext, ProductionNativeRegistry};
 use mono_move_testsuite::InMemoryModuleProvider;
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::{account_address::AccountAddress, ident_str, identifier::Identifier};
 
 #[test]
 fn test_out_of_gas() {
@@ -60,7 +63,10 @@ module 0x1::test {
         .map(CompletedCall::into_status)
         .unwrap_err()
         .into_error();
-    assert!(err.downcast_ref::<GasExhaustedError>().is_some(),);
+    assert_eq!(
+        err.downcast_ref::<MeteringError>(),
+        Some(&MeteringError::OutOfGas)
+    );
 }
 
 /// `load_function` errors when the gas budget is too small to cover the
@@ -101,4 +107,89 @@ fn test_out_of_gas_during_load() {
         err.to_string().contains("out of gas"),
         "unexpected error: {err}"
     );
+}
+
+/// Asks to stop every time it is polled.
+struct AlwaysInterrupt;
+
+impl InterruptSource for AlwaysInterrupt {
+    fn interrupt_requested(&self) -> bool {
+        true
+    }
+}
+
+fn run_to_error<'guard>(
+    interp: &mut InterpreterContext<'guard>,
+    func: &'guard Function,
+) -> VMInternalError {
+    let call = interp
+        .build_call(func)
+        .expect("the root frame fits on the stack");
+    call.run()
+        .map(CompletedCall::into_status)
+        .unwrap_err()
+        .into_error()
+}
+
+/// Loops that never end on their own stop at the first poll, whether metered
+/// or not.
+#[test]
+fn test_interrupt() {
+    let modules = mono_move_testsuite::compile_move_source(
+        r#"
+module 0x1::test {
+    fun noop() {}
+    fun spin() { loop {} }
+    fun spin_with_calls() { loop { noop() } }
+}
+"#,
+    )
+    .expect("compilation failed");
+    let mut provider = InMemoryModuleProvider::new();
+    provider.add_modules(&modules);
+
+    for (name, metered) in [
+        ("spin", true),
+        ("spin", false),
+        ("spin_with_calls", true),
+        ("spin_with_calls", false),
+    ] {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let natives = ProductionNativeRegistry::new();
+        let loader = Loader::new_with_policy(
+            &guard,
+            &provider,
+            LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+            &natives,
+        );
+        let id = guard
+            .intern_address_name(&AccountAddress::ONE, ident_str!("test"))
+            .into_global_arena_ptr();
+        let func_name = guard
+            .intern_identifier(Identifier::new(name).unwrap().as_ident_str())
+            .into_global_arena_ptr();
+        let mut interpreter = InterpreterContext::new(
+            loader,
+            GasMeter::with_max_budget().with_interrupt_listener(InterruptListener::new(
+                &AlwaysInterrupt,
+                INTERRUPT_INTERVAL_GAS_UNITS,
+            )),
+            &mono_move_core::NoResourceProvider,
+            &natives,
+        );
+        let func = interpreter
+            .unmetered(|interp| interp.load_function(id, func_name, EMPTY_TYPE_LIST))
+            .expect("load should succeed");
+        let err = if metered {
+            run_to_error(&mut interpreter, func)
+        } else {
+            interpreter.unmetered(|interp| run_to_error(interp, func))
+        };
+        assert_eq!(
+            err.downcast_ref::<MeteringError>(),
+            Some(&MeteringError::Interrupted),
+            "{name} (metered: {metered}): {err:?}"
+        );
+    }
 }

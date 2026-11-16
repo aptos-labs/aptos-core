@@ -121,12 +121,17 @@ pub fn nominal_tag(ty: InternedType) -> anyhow::Result<StructTag> {
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
     InvariantViolation(String),
+    /// The read was stopped by an interrupt, e.g. while loading the code of
+    /// the value's type.
+    #[error("execution interrupted")]
+    Interrupted,
 }
 
 impl IntoExecutionError for ResourceProviderError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
             ResourceProviderError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProviderError::Interrupted => ExecutionErrorKind::Interrupted,
         }
     }
 }

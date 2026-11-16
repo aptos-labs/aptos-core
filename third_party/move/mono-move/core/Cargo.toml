@@ -23,3 +23,6 @@ move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

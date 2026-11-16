@@ -31,7 +31,10 @@ pub use function::{
     BytecodeOffset, Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry,
     SortedSafePointEntries,
 };
-pub use gas::{GasExhaustedError, GasMeter};
+pub use gas::{
+    GasMeter, InterruptListener, InterruptSource, MeteringError, NoInterrupts,
+    INTERRUPT_INTERVAL_GAS_UNITS,
+};
 pub use instruction::{
     captured_values_size, next_captured_value_offset, CallClosureOp, ClosureFuncRef, CmpKind,
     CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntCastOp, IntCmpOp, IntNegateOp,

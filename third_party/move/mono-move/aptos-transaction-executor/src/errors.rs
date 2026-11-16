@@ -6,7 +6,7 @@ use aptos_types::{
     error::{split_canonical, OUT_OF_RANGE},
     transaction::validation::ECANT_PAY_GAS_DEPOSIT,
 };
-use mono_move_core::VMInternalError;
+use mono_move_core::{ExecutionErrorKind, VMInternalError};
 use mono_move_runtime::{
     error::{RuntimeError, RuntimeInvariantViolation},
     RuntimeStatus,
@@ -57,6 +57,10 @@ pub enum DiscardReason {
     },
     /// An executor-internal invariant violation.
     InvariantViolation(String),
+    /// Stopped on request of the interrupt source. The executor reports it as
+    /// [`TxnOutcome::Interrupted`](crate::outcome::TxnOutcome::Interrupted),
+    /// never as a discard.
+    Interrupted,
 }
 
 /// Why a transaction committed without side effects.
@@ -189,6 +193,21 @@ pub enum MoveExecutionFailure {
     UndecryptedPayload,
     /// Execution failed with a VM error.
     RuntimeError(VMInternalError),
+}
+
+impl MoveExecutionFailure {
+    /// Whether the interrupt source stopped execution.
+    pub fn is_interrupted(&self) -> bool {
+        match self {
+            MoveExecutionFailure::RuntimeError(err) => {
+                matches!(err.kind(), ExecutionErrorKind::Interrupted)
+            },
+            MoveExecutionFailure::Abort { .. }
+            | MoveExecutionFailure::InvalidArguments(_)
+            | MoveExecutionFailure::RejectedScript(_)
+            | MoveExecutionFailure::UndecryptedPayload => false,
+        }
+    }
 }
 
 /// An error that should not be reachable, as a VM error.

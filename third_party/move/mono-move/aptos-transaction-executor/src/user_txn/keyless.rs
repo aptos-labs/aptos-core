@@ -24,6 +24,10 @@ use std::cell::RefCell;
 
 /// Serves keyless validation the chain state it reads, through the
 /// interpreter so every read is recorded.
+//
+// TODO(completeness): the reads drop their errors, since `KeylessStateView`
+// returns `Option`. An interrupt during a read then discards the transaction
+// instead of reporting it as interrupted.
 struct InterpreterStateView<'a, 'guard> {
     // The validation reads through `&self`, so each read borrows the
     // interpreter mutably for its duration.

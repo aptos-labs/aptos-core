@@ -27,7 +27,7 @@
 //! equality and would report the divergence as a mismatch.
 
 use mono_move_core::{
-    BytecodeOffset, CallFrame, ErrorLocation, ExecutionErrorKind, GasExhaustedError, IntTy,
+    BytecodeOffset, CallFrame, ErrorLocation, ExecutionErrorKind, IntTy, MeteringError,
     VMInternalError,
 };
 use mono_move_loader::LoaderError;
@@ -316,9 +316,17 @@ pub fn describe(err: &VMInternalError) -> V1Equivalent {
     if let Some(err) = err.downcast_ref::<LoaderError>() {
         return describe_loader_error(err);
     }
-    if err.downcast_ref::<GasExhaustedError>().is_some() {
-        // V1 raises `PartialVMError::new(OUT_OF_GAS)` without a message.
-        return V1Equivalent::Described(V1ErrorInfo::with_no_message(StatusCode::OUT_OF_GAS));
+    if let Some(err) = err.downcast_ref::<MeteringError>() {
+        match err {
+            // V1 raises `PartialVMError::new(OUT_OF_GAS)` without a message.
+            MeteringError::OutOfGas => {
+                return V1Equivalent::Described(V1ErrorInfo::with_no_message(
+                    StatusCode::OUT_OF_GAS,
+                ));
+            },
+            // Falls back to the status of its kind.
+            MeteringError::Interrupted => {},
+        }
     }
     V1Equivalent::V1StatusUnknown
 }
@@ -336,14 +344,17 @@ fn fallback_info(err: &VMInternalError, equivalent: V1Equivalent) -> V1ErrorInfo
     let status = match equivalent {
         V1Equivalent::Described(info) => return info,
         V1Equivalent::Verbatim(error) => return V1ErrorInfo::verbatim(error),
-        // Execution-range codes throughout, so the executor keeps the
-        // transaction and the fee it already charged.
+        // Execution-range codes, so the executor keeps the transaction and the
+        // fee it already charged. The one exception is an interrupt, which must
+        // never be kept.
         V1Equivalent::NoV1Failure => StatusCode::UNKNOWN_RUNTIME_STATUS,
         // TODO(correctness): multiple error kinds share `UNKNOWN_RUNTIME_STATUS`;
         // distinct codes would change committed transaction statuses.
         V1Equivalent::V1StatusUnknown => match err.kind() {
             ExecutionErrorKind::OutOfGas => StatusCode::OUT_OF_GAS,
             ExecutionErrorKind::LinkingError => StatusCode::LINKER_ERROR,
+            // V1's status for the same interrupt. It discards the transaction.
+            ExecutionErrorKind::Interrupted => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
             ExecutionErrorKind::InvariantViolation
             | ExecutionErrorKind::RuntimeLimitExceeded
             | ExecutionErrorKind::InvalidOperation
@@ -862,12 +873,22 @@ mod tests {
             assert_eq!(info.status, expected_status);
             assert_eq!(info.message, V1Message::Absent);
         }
-        let gas = VMInternalError::new(GasExhaustedError);
+        let gas = VMInternalError::new(MeteringError::OutOfGas);
         let V1Equivalent::Described(info) = describe(&gas) else {
             panic!("gas exhaustion has a V1 counterpart");
         };
         assert_eq!(info.status, StatusCode::OUT_OF_GAS);
         assert_eq!(info.message, V1Message::Absent);
+    }
+
+    /// An interrupt gets V1's speculative-abort status, which is never kept.
+    #[test]
+    fn interrupt_maps_to_speculative_abort() {
+        let err = VMInternalError::new(MeteringError::Interrupted);
+        assert_eq!(
+            describe_or_fallback(&err).status,
+            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
+        );
     }
 
     /// Stack overflow and loader errors omit execution state; heap exhaustion

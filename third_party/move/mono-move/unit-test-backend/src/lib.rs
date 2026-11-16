@@ -389,6 +389,7 @@ fn classify(err: &VMInternalError) -> Classification {
         | ExecutionErrorKind::InvalidOperation => Classification::Ran,
         ExecutionErrorKind::InvariantViolation
         | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Interrupted
         | ExecutionErrorKind::Placeholder => Classification::BackendError,
     }
 }
@@ -483,7 +484,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mono_move_core::GasExhaustedError;
+    use mono_move_core::MeteringError;
     use mono_move_runtime::ArithOp;
 
     fn classified(err: impl mono_move_core::IntoExecutionError) -> &'static str {
@@ -552,7 +553,7 @@ mod tests {
             "ran"
         );
         assert_eq!(classified(RuntimeError::StackOverflow), "ran");
-        assert_eq!(classified(GasExhaustedError), "ran");
+        assert_eq!(classified(MeteringError::OutOfGas), "ran");
         // V1 fails here too, with a status MonoMove cannot determine.
         assert_eq!(classified(RuntimeError::BCSEof), "ran");
     }
