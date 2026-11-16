@@ -222,10 +222,6 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/function_values_safety/dep_compatibility.masm",
         "invariant violation message, sub-status, location, and exec_state for a stale closure",
     ),
-    MonoMoveDivergence::unsupported(
-        "tests/instructions/closure_equality.masm",
-        "function value equality",
-    ),
     MonoMoveDivergence::semantic(
         "tests/lazy_loading/cyclic_structs.masm",
         "no value depth limit; cyclic struct types are unsupported",
