@@ -16,6 +16,6 @@ rust-version = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
 hex = { workspace = true }
-ledger-apdu = "0.10.0"
-ledger-transport-hid = "0.10.0"
+ledger-apdu = "0.11.0"
+ledger-transport-hid = "0.11.0"
 thiserror = { workspace = true }
