@@ -138,7 +138,7 @@ impl AptosDB {
             &persisted_state,
             hot_state,
             transactions_to_keep.state_update_refs(),
-            self.state_store.clone(),
+            self.state_store.state_db.clone(),
         )?;
         let persisted_summary = live.persisted_state().get_state_summary();
         let new_state_summary = current.ledger_state_summary().update(
