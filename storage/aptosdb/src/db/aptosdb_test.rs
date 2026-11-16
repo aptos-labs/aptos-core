@@ -38,13 +38,14 @@ use aptos_types::{
     proof::SparseMerkleLeafNode,
     state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::{
-        ExecutionStatus, PersistedAuxiliaryInfo, TransactionAuxiliaryData,
+        ExecutionStatus, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionAuxiliaryDataV1, TransactionInfo, TransactionToCommit, VMErrorDetail, Version,
     },
+    validator_txn::ValidatorTransaction,
     vm_status::StatusCode,
     write_set::WriteSet,
 };
-use proptest::prelude::*;
+use proptest::{collection::vec, option, prelude::*, sample::Index};
 use std::{collections::HashSet, sync::Arc};
 
 proptest! {
@@ -296,6 +297,148 @@ fn test_get_latest_ledger_summary() {
     assert_eq!(bootstrapped.next_version(), 1);
     assert_eq!(bootstrapped.transaction_accumulator.root_hash(), root_hash,);
     assert_eq!(bootstrapped.state_summary.root_hash(), state_hash);
+}
+
+fn txn_to_commit(write_set: WriteSet, is_block_end: bool) -> TransactionToCommit {
+    let transaction = if is_block_end {
+        Transaction::StateCheckpoint(HashValue::zero())
+    } else {
+        Transaction::ValidatorTransaction(ValidatorTransaction::dummy(vec![]))
+    };
+    let txn_info = TransactionInfo::builder_v0()
+        .transaction_hash(HashValue::random())
+        .state_change_hash(HashValue::random())
+        .event_root_hash(HashValue::random())
+        .maybe_state_checkpoint_hash(is_block_end.then(HashValue::random))
+        .gas_used(0)
+        .status(ExecutionStatus::Success)
+        .build();
+    TransactionToCommit::new(
+        transaction,
+        txn_info,
+        write_set,
+        vec![],                              /* events */
+        false,                               /* is_reconfig */
+        TransactionAuxiliaryData::default(), /* transaction_auxiliary_data */
+    )
+}
+
+/// Checks reads of `keys` at every version (and past the last one) against the write sets of
+/// `txns`. Below `prune_version` reads must fail, and in the block containing it they may.
+fn check_state_reads(
+    db: &AptosDB,
+    txns: &[TransactionToCommit],
+    keys: &[StateKey],
+    block_starts: &[Version],
+    prune_version: Version,
+) {
+    for key in keys {
+        let mut expected = None;
+        for version in 0..txns.len() as Version + 2 {
+            if let Some(write_op) = txns
+                .get(version as usize)
+                .and_then(|txn| txn.write_set().get_write_op(key))
+            {
+                expected = write_op
+                    .as_state_value_opt()
+                    .map(|value| (version, value.clone()));
+            }
+
+            let result = db.get_state_value_with_version_by_version(key, version);
+            if version < prune_version {
+                assert!(result.is_err());
+                continue;
+            }
+            match result {
+                Ok(value) => {
+                    assert_eq!(value, expected, "{key:?} at version {version}");
+                    assert_eq!(
+                        db.get_state_value_by_version(key, version).unwrap(),
+                        value.map(|(_, value)| value),
+                    );
+                },
+                Err(err) => assert!(
+                    block_starts
+                        .get(version as usize)
+                        .is_some_and(|start| *start <= prune_version),
+                    "{key:?} at version {version}: {err}",
+                ),
+            }
+        }
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(20))]
+
+    #[test]
+    fn test_get_state_value_mid_block(
+        // Per block, per txn, writes as `(key index, value)`; `None` deletes.
+        blocks in vec(vec(vec((0..3u8, option::of(any::<u8>())), 0..=2), 1..=5), 1..=8),
+        blocks_per_chunk in 1..=3usize,
+        prune_index in any::<Index>(),
+    ) {
+        let keys: Vec<_> = (0..3u8).map(|i| StateKey::raw(&[i])).collect();
+        let blocks: Vec<Vec<_>> = blocks
+            .into_iter()
+            .map(|block| {
+                let num_txns = block.len();
+                block
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, writes)| {
+                        let write_set = WriteSet::new_for_test(writes.into_iter().map(
+                            |(key, value)| {
+                                (keys[key as usize].clone(), value.map(|v| StateValue::from(vec![v])))
+                            },
+                        ));
+                        txn_to_commit(write_set, i + 1 == num_txns)
+                    })
+                    .collect()
+            })
+            .collect();
+        let txns = blocks.concat();
+        let mut block_starts = vec![];
+        for block in &blocks {
+            block_starts.extend(std::iter::repeat_n(block_starts.len() as Version, block.len()));
+        }
+
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let mut version = 0;
+        for chunk in blocks.chunks(blocks_per_chunk) {
+            let chunk = chunk.concat();
+            db.save_transactions_for_test(&chunk, version, None, true).unwrap();
+            version += chunk.len() as Version;
+        }
+        check_state_reads(&db, &txns, &keys, &block_starts, 0);
+
+        // Drop rows as if state KV kept only the last write to a key in each block.
+        let mut seen = HashSet::new();
+        for (version, txn) in txns.iter().enumerate().rev() {
+            if txn.has_state_checkpoint_hash() {
+                seen.clear();
+            }
+            for (key, _) in txn.write_set().write_op_iter() {
+                if !seen.insert(key) {
+                    db.state_kv_db
+                        .db_shard(key.get_shard_id())
+                        .delete::<StateValueByKeyHashSchema>(&(key.hash(), version as Version))
+                        .unwrap();
+                }
+            }
+        }
+        check_state_reads(&db, &txns, &keys, &block_starts, 0);
+
+        let prune_version = prune_index.index(txns.len()) as Version;
+        db.ledger_pruner.save_min_readable_version(prune_version).unwrap();
+        db.state_store
+            .state_pruner
+            .state_kv_pruner
+            .save_min_readable_version(prune_version)
+            .unwrap();
+        check_state_reads(&db, &txns, &keys, &block_starts, prune_version);
+    }
 }
 
 pub fn test_state_merkle_pruning_impl(
