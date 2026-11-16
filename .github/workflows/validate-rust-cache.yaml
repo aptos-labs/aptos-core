@@ -28,6 +28,7 @@ jobs:
           ln -s /usr/bin/ld.lld-19 /tmp/cache-compilers/ld.lld
           echo /tmp/cache-compilers >> "$GITHUB_PATH"
           echo RUSTUP_TOOLCHAIN=1.85.1 >> "$GITHUB_ENV"
+      - run: python3 -m unittest discover -s .github/scripts -p 'test_native_cache_transition.py'
       - run: python3 .github/scripts/rust_cache_fixture.py prepare
       - run: python3 .github/actions/rust-prebuilt-setup/setup.py cache-identity
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
