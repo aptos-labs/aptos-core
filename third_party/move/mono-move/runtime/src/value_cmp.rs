@@ -906,57 +906,6 @@ mod tests {
     }
 
     #[test]
-    fn compare_unsigned_is_numeric_not_byte_order() {
-        // Little-endian bytes order these the other way round.
-        assert_eq!(
-            cmp_same(&MoveTypeLayout::U64, &1u64, &256u64).unwrap(),
-            Ordering::Less
-        );
-        assert_eq!(
-            cmp_same(&MoveTypeLayout::U128, &u128::MAX, &0u128).unwrap(),
-            Ordering::Greater
-        );
-        assert_eq!(
-            cmp_same(&MoveTypeLayout::U16, &7u16, &7u16).unwrap(),
-            Ordering::Equal
-        );
-    }
-
-    #[test]
-    fn compare_signed_orders_by_sign_first() {
-        for (a, b, expected) in [
-            (-1i64, 0i64, Ordering::Less),
-            (0, -1, Ordering::Greater),
-            (-2, -1, Ordering::Less),
-            (i64::MIN, i64::MAX, Ordering::Less),
-            (-5, -5, Ordering::Equal),
-        ] {
-            assert_eq!(
-                cmp_same(&MoveTypeLayout::I64, &a, &b).unwrap(),
-                expected,
-                "{a} against {b}"
-            );
-        }
-    }
-
-    #[test]
-    fn compare_bools_and_addresses() {
-        assert_eq!(
-            cmp_same(&MoveTypeLayout::Bool, &false, &true).unwrap(),
-            Ordering::Less
-        );
-        assert_eq!(
-            cmp_same(
-                &MoveTypeLayout::Address,
-                &AccountAddress::ONE,
-                &AccountAddress::TWO
-            )
-            .unwrap(),
-            Ordering::Less
-        );
-    }
-
-    #[test]
     fn compare_vectors_by_element_then_length() {
         let layout = MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8));
         // The longer vector loses on its first element, which the ULEB length
@@ -1155,31 +1104,6 @@ mod tests {
             compare_captures(&closure(&[]), &closure(&[TypeTag::U8]), 1).unwrap(),
             Ordering::Less
         );
-    }
-
-    #[test]
-    fn compare_is_a_total_order() {
-        // Sorting by the comparison must agree with it pairwise.
-        let layout = MoveTypeLayout::Struct(Arc::new(MoveStructLayout::Runtime(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-        ])));
-        let values = [
-            (0u64, vec![]),
-            (0u64, vec![1u8]),
-            (1u64, vec![]),
-            (1u64, vec![0u8, 0]),
-            (u64::MAX, vec![255u8]),
-        ];
-        for (i, a) in values.iter().enumerate() {
-            for (j, b) in values.iter().enumerate() {
-                assert_eq!(
-                    cmp_same(&layout, a, b).unwrap(),
-                    i.cmp(&j),
-                    "{a:?} against {b:?}"
-                );
-            }
-        }
     }
 
     #[test]

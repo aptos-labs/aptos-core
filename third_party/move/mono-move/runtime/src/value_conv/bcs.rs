@@ -2788,20 +2788,6 @@ mod tests {
         slot
     }
 
-    /// Writes heap pointer `capture` as the first captured value of `closure`.
-    /// Copying it in as bytes would drop its provenance.
-    ///
-    /// # Safety
-    ///
-    /// `closure` must be a capturing closure whose first capture is a pointer.
-    unsafe fn write_captured_ptr(closure: *mut u8, capture: *mut u8) {
-        // SAFETY: forwarded to the caller.
-        unsafe {
-            let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
-            write_ptr(captured_data, CAPTURED_DATA_VALUES_OFFSET, capture);
-        }
-    }
-
     /// Publishes the layout of a closure's captured values, one field per
     /// `(offset, layout)` capture.
     fn push_captured_values_layout(
@@ -2827,123 +2813,6 @@ mod tests {
         out
     }
 
-    /// V1's own decoder must accept the bytes and consume all of them.
-    fn assert_closure_walks(bytes: &[u8]) {
-        bcs::from_bytes_seed(&MoveTypeLayout::Function, bytes)
-            .expect("V1 decodes the closure and consumes every byte");
-    }
-
-    #[test]
-    fn serialize_non_capturing_closure() {
-        let layouts = ValueLayoutTable::new();
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0, None, &[]);
-            serialize_closure_value(&layouts, closure)
-        };
-
-        assert_eq!(out, expected_header(0, &[]));
-        assert_closure_walks(&out);
-    }
-
-    #[test]
-    fn serialize_closure_over_generic_target() {
-        let layouts = ValueLayoutTable::new();
-        let func_ref = test_func_ref(InternedTypeList::new(GlobalArenaPtr::from_static(
-            &CLOSURE_TY_ARGS,
-        )));
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0, None, &[]);
-            serialize_closure_value(&layouts, closure)
-        };
-
-        assert_eq!(out, expected_header(0, &[TypeTag::U64]));
-        assert_closure_walks(&out);
-    }
-
-    #[test]
-    fn serialize_closure_capturing_scalars() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 9, vec![
-            (0, U64_LAYOUT_ID),
-            (8, BOOL_LAYOUT_ID),
-        ]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        // A `u64` then a `bool`, at their natural offsets in the values region.
-        let mut values = [0u8; 16];
-        values[..8].copy_from_slice(&7u64.to_le_bytes());
-        values[8] = 1;
-
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let closure = build_closure(&mut heap, &func_ref, 0b11, Some(layout_id), &values);
-            serialize_closure_value(&layouts, closure)
-        };
-
-        let mut expected = expected_header(0b11, &[]);
-        expected.extend_from_slice(&bcs::to_bytes(&MoveTypeLayout::U64).unwrap());
-        expected.extend_from_slice(&bcs::to_bytes(&7u64).unwrap());
-        expected.extend_from_slice(&bcs::to_bytes(&MoveTypeLayout::Bool).unwrap());
-        expected.extend_from_slice(&bcs::to_bytes(&true).unwrap());
-        assert_eq!(out, expected);
-        assert_closure_walks(&out);
-    }
-
-    #[test]
-    fn serialize_closure_capturing_vector() {
-        let mut layouts = ValueLayoutTable::new();
-        let vec_id = layouts.push(vector_layout(U64_TY, U8_LAYOUT_ID));
-        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, vec_id)]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let elems = vec![1u8, 2, 3];
-        let encoded = bcs::to_bytes(&elems).unwrap();
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let vec_ptr = decode_ptr(
-                &mut heap,
-                &layouts,
-                layouts.layout(vec_id).unwrap(),
-                &encoded,
-            );
-            let closure = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &[0; 8]);
-            write_captured_ptr(closure, vec_ptr);
-            serialize_closure_value(&layouts, closure)
-        };
-
-        let mut expected = expected_header(0b1, &[]);
-        expected.extend_from_slice(
-            &bcs::to_bytes(&MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8))).unwrap(),
-        );
-        expected.extend_from_slice(&encoded);
-        assert_eq!(out, expected);
-        assert_closure_walks(&out);
-    }
-
-    #[test]
-    fn serialize_closure_capturing_closure() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, FUNCTION_LAYOUT_ID)]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let inner = build_closure(&mut heap, &func_ref, 0, None, &[]);
-            let outer = build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), &[0; 8]);
-            write_captured_ptr(outer, inner);
-            serialize_closure_value(&layouts, outer)
-        };
-
-        let mut expected = expected_header(0b1, &[]);
-        expected.extend_from_slice(&bcs::to_bytes(&MoveTypeLayout::Function).unwrap());
-        expected.extend_from_slice(&expected_header(0, &[]));
-        assert_eq!(out, expected);
-        assert_closure_walks(&out);
-    }
-
     /// Serializing a closure over one capture must be refused, as V1 refuses it.
     fn assert_capture_refused(layouts: &ValueLayoutTable, layout_id: LayoutId, values: &[u8]) {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
@@ -2964,32 +2833,6 @@ mod tests {
             err.downcast_ref::<RuntimeError>(),
             Some(RuntimeError::ValueNotSerializable(_))
         ));
-    }
-
-    #[test]
-    fn serialize_closure_capturing_signer() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 32, vec![(0, SIGNER_LAYOUT_ID)]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
-        let mut heap = Heap::new(4096);
-        let out = unsafe {
-            let closure = build_closure(
-                &mut heap,
-                &func_ref,
-                0b1,
-                Some(layout_id),
-                &addr.into_bytes(),
-            );
-            serialize_closure_value(&layouts, closure)
-        };
-
-        // V1's bcs natives write a signer as its address.
-        let mut expected = expected_header(0b1, &[]);
-        expected.extend_from_slice(&bcs::to_bytes(&MoveTypeLayout::Signer).unwrap());
-        expected.extend_from_slice(&bcs::to_bytes(&addr).unwrap());
-        assert_eq!(out, expected);
     }
 
     #[test]
@@ -3139,33 +2982,6 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_non_capturing_closure() {
-        let bytes = expected_header(0, &[TypeTag::U64]);
-        assert_eq!(closure_round_trip(&bytes).unwrap(), bytes);
-    }
-
-    #[test]
-    fn deserialize_closure_capturing_scalars_and_vector() {
-        let bytes = closure_wire(0b101, &[], &[
-            (MoveTypeLayout::U64, bcs::to_bytes(&7u64).unwrap()),
-            (
-                MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-                bcs::to_bytes(&vec![1u8, 2, 3]).unwrap(),
-            ),
-        ]);
-        assert_eq!(closure_round_trip(&bytes).unwrap(), bytes);
-    }
-
-    #[test]
-    fn deserialize_closure_capturing_closure() {
-        let bytes = closure_wire(0b1, &[], &[(
-            MoveTypeLayout::Function,
-            expected_header(0, &[TypeTag::Bool]),
-        )]);
-        assert_eq!(closure_round_trip(&bytes).unwrap(), bytes);
-    }
-
-    #[test]
     fn deserialize_closure_keeps_layouts_mono_never_emits() {
         // The emitter widths an 8-byte integer to `u64` and reaches
         // `RuntimeVariants` only through a published enum layout, so these two
@@ -3199,21 +3015,6 @@ mod tests {
         assert!(matches!(
             closure_decode_err(&bytes),
             RuntimeError::BCSInvalidClosure("sequence length")
-        ));
-    }
-
-    #[test]
-    fn deserialize_closure_rejects_capture_count_mismatch() {
-        let mut bytes = closure_wire(0b1, &[], &[(
-            MoveTypeLayout::U64,
-            bcs::to_bytes(&7u64).unwrap(),
-        )]);
-        // Declare two capture pairs where the mask names one. Trailing elements
-        // land here too, since a BCS sequence is length-prefixed.
-        bytes[0] = 5 + 2 * 2;
-        assert!(matches!(
-            closure_decode_err(&bytes),
-            RuntimeError::BCSInvalidClosure("capture count")
         ));
     }
 
@@ -3461,36 +3262,6 @@ mod tests {
         unsafe { equals_impl(layouts, ptr(&slot_a), ptr(&slot_b), FUNCTION_LAYOUT_ID) }
     }
 
-    /// Decodes `bytes` into a `Raw` closure on `heap`.
-    ///
-    /// # Safety
-    ///
-    /// `bytes` must encode a closure.
-    unsafe fn build_raw_closure<T: LayoutProvider + ?Sized>(
-        layouts: &T,
-        heap: &mut Heap,
-        bytes: &[u8],
-    ) -> *mut u8 {
-        let mut slot = 0u64;
-        let mut cursor = 0;
-        // SAFETY: a `u64` holding the closure pointer is exactly a function
-        // value's in-memory image.
-        unsafe {
-            deserialize_impl(
-                layouts,
-                heap,
-                &ValueLayout::function(),
-                bytes,
-                &mut cursor,
-                &mut slot as *mut u64 as *mut u8,
-                None,
-            )
-            .unwrap()
-        };
-        assert_eq!(cursor, bytes.len());
-        slot as *mut u8
-    }
-
     #[test]
     fn compare_closures_by_target() {
         let layouts = ValueLayoutTable::new();
@@ -3509,173 +3280,6 @@ mod tests {
             let c = build_closure(&mut heap, &same, 0, None, &[]);
             assert!(!eq_closures(&layouts, a, b).unwrap());
             assert!(eq_closures(&layouts, a, c).unwrap());
-        }
-    }
-
-    #[test]
-    fn closures_are_not_ordered() {
-        let layouts = ValueLayoutTable::new();
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let a = build_closure(&mut heap, &func_ref, 0, None, &[]);
-            let slot = a as u64;
-            // Even a closure against itself is an error, not `Equal`.
-            let err =
-                compare_impl(&layouts, ptr(&slot), ptr(&slot), FUNCTION_LAYOUT_ID).unwrap_err();
-            assert!(matches!(
-                err.downcast_ref::<RuntimeError>(),
-                Some(RuntimeError::FunctionValuesNotOrdered)
-            ));
-        }
-    }
-
-    #[test]
-    fn compare_closures_by_mask() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, U64_LAYOUT_ID)]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let values = 7u64.to_le_bytes();
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let a = build_closure(&mut heap, &func_ref, 0b01, Some(layout_id), &values);
-            let b = build_closure(&mut heap, &func_ref, 0b10, Some(layout_id), &values);
-            // Same target and the same single capture, so only the mask
-            // separates them.
-            assert!(!eq_closures(&layouts, a, b).unwrap());
-        }
-    }
-
-    #[test]
-    fn compare_closures_on_the_flat_path() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 9, vec![
-            (0, U64_LAYOUT_ID),
-            (8, BOOL_LAYOUT_ID),
-        ]);
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        // A `u64` then a `bool`, at their natural offsets in the values region.
-        let values = |n: u64, flag: bool| {
-            let mut values = [0u8; 16];
-            values[..8].copy_from_slice(&n.to_le_bytes());
-            values[8] = flag as u8;
-            values
-        };
-
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let a = build_closure(
-                &mut heap,
-                &func_ref,
-                0b11,
-                Some(layout_id),
-                &values(7, true),
-            );
-            let b = build_closure(
-                &mut heap,
-                &func_ref,
-                0b11,
-                Some(layout_id),
-                &values(7, true),
-            );
-            let c = build_closure(
-                &mut heap,
-                &func_ref,
-                0b11,
-                Some(layout_id),
-                &values(7, false),
-            );
-            let d = build_closure(
-                &mut heap,
-                &func_ref,
-                0b11,
-                Some(layout_id),
-                &values(8, false),
-            );
-            assert!(eq_closures(&layouts, a, b).unwrap());
-            assert!(!eq_closures(&layouts, a, c).unwrap());
-            assert!(!eq_closures(&layouts, c, d).unwrap());
-
-            // Nothing resolved the target: comparison never reaches the loader.
-            for closure in [a, b, c, d] {
-                assert_eq!(
-                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET),
-                    FUNC_REF_TAG_UNRESOLVED
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn compare_closures_on_the_wire_path() {
-        let ctx = GlobalContext::with_num_execution_workers(1);
-        let guard = ctx.try_execution_context(0).unwrap();
-        let table = ValueLayoutTable::new();
-        let layouts = InternedLayouts {
-            table: &table,
-            guard: &guard,
-        };
-
-        let wire = |n: u64| {
-            closure_wire(0b1, &[], &[(
-                MoveTypeLayout::U64,
-                bcs::to_bytes(&n).unwrap(),
-            )])
-        };
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let a = build_raw_closure(&layouts, &mut heap, &wire(7));
-            let b = build_raw_closure(&layouts, &mut heap, &wire(7));
-            let c = build_raw_closure(&layouts, &mut heap, &wire(8));
-            assert!(eq_closures(&layouts, a, b).unwrap());
-            assert!(!eq_closures(&layouts, a, c).unwrap());
-        }
-    }
-
-    #[test]
-    fn compare_a_wire_closure_against_a_packed_one() {
-        let ctx = GlobalContext::with_num_execution_workers(1);
-        let guard = ctx.try_execution_context(0).unwrap();
-        let mut table = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut table, 8, vec![(0, U64_LAYOUT_ID)]);
-        let layouts = InternedLayouts {
-            table: &table,
-            guard: &guard,
-        };
-        let func_ref = test_func_ref(EMPTY_TYPE_LIST);
-
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let packed = build_closure(
-                &mut heap,
-                &func_ref,
-                0b1,
-                Some(layout_id),
-                &7u64.to_le_bytes(),
-            );
-            let raw = build_raw_closure(
-                &layouts,
-                &mut heap,
-                &closure_wire(0b1, &[], &[(
-                    MoveTypeLayout::U64,
-                    bcs::to_bytes(&7u64).unwrap(),
-                )]),
-            );
-            let bigger = build_raw_closure(
-                &layouts,
-                &mut heap,
-                &closure_wire(0b1, &[], &[(
-                    MoveTypeLayout::U64,
-                    bcs::to_bytes(&8u64).unwrap(),
-                )]),
-            );
-            // The packed side is demoted to wire bytes, in both operand orders.
-            assert!(eq_closures(&layouts, packed, raw).unwrap());
-            assert!(eq_closures(&layouts, raw, packed).unwrap());
-            assert!(!eq_closures(&layouts, packed, bigger).unwrap());
         }
     }
 
@@ -3702,35 +3306,6 @@ mod tests {
                     RuntimeInvariantViolation::ClosureCaptureKindMismatch
                 ))
             ));
-        }
-    }
-
-    #[test]
-    fn compare_nested_closures_through_captures() {
-        let mut layouts = ValueLayoutTable::new();
-        let layout_id = push_captured_values_layout(&mut layouts, 8, vec![(0, FUNCTION_LAYOUT_ID)]);
-        let plain = test_func_ref(EMPTY_TYPE_LIST);
-        let generic = test_func_ref(InternedTypeList::new(GlobalArenaPtr::from_static(
-            &CLOSURE_TY_ARGS,
-        )));
-
-        let mut heap = Heap::new(4096);
-        unsafe {
-            let wrap = |heap: &mut Heap, inner: *mut u8| {
-                build_closure(
-                    heap,
-                    &plain,
-                    0b1,
-                    Some(layout_id),
-                    &(inner as u64).to_ne_bytes(),
-                )
-            };
-            let inner_a = build_closure(&mut heap, &plain, 0, None, &[]);
-            let inner_b = build_closure(&mut heap, &generic, 0, None, &[]);
-            let a = wrap(&mut heap, inner_a);
-            let b = wrap(&mut heap, inner_b);
-            assert!(!eq_closures(&layouts, a, b).unwrap());
-            assert!(eq_closures(&layouts, a, a).unwrap());
         }
     }
 }

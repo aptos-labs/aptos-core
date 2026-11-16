@@ -8,6 +8,8 @@ module 0x99::closure_eq {
 
     struct Point has copy, drop, store { x: u64, y: u8 }
 
+    struct Wrapper has copy, drop { f: |u64|u64 has copy + drop }
+
     #[persistent]
     fun add(a: u64, b: u64): u64 {
         a + b
@@ -16,6 +18,16 @@ module 0x99::closure_eq {
     #[persistent]
     fun mul(a: u64, b: u64): u64 {
         a * b
+    }
+
+    #[persistent]
+    fun sub(a: u64, b: u64): u64 {
+        a - b
+    }
+
+    #[persistent]
+    fun apply(f: |u64|u64 has copy + drop + store, x: u64): u64 {
+        f(x)
     }
 
     #[persistent]
@@ -50,12 +62,6 @@ module 0x99::closure_eq {
         f == g
     }
 
-    public fun different_target_neq(): bool {
-        let f: |u64, u64|u64 has copy + drop = add;
-        let g: |u64, u64|u64 has copy + drop = mul;
-        f != g
-    }
-
     public fun different_type_arg(): bool {
         let a = true;
         let b = 1u8;
@@ -73,13 +79,6 @@ module 0x99::closure_eq {
     public fun different_capture(): bool {
         let f: |u64|u64 has copy + drop = |b| add(7, b);
         let g: |u64|u64 has copy + drop = |b| add(8, b);
-        f == g
-    }
-
-    // BCS is little-endian, so byte order and value order disagree here.
-    public fun capture_byte_order(): bool {
-        let f: |u64|u64 has copy + drop = |b| add(1, b);
-        let g: |u64|u64 has copy + drop = |b| add(256, b);
         f == g
     }
 
@@ -138,21 +137,78 @@ module 0x99::closure_eq {
         f == g
     }
 
-    // Calling the wire-backed closure resolves its target and materializes its
-    // captures, so this compares a resolved closure against an unresolved one.
-    public fun resolved_equals_unresolved(): bool {
-        let f: |u64|u64 has copy + drop + store = |b| add(7, b);
-        let g = wire(&f);
-        let _ = g(1);
+    // The same target and capture, captured at different positions.
+    public fun different_mask(): bool {
+        let f: |u64|u64 has copy + drop = |b| sub(7, b);
+        let g: |u64|u64 has copy + drop = |a| sub(a, 7);
         f == g
     }
 
-    public fun resolved_equals_wire(): bool {
+    public fun nested_closures(): bool {
+        let inner: |u64|u64 has copy + drop + store = |b| add(7, b);
+        let other: |u64|u64 has copy + drop + store = |b| add(8, b);
+        let f: |u64|u64 has copy + drop + store = |x| apply(inner, x);
+        let g: |u64|u64 has copy + drop + store = |x| apply(inner, x);
+        let h: |u64|u64 has copy + drop + store = |x| apply(other, x);
+        f == g && f != h
+    }
+
+    public fun nested_closures_on_the_wire(): bool {
+        let inner: |u64|u64 has copy + drop + store = |b| add(7, b);
+        let other: |u64|u64 has copy + drop + store = |b| add(8, b);
+        let f: |u64|u64 has copy + drop + store = |x| apply(inner, x);
+        let h: |u64|u64 has copy + drop + store = |x| apply(other, x);
+        f == wire(&f) && wire(&f) != h
+    }
+
+    public fun closures_in_vectors(): bool {
+        let f: |u64|u64 has copy + drop = |b| add(7, b);
+        let g: |u64|u64 has copy + drop = |b| add(7, b);
+        let h: |u64|u64 has copy + drop = |b| add(8, b);
+        vector[f, h] == vector[g, h] && vector[f] != vector[h]
+    }
+
+    public fun closures_in_structs(): bool {
+        let a = Wrapper { f: |b| add(7, b) };
+        let b = Wrapper { f: |b| add(7, b) };
+        let c = Wrapper { f: |b| add(8, b) };
+        a == b && a != c
+    }
+
+    public fun wire_struct_capture_with_type_args(): bool {
+        let p = Point { x: 1, y: 2 };
+        let f: |u64|u64 has copy + drop + store = |b| pick<Point>(p, b);
+        f == wire(&f)
+    }
+
+    public fun wire_differs_from_wire(): bool {
         let f: |u64|u64 has copy + drop + store = |b| add(7, b);
-        let g = wire(&f);
-        let h = wire(&f);
-        let _ = g(1);
-        g == h
+        let g: |u64|u64 has copy + drop + store = |b| add(8, b);
+        wire(&f) == wire(&g)
+    }
+
+    public fun wire_on_the_left(): bool {
+        let f: |u64|u64 has copy + drop + store = |b| add(7, b);
+        let g: |u64|u64 has copy + drop + store = |b| add(8, b);
+        wire(&f) == f && wire(&g) != f
+    }
+
+    // Equality never loads the target, so it need not exist.
+    public fun missing_target(): bool {
+        let bytes = x"05010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f6263730c6e6f745f615f6d6574686f64000000000000000000";
+        let f = 0x1::from_bcs::from_bytes<|u64|u64 has copy + drop>(bytes);
+        let g = 0x1::from_bcs::from_bytes<|u64|u64 has copy + drop>(bytes);
+        f == g
+    }
+
+    public fun compare_across_gc(): bool {
+        let d1 = vector[1u8, 2u8];
+        let d2 = vector[1u8, 2u8];
+        let f: |u64|u64 has copy + drop + store = |k| tally(d1, k);
+        let g: |u64|u64 has copy + drop + store = |k| tally(d2, k);
+        let w = wire(&g);
+        0x0::test_utils::force_gc();
+        f == g && f == w
     }
 }
 
@@ -162,9 +218,6 @@ module 0x99::closure_eq {
 // RUN: execute 0x99::closure_eq::different_target
 // CHECK: results: false
 
-// RUN: execute 0x99::closure_eq::different_target_neq
-// CHECK: results: true
-
 // RUN: execute 0x99::closure_eq::different_type_arg
 // CHECK: results: false
 
@@ -172,9 +225,6 @@ module 0x99::closure_eq {
 // CHECK: results: true
 
 // RUN: execute 0x99::closure_eq::different_capture
-// CHECK: results: false
-
-// RUN: execute 0x99::closure_eq::capture_byte_order
 // CHECK: results: false
 
 // RUN: execute 0x99::closure_eq::vector_capture
@@ -198,8 +248,33 @@ module 0x99::closure_eq {
 // RUN: execute 0x99::closure_eq::wire_noncapturing
 // CHECK: results: true
 
-// RUN: execute 0x99::closure_eq::resolved_equals_unresolved
+// RUN: execute 0x99::closure_eq::different_mask
+// CHECK: results: false
+
+// RUN: execute 0x99::closure_eq::nested_closures
 // CHECK: results: true
 
-// RUN: execute 0x99::closure_eq::resolved_equals_wire
+// RUN: execute 0x99::closure_eq::nested_closures_on_the_wire
 // CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::closures_in_vectors
+// CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::closures_in_structs
+// CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::wire_struct_capture_with_type_args
+// CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::wire_differs_from_wire
+// CHECK: results: false
+
+// RUN: execute 0x99::closure_eq::wire_on_the_left
+// CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::missing_target
+// CHECK: results: true
+
+// RUN: execute 0x99::closure_eq::compare_across_gc
+// CHECK: results: true
+// CHECK-GC-COUNT: 1

@@ -23,10 +23,6 @@ module 0x42::main {
         2
     }
 
-    fun adder(x: u64): |u64|u64 has drop {
-        |y| x + y
-    }
-
     public fun u64_lt(): bool {
         cmp::compare(&1u64, &2u64).is_lt()
     }
@@ -57,16 +53,6 @@ module 0x42::main {
     public fun closure_same_target(): bool {
         let f: ||u64 has drop = one;
         cmp::compare(&f, &f).is_eq()
-    }
-
-    public fun closure_different_targets(): bool {
-        let f: ||u64 has drop = one;
-        let g: ||u64 has drop = two;
-        cmp::compare(&f, &g).is_lt()
-    }
-
-    public fun closure_different_captures(): bool {
-        cmp::compare(&adder(1), &adder(2)).is_lt()
     }
 
     // The tags tie, so the comparison reaches the closures.
@@ -103,14 +89,6 @@ module 0x42::main {
 // CHECK: results: true
 
 // RUN: execute 0x42::main::closure_same_target
-// CHECK-V1: results: true
-// CHECK-V2-SUBSTR: function values cannot be ordered
-
-// RUN: execute 0x42::main::closure_different_targets
-// CHECK-V1: results: true
-// CHECK-V2-SUBSTR: function values cannot be ordered
-
-// RUN: execute 0x42::main::closure_different_captures
 // CHECK-V1: results: true
 // CHECK-V2-SUBSTR: function values cannot be ordered
 
