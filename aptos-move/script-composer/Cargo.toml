@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["serde_bytes", "wasm-bindgen-futures", "getrandom"]
+ignored = ["serde_bytes", "getrandom"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -28,7 +28,6 @@ move-core-types = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 wasm-bindgen = { workspace = true }
-wasm-bindgen-futures = { workspace = true }
 
 [dev-dependencies]
 aptos-move-e2e-test-harness = { workspace = true }
