@@ -694,8 +694,10 @@ impl DbReader for AptosDB {
         gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
-            self.state_store
-                .get_state_value_by_version(state_store_key, version)
+            Ok(self
+                .state_kv_db
+                .get_state_value_row_by_version(state_store_key, version)?
+                .and_then(|(_, value)| value))
         })
     }
 
@@ -707,8 +709,10 @@ impl DbReader for AptosDB {
         gauged_api("get_state_value_with_version_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
-            self.state_store
-                .get_state_value_with_version_by_version(state_key, version)
+            Ok(self
+                .state_kv_db
+                .get_state_value_row_by_version(state_key, version)?
+                .and_then(|(version, value)| value.map(|value| (version, value))))
         })
     }
 
@@ -737,7 +741,7 @@ impl DbReader for AptosDB {
             self.debug_assert_block_end(version);
 
             self.state_store
-                .get_state_value_by_version(state_key, version)
+                .get_state_value_at_checkpoint(state_key, version)
         })
     }
 
@@ -751,7 +755,7 @@ impl DbReader for AptosDB {
             self.debug_assert_block_end(version);
 
             self.state_store
-                .get_state_value_with_version_by_version(state_key, version)
+                .get_state_value_with_version_at_checkpoint(state_key, version)
         })
     }
 

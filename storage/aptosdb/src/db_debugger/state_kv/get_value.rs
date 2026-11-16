@@ -70,7 +70,10 @@ impl Cmd {
         let mut start_version = self.version;
         let mut count = 0;
         while count < 10 {
-            match db.get_state_value_with_version_by_version(&key, start_version)? {
+            match db
+                .get_state_value_row_by_version(&key, start_version)?
+                .and_then(|(version, value)| value.map(|value| (version, value)))
+            {
                 None => {
                     if count == 0 {
                         println!("{}", "Value not found.".to_string().yellow());
