@@ -18,7 +18,7 @@ use crate::{
 };
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::CheckpointStateReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
