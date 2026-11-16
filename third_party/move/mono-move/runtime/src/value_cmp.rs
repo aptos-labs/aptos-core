@@ -11,18 +11,17 @@ use crate::{
     types::VEC_DATA_OFFSET,
     value_conv::bcs::{
         capture_blob, capture_slots, captured_fields, closure_parts, decode_captures,
-        emit_closure_captures, materialized_layout_id, ClosureParts, Encoding,
+        emit_closure_captures, func_ref_ty_tags, materialized_layout_id, ClosureParts, Encoding,
     },
 };
 use mono_move_core::{
-    interner::{type_tag_of, view_module_id, FunctionRef},
-    types::{view_name, view_type_list, InternedType},
+    interner::{view_module_id, FunctionRef},
+    types::{view_name, InternedType},
     LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ENUM_DATA_OFFSET,
 };
 use move_core_types::{
     function::MoveClosure,
     int256::{I256, U256},
-    language_storage::TypeTag,
     value::{MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
 use std::cmp::Ordering;
@@ -795,24 +794,7 @@ fn compare_func_refs(a: &FunctionRef, b: &FunctionRef) -> VMResult<Ordering> {
     if ord.is_ne() {
         return Ok(ord);
     }
-    Ok(func_ref_ty_args(a)?.cmp(&func_ref_ty_args(b)?))
-}
-
-fn func_ref_ty_args(func_ref: &FunctionRef) -> VMResult<Vec<TypeTag>> {
-    view_type_list(func_ref.ty_args)
-        .iter()
-        .map(|&ty| {
-            // A closure's type arguments are fully substituted, so each has a
-            // tag.
-            type_tag_of(ty).ok_or_else(|| {
-                VMInternalError::new(RuntimeError::InvariantViolation(
-                    RuntimeInvariantViolation::Unreachable(
-                        "function value over a type with no type tag".to_string(),
-                    ),
-                ))
-            })
-        })
-        .collect::<VMResult<Vec<TypeTag>>>()
+    Ok(func_ref_ty_tags(a)?.cmp(&func_ref_ty_tags(b)?))
 }
 
 /// Reads `N` bytes from the pointer into an array.
@@ -853,7 +835,7 @@ mod tests {
         account_address::AccountAddress,
         function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
         identifier::Identifier,
-        language_storage::ModuleId,
+        language_storage::{ModuleId, TypeTag},
         value::IdentifierMappingKind,
     };
     use serde::Serialize;

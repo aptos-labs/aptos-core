@@ -231,9 +231,10 @@ impl<'a> ProductionNativeContext<'a> {
     }
 }
 
-/// Maps a serialization V1 refuses, which carries the `InvalidOperation` kind,
-/// to `None`. Heap exhaustion and invariant violations still propagate.
-fn refused_as_none<T>(result: VMResult<T>) -> VMResult<Option<T>> {
+/// Maps an encoding or decoding V1's BCS natives reject, which carries the
+/// `InvalidOperation` kind, to `None`. Heap exhaustion, missing layouts and
+/// invariant violations carry other kinds and still propagate.
+fn rejected_as_none<T>(result: VMResult<T>) -> VMResult<Option<T>> {
     match result {
         Ok(value) => Ok(Some(value)),
         Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
@@ -888,7 +889,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     ) -> VMResult<Option<Vec<u8>>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        refused_as_none(unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) })
+        rejected_as_none(unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) })
     }
 
     unsafe fn bcs_serialized_size(
@@ -897,7 +898,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         ty: InternedType,
     ) -> VMResult<Option<usize>> {
         // SAFETY: forwarded from this method's contract.
-        refused_as_none(unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) })
+        rejected_as_none(unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) })
     }
 
     fn bcs_deserialize_value(
@@ -932,13 +933,8 @@ impl NativeContext for ProductionNativeContext<'_> {
                 TopFrame::Native(self.abi),
             )
         };
-        match result {
-            Ok(()) => Ok(Some(region)),
-            // Malformed input: the bytes are not a valid encoding of `ty`. Heap
-            // exhaustion and missing layouts carry other kinds and still propagate.
-            Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
-            Err(e) => Err(e),
-        }
+        // Malformed input: the bytes are not a valid encoding of `ty`.
+        rejected_as_none(result.map(|()| region))
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {

@@ -24,8 +24,8 @@ pub enum LoaderError {
     },
 
     /// A function was named with a different number of type arguments than it
-    /// declares. Only a closure decoded from storage names its own type
-    /// arguments, so only it can reach this.
+    /// declares, as an untrusted caller such as a closure decoded from storage
+    /// or a script's transaction can.
     #[error("Function {address}::{module}::{name} takes {expected} type arguments, got {got}")]
     TypeArgumentCountMismatch {
         address: AccountAddress,

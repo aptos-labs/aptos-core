@@ -514,7 +514,8 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::FunctionNotFound { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::FUNCTION_RESOLUTION_FAILURE, err)
         },
-        // A function value decoded from storage names its own type arguments.
+        // Reachable from a function value decoded from storage or a script run
+        // with the wrong number of type arguments.
         L::TypeArgumentCountMismatch { .. } => {
             V1ErrorInfo::with_no_message(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
         },

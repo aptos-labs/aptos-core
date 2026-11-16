@@ -1360,9 +1360,8 @@ fn discover_captured_data_descriptor(
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
-    let mut cursor = 0u32;
+    let mut cursor = 0usize;
     let mut max_align = 1u32;
-    let mut pointer_offsets = Vec::new();
     let mut fields = vec![];
     let mut field_ids = vec![];
     for (i, &ty) in view_type_list(captured_list).iter().enumerate() {
@@ -1376,40 +1375,35 @@ fn discover_captured_data_descriptor(
         };
         let layout = ctx.layout(id).ok_or(LoweringError::LayoutIdUnresolved)?;
         let (size, align) = (layout.size, layout.align);
-        let (offset, next) =
-            next_captured_value_offset(cursor as usize, size as usize, align as usize);
-        let offset = u32::try_from(offset).map_err(|_| LoweringError::CapturedValuesOverflow)?;
-        for rel in ctx
-            .pointer_offsets(id)
-            .ok_or(LoweringError::LayoutIdUnresolved)?
-        {
-            let ptr_offset = offset
-                .checked_add(rel)
-                .ok_or(LoweringError::CapturedValuesOverflow)?;
-            pointer_offsets.push(FrameOffset(ptr_offset));
-        }
+        let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
         // Captures have no names, so they are named by position.
         //
         // TODO(metering): try to avoid building and interning identifiers here.
         let name = Identifier::new(format!("_{i}")).expect("`_<index>` is a valid identifier");
         fields.push(VariantFieldLayout {
-            offset,
+            offset: u32::try_from(offset).map_err(|_| LoweringError::CapturedValuesOverflow)?,
             size,
             ty,
             name: interner.identifier_of(&name),
         });
         field_ids.push(Some(id));
         max_align = max_align.max(align);
-        cursor = u32::try_from(next).map_err(|_| LoweringError::CapturedValuesOverflow)?;
+        cursor = next;
     }
-    let values_size = cursor;
-    let Some(layout) =
+    let values_size = u32::try_from(cursor).map_err(|_| LoweringError::CapturedValuesOverflow)?;
+    // Every field has a layout, so the aggregate always builds.
+    let layout =
         try_build_inline_value_layout(&*ctx, None, &fields, &field_ids, values_size, max_align)?
-    else {
-        return Ok(CapturedDataLayout::NotDerivable);
-    };
-    let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
+            .ok_or(LoweringError::CapturedLayoutNotDerivable)?;
     let layout_id = ctx.publish_captured_values_layout(captured_list, layout);
+    // The GC traces exactly the pointers the captured values' layout holds.
+    let pointer_offsets = ctx
+        .pointer_offsets(layout_id)
+        .ok_or(LoweringError::CapturedValuesOverflow)?
+        .into_iter()
+        .map(FrameOffset)
+        .collect::<Vec<_>>();
+    let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
     Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
         descriptor_id,
         values_size,

@@ -89,6 +89,17 @@ pub(crate) unsafe fn write_closure_func_ref_and_mask(
     }
 }
 
+/// Whether a closure heap object carries [`CLOSURE_FLAG_PERSISTENT`].
+///
+/// # Safety
+///
+/// `closure` points at a live closure object.
+#[inline]
+pub(crate) unsafe fn read_closure_persistent(closure: *const u8) -> bool {
+    // SAFETY: a closure object carries its flags at a fixed offset.
+    unsafe { *closure.add(CLOSURE_FLAGS_OFFSET) & CLOSURE_FLAG_PERSISTENT != 0 }
+}
+
 /// Pointer to the `idx`-th element inside a vector's data region.
 ///
 /// # Safety

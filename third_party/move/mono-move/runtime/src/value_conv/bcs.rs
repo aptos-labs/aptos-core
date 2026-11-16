@@ -26,8 +26,8 @@ use crate::{
         alloc_enum_no_gc, alloc_vec_no_gc, heap_alloc, AllocationError, AllocationResult, Heap,
     },
     memory::{
-        read_enum_tag, read_ptr, read_u32, read_u64, read_vec_len, write_closure_func_ref_and_mask,
-        write_ptr, write_u32,
+        read_closure_persistent, read_enum_tag, read_ptr, read_u32, read_u64, read_vec_len,
+        write_closure_func_ref_and_mask, write_ptr, write_u32,
     },
     types::VEC_DATA_OFFSET,
     value_conv::v1_layout::to_v1_type_layout,
@@ -43,9 +43,9 @@ use mono_move_core::{
     CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID,
-    CLOSURE_FLAGS_OFFSET, CLOSURE_FLAG_PERSISTENT, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
-    ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
-    FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, ENUM_DATA_OFFSET, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, OBJECT_HEADER_SIZE,
+    TRIVIAL_DESCRIPTOR_ID,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -322,7 +322,7 @@ pub(crate) unsafe fn closure_parts<'a>(base: *const u8) -> VMResult<ClosureParts
 
     // SAFETY: a closure object carries its flags and mask at fixed offsets,
     // and one with captures a non-null captured-data pointer.
-    let persistent = unsafe { *closure.add(CLOSURE_FLAGS_OFFSET) } & CLOSURE_FLAG_PERSISTENT != 0;
+    let persistent = unsafe { read_closure_persistent(closure) };
     let mask = unsafe { read_u64(closure, CLOSURE_MASK_OFFSET) };
     let captured_data = if mask == 0 {
         std::ptr::null()
@@ -507,15 +507,10 @@ fn serialize_closure_header(func_ref: &FunctionRef, mask: u64, out: &mut Vec<u8>
     serialize_identifier(out, view_name(module_id.name()));
     serialize_identifier(out, view_name(func_ref.func_name));
 
-    let ty_args = view_type_list(func_ref.ty_args);
+    let ty_args = func_ref_ty_tags(func_ref)?;
     write_uleb128_len(out, ty_args.len() as u64);
-    for &ty in ty_args {
-        // Type parameters and references have no `TypeTag`. Neither can be a
-        // closure's type argument once it is fully substituted.
-        let tag = type_tag_of(ty).ok_or_else(|| {
-            bad_closure("function value over a type with no type tag".to_string())
-        })?;
-        bcs::serialize_into(out, &tag).map_err(|err| {
+    for tag in &ty_args {
+        bcs::serialize_into(out, tag).map_err(|err| {
             bad_closure(format!(
                 "a substituted type argument has no BCS form: {err}"
             ))
@@ -525,6 +520,20 @@ fn serialize_closure_header(func_ref: &FunctionRef, mask: u64, out: &mut Vec<u8>
     // A `ClosureMask` is a newtype over `u64`.
     out.extend_from_slice(&mask.to_le_bytes());
     Ok(())
+}
+
+/// The `TypeTag` of each of a closure target's type arguments.
+pub(crate) fn func_ref_ty_tags(func_ref: &FunctionRef) -> VMResult<Vec<TypeTag>> {
+    view_type_list(func_ref.ty_args)
+        .iter()
+        .map(|&ty| {
+            // Type parameters and references have no `TypeTag`. Neither can be
+            // a closure's type argument once it is fully substituted.
+            type_tag_of(ty).ok_or_else(|| {
+                bad_closure("function value over a type with no type tag".to_string())
+            })
+        })
+        .collect::<VMResult<Vec<TypeTag>>>()
 }
 
 /// Writes an `Identifier`, a length-prefixed string.
@@ -1453,7 +1462,7 @@ mod tests {
         DescriptorId, FieldValueLayout, LayoutFlags, LayoutId, ObjectDescriptorTable,
         ValueLayoutTable, VariantValueLayout, CAPTURED_DATA_BLOB_SIZE_OFFSET,
         CAPTURED_DATA_VALUES_SIZE_OFFSET, CLOSURE_DATA_SIZE, CLOSURE_DESCRIPTOR_ID,
-        OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
+        CLOSURE_FLAGS_OFFSET, CLOSURE_FLAG_PERSISTENT, OBJECT_HEADER_SIZE, TRIVIAL_DESCRIPTOR_ID,
     };
     use mono_move_global_context::{ExecutionGuard, GlobalContext};
     use move_core_types::{

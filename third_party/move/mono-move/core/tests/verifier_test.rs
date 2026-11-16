@@ -810,12 +810,9 @@ fn pack_op(
 /// A function that packs `op` and returns.
 fn pack_closure_func(op: PackClosureOp) -> Function {
     Function {
-        code: Code::from_vec(vec![MicroOp::PackClosure(Box::new(op)), MicroOp::Return]),
-        param_and_local_sizes_sum: 24,
-        extended_frame_size: 48,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(16)]),
-        ..minimal_func()
+        ..func_with_single_op(MicroOp::PackClosure(Box::new(op)))
     }
 }
 

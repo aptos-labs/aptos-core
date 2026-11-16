@@ -18,10 +18,11 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        copy_8, read_account_address, read_bool, read_descriptor, read_enum_tag, read_fat_ptr,
-        read_int, read_obj_size, read_ptr, read_u32, read_u64, read_u8, read_vec_len, vec_elem_ptr,
-        write_bool, write_closure_func_ref_and_mask, write_enum_tag, write_fat_ptr, write_int,
-        write_ptr, write_u32, write_u64, write_u8, MemoryRegion,
+        copy_8, read_account_address, read_bool, read_closure_persistent, read_descriptor,
+        read_enum_tag, read_fat_ptr, read_int, read_obj_size, read_ptr, read_u32, read_u64,
+        read_u8, read_vec_len, vec_elem_ptr, write_bool, write_closure_func_ref_and_mask,
+        write_enum_tag, write_fat_ptr, write_int, write_ptr, write_u32, write_u64, write_u8,
+        MemoryRegion,
     },
     native_context::{LoaderAccess, ProductionNativeContext, ProductionNativeRegistry},
     reentrancy::ReentrancyState,
@@ -38,8 +39,8 @@ use crate::{
 };
 use mono_move_core::{
     interner::{
-        is_script_module_id, module_id_of, view_module_id, InternedFunctionRef, InternedIdentifier,
-        InternedModuleId,
+        identifier_of, is_script_module_id, module_id_of, view_function_ref, InternedFunctionRef,
+        InternedIdentifier, InternedModuleId,
     },
     native::{
         FunctionResolutionError, NativeABI, NativeExtension, NativeExtensions, NativeIdx,
@@ -49,8 +50,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     strip_ref,
     types::{
-        is_signer_or_signer_immut_ref, view_name, view_type, view_type_list, InternedType,
-        InternedTypeList, Type,
+        is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
+        Type,
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
@@ -60,10 +61,9 @@ use mono_move_core::{
     CAPTURED_DATA_LAYOUT_ID_OFFSET, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_MATERIALIZED_RAW, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_TAG_RAW,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FLAGS_OFFSET,
-    CLOSURE_FLAG_PERSISTENT, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
-    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED,
-    MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED, FUNC_REF_TAG_UNRESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_global_context::LoadedModule;
 use mono_move_loader::{Loader, ModuleReadSet};
@@ -637,6 +637,17 @@ fn native_abort_location(name: &NativeName) -> VMResult<AbortLocation> {
             "native module name is not a valid identifier".to_string()
         )),
     }
+}
+
+#[cold]
+#[inline(never)]
+fn stored_closure_target_not_persistent(callee: &Function) -> VMInternalError {
+    VMInternalError::new(RuntimeError::InvariantViolation(
+        RuntimeInvariantViolation::StoredClosureTargetNotPersistent {
+            module: Box::new(module_id_of(callee.module_id())),
+            function: identifier_of(view_function_ref(callee.func_ref).func_name),
+        },
+    ))
 }
 
 /// Attaches the faulting micro-op's originating instruction, or only the
@@ -3454,17 +3465,8 @@ impl InterpreterContext<'_> {
                 // storage is, must call a persistent function. Only those have
                 // signatures frozen across upgrades, so any other target could
                 // disagree with the stored captures.
-                let persistent = *closure.add(CLOSURE_FLAGS_OFFSET) & CLOSURE_FLAG_PERSISTENT != 0;
-                if persistent && !callee.is_persistent {
-                    let module_id = view_module_id(callee.module_id());
-                    invariant_violation!(StoredClosureTargetNotPersistent {
-                        function: format!(
-                            "0x{}::{}::{}",
-                            module_id.address().short_str_lossless(),
-                            view_name(module_id.name()),
-                            callee.name()
-                        ),
-                    });
+                if read_closure_persistent(closure) && !callee.is_persistent {
+                    return Err(stored_closure_target_not_persistent(callee));
                 }
             }
 

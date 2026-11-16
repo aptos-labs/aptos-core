@@ -595,29 +595,34 @@ pub trait LayoutProvider {
     /// offset overflows. A reference, vector, function or (frozen) enum slot
     /// holds a pointer at relative offset 0; a struct recurses through its
     /// fields; scalars hold none.
+    fn pointer_offsets(&self, id: LayoutId) -> Option<Vec<u32>> {
+        let mut out = vec![];
+        self.push_pointer_offsets(id, 0, &mut out)?;
+        Some(out)
+    }
+
+    /// Appends the heap-pointer offsets of layout `id`, shifted by `base`, to
+    /// `out`. See [`Self::pointer_offsets`].
     //
     // TODO(metering): rewrite without recursion or add a depth/visited bound.
-    fn pointer_offsets(&self, id: LayoutId) -> Option<Vec<u32>> {
-        Some(match &self.layout(id)?.kind {
+    fn push_pointer_offsets(&self, id: LayoutId, base: u32, out: &mut Vec<u32>) -> Option<()> {
+        match &self.layout(id)?.kind {
             LayoutKind::Bool
             | LayoutKind::UnsignedInt
             | LayoutKind::SignedInt
             | LayoutKind::Address
-            | LayoutKind::Signer => vec![],
+            | LayoutKind::Signer => {},
             LayoutKind::Ref
             | LayoutKind::Vector { .. }
             | LayoutKind::FrozenEnum { .. }
-            | LayoutKind::Function => vec![0],
+            | LayoutKind::Function => out.push(base),
             LayoutKind::Struct { fields } => {
-                let mut out = vec![];
                 for field in fields.iter() {
-                    for rel in self.pointer_offsets(field.id)? {
-                        out.push(field.offset.checked_add(rel)?);
-                    }
+                    self.push_pointer_offsets(field.id, base.checked_add(field.offset)?, out)?;
                 }
-                out
             },
-        })
+        }
+        Some(())
     }
 }
 

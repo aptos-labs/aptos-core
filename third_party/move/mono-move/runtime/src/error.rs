@@ -476,8 +476,14 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
     ClosureMaskExceedsParams { mask: u64, num_params: usize },
 
-    #[error("CallClosure: stored closure references non-persistent function `{function}`")]
-    StoredClosureTargetNotPersistent { function: String },
+    #[error(
+        "CallClosure: stored closure references non-persistent function `{}::{function}`",
+        .module.short_str_lossless()
+    )]
+    StoredClosureTargetNotPersistent {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
 
     #[error(
         "CallClosure: capture {capture_idx} was packed under layout {packed_id} but resolved \
