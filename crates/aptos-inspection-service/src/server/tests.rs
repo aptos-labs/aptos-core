@@ -15,7 +15,7 @@ use crate::{
 use aptos_config::config::{AptosDataClientConfig, BaseConfig, Identity, NodeConfig};
 use aptos_data_client::client::AptosDataClient;
 use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{CheckpointStateReader, DbReader};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;
 use assert_approx_eq::assert_approx_eq;
@@ -323,4 +323,5 @@ async fn send_get_request_to_path(config: &NodeConfig, endpoint: &str) -> Respon
 
 /// A simple mock database reader
 pub struct MockDatabaseReader {}
+impl CheckpointStateReader for MockDatabaseReader {}
 impl DbReader for MockDatabaseReader {}

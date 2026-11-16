@@ -31,7 +31,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{AptosDbError, DbReader, Order, StateKind};
+use aptos_storage_interface::{AptosDbError, CheckpointStateReader, DbReader, Order, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
