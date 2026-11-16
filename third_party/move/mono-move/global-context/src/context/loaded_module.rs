@@ -7,7 +7,7 @@
 use crate::context::ExecutionGuard;
 use anyhow::Result;
 use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
-use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
+use mono_move_alloc::LeakedBoxPtr;
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
@@ -26,10 +26,11 @@ use std::sync::{Arc, OnceLock};
 
 /// Stable cache slot for a loaded module. The slot's identifier is fixed at
 /// creation time (from the cache key), while the content may be empty until
-/// the module is installed.
+/// the module is installed. Once set, the content never changes: modules are
+/// not versioned, and the slot is freed only when the whole cache is cleared.
 pub struct ModuleSlot {
     id: InternedModuleId,
-    versions: VersionedLeakedBoxPtr<LoadedModule>,
+    module: OnceLock<LeakedBoxPtr<LoadedModule>>,
 }
 
 impl ModuleSlot {
@@ -37,7 +38,7 @@ impl ModuleSlot {
     pub fn new(id: InternedModuleId) -> Self {
         Self {
             id,
-            versions: VersionedLeakedBoxPtr::new(),
+            module: OnceLock::new(),
         }
     }
 
@@ -51,23 +52,19 @@ impl ModuleSlot {
     pub fn get<'guard>(&self, _guard: &'guard ExecutionGuard<'_>) -> Option<&'guard LoadedModule> {
         // SAFETY: while a guard is held, maintenance cannot run, so the
         // pointer is alive for and not null.
-        unsafe { self.versions.load().map(|p| p.as_ref_unchecked()) }
+        unsafe { self.get_ptr().map(|p| p.as_ref_unchecked()) }
     }
 
     /// Returns the raw pointer to the module if set, and [`None`] otherwise.
     pub fn get_ptr(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.load()
+        self.module.get().copied()
     }
 
-    /// Sets the slot content if empty. See [`VersionedLeakedBoxPtr::init`]
-    /// for race semantics.
+    /// Sets the slot content if empty. On race, if the slot is already set,
+    /// returns the input pointer back in `Err` so the caller can free it and
+    /// adopt the winner.
     pub fn init(&self, ptr: LeakedBoxPtr<LoadedModule>) -> Result<(), LeakedBoxPtr<LoadedModule>> {
-        self.versions.init(ptr)
-    }
-
-    /// Atomically empties the slot, returning the previous content if any.
-    pub fn clear(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.clear()
+        self.module.set(ptr)
     }
 }
 
