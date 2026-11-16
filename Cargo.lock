@@ -1599,7 +1599,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "wasm-bindgen",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -3044,7 +3043,6 @@ dependencies = [
  "hex",
  "hyper 0.14.28",
  "jsonwebtoken 8.3.0",
- "jwt",
  "more-asserts",
  "num-traits",
  "once_cell",
@@ -4657,7 +4655,6 @@ name = "aptos-system-utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-profiler",
  "async-mutex",
  "http 0.2.11",
  "hyper 0.14.28",
@@ -12139,21 +12136,6 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1 0.6.2",
-]
-
-[[package]]
-name = "jwt"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6204285f77fe7d9784db3fdc449ecce1a0114927a51d5a41c4c7a292011c015f"
-dependencies = [
- "base64 0.13.1",
- "crypto-common 0.1.6",
- "digest 0.10.7",
- "hmac 0.12.1",
- "serde",
- "serde_json",
- "sha2 0.10.9",
 ]
 
 [[package]]
