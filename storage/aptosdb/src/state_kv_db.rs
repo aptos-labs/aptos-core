@@ -307,6 +307,26 @@ impl StateKvDb {
             .map(|((_, version), value_opt)| (version, value_opt)))
     }
 
+    /// Returns the version of the earliest row of `state_key` after `version`.
+    pub(crate) fn get_next_state_value_row_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<Version>> {
+        let Some(next_version) = version.checked_add(1) else {
+            return Ok(None);
+        };
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .rev_iter_with_opts::<StateValueByKeyHashSchema>(read_opts)?;
+        // Versions are encoded in descending order, so this lands on the smallest version at or
+        // after `next_version`.
+        iter.seek_for_prev(&(state_key.hash(), next_version))?;
+        Ok(iter.next().transpose()?.map(|((_, version), _)| version))
+    }
+
     /// Returns the latest hot state entry for the given key hash at or before
     /// the given version. Outer `None` means no entry found; inner `None` means
     /// the key was evicted at that version.

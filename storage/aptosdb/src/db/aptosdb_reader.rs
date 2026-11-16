@@ -688,15 +688,14 @@ impl DbReader for AptosDB {
 
     fn get_state_value_by_version(
         &self,
-        state_store_key: &StateKey,
+        state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(self
-                .state_kv_db
-                .get_state_value_row_by_version(state_store_key, version)?
+                .get_latest_state_write(state_key, version)?
                 .and_then(|(_, value)| value))
         })
     }
@@ -710,8 +709,7 @@ impl DbReader for AptosDB {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(self
-                .state_kv_db
-                .get_state_value_row_by_version(state_key, version)?
+                .get_latest_state_write(state_key, version)?
                 .and_then(|(version, value)| value.map(|value| (version, value))))
         })
     }
@@ -1349,5 +1347,74 @@ impl AptosDB {
                 .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
             "Version {version} is not a block end.",
         );
+    }
+
+    /// Returns the latest write to `state_key` at or before `version`, with `None` as the value
+    /// of a deletion. Seeks state KV first, then checks write sets if the key's next row is in
+    /// the same block.
+    fn get_latest_state_write(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, Option<StateValue>)>> {
+        let row = self
+            .state_kv_db
+            .get_state_value_row_by_version(state_key, version)?;
+        let first_version_after_row = row.as_ref().map_or(0, |(row_version, _)| row_version + 1);
+        if first_version_after_row > version {
+            return Ok(row);
+        }
+
+        // A write in `[first_version_after_row, version]` can only lack a row if a later write
+        // in the same block replaced it, and that block's last write has a row. That row must be
+        // after `version`, so such a write can only be in `version`'s block, and only if the
+        // key's next row is in that block too.
+        let Some(next_row_version) = self
+            .state_kv_db
+            .get_next_state_value_row_version(state_key, version)?
+        else {
+            return Ok(row);
+        };
+        if self.has_block_end_in(version, next_row_version)? {
+            return Ok(row);
+        }
+
+        for v in (first_version_after_row..=version).rev() {
+            self.error_if_ledger_pruned("WriteSet", v)?;
+            // `v` ends the previous block (`version` doesn't, as checked above).
+            if v < version
+                && self
+                    .ledger_db
+                    .transaction_info_db()
+                    .get_transaction_info(v)?
+                    .has_state_checkpoint_hash()
+            {
+                break;
+            }
+            if let Some(write_op) = self
+                .ledger_db
+                .write_set_db()
+                .get_write_set(v)?
+                .get_write_op(state_key)
+            {
+                return Ok(Some((v, write_op.as_state_value_opt().cloned())));
+            }
+        }
+        Ok(row)
+    }
+
+    /// Whether a block ends in `[begin, end)`.
+    fn has_block_end_in(&self, begin: Version, end: Version) -> Result<bool> {
+        self.error_if_ledger_pruned("TransactionInfo", begin)?;
+        for txn_info in self
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_iter(begin, (end - begin) as usize)?
+        {
+            if txn_info?.has_state_checkpoint_hash() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
