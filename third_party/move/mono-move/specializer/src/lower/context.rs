@@ -451,8 +451,7 @@ pub enum BuildContextOutcome<'a> {
 
 /// Outcome of attempting to lower a function: either a fully lowered
 /// [`Function`] was produced, or lowering was skipped for an
-/// out-of-scope feature (currently nominal types or partial
-/// concretization). Mirrors [`BuildContextOutcome`] — `Skipped` is a
+/// out-of-scope feature. Mirrors [`BuildContextOutcome`] — `Skipped` is a
 /// non-fatal "not yet supported," while internal-invariant violations
 /// still travel on the `Err` path.
 pub enum LoweringOutcome {

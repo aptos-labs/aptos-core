@@ -616,12 +616,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             self.natives,
         )? {
             LoweringOutcome::Built(f) => f,
-            // TODO(cleanup): drop this arm — together with the `LoweringOutcome`
-            // enum and the corresponding `BuildContextOutcome::Skipped`
-            // paths in the specializer — once `try_build_context`
-            // handles nominal types and partial concretization. At that
-            // point `try_lower_function` is total and can go back to
-            // returning `Result<Function>` directly.
+            // TODO(cleanup, completeness): drop this arm, together with
+            // `LoweringOutcome`, `BuildContextOutcome::Skipped` and
+            // `LoaderError::LoweringSkipped`, once lowering is total. The
+            // remaining skips are: native closure targets (reachable at
+            // runtime), unpublished layouts (only on layout-size overflow),
+            // and wrong `ty_args` arity (only reachable from publish-time
+            // snapshot printing). Then `try_lower_function` can return
+            // `Result<Function>` directly.
             LoweringOutcome::Skipped(reason) => {
                 return Err(VMInternalError::new(LoaderError::LoweringSkipped {
                     reason,

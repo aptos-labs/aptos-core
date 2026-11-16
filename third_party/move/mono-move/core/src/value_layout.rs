@@ -145,8 +145,10 @@ pub enum LayoutKind {
     /// A `signer` (32 bytes). Distinct from `Address` so it can be rejected on
     /// deserialization.
     Signer,
-    /// An inline struct: fields laid out flat in the parent's payload.
-    /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
+    /// An inline struct: fields laid out flat in the parent's payload. Structs
+    /// nested in values are always inline. A resource's heap-object
+    /// descriptor is not stored here: it is published per type during
+    /// lowering.
     Struct {
         /// Byte offsets, names and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
