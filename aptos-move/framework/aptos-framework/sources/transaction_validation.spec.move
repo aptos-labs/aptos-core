@@ -165,7 +165,7 @@ spec aptos_framework::transaction_validation {
         let account_sequence_number =
             if (exists<Account>(sender_address)) global<Account>(sender_address).sequence_number else 0;
         aborts_if checked && !account::spec_exists_at(sender_address);
-        aborts_if checked && txn_sequence_number >= 9223372036854775808;
+        aborts_if checked && txn_sequence_number >= (1 << 63);
         aborts_if checked && txn_sequence_number != account_sequence_number;
     }
 
@@ -214,44 +214,37 @@ spec aptos_framework::transaction_validation {
         let num_secondary_signers = len(secondary_signer_addresses);
         aborts_if len(secondary_signer_public_key_hashes) != num_secondary_signers;
 
-        // If any account does not exist, or public key hash does not match, abort.
         // property 2: All secondary signer addresses are verified to be authentic through a validation process.
-        aborts_if exists i in 0..num_secondary_signers:
-            !account::spec_exists_at(secondary_signer_addresses[i]);
-        aborts_if exists i in 0..num_secondary_signers:
-            !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
-                option::is_some(secondary_signer_public_key_hashes[i]) && option::borrow(
-                secondary_signer_public_key_hashes[i]
-            ) !=
-                    account::spec_get_authentication_key(secondary_signer_addresses[i]);
-        // By the end, all secondary signers account should exist and public key hash should match.
-        ensures forall i in 0..num_secondary_signers:
-            account::spec_exists_at(secondary_signer_addresses[i]);
-        ensures forall i in 0..num_secondary_signers:
-            option::is_none(secondary_signer_public_key_hashes[i]) || option::borrow(
-                secondary_signer_public_key_hashes[i]
-            ) ==
-                account::spec_get_authentication_key(secondary_signer_addresses[i])
-                || can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]);
+        aborts_if exists i in 0..num_secondary_signers: !spec_secondary_signer_valid(
+            secondary_signer_addresses[i], secondary_signer_public_key_hashes[i], is_simulation
+        );
+        ensures forall i in 0..num_secondary_signers: spec_secondary_signer_valid(
+            secondary_signer_addresses[i], secondary_signer_public_key_hashes[i], is_simulation
+        );
     }
 
-    spec fun can_skip(feature_flag: bool, is_simulation: bool, auth_key: Option<vector<u8>>): bool {
-        features::spec_simulation_enhancement_enabled() && is_simulation && option::is_none(auth_key)
+    /// The secondary signer's account exists and its authentication key matches, unless the check is skipped in
+    /// simulation or the key is missing and account abstraction is enabled. The dispatchable authenticator lookup
+    /// for a missing key is not modeled.
+    spec fun spec_secondary_signer_valid(addr: address, key: Option<vector<u8>>, is_simulation: bool): bool {
+        account::spec_exists_at(addr) && (
+            (is_simulation && (option::is_none(key) || len(option::borrow(key)) == 0))
+                || (option::is_some(key) && option::borrow(key) == account::spec_get_authentication_key(addr))
+                || (option::is_none(key) && (features::spec_is_enabled(features::DERIVABLE_ACCOUNT_ABSTRACTION)
+                    || features::spec_is_enabled(features::ACCOUNT_ABSTRACTION)))
+        )
     }
 
+    /// Every secondary signer is valid.
     spec multi_agent_common_prologue(
         secondary_signer_addresses: vector<address>,
         secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         is_simulation: bool,
     ) {
-        // Partial: the per-signer existence and authentication key checks are not specified.
+        // Partial: a missing key is accepted only for accounts using a dispatchable authenticator, which is not
+        // specified.
         pragma aborts_if_is_partial;
-        aborts_if len(secondary_signer_public_key_hashes) != len(secondary_signer_addresses);
-        // include MultiAgentPrologueCommonAbortsIf {
-        //     secondary_signer_addresses,
-        //     secondary_signer_public_key_hashes,
-        //     is_simulation,
-        // };
+        include MultiAgentPrologueCommonAbortsIf;
     }
 
     spec multi_agent_script_prologue_extended(
@@ -320,25 +313,15 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
+        // Partial: the secondary signer checks are not specified.
         pragma aborts_if_is_partial;
-        pragma verify_duration_estimate = 120;
-
-        aborts_if !features::spec_is_enabled(features::FEE_PAYER_ENABLED);
-        let gas_payer = create_signer::spec_create_signer(fee_payer_address);
+        let fee_payer = create_signer::spec_create_signer(fee_payer_address);
         include PrologueCommonAbortsIf {
-            gas_payer,
+            gas_payer: fee_payer,
             replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
             txn_authentication_key: option::spec_some(txn_sender_public_key),
         };
-        // include MultiAgentPrologueCommonAbortsIf {
-        //     secondary_signer_addresses,
-        //     secondary_signer_public_key_hashes,
-        //     is_simulation,
-        // };
-
-        aborts_if !account::spec_exists_at(fee_payer_address);
-        aborts_if !(fee_payer_public_key_hash == account::spec_get_authentication_key(fee_payer_address));
-        aborts_if !features::spec_fee_payer_enabled();
+        include FeePayerAuthKeyAbortsIf { fee_payer_public_key_hash: option::spec_some(fee_payer_public_key_hash) };
     }
 
     spec fee_payer_script_prologue(
@@ -479,14 +462,14 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        // Partial: the secondary signer checks and the account abstraction authenticator lookup are not specified.
+        // Partial: the account abstraction authenticator lookups are not specified.
         pragma aborts_if_is_partial;
         include PrologueCommonAbortsIf {
             gas_payer: sender,
             replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
             txn_authentication_key: txn_sender_public_key,
         };
-        aborts_if len(secondary_signer_public_key_hashes) != len(secondary_signer_addresses);
+        include MultiAgentPrologueCommonAbortsIf;
     }
 
     spec unified_prologue_fee_payer(
@@ -503,14 +486,14 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        // Partial: the secondary signer checks and the account abstraction authenticator lookup are not specified.
+        // Partial: the account abstraction authenticator lookups are not specified.
         pragma aborts_if_is_partial;
         include PrologueCommonAbortsIf {
             gas_payer: fee_payer,
             replay_protector: ReplayProtector::SequenceNumber(txn_sequence_number),
             txn_authentication_key: txn_sender_public_key,
         };
-        aborts_if len(secondary_signer_public_key_hashes) != len(secondary_signer_addresses);
+        include MultiAgentPrologueCommonAbortsIf;
         include FeePayerAuthKeyAbortsIf;
     }
 
@@ -541,11 +524,11 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        // Partial: the aborts of the nonce history update, the secondary signer checks and the account
-        // abstraction authenticator lookup are not specified.
+        // Partial: the aborts of the nonce history update and the account abstraction authenticator lookups are
+        // not specified.
         pragma aborts_if_is_partial;
         include PrologueCommonAbortsIf { gas_payer: sender, txn_authentication_key: txn_sender_public_key };
-        aborts_if len(secondary_signer_public_key_hashes) != len(secondary_signer_addresses);
+        include MultiAgentPrologueCommonAbortsIf;
     }
 
     spec unified_prologue_fee_payer_v2(
@@ -562,11 +545,11 @@ spec aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        // Partial: the aborts of the nonce history update, the secondary signer checks and the account
-        // abstraction authenticator lookup are not specified.
+        // Partial: the aborts of the nonce history update and the account abstraction authenticator lookups are
+        // not specified.
         pragma aborts_if_is_partial;
         include PrologueCommonAbortsIf { gas_payer: fee_payer, txn_authentication_key: txn_sender_public_key };
-        aborts_if len(secondary_signer_public_key_hashes) != len(secondary_signer_addresses);
+        include MultiAgentPrologueCommonAbortsIf;
         include FeePayerAuthKeyAbortsIf;
     }
 
@@ -636,76 +619,6 @@ spec aptos_framework::transaction_validation {
             is_simulation: args.is_simulation,
         };
         include !args.is_orderless_txn ==> IncrementSequenceNumber { addr: signer::address_of(sender) };
-    }
-
-    spec schema EpilogueGasPayerAbortsIf {
-        use std::option;
-        use aptos_std::type_info;
-        use aptos_framework::account::{Account};
-        use aptos_framework::aptos_coin::{AptosCoin};
-        use aptos_framework::coin;
-        use aptos_framework::coin::{CoinStore, CoinInfo};
-        use aptos_framework::optional_aggregator;
-        use aptos_framework::transaction_fee::{AptosCoinCapabilities, AptosCoinMintCapability};
-
-        account: signer;
-        gas_payer: address;
-        storage_fee_refunded: u64;
-        txn_gas_price: u64;
-        txn_max_gas_units: u64;
-        gas_units_remaining: u64;
-
-        // Check transaction invariants.
-        aborts_if !(txn_max_gas_units >= gas_units_remaining);
-        let gas_used = txn_max_gas_units - gas_units_remaining;
-        aborts_if !(txn_gas_price * gas_used <= MAX_U64);
-        let transaction_fee_amount = txn_gas_price * gas_used;
-
-        // Check account invariants.
-        let addr = signer::address_of(account);
-        // TODO(fa_migration)
-        // let pre_balance = global<coin::CoinStore<AptosCoin>>(gas_payer).coin.value;
-        // let post balance = global<coin::CoinStore<AptosCoin>>(gas_payer).coin.value;
-        let pre_account = global<account::Account>(addr);
-        let post account = global<account::Account>(addr);
-
-        aborts_if !exists<CoinStore<AptosCoin>>(gas_payer);
-        aborts_if !exists<Account>(addr);
-        aborts_if !(global<Account>(addr).sequence_number < MAX_U64);
-        // aborts_if pre_balance < transaction_fee_amount;
-        // ensures balance == pre_balance - transaction_fee_amount + storage_fee_refunded;
-        ensures account.sequence_number == pre_account.sequence_number + 1;
-
-        // Check burning.
-        //   (Check the total supply aggregator when enabled.)
-        let amount_to_burn = transaction_fee_amount - storage_fee_refunded;
-        let apt_addr = type_info::type_of<AptosCoin>().account_address;
-        let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let total_supply_enabled = option::is_some(maybe_apt_supply);
-        let apt_supply = option::borrow(maybe_apt_supply);
-        let apt_supply_value = optional_aggregator::optional_aggregator_value(apt_supply);
-        let post post_maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let post post_apt_supply = option::borrow(post_maybe_apt_supply);
-        let post post_apt_supply_value = optional_aggregator::optional_aggregator_value(post_apt_supply);
-
-        aborts_if amount_to_burn > 0 && !exists<AptosCoinCapabilities>(@aptos_framework);
-        aborts_if amount_to_burn > 0 && !exists<CoinInfo<AptosCoin>>(apt_addr);
-        aborts_if amount_to_burn > 0 && total_supply_enabled && apt_supply_value < amount_to_burn;
-        ensures total_supply_enabled ==> apt_supply_value - amount_to_burn == post_apt_supply_value;
-
-        // Check minting.
-        let amount_to_mint = storage_fee_refunded - transaction_fee_amount;
-        let total_supply = coin::supply<AptosCoin>;
-        let post post_total_supply = coin::supply<AptosCoin>;
-
-        aborts_if amount_to_mint > 0 && !exists<CoinStore<AptosCoin>>(addr);
-        aborts_if amount_to_mint > 0 && !exists<AptosCoinMintCapability>(@aptos_framework);
-        aborts_if amount_to_mint > 0 && total_supply + amount_to_mint > MAX_U128;
-        ensures amount_to_mint > 0 ==> post_total_supply == total_supply + amount_to_mint;
-
-        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
-        aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
-        include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
     }
 
     spec metered_prologue(sender: signer, _fee_payer: signer, args: MeteredPrologueArgs) {

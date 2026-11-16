@@ -84,7 +84,8 @@ spec aptos_framework::stake {
     }
 
     spec schema StakePoolNotChangeDuringReconfig {
-        ensures forall a: address where old(exists<StakePool>(a)):
+        // Explicit trigger: an inferred one matches every address term.
+        ensures forall a: address {old(exists<StakePool>(a))} where old(exists<StakePool>(a)):
             reconfiguration_state::spec_is_in_progress() ==>
                 (
                     old(global<StakePool>(a).pending_inactive)
@@ -176,8 +177,6 @@ spec aptos_framework::stake {
     }
 
     spec join_validator_set(operator: &signer, pool_address: address) {
-        // This function casue timeout (property proved)
-        pragma verify_duration_estimate = 60;
         pragma disable_invariants_in_body;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
         aborts_if !exists<StakePool>(pool_address);
@@ -310,16 +309,16 @@ spec aptos_framework::stake {
         let post post_stake_pool = global<StakePool>(owner_cap.pool_address);
         let store_addr = spec_apt_paired_store_address(owner_address);
         let existing = spec_has_apt_paired_store(owner_address);
-        let plain = existing && fungible_asset::spec_store_no_deposit_hook(store_addr);
         aborts_if !exists<OwnerCapability>(owner_address);
         include WithdrawWithCapAbortsIfAndEnsures;
         aborts_if !exists<coin::CoinConversionMap>(@aptos_framework);
         aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
-        // What left the pool arrives in the owner's paired store.
-        ensures plain ==> fungible_asset::spec_balance(store_addr)
-            == old(fungible_asset::spec_balance(store_addr))
-                + stake_pool.inactive.value + stake_pool.pending_inactive.value
-                - post_stake_pool.inactive.value - post_stake_pool.pending_inactive.value;
+        // What left the pool arrives in the owner's paired store, which is created if missing.
+        include coin::PairedDepositBalance<AptosCoin> {
+            owner: owner_address,
+            amount: stake_pool.inactive.value + stake_pool.pending_inactive.value
+                - post_stake_pool.inactive.value - post_stake_pool.pending_inactive.value
+        };
     }
 
     spec withdraw_with_cap(owner_cap: &OwnerCapability, withdraw_amount: u64): Coin<AptosCoin> {
@@ -424,6 +423,10 @@ spec aptos_framework::stake {
         ensures stake_pool.active.value == pre_stake_pool.active.value - min_amount;
         ensures stake_pool.pending_inactive.value
             == pre_stake_pool.pending_inactive.value + min_amount;
+        // Only the active and pending_inactive stake change.
+        ensures stake_pool == update_field(
+            update_field(pre_stake_pool, active, stake_pool.active),
+            pending_inactive, stake_pool.pending_inactive);
     }
 
     // Only active validator can update locked_until_secs.
@@ -447,6 +450,13 @@ spec aptos_framework::stake {
 
         ensures exists<StakePool>(pool_address);
         ensures stake_pool.locked_until_secs == lockup + now_seconds;
+        // The stake amounts, the operator and the voter are unchanged.
+        ensures stake_pool.active == pre_stake_pool.active;
+        ensures stake_pool.inactive == pre_stake_pool.inactive;
+        ensures stake_pool.pending_active == pre_stake_pool.pending_active;
+        ensures stake_pool.pending_inactive == pre_stake_pool.pending_inactive;
+        ensures stake_pool.operator_address == pre_stake_pool.operator_address;
+        ensures stake_pool.delegated_voter == pre_stake_pool.delegated_voter;
     }
 
     spec update_network_and_fullnode_addresses(
@@ -505,6 +515,10 @@ spec aptos_framework::stake {
         ensures stake_pool.pending_inactive.value
             == pre_stake_pool.pending_inactive.value - min_amount;
         ensures stake_pool.active.value == pre_stake_pool.active.value + min_amount;
+        // Only the active and pending_inactive stake change.
+        ensures stake_pool == update_field(
+            update_field(pre_stake_pool, active, stake_pool.active),
+            pending_inactive, stake_pool.pending_inactive);
     }
 
     spec rotate_consensus_key(
@@ -540,8 +554,8 @@ spec aptos_framework::stake {
         modifies global<StakePool>(pool_address);
         ensures exists<StakePool>(pool_address);
         ensures post_stake_pool.delegated_voter == new_voter;
-        ensures post_stake_pool.operator_address
-            == old(global<StakePool>(pool_address)).operator_address;
+        ensures post_stake_pool == update_field(
+            old(global<StakePool>(pool_address)), delegated_voter, new_voter);
     }
 
     spec initialize_pending_transaction_fee {
@@ -915,34 +929,15 @@ spec aptos_framework::stake {
         pragma aborts_if_is_partial = false;
         aborts_if !exists<ValidatorSet>(@aptos_framework);
         let validator_set = global<ValidatorSet>(@aptos_framework);
-        ensures result == VALIDATOR_STATUS_PENDING_ACTIVE ==>
-            spec_contains(validator_set.pending_active, pool_address);
-        ensures result == VALIDATOR_STATUS_ACTIVE ==>
-            spec_contains(validator_set.active_validators, pool_address);
-        ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==>
-            spec_contains(validator_set.pending_inactive, pool_address);
-        ensures result == VALIDATOR_STATUS_INACTIVE ==>
-            (
-                !spec_contains(validator_set.pending_active, pool_address)
-                    && !spec_contains(validator_set.active_validators, pool_address)
-                    && !spec_contains(validator_set.pending_inactive, pool_address)
-            );
-        // The state is exactly one of the four, checked in this order.
-        ensures result == VALIDATOR_STATUS_PENDING_ACTIVE
-            || result == VALIDATOR_STATUS_ACTIVE
-            || result == VALIDATOR_STATUS_PENDING_INACTIVE
-            || result == VALIDATOR_STATUS_INACTIVE;
-        ensures spec_contains(validator_set.pending_active, pool_address) ==>
-            result == VALIDATOR_STATUS_PENDING_ACTIVE;
-        ensures result == VALIDATOR_STATUS_PENDING_INACTIVE ==>
-            !spec_contains(validator_set.active_validators, pool_address);
-        ensures !spec_contains(validator_set.pending_active, pool_address)
-            && spec_contains(validator_set.active_validators, pool_address) ==>
-            result == VALIDATOR_STATUS_ACTIVE;
-        ensures !spec_contains(validator_set.pending_active, pool_address)
-            && !spec_contains(validator_set.active_validators, pool_address)
-            && !spec_contains(validator_set.pending_inactive, pool_address) ==>
-            result == VALIDATOR_STATUS_INACTIVE;
+        ensures result == if (spec_contains(validator_set.pending_active, pool_address)) {
+            VALIDATOR_STATUS_PENDING_ACTIVE
+        } else if (spec_contains(validator_set.active_validators, pool_address)) {
+            VALIDATOR_STATUS_ACTIVE
+        } else if (spec_contains(validator_set.pending_inactive, pool_address)) {
+            VALIDATOR_STATUS_PENDING_INACTIVE
+        } else {
+            VALIDATOR_STATUS_INACTIVE
+        };
         ensures result == VALIDATOR_STATUS_INACTIVE ==>
             option::is_none(spec_find_validator(validator_set.pending_active, pool_address))
                 && option::is_none(
@@ -1018,11 +1013,9 @@ spec aptos_framework::stake {
         let post stake_pool = global<StakePool>(addr);
         ensures stake_pool.operator_address == operator;
         ensures stake_pool.delegated_voter == voter;
-        // The new pool is not a validator, so the initial stake is active right away. The stake amounts are
-        // stated only when the voter stays the owner.
-        let kept = voter == addr;
-        ensures kept && (!staking || plain) ==> stake_pool.active.value == initial_stake_amount;
-        ensures kept ==> stake_pool.pending_active.value == 0
+        // The new pool is not a validator, so the initial stake is active right away.
+        ensures (!staking || plain) ==> stake_pool.active.value == initial_stake_amount;
+        ensures stake_pool.pending_active.value == 0
             && stake_pool.inactive.value == 0
             && stake_pool.pending_inactive.value == 0;
     }
@@ -1148,17 +1141,6 @@ spec aptos_framework::stake {
         aborts_if amount != 0 && voting_power > maximum_stake;
     }
 
-    spec schema AddStakeAbortsIfAndEnsures {
-        owner: signer;
-        amount: u64;
-
-        let owner_address = signer::address_of(owner);
-        aborts_if !exists<OwnerCapability>(owner_address);
-
-        let owner_cap = global<OwnerCapability>(owner_address);
-        include AddStakeWithCapAbortsIfAndEnsures { owner_cap };
-    }
-
     /// The primary store of `owner` for the fungible asset paired with `AptosCoin` in the coin conversion map.
     spec fun spec_apt_paired_store_address(owner: address): address {
         coin::spec_paired_store_address(owner, coin::spec_paired_metadata(aptos_std::type_info::type_of<AptosCoin>()))
@@ -1244,11 +1226,6 @@ spec aptos_framework::stake {
         forall i in 0..len(validators):
             spec_has_stake_pool(validators[i].addr)
                 && spec_has_validator_config(validators[i].addr)
-    }
-
-    spec fun spec_validators_are_initialized_addrs(addrs: vector<address>): bool {
-        forall i in 0..len(addrs):
-            spec_has_stake_pool(addrs[i]) && spec_has_validator_config(addrs[i])
     }
 
     // A predicate that the validator index of each given validator in-range.
@@ -1379,6 +1356,7 @@ spec aptos_framework::stake {
     }
 
     spec get_pending_transaction_fee {
-        pragma verify = false;
+        // Partial: the fees are read in a loop over the fee table.
+        aborts_if !exists<PendingTransactionFee>(@aptos_framework);
     }
 }

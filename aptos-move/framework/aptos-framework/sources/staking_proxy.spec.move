@@ -47,8 +47,7 @@ spec aptos_framework::staking_proxy {
     /// Aborts if conditions of SetStakePoolOperator are not met
     spec set_operator(owner: &signer, old_operator: address, new_operator: address) {
         pragma verify = false;
-        // TODO: Can't verify due to timeout (>1000)
-        // TODO: Can't verify `set_vesting_contract_operator` and `set_staking_contract_operator`
+        // TODO: times out at 40s.
         include SetStakePoolOperator;
         include SetStakingContractOperator;
     }
@@ -64,13 +63,10 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
-        // TODO: Can't verify `update_voter` in while loop.
-        pragma verify = false;
+        // Partial: the vesting contracts are updated in a loop.
     }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
-        pragma verify = false;
-        // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         include SetStakingContractOperator;
     }
 
@@ -114,8 +110,7 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_vesting_contract_voter(owner: &signer, operator: address, new_voter: address) {
-        // TODO: Can't verify `update_voter` in while loop.
-        pragma verify = false;
+        // Partial: the vesting contracts are updated in a loop.
     }
 
     /// Aborts if stake_pool is exists and when OwnerCapability or stake_pool_exists

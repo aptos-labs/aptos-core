@@ -135,8 +135,12 @@ spec aptos_framework::fungible_asset {
     spec module {
         pragma verify = true;
         /// Once a store has a concurrent balance, its plain balance stays zero.
-        invariant forall addr: address where exists<ConcurrentFungibleBalance>(addr) && exists<FungibleStore>(addr):
+        invariant forall addr: address {exists<ConcurrentFungibleBalance>(addr)}
+            where exists<ConcurrentFungibleBalance>(addr) && exists<FungibleStore>(addr):
             global<FungibleStore>(addr).balance == 0;
+        /// A concurrent balance only exists alongside its store.
+        invariant [suspendable] forall addr: address {exists<ConcurrentFungibleBalance>(addr)}
+            where exists<ConcurrentFungibleBalance>(addr): exists<FungibleStore>(addr);
     }
 
     spec store_exists(store: address): bool {
@@ -217,6 +221,8 @@ spec aptos_framework::fungible_asset {
     }
 
     spec remove_store(delete_ref: &DeleteRef) {
+        // The store is removed before its concurrent balance.
+        pragma disable_invariants_in_body;
         let addr = delete_ref.self;
         aborts_if !exists<object::ObjectCore>(addr);
         aborts_if !exists<FungibleStore>(addr);
