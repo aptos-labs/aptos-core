@@ -2057,6 +2057,11 @@ structure TypedReads (carrier : Type) (encode : carrier → RuntimeValue) where
   unread_read : ∀ value, unread (read value) = value
   /-- The order of the typed values, as an ordered map's typed keys compare. -/
   order : ValueRanks → SpecMap.KeyOrder typed
+  /-- The order of two values' reads is the runtime order of their encodings:
+  the typed keys of an ordered map compare as its native keys do. -/
+  order_encode : ∀ rank left right,
+    (order rank).compare (read left) (read right) =
+      RuntimeValue.order rank (encode left) (encode right)
 
 /-- The key order of values by the runtime order of their images, where
 the images are injective: the order of runtime values themselves, which
@@ -2086,6 +2091,7 @@ instances are: a family's reads unfold to the type's under unification. -/
   unread := fun _ => ()
   unread_read := fun _ => rfl
   order := SpecMap.KeyOrder.byRuntime (fun _ => .unit) (fun _ _ _ => rfl)
+  order_encode := fun _ _ _ => rfl
 
 /-- A loan-free runtime value: the runtime family's value of a type
 parameter. -/
@@ -2117,6 +2123,7 @@ theorem PlainValue.ofRuntime_unit : PlainValue.ofRuntime .unit = ⟨.unit, .unit
   unread := fun value => value
   unread_read := fun _ => rfl
   order := SpecMap.KeyOrder.byRuntime Subtype.val fun _ _ same => Subtype.ext same
+  order_encode := fun _ _ _ => rfl
 
 mutual
 /-- A runtime value with its ghost slots' contents dropped: the value the
@@ -4413,7 +4420,7 @@ attribute [vir_denote_norm]
   NTy.holds_unit NTy.holds_bool NTy.holds_int NTy.holds_num NTy.holds_address
   NTy.holds_signer NTy.holds_string NTy.holds_bytes NTy.holds_char NTy.holds_function
   NTy.holds_nominal NTy.holds_tuple NTy.holds_ref NTy.holds_ghost NTy.holds_observed
-  NTy.holds_param HList.holds_nil HList.holds_cons
+  HList.holds_nil HList.holds_cons
   variantCarrier.holds_inl variantCarrier.holds_inr
 mutual
 /-- A value as a clause reads it at entry, or with `prophecies` at exit: each
@@ -6134,6 +6141,27 @@ theorem getElem?_insertIdx_toNat_of_gt {α : Type} (xs : Array α) (x : α) (i :
   rw [Array.getElem?_insertIdx_of_ge (by omega : i < k.toNat) (by omega)]
   congr 1
   omega
+
+/-- A lookup into a swapped array at one of the two positions the swap
+moves: the array before the swap, read at the other one.  A position the
+swap does not decide is no instance of these, so such a read stays of the
+swap's result.  Two further reads a swap does decide are outside these two
+laws and stay of the swap's result as well: a read at a third position known
+to differ from both, and a read of a swap whose positions are known to be
+out of bounds. -/
+theorem getElem_swapIfInBounds_left {α : Type} {xs : Array α} {i j : Nat} (hj : j < xs.size)
+    (bound : i < (xs.swapIfInBounds i j).size) :
+    (xs.swapIfInBounds i j)[i]'bound = xs[j]'hj := by
+  rw [Array.getElem_swapIfInBounds, dif_pos ⟨rfl, hj⟩]
+
+theorem getElem_swapIfInBounds_right {α : Type} {xs : Array α} {i j : Nat} (hi : i < xs.size)
+    (bound : j < (xs.swapIfInBounds i j).size) :
+    (xs.swapIfInBounds i j)[j]'bound = xs[i]'hi := by
+  rw [Array.getElem_swapIfInBounds]
+  by_cases same : j = i
+  · subst same
+    simp [hi]
+  · rw [dif_neg fun both => same both.1, dif_pos ⟨rfl, hi⟩]
 
 /-- An insertion at a position within the vector (the end included). -/
 theorem insertIdxIfInBounds_of_le {α : Type} (xs : Array α) (i : Nat) (a : α) (h : i ≤ xs.size) :
@@ -9372,6 +9400,49 @@ them, any other type's by the structural order (`NTy.keyOrder`). -/
   | .function parameters shared results => NTy.keyOrder rank (.function parameters shared results)
   | .nominal source arguments productive => NTy.keyOrder rank (NTy.nominal source arguments productive)
 
+/-- The order of two values' typed reads is the runtime order of their
+encodings: an integer's by its value, a type parameter's by its family's law
+(`TypedReads.order_encode`), a marked entry's as its referent's, every other
+type's by the structural order (`NTy.order_encode`). -/
+theorem NTy.readOrder_read (rank : ValueRanks) : (τ : NTy) → (left right : τ.carrier) →
+    (NTy.readOrder rank τ).compare (τ.read left) (τ.read right) =
+      RuntimeValue.order rank (τ.encode left) (τ.encode right)
+  | .int _ _, left, right => (RuntimeValue.order_integer rank left.val right.val).symm
+  | .num, left, right => (RuntimeValue.order_integer rank left.val right.val).symm
+  | .param index, left, right => (Carriers.reads index).order_encode rank left right
+  | .observed referent, left, right => NTy.readOrder_read rank referent left right
+  | .unit, left, right => (NTy.order_encode rank .unit left right).symm
+  | .bool, left, right => (NTy.order_encode rank .bool left right).symm
+  | .address, left, right => (NTy.order_encode rank .address left right).symm
+  | .signer, left, right => (NTy.order_encode rank .signer left right).symm
+  | .string, left, right => (NTy.order_encode rank .string left right).symm
+  | .bytes, left, right => (NTy.order_encode rank .bytes left right).symm
+  | .char, left, right => (NTy.order_encode rank .char left right).symm
+  | .tuple elements, left, right => (NTy.order_encode rank (.tuple elements) left right).symm
+  | .struct source arguments fields, left, right =>
+      (NTy.order_encode rank (.struct source arguments fields) left right).symm
+  | .enum source arguments names rows distinct, left, right =>
+      (NTy.order_encode rank (.enum source arguments names rows distinct) left right).symm
+  | .slice element, left, right => (NTy.order_encode rank (.slice element) left right).symm
+  | .vector element, left, right => (NTy.order_encode rank (.vector element) left right).symm
+  | .array element length, left, right =>
+      (NTy.order_encode rank (.array element length) left right).symm
+  | .table key value, left, right => (NTy.order_encode rank (.table key value) left right).symm
+  | .ghost slot, left, right => (NTy.order_encode rank (.ghost slot) left right).symm
+  | .sliceRef referent, left, right => (NTy.order_encode rank (.sliceRef referent) left right).symm
+  | .ref referent, left, right => (NTy.order_encode rank (.ref referent) left right).symm
+  | .function parameters shared results, left, right =>
+      (NTy.order_encode rank (.function parameters shared results) left right).symm
+  | .nominal source arguments productive, left, right =>
+      (NTy.order_encode rank (.nominal source arguments productive) left right).symm
+
+/-- The order of two values' typed reads is the structural order of the
+values: the two coherence laws composed. An ordered map keyed through the
+typed view is ordered as its native keys are. -/
+theorem NTy.readOrder_read_order (rank : ValueRanks) (τ : NTy) (left right : τ.carrier) :
+    (NTy.readOrder rank τ).compare (τ.read left) (τ.read right) = NTy.order rank τ left right :=
+  (NTy.readOrder_read rank τ left right).trans (NTy.order_encode rank τ left right)
+
 /-- The typed reads of a type, bundled: what a family instantiated at the
 type reads a parameter by. -/
 @[reducible] def NTy.reads (τ : NTy) (inhabitable : τ.inhabitable = true) :
@@ -9388,6 +9459,7 @@ type reads a parameter by. -/
   unread := τ.unread inhabitable
   unread_read := τ.unread_read inhabitable
   order := fun rank => NTy.readOrder rank τ
+  order_encode := fun rank left right => NTy.readOrder_read rank τ left right
 
 end TypedReads
 
@@ -10884,7 +10956,7 @@ theorem Skolems.unmark_argument (Θ : Skolems unit) (index : Nat) :
   rw [Θ.resolve_eq]
   exact (NTy.unmark_unmark _).symm
 
-@[simp, vir_denote_norm] theorem Skolems.unmark_type (Θ : Skolems unit) (index : Nat) :
+@[simp, vir_denote, vir_denote_norm] theorem Skolems.unmark_type (Θ : Skolems unit) (index : Nat) :
     (Θ.type index).unmark = Θ.type index := by
   show (Θ.resolve (.param index)).unmark = Θ.resolve (.param index)
   rw [Θ.resolve_eq]

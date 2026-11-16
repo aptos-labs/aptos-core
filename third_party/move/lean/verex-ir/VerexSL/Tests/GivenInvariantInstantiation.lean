@@ -163,7 +163,8 @@ set_option verex.givenRoute false
 run_cmd do
   assertRejectedAtBoundary `«0x42».given_invariant_instantiation.launder_open_bad
     (← `(command| verify 0x42::given_invariant_instantiation::launder_open_bad))
-    "the specification clause `invariant value <= 100` is not established"
+    "the data invariant `invariant value <= 100` does not hold where a value is copied out of a \
+      mutable reference"
     "Given invariant instantiation: launder_open_bad (.copyOut)"
   assertRejectedAtBoundary `«0x42».given_invariant_instantiation.launder_handover_bad
     (← `(command| verify 0x42::given_invariant_instantiation::launder_handover_bad))

@@ -900,7 +900,9 @@ private theorem closureTyped_ofCarrier {unit : ValidatedUnit} [FunctionCarriers 
 
 /-- The rule at an invocation of a function value a proof does not see, at
 rows the frame resolves to scalars: `wp_closureMeaning_unseen` with the
-value's typing from its carrier (`closureTyped_ofCarrier`). -/
+value's typing from its carrier (`closureTyped_ofCarrier`).  The result's
+validity comes from the value's own fact (`ValidResultsAt`) at arguments that
+hold theirs. -/
 theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
@@ -912,8 +914,11 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers uni
     (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
     (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
     {initial : Memory unit}
+    (validResults : ValidResultsAt executable σs shared shape function)
+    (validArgs : HList.Holds σs args)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (returns : ∀ result final,
+      shape.Holds result →
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
       ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
         (HList.settle σs args) initial →
@@ -930,11 +935,18 @@ theorem wp_closureMeaning_unseen_at {unit : ValidatedUnit} [FunctionCarriers uni
   obtain ⟨_, resultTypes, targetTypes, -, typed, -, decodes⟩ :=
     closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
   exact wp_closureMeaning_unseen executable natives agrees function args free shapeFree typed
-    (decodes shape rfl) returns fails
+    (decodes shape rfl) validArgs
+    (fun result final ensures unaborted resultOf stateOf =>
+      have validResult := validResults args result initial final validArgs ensures
+      returns result final validResult ensures unaborted (resultOf validResult)
+        (stateOf validResult))
+    fails
 
-/-- An invocation of rows the frame resolves to scalars that does not
-abort returns, where runs end: a run `ensures_of` names, whose result and
-final memory `result_of` and `state_of` read. -/
+/-- An invocation of rows the frame resolves to scalars, on valid arguments,
+that does not abort returns, where runs end: a run `ensures_of` names, whose
+result and final memory `result_of` and `state_of` read.  The result's
+validity, which makes the run one the labels read, is the function value's
+own fact (`ValidResultsAt`). -/
 theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     [Skolems unit] (terminating : Terminating executable)
@@ -946,6 +958,8 @@ theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
     (agree : TypesAgree unit) (representable : OwnersRepresentable unit)
     (parametersScalar : ScalarAt unit σs) (resultsScalar : ScalarAt unit shape.row)
     {initial : Memory unit} (globals : MemoryTyped unit initial)
+    (validResults : ValidResultsAt executable σs shared shape function)
+    (validArgs : HList.Holds σs args)
     (unaborted : ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
       (HList.settle σs args) initial) :
     ∃ result final,
@@ -956,15 +970,17 @@ theorem returns_of_terminating {unit : ValidatedUnit} [FunctionCarriers unit]
         final := by
   obtain ⟨parameterTypes, resultTypes, targetTypes, observed, typed, rowTyped, decodes⟩ :=
     closureTyped_ofCarrier agree representable function shapeFree parametersScalar resultsScalar
-  rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial free shapeFree
+  rcases terminating ‹_› _ σs shape args targetTypes resultTypes initial validArgs free shapeFree
       typed (HasTypes.ofObserved (observed ▸ rowTyped args)) (decodes shape rfl) globals with
     ⟨error, aborted⟩ | ⟨result, final, run⟩
-  · exact absurd (abortsOfEntries_of_abortsOf ⟨error, aborted⟩) unaborted
+  · exact absurd (abortsOfEntries_of_abortsOf validArgs ⟨error, aborted⟩) unaborted
   · have flat := NRow.lentFlat_of_refFree σs free
     have shapeFlat := NRow.lentFlat_of_refFree shape.row shapeFree
     have settled := ResultShape.settled_of_refFree shape shapeFree result
-    exact ⟨result, final, run, resultOf_eq_of_ok agrees flat shapeFlat rfl run settled,
-      stateOf_eq_of_ok agrees flat shapeFlat rfl run settled⟩
+    have validResult := validResults args result initial final validArgs run
+    exact ⟨result, final, run,
+      resultOf_eq_of_ok agrees flat shapeFlat validArgs rfl run settled validResult,
+      stateOf_eq_of_ok agrees flat shapeFlat validArgs rfl run settled validResult⟩
 
 /-- Every runtime encoding of a memory has a typed representation, for a unit
 whose resource types correspond to their keys' types and whose typed values

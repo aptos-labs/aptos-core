@@ -917,6 +917,31 @@ theorem NRow.getD_map_params (g : NTy → NTy) :
       congr 2
       omega
 
+/-- An entry inside a row, with the entry replaced. Beyond the row the two
+differ, as the default is not replaced. -/
+theorem NRow.getD_map (g : NTy → NTy) :
+    (row : NRow) → (index : Nat) → index < row.length → (default : NTy) →
+      (row.map g).getD index default = g (row.getD index default)
+  | .nil, _, below, _ => absurd below (Nat.not_lt_zero _)
+  | .cons _ _, 0, _, _ => rfl
+  | .cons _ rest, index + 1, below, default => by
+      simp only [NRow.length] at below
+      exact NRow.getD_map g rest index (by omega) default
+
+/-- A declaration's parameters are read as themselves. -/
+theorem NRow.getD_params : (params : NRow) → (start : Nat) →
+    params.isParamsFrom start = true → (index : Nat) → index < params.length →
+      (default : NTy) → params.getD index default = .param (start + index)
+  | .nil, _, _, _, below, _ => absurd below (Nat.not_lt_zero _)
+  | .cons τ _, start, own, 0, _, _ => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true, beq_iff_eq] at own
+      simp only [NRow.getD, own.1, Nat.add_zero]
+  | .cons _ rest, start, own, index + 1, below, default => by
+      simp only [NRow.isParamsFrom, Bool.and_eq_true] at own
+      simp only [NRow.length] at below
+      rw [show start + (index + 1) = start + 1 + index from by omega]
+      exact NRow.getD_params rest (start + 1) own.2 index (by omega) default
+
 /-- A declaration's parameters are below their number. -/
 theorem NRow.paramsAll_params : (params : NRow) → (start bound : Nat) →
     params.isParamsFrom start = true → start + params.length ≤ bound →
@@ -1028,6 +1053,14 @@ appear. -/
       FunctionCarriers.own unit source (arguments.map Θ.resolve) value := by
   rw [Θ.own_resolve source arguments value, NRow.map_resolve Θ arguments]
 
+/-- A declaration's own parameters substitute a type over them to itself. -/
+theorem NTy.subst_params {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
+    τ.subst params = τ := by
+  refine (NTy.subst_eq_substWith params (fun index => .param index) params.length
+    (fun index below => ?_) τ bounded).trans (NTy.substWith_param τ)
+  simpa only [Nat.zero_add] using NRow.getD_params params 0 own index below (.param index)
+
 /-- A frame's resolutions of a declaration's parameters are inhabitable. -/
 theorem NRow.inhabitable_map_resolve (Θ : Skolems unit) :
     (params : NRow) → (start : Nat) → params.isParamsFrom start = true →
@@ -1052,15 +1085,24 @@ each, marked where the parameter stands for a shared reference. -/
   Skolems.instantiate (Θ.typeArgs params own) (Skolems.runtime unit)
 
 /-- A type over a declaration's parameters resolves alike at a frame and at
-the frame of its type arguments. -/
-theorem Skolems.resolve_instance (Θ : Skolems unit) {params : NRow}
+the frame the row of its type arguments induces: substituting the row of the
+frame's readings is resolving what the row itself substitutes. Stated of any
+instance row, so an argument of a declaration may be any type over the
+parameters the frame reads, not only one of them. -/
+theorem Skolems.resolve_instance (Θ : Skolems unit) (params : NRow) {τ : NTy}
+    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
+    τ.subst (params.map (NTy.argumentWith Θ.argument)) = Θ.resolve (τ.subst params) := by
+  rw [Θ.resolve_eq (τ.subst params), NTy.substWith_subst]
+  refine NTy.subst_eq_substWith _ _ params.length (fun index below => ?_) τ bounded
+  exact NRow.getD_map (NTy.argumentWith Θ.argument) params index below (.param index)
+
+/-- The instance row of a declaration's own parameters substitutes a type over
+them to itself, so the general resolution reads as it did. -/
+theorem Skolems.resolve_instance_params (Θ : Skolems unit) {params : NRow}
     (own : params.isParamsFrom 0 = true) {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
     τ.subst (params.map (NTy.argumentWith Θ.argument)) = Θ.resolve τ := by
-  rw [Θ.resolve_eq τ]
-  refine NTy.subst_eq_substWith _ _ params.length (fun index below => ?_) τ bounded
-  simpa only [Nat.zero_add, NTy.argumentWith] using
-    NRow.getD_map_params (NTy.argumentWith Θ.argument) params 0 own index below (.param index)
+  rw [Θ.resolve_instance params bounded, NTy.subst_params own bounded]
 
 /-- A frame's value of a type over a declaration's parameters, at the frame
 of its type arguments: the same runtime value. -/
@@ -1069,7 +1111,7 @@ noncomputable def Skolems.reframe
     {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     (value : @NTy.carrier Θ.toCarriers τ) : @NTy.carrier (Θ.instance params own).toCarriers τ :=
   (Θ.instance params own).ofRuntime τ
-    (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) (Θ.resolve_instance own bounded).symm)
+    (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) (Θ.resolve_instance_params own bounded).symm)
       (Θ.toRuntime τ value))
 
 /-- An encoding does not see a cast between the carriers of equal types. -/
@@ -1095,7 +1137,7 @@ theorem Skolems.encode_reframe
       @NTy.encode Θ.toCarriers τ value := by
   unfold Skolems.reframe
   rw [← (Θ.instance params own).encode_toRuntime, (Θ.instance params own).toRuntime_ofRuntime]
-  exact (NTy.encode_castCarrier (Θ.resolve_instance own bounded).symm _ _).trans
+  exact (NTy.encode_castCarrier (Θ.resolve_instance_params own bounded).symm _ _).trans
     (Θ.encode_toRuntime τ value)
 
 attribute [vir_denote_norm] Skolems.encode_reframe
@@ -1117,7 +1159,7 @@ attribute [simp, vir_transport] Skolems.holds_toRuntime Skolems.holds_ofRuntime
     @NTy.Holds (Θ.instance params own).toCarriers τ (Θ.reframe own bounded value) ↔
       @NTy.Holds Θ.toCarriers τ value :=
   (@Skolems.holds_ofRuntime unit _ (Θ.instance params own) τ _).trans
-    ((NTy.holds_castCarrier (Θ.resolve_instance own bounded).symm _ _).trans
+    ((NTy.holds_castCarrier (Θ.resolve_instance_params own bounded).symm _ _).trans
       (Θ.holds_toRuntime τ value))
 
 /-- Moving values to the frame of their type arguments is injective. -/
@@ -1472,16 +1514,16 @@ theorem StoredCase.atFrame (Θ : Skolems unit) {σ : NTy} {params : NRow}
         (params.map (NTy.argumentWith (Θ.instance params own).argument)) .value
     rw [Θ.map_resolve_instance own params
       (NRow.paramsAll_params params 0 params.length own (by omega)),
-      Θ.resolve_instance own bounded]
+      Θ.resolve_instance_params own bounded]
   constructor
   · intro stored
     have held := stored (Θ.typeArgs params own).2 same
-    rw [stored_val_cast same (Θ.resolve_instance own bounded).symm value] at held
+    rw [stored_val_cast same (Θ.resolve_instance_params own bounded).symm value] at held
     unfold Skolems.reframe
     rw [Θ.toRuntime_ofRuntime]
     exact held
   · intro held _ same'
-    rw [stored_val_cast same' (Θ.resolve_instance own bounded).symm value]
+    rw [stored_val_cast same' (Θ.resolve_instance_params own bounded).symm value]
     unfold Skolems.reframe at held
     rw [Θ.toRuntime_ofRuntime] at held
     exact held

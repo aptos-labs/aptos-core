@@ -37,6 +37,8 @@ private def identifierPart (name : String) : String :=
 /-- The key a leaf's origin gives it, where no clause names it. -/
 private def Provenance.key : Provenance → ObligationKey
   | .precondition callee call => { kind := "requires", callee := identifierPart callee, call }
+  | .callArgument callee call position =>
+      { kind := "argument", index := some position, callee := identifierPart callee, call }
   | .continuation callee call => { kind := "after", callee := identifierPart callee, call }
   | .loopEntry loop => { kind := "invariant", phase := "entry", loop }
   | .loopIteration loop => { kind := "invariant", phase := "step", loop }
@@ -117,6 +119,11 @@ private def leafKey (goal : MVarId) (provenance : Option Provenance)
     | some .returns, _ => returnsKey names
     | some (.precondition callee call), _ =>
         { (Provenance.precondition callee call).key with index := numbered }
+    -- An argument's validity is keyed by the argument, whatever clause the
+    -- invariant it opened to belongs to: that clause is what the leaf's text
+    -- names.
+    | some (.callArgument callee call position), _ =>
+        (Provenance.callArgument callee call position).key
     | some (.loopEntry loop), some name => { clauseKey name with phase := "entry", loop }
     | some (.loopIteration loop), some name => { clauseKey name with phase := "step", loop }
     | _, some name => clauseKey name
@@ -211,9 +218,10 @@ private def reportExposure (failures : Array (MVarId × Lean.Expr)) (alternative
 
 /-- The incoming alternatives of a goal under entry relations, each in the
 walk normal form. Linking an entry row substitutes the arrival's values into
-a target normalized over abstract ones; normalizing it again gives the
-alternative what `exitStep` gives the same path's concrete arrival, where a
-clause every value settles closes to `True` before any decider. -/
+a target and hypotheses normalized over abstract ones; normalizing them
+again gives the alternative what `exitStep` gives the same path's concrete
+arrival, where a clause every value settles closes to `True` before any
+decider and a fact reads the arrival's values as the walk states them. -/
 private def exposeNormalEntries (normalization : Simp.Context × Simp.SimprocsArray)
     (goal : MVarId) (entries : Array Name) : TacticM (List MVarId) := do
   -- A target the summary's walk settled without its rows, or one its
@@ -247,9 +255,11 @@ private def exposeNormalEntries (normalization : Simp.Context × Simp.SimprocsAr
   countAlternatives alternatives
   reportExposure (← failures.get) alternatives
   if alternatives == [goal] then return alternatives
+  let known := (← goal.getDecl).lctx
   alternatives.filterMapM fun alternative => do
     setGoals [alternative]
     normalizeAround (fixedPoints := walkFixedPoints) normalization #[]
+    renormalizeSubstituted normalization known
     return (← getGoals).head?
 
 /-- The arrivals a shared suffix's goals answer for: the suffix was queued
@@ -688,6 +698,12 @@ structure SolveState where
   needs the ordinary post-entry preparation under its own allowance. -/
   activeEntryOpened : Bool := false
   openedEntries : Std.HashSet MVarId := {}
+  /-- The group's opened entry left the target as the suffix stated it over
+  the abstract row, so that its conjunction could be routed. A routed
+  clause's leaf puts its target in the walk normal form, once
+  (`prepareLeafStep`). -/
+  activeTargetLinked : Bool := false
+  linkedTargets : Std.HashSet MVarId := {}
   /-- The arrivals the goal being stepped answers for (`OwedAttribution`). -/
   activeOwed : Option OwedAttribution := none
   goalOwed : Std.HashMap MVarId OwedAttribution := {}
@@ -785,6 +801,8 @@ private def queue (goals : List MVarId) (provenance : Option Provenance)
         else debits.insert goal s.activeDebits) s.goalDebits
       openedEntries := goals.foldl (fun opened goal =>
         if s.activeEntryOpened then opened.insert goal else opened.erase goal) s.openedEntries
+      linkedTargets := goals.foldl (fun linked goal =>
+        if s.activeTargetLinked then linked.insert goal else linked.erase goal) s.linkedTargets
       goalOwed := goals.foldl (fun owed goal => match s.activeOwed with
         | some attribution => owed.insert goal attribution
         | none => owed.erase goal) s.goalOwed
@@ -1245,6 +1263,7 @@ private def resumeShared (ctx : SolveContext) (index : Nat) : SolveM Unit := do
     activeOwners := region.owners
     activeDebits := region.debits
     activeEntryOpened := false
+    activeTargetLinked := false
     activeOwed := region.owed }
   -- The enclosing continuation also benefits if this region has no normal
   -- exit. Retain its debit even when there will be no arrival to carry it.
@@ -2029,21 +2048,57 @@ private def ghostWriteStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool
   charge "ghost" stageStart
   return true
 
-/-- Queue subgoals produced when a folded data invariant opens, splitting any
-inherited atomic budget allowance across independent structural children. -/
-private def queueOpenedInvariants (ctx : SolveContext) (goals : List MVarId)
-    (provenance : Option Provenance) (clauses : Array ObligationRange) (prepared : Bool) :
-    SolveM Unit := do
+/-- Queue subgoals produced when folded data invariants open, each with its
+own provenance: one child set, whose owners are split once from the step's
+inherited atomic allowance, each child owner taking that allowance's limit
+and what it has spent (`SharedBudgets.Ledger.split`). -/
+private def queueOpenedResiduals (ctx : SolveContext)
+    (goals : List (MVarId × Option Provenance)) (clauses : Array ObligationRange)
+    (prepared : Bool) : SolveM Unit := do
   let inherited := (← get).activeOwners
   if goals.length > 1 && !inherited.isEmpty && inherited.all (·.1.isEmpty) then
     let (ledger, ids) := (← ctx.budgets.get).split (inherited.map (·.2)) goals.length
     ctx.budgets.set ledger
-    for (subgoal, id) in goals.toArray.zip ids do
+    for ((subgoal, provenance), id) in goals.toArray.zip ids do
       modify fun s => { s with activeOwners := #[([], id)] }
       queue [subgoal] provenance clauses prepared
     modify fun s => { s with activeOwners := inherited }
   else
-    queue goals provenance clauses prepared
+    for (subgoal, provenance) in goals do
+      queue [subgoal] provenance clauses prepared
+
+/-- Queue subgoals produced when a folded data invariant opens, splitting any
+inherited atomic budget allowance across independent structural children. -/
+private def queueOpenedInvariants (ctx : SolveContext) (goals : List MVarId)
+    (provenance : Option Provenance) (clauses : Array ObligationRange) (prepared : Bool) :
+    SolveM Unit :=
+  queueOpenedResiduals ctx (goals.map (·, provenance)) clauses prepared
+
+/-- A folded data invariant as a goal (`NTy.Holds`), opened: closed directly
+where the local context states it, otherwise read structurally to the
+declaration and element obligations it is of, so that `OwnAtArguments` /
+`decodedOwnGoal?` expose each clause's own `Obligation` marker on the next
+step, and the readings normalized. None where the opener leaves the goal as
+it is. -/
+private def openFoldedInvariant (ctx : SolveContext) (goal : MVarId) :
+    SolveM (Option (List MVarId)) := do
+  let goals ← goal.withContext do
+    let target := (← instantiateMVars (← goal.getType)).consumeMData
+    if target.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 then
+      if let .fvar valueId := (target.getArg! 2).consumeMData then
+        let type ← whnfD (← instantiateMVars (← valueId.getType))
+        if type.isAppOf ``Sum then
+          if (← findHoldsHypothesis? target).isNone then
+            return (← destructureOuterVariant goal valueId).toList
+    return [goal]
+  let mut unfolded := #[]
+  for owed in goals do
+    unfolded := unfolded ++ (← openHoldsGoal owed).toArray
+  if unfolded == #[goal] then return none
+  if unfolded.isEmpty then return some []
+  setGoals unfolded.toList
+  normalizeGoals ctx
+  return some (← getGoals)
 
 /-- A data invariant where a mutation of a local ends, and of a value where
 it is constructed: cuts, as an assertion is. -/
@@ -2070,29 +2125,12 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
     queueOpenedInvariants ctx (← getGoals) provenance clauses prepared
     charge "invariant" stageStart
     return true
-  -- A folded boundary or loop data invariant (`NTy.Holds`): closed directly
-  -- when already in the local context, otherwise opened structurally to
-  -- declaration and element obligations so `OwnAtArguments` / `decodedOwnGoal?`
-  -- expose each clause's own `Obligation` marker on the next step.
+  -- A folded boundary or loop data invariant (`openFoldedInvariant`).
   if ← goal.withContext do
       pure ((← instantiateMVars (← goal.getType)).consumeMData.isAppOfArity
         ``VerexIR.Proofs.Denote.NTy.Holds 3) then
-    let goals ← goal.withContext do
-      let target := (← instantiateMVars (← goal.getType)).consumeMData
-      if let .fvar valueId := (target.getArg! 2).consumeMData then
-        let type ← whnfD (← instantiateMVars (← valueId.getType))
-        if type.isAppOf ``Sum then
-          if (← findHoldsHypothesis? target).isNone then
-            return (← destructureOuterVariant goal valueId).toList
-      return [goal]
-    let mut unfolded := #[]
-    for owed in goals do
-      unfolded := unfolded ++ (← openHoldsGoal owed).toArray
-    if unfolded == #[goal] then return false
-    unless unfolded.isEmpty do
-      setGoals unfolded.toList
-      normalizeGoals ctx
-      queueOpenedInvariants ctx (← getGoals) provenance clauses prepared
+    let some opened ← openFoldedInvariant ctx goal | return false
+    queueOpenedInvariants ctx opened provenance clauses prepared
     charge "invariant" stageStart
     return true
   -- A checking step: the obligation is the value's data invariants at
@@ -2270,6 +2308,10 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   if let some remaining ← literalClosureKeepsMemory? goal ctx.callees then
     queue remaining provenance (← withTargetClause goal clauses)
     charge "closure frame" stageStart
+    return true
+  if let some remaining ← closureValidResults? goal ctx.callees then
+    queue remaining provenance (← withTargetClause goal clauses)
+    charge "closure results" stageStart
     return true
   if let some remaining ← routedInvocation? goal then
     queue remaining provenance clauses
@@ -2538,26 +2580,47 @@ private partial def argumentPattern (e : Lean.Expr) (components variables : Arra
     | some index => variables[index]!
     | none => e
 
-private def ResultShape.invariantFree : ResultShape → Bool
-  | .none => true
-  | .one τ => τ.invariantFree
+private theorem wp_call_valid_eq {State : Type} {Args Result : Type}
+    {function : Args → Spec State Failure Result}
+    {contract : Contract State Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {validArgs : Prop} {validResult : Result → Prop}
+    (verified : Satisfies function contract)
+    (validArgs_eq : contract.validArgs args = validArgs)
+    (validResult_eq : ∀ result, contract.validResult result = validResult result)
+    (valid : validArgs)
+    (assumed : contract.assumes args initial)
+    (permitted : contract.requires args initial)
+    (post : ∀ result final, validResult result →
+      (¬contract.mayAbort args initial → contract.ensures args initial result final) →
+      contract.frame args initial result final → ¬contract.mustAbort args initial →
+      ensures result final)
+    (failing : ∀ error, contract.aborts args initial error → aborts error) :
+    wp (function args) ensures aborts initial :=
+  wp_call_valid verified (validArgs_eq.symm ▸ valid) assumed permitted
+    (fun result final validRes => post result final (validResult_eq result ▸ validRes))
+    failing
 
-private theorem HList.holds_eq_true_of_invariantFree [Carriers] {row : NRow}
-    (free : row.invariantFree = true) (values : HList row) :
-    HList.Holds row values = True :=
-  eq_true ((HList.holds_iff row values).mpr (HList.deepHolds_of_invariantFree row free values))
-
-private theorem HList.holds_of_invariantFree [Carriers] {row : NRow}
-    (free : row.invariantFree = true) (values : HList row) :
-    HList.Holds row values :=
-  (HList.holds_iff row values).mpr (HList.deepHolds_of_invariantFree row free values)
-
-private theorem ResultShape.holds_eq_true_of_invariantFree [Carriers] {shape : ResultShape}
-    (free : shape.invariantFree = true) (value : shape.carrier) :
-    shape.Holds value = True := by
-  cases shape with
-  | none => exact eq_true trivial
-  | one τ => exact eq_true (NTy.holds_of_invariantFree τ free value)
+private theorem wp_call_strict_valid_eq {State : Type} {Args Result : Type}
+    {function : Args → Spec State Failure Result}
+    {contract : Contract State Failure Args Result} {args : Args}
+    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
+    {validArgs : Prop} {validResult : Result → Prop}
+    (verified : Satisfies function contract)
+    (strict : contract.mayAbort = contract.mustAbort)
+    (validArgs_eq : contract.validArgs args = validArgs)
+    (validResult_eq : ∀ result, contract.validResult result = validResult result)
+    (valid : validArgs)
+    (assumed : contract.assumes args initial)
+    (permitted : contract.requires args initial)
+    (post : ∀ result final, validResult result → ¬contract.mustAbort args initial →
+      contract.ensures args initial result final → contract.frame args initial result final →
+      ensures result final)
+    (failing : ∀ error, contract.aborts args initial error → aborts error) :
+    wp (function args) ensures aborts initial :=
+  wp_call_strict_valid verified strict (validArgs_eq.symm ▸ valid) assumed permitted
+    (fun result final validRes => post result final (validResult_eq result ▸ validRes))
+    failing
 
 private theorem wp_call_normal_valid_eq {State : Type} {Args Result : Type}
     {function : Args → Spec State Failure Result}
@@ -2588,194 +2651,21 @@ private theorem wp_call_normal_valid_eq {State : Type} {Args Result : Type}
     (fun result final validRes => post result final (validResult_eq result ▸ validRes))
     failing
 
-private theorem wp_call_normal_validResult_eq {State : Type} {Args Result : Type}
-    {function : Args → Spec State Failure Result}
-    {contract : Contract State Failure Args Result} {args : Args}
-    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
-    {assumes requires mustAbort : Prop}
-    {validResult : Result → Prop}
-    {established framed : Result → State → Prop}
-    {failed : Failure → Prop}
-    (verified : Satisfies function contract)
-    (strict : contract.mayAbort = contract.mustAbort)
-    (validResult_eq : ∀ result, contract.validResult result = validResult result)
-    (assumes_eq : contract.assumes args initial = assumes)
-    (requires_eq : contract.requires args initial = requires)
-    (mustAbort_eq : contract.mustAbort args initial = mustAbort)
-    (ensures_eq : ∀ result final, contract.ensures args initial result final = established result final)
-    (frame_eq : ∀ result final, contract.frame args initial result final = framed result final)
-    (aborts_eq : ∀ error, contract.aborts args initial error = failed error)
-    (valid : contract.validArgs args)
-    (assumed : assumes) (permitted : requires)
-    (post : ∀ result final, validResult result → ¬mustAbort → established result final →
-      framed result final → ensures result final)
-    (failing : ∀ error, failed error → aborts error) :
-    wp (function args) ensures aborts initial :=
-  wp_call_normal_valid verified strict assumes_eq requires_eq mustAbort_eq ensures_eq frame_eq
-    aborts_eq valid assumed permitted
-    (fun result final validRes => post result final (validResult_eq result ▸ validRes))
-    failing
-
-private partial def peelContractExpr (c : Lean.Expr) (fuel : Nat := 12) : MetaM Lean.Expr := do
-  let c := (← whnfCore c).consumeMData
-  if fuel == 0 || c.isAppOf ``VerexIR.Proofs.Contract.mk then return c
-  match ← unfoldDefinition? c with
-  | some next => peelContractExpr next (fuel - 1)
-  | none => return c
-
-private partial def peelToHoldsHead (e : Lean.Expr) (fuel : Nat := 16) : MetaM Lean.Expr := do
-  let e := (← whnfCore e).consumeMData
-  if fuel == 0 || e.isConstOf ``True ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 ||
-      e.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then
-    return e
-  if let .proj s idx structVal := e.getAppFn.consumeMData then
-    let structVal' ← peelContractExpr structVal
-    if structVal' != structVal then
-      return ← peelToHoldsHead (mkAppN (.proj s idx structVal') e.getAppArgs) (fuel - 1)
-  match ← unfoldDefinition? e with
-  | some next => peelToHoldsHead next (fuel - 1)
-  | none => return e
-
-private partial def peelCastsHEq (e : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  let core := e.consumeMData
-  if core.isAppOfArity ``cast 4 then
-    let (inner, hInner) ← peelCastsHEq (core.getArg! 3)
-    let hStep ← mkAppOptM ``cast_heq
-      #[some (core.getArg! 0), some (core.getArg! 1), some (core.getArg! 2), some (core.getArg! 3)]
-    return (inner, ← mkHEqTrans hStep hInner)
-  return (e, ← mkHEqRefl e)
-
-/-- Find a local `NTy.Holds` hypothesis matching `carriers`, `τ`, and `val` componentwise,
-without ever unfolding `NTy.Holds` across non-matching types or families. -/
-private def findMatchingHoldsHyp? (carriers τ val : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  let carriers := carriers.consumeMData
-  let τ := τ.consumeMData
-  let val := val.consumeMData
-  for decl in ← getLCtx do
-    if decl.isAuxDecl then continue
-    let raw := decl.type.consumeMData
-    let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
-    unless ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.Holds 3 do continue
-    let ok ← withNewMCtxDepth do
-      unless ← withDefault (isDefEq (ty.getArg! 1) τ) do return false
-      unless ← withDefault (isDefEq (ty.getArg! 2) val) do return false
-      withDefault (isDefEq (ty.getArg! 0) carriers)
-    if ok then return some decl.toExpr
-  return none
-
-private partial def proveDirectNTyHolds? (carriers τ val : Lean.Expr) (fuel : Nat := 8) :
-    MetaM (Option Lean.Expr) := do
-  let expected := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers τ val
-  if !τ.hasFVar && !τ.hasMVar then
-    if (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.invariantFree) τ)).isConstOf ``Bool.true then
-      let raw := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.holds_of_invariantFree)
-        carriers τ (← mkEqRefl (mkConst ``Bool.true)) val
-      return some (← mkExpectedTypeHint raw expected)
-  if fuel > 0 then
-    if let some (θ, outer) := FamilyTransport.inducedCarriers? carriers.consumeMData then
-      if let some row := FamilyTransport.substitutionRow? θ then
-        if let some substituted := FamilyTransport.substituteNTy row τ (some (← getEnv)) then
-          let (val', heq) ← peelCastsHEq val
-          let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) outer substituted
-          if ← withDefault (isDefEq (← inferType val') expectedCarrier) then
-            if let some innerProof ← proveDirectNTyHolds? outer substituted val' (fuel - 1) then
-              let rhs := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) outer substituted val'
-              let eqProof ← mkAppOptM ``VerexIR.Proofs.Denote.NTy.holds_instantiate_heq
-                #[some outer, some θ, some τ, some val, some val', some heq]
-              let eqHint ← withDefault (mkExpectedTypeHint eqProof (← mkEq expected rhs))
-              let transported ← mkAppOptM ``Eq.mpr #[some expected, some rhs, some eqHint, some innerProof]
-              return some (← withDefault (mkExpectedTypeHint transported expected))
-  if let some h ← findMatchingHoldsHyp? carriers τ val then
-    return some (← withDefault (mkExpectedTypeHint h expected))
-  let τCore := (← whnfCore τ).consumeMData
-  if τCore.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 then
-    if let some h ← findMatchingHoldsHyp? carriers (τCore.getArg! 0) val then
-      return some (← withDefault (mkExpectedTypeHint h expected))
-  return none
-
-private partial def proveDirectHListHolds? (carriers row val : Lean.Expr) (fuel : Nat := 16) :
-    MetaM (Option Lean.Expr) := do
-  if fuel == 0 then return none
-  let expected := mkApp3 (mkConst ``VerexIR.Proofs.Denote.HList.Holds) carriers row val
-  let rowCore := (← whnfD row).consumeMData
-  if rowCore.isConstOf ``VerexIR.Proofs.Denote.NRow.nil then
-    return some (← mkExpectedTypeHint (mkConst ``True.intro) expected)
-  if !row.hasFVar && !row.hasMVar then
-    if (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.invariantFree) row)).isConstOf ``Bool.true then
-      let raw := mkApp4 (mkConst ``HList.holds_of_invariantFree)
-        carriers row (← mkEqRefl (mkConst ``Bool.true)) val
-      return some (← mkExpectedTypeHint raw expected)
-  let valCore := (← whnfCore val).consumeMData
-  if valCore.isAppOfArity ``VerexIR.Proofs.Denote.HList.ofSkolem 4 then
-    let (outerC, θ, row0, innerVals) :=
-      (valCore.getArg! 0, valCore.getArg! 1, valCore.getArg! 2, valCore.getArg! 3)
-    let instC := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate) θ outerC
-    if let some hInner ← proveDirectHListHolds? instC row0 innerVals (fuel - 1) then
-      let iffProof := mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.holds_ofSkolem_iff) outerC θ row0 innerVals
-      let mpProof ← mkAppM ``Iff.mpr #[iffProof, hInner]
-      return some (← withDefault (mkExpectedTypeHint mpProof expected))
-  if valCore.isAppOfArity ``VerexIR.Proofs.Denote.HList.toSkolem 4 then
-    let (outerC, θ, row0, callerVals) :=
-      (valCore.getArg! 0, valCore.getArg! 1, valCore.getArg! 2, valCore.getArg! 3)
-    if let some substRow := FamilyTransport.substitutionRow? θ then
-      if let some rowSubst := FamilyTransport.substituteNRow substRow row0 (some (← getEnv)) then
-        if let some hCaller ← proveDirectHListHolds? outerC rowSubst callerVals (fuel - 1) then
-          let iffProof := mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.holds_toSkolem_iff) outerC θ row0 callerVals
-          let mpProof ← mkAppM ``Iff.mpr #[iffProof, hCaller]
-          return some (← withDefault (mkExpectedTypeHint mpProof expected))
-  if rowCore.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 then
-    let (τ, rest) := (rowCore.getArg! 0, rowCore.getArg! 1)
-    let (headVal, tailVal) ←
-      if valCore.isAppOfArity ``Prod.mk 4 then
-        pure (valCore.getArg! 2, valCore.getArg! 3)
-      else
-        pure (← mkAppM ``Prod.fst #[val], ← mkAppM ``Prod.snd #[val])
-    let some hHead ← proveDirectNTyHolds? carriers τ headVal | return none
-    let some hTail ← proveDirectHListHolds? carriers rest tailVal (fuel - 1) | return none
-    let conj ← mkAppM ``And.intro #[hHead, hTail]
-    return some (← withDefault (mkExpectedTypeHint conj expected))
-  return none
-
-private def proveDirectValidType? (validArgsType : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  try withTransparency .default do
-    let validArgsType ← instantiateMVars validArgsType
-    let peeled ← peelToHoldsHead validArgsType
-    let raw? ←
-      if peeled.isConstOf ``True then
-        pure (some (mkConst ``True.intro))
-      else if peeled.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then
-        proveDirectHListHolds? (peeled.getArg! 0) (peeled.getArg! 1) (peeled.getArg! 2)
-      else
-        pure none
-    let some raw := raw? | return none
-    let hinted ← mkExpectedTypeHint raw validArgsType
-    let hinted ← instantiateMVars hinted
-    if hinted.hasMVar then return none
-    return some hinted
-  catch _ =>
-    return none
-
-private def proveDirectContractValidArgs? (contract args : Lean.Expr) : MetaM (Option Lean.Expr) := do
-  try withTransparency .default do
-    proveDirectValidType? (← mkAppM ``VerexIR.Proofs.Contract.validArgs #[contract, args])
-  catch _ =>
-    return none
-
-private def isContractResultInvariantFree (contract : Lean.Expr) : MetaM Bool := do
-  try
-    let validResultFn ← mkAppM ``VerexIR.Proofs.Contract.validResult #[contract]
-    let .forallE _ resultTy _ _ ← whnfR (← inferType validResultFn) | return false
-    withLocalDeclD `result resultTy fun result => do
-      let peeled ← peelToHoldsHead (mkApp validResultFn result)
-      if peeled.isConstOf ``True then return true
-      if peeled.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then
-        let shape := peeled.getArg! 1
-        if shape.hasFVar || shape.hasMVar then return false
-        return (← whnfD (mkApp (mkConst ``ResultShape.invariantFree) shape)).isConstOf ``Bool.true
-      return false
-  catch _ =>
-    return false
+/-- The consumer of a call's argument validity: the goal, which the rule
+states in validity normal form, split into the atoms of each argument, and
+each of them opened to the invariants it reads (`openFoldedInvariant`). The
+residuals of the call are one child set, split once from the budget the step
+inherited. -/
+private def consumeArgumentValidity (ctx : SolveContext) (owed : List MVarId)
+    (calleeName : String) (call : Option Nat) : SolveM Unit := do
+  let mut residuals : Array (MVarId × Option Provenance) := #[]
+  for goal in owed do
+    for (position, atom) in ← argumentValidityGoals goal 0 #[] do
+      let origin := some (Provenance.callArgument calleeName call (position + 1))
+      match ← openFoldedInvariant ctx atom with
+      | some opened => residuals := residuals ++ opened.toArray.map (·, origin)
+      | none => residuals := residuals.push (atom, origin)
+  queueOpenedResiduals ctx residuals.toList #[] false
 
 /-- The conditions of a contract the call rules take as equations: those of
 `wp_call_equations_valid` in its order; `wp_call_normal_valid_eq` takes all but the
@@ -2842,62 +2732,27 @@ private def contractEquations? (contract args initial : Lean.Expr)
       let proof ← forallTelescope (← whnfR (← inferType applied)) fun rest _ => do
         let value := mkAppN applied rest
         let (result, _) ← Simp.main value ctx (methods := Simp.mkDefaultMethodsCore simprocs)
-        let proof ← match result.proof? with
-          | some proof => pure proof
-          | none => mkEqRefl value
-        mkLambdaFVars (binders ++ rest) proof
+        mkLambdaFVars (binders ++ rest) (← normalFormEquation value result)
       let proof ← instantiateMVars proof
       if proof.hasFVar || proof.hasMVar then return none
       return some proof
-    let proveInvariantFreeEquation? (applied : Lean.Expr) : TacticM (Option Lean.Expr) := do
-      try
-        let proof ← forallTelescope (← whnfR (← inferType applied)) fun rest _ => do
-          let value := mkAppN applied rest
-          let reduced ← peelToHoldsHead value
-          let direct ←
-            if reduced.isConstOf ``True then
-              some <$> mkExpectedTypeHint (← mkEqRefl (mkConst ``True)) (← mkEq value (mkConst ``True))
-            else if reduced.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then do
-              let (carriers, row, val) := (reduced.getArg! 0, reduced.getArg! 1, reduced.getArg! 2)
-              if row.hasFVar || row.hasMVar then return none
-              unless (← whnfD (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.invariantFree) row)).isConstOf
-                  ``Bool.true do return none
-              let eqProof := mkApp4 (mkConst ``HList.holds_eq_true_of_invariantFree)
-                carriers row (← mkEqRefl (mkConst ``Bool.true)) val
-              some <$> mkExpectedTypeHint eqProof (← mkEq value (mkConst ``True))
-            else if reduced.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.Holds 3 then do
-              let (carriers, shape, val) := (reduced.getArg! 0, reduced.getArg! 1, reduced.getArg! 2)
-              if shape.hasFVar || shape.hasMVar then return none
-              unless (← whnfD (mkApp (mkConst ``ResultShape.invariantFree) shape)).isConstOf
-                  ``Bool.true do return none
-              let eqProof := mkApp4 (mkConst ``ResultShape.holds_eq_true_of_invariantFree)
-                carriers shape (← mkEqRefl (mkConst ``Bool.true)) val
-              some <$> mkExpectedTypeHint eqProof (← mkEq value (mkConst ``True))
-            else
-              pure none
-          let some body := direct | return none
-          some <$> mkLambdaFVars (binders ++ rest) body
-        let some proof := proof | return none
-        let proof ← instantiateMVars proof
-        if proof.hasFVar || proof.hasMVar then return none
-        check proof
-        return some proof
-      catch _ =>
-        return none
+    -- The validity of the arguments and of the result is normalized by the
+    -- form their consumer reads (`validityNormalForm`).
+    let validity ← validityNormalization lemmas
+    let proveValidityEquation (applied : Lean.Expr) : TacticM (Option Lean.Expr) := do
+      let proof ← forallTelescope (← whnfR (← inferType applied)) fun rest _ => do
+        let value := mkAppN applied rest
+        let result ← validityNormalForm validity value
+        mkLambdaFVars (binders ++ rest) (← normalFormEquation value result)
+      let proof ← instantiateMVars proof
+      if proof.hasFVar || proof.hasMVar then return none
+      return some proof
     let mut proofs := #[]
     let validArgsExpr := mkApp (← mkAppM ``VerexIR.Proofs.Contract.validArgs #[contract']) args'
-    let some validArgsProof ← do
-        match ← proveInvariantFreeEquation? validArgsExpr with
-        | some p => pure (some p)
-        | none => proveEquation validArgsExpr
-      | return none
+    let some validArgsProof ← proveValidityEquation validArgsExpr | return none
     proofs := proofs.push validArgsProof
     let validResultExpr ← mkAppM ``VerexIR.Proofs.Contract.validResult #[contract']
-    let some validResultProof ← do
-        match ← proveInvariantFreeEquation? validResultExpr with
-        | some p => pure (some p)
-        | none => proveEquation validResultExpr
-      | return none
+    let some validResultProof ← proveValidityEquation validResultExpr | return none
     proofs := proofs.push validResultProof
     for condition in contractConditions do
       let some proof ← proveEquation (mkApp2 (← mkAppM condition #[contract']) args' state)
@@ -2911,8 +2766,8 @@ private def contractEquations? (contract args initial : Lean.Expr)
 (`contractEquations?`, `wp_call_normal_valid_eq`). False, the state restored, where
 the normal forms do not apply. -/
 private def callThroughNormalForms (goal : MVarId) (proofType : Lean.Expr)
-    (proofSyntax : TSyntax `term) (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma))
-    (directValid : Bool) (resultFree : Bool) :
+    (proofSyntax resultDomain : TSyntax `term)
+    (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) :
     TacticM Bool := do
   let saved ← saveState
   try
@@ -2927,18 +2782,9 @@ private def callThroughNormalForms (goal : MVarId) (proofType : Lean.Expr)
         | return none
       some <$> equations.mapM fun equation => do Lean.Elab.Term.exprToSyntax equation
     let some terms := found | return false
-    if directValid && resultFree then
-      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call_normal $proofSyntax rfl
-        $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
-        ?_ ?_ ?_ ?_ ?_))
-    else if directValid then
-      evalTactic (← `(tactic| refine wp_call_normal_validResult_eq $proofSyntax rfl
-        $(terms[1]!) $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
-        ?_ ?_ ?_ ?_ ?_))
-    else
-      evalTactic (← `(tactic| refine wp_call_normal_valid_eq $proofSyntax rfl
-        $(terms[0]!) $(terms[1]!) $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
-        ?_ ?_ ?_ ?_ ?_))
+    evalTactic (← `(tactic| refine wp_call_normal_valid_eq (Result := $resultDomain) $proofSyntax rfl
+      $(terms[0]!) $(terms[1]!) $(terms[2]!) $(terms[3]!) $(terms[5]!) $(terms[6]!) $(terms[7]!) $(terms[8]!)
+      ?_ ?_ ?_ ?_ ?_))
     return true
   catch _ =>
     saved.restore
@@ -3041,6 +2887,39 @@ private def namePremises (goal : MVarId) (names : List Name) : MetaM MVarId :=
   goal.withContext do
     goal.replaceTargetDefEq (← namePropositions (← instantiateMVars (← goal.getType)) names)
 
+/-- The validity equations of a call, where no normal form of the callee's
+contract applies: the arguments' condition and, under its binder, the
+result's, each in `validityNormalForm`. It throws where the goal states no
+call through the callee's contract, and where one of the two conditions
+still holds an unassigned metavariable. -/
+private def callValidityEquations (calleeName : String) (goal : MVarId) (proofType : Lean.Expr)
+    (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) :
+    TacticM (TSyntax `term × TSyntax `term) := goal.withContext do
+  let notACall := m!"the call of {calleeName} does not meet its callee's contract"
+  let target ← instantiateMVars (← goal.getType)
+  let_expr VerexIR.Proofs.Satisfies _ _ _ _ _ contract :=
+      ← whnfR (← instantiateMVars proofType) | throwError notACall
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do throwError notACall
+  let action := (target.getArg! 3).consumeMData
+  unless action.isApp do throwError notACall
+  let normalization ← validityNormalization lemmas
+  let equation (condition : Lean.Expr) : MetaM Lean.Expr := do
+    normalFormEquation condition (← validityNormalForm normalization condition)
+  let settled (condition : String) (proof : Lean.Expr) : TacticM Lean.Expr := do
+    let proof ← instantiateMVars proof
+    if proof.hasMVar then
+      throwError m!"the {condition} of the call of {calleeName} is not settled: \
+        {proof.collectMVars {} |>.result.toList.map (·.name)}"
+    return proof
+  let validArgs ← settled "argument validity" (← equation
+    (mkApp (← mkAppM ``VerexIR.Proofs.Contract.validArgs #[contract]) action.appArg!))
+  let validResultFn ← mkAppM ``VerexIR.Proofs.Contract.validResult #[contract]
+  let validResult ← settled "result validity" (← forallTelescope
+    (← whnfR (← inferType validResultFn))
+    fun rest _ => do mkLambdaFVars rest (← equation (mkAppN validResultFn rest)))
+  return (← Lean.Elab.Term.exprToSyntax validArgs,
+    ← Lean.Elab.Term.exprToSyntax validResult)
+
 /-- A call by the callee's theorem: what the theorem assumes and its
 precondition, then the continuation and the failures. A generic call meets
 the callee's contract specialized at its type arguments, where one is
@@ -3091,16 +2970,16 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         pure (proof, ← instantiateMVars (← inferType proof), ← Lean.Elab.Term.exprToSyntax proof)
     | none => pure (theoremProof, proofType, proofSyntax)
   let goal ← getMainGoal
-  let (directValid?, resultFree) ← goal.withContext do
+  -- The rule is stated at the domain the callee's result is bound at
+  -- (`callResultDomain?`): its validity, postcondition and frame are over
+  -- that domain, and the continuation binds the result at it.
+  let resultDomain ← goal.withContext do
     let target ← instantiateMVars (← goal.getType)
-    let_expr VerexIR.Proofs.Satisfies _ _ _ _ _ contract :=
-        ← whnfR (← instantiateMVars proofType) | pure (none, false)
-    unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return (none, false)
-    let action := (target.getArg! 3).consumeMData
-    unless action.isApp do return (none, false)
-    let directValid? ← proveDirectContractValidArgs? contract action.appArg!
-    let resultFree ← if directValid?.isSome then isContractResultInvariantFree contract else pure false
-    return (directValid?, resultFree)
+    let domain? ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
+        callResultDomain? (target.getArg! 2) else pure none
+    match domain? with
+    | some domain => Lean.Elab.Term.exprToSyntax domain
+    | none => `(_)
   let constants ← goal.withContext (do contractConstants (← inferType theoremProof))
   let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name => do
     let ident := mkIdent (rootNamespace ++ name)
@@ -3108,7 +2987,7 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
   -- The callee's contract normalized once for its instance, its normal
   -- forms instantiated at the call (`doc/designs/native-verification.md`, "Specialized contracts").
   let contractForms ← if verex.contractLemmas.get (← getOptions) then
-      callThroughNormalForms goal proofType proofSyntax lemmas directValid?.isSome resultFree
+      callThroughNormalForms goal proofType proofSyntax resultDomain lemmas
     else pure false
   -- The equation rule uses the target's normalization below. Build the
   -- contract's unfolding context only when a call rule still needs it.
@@ -3120,27 +2999,26 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
           VerexIR.Proofs.Denote.NTy.holds_toSkolem_iff,
           VerexIR.Proofs.Denote.HList.holds_toSkolem_iff,
           Prod.fst, Prod.snd]))
+  -- Where no normal form of the contract applies, the call's own validity
+  -- equations give the rule the same forms the cache gives it.
   -- A contract whose failure conditions coincide gives its postcondition
-  -- outright after a successful run.
-  let strict ← if !contractForms then do
+  -- outright after a successful run; either rule states the validity
+  -- conditions by the normal forms of this call.
+  let strict ← if contractForms then pure false else do
+      let (validArgsTerm, validResultTerm) ←
+        callValidityEquations calleeName goal proofType lemmas
       let saved ← (Tactic.saveState : TacticM Tactic.SavedState)
-      try
-        if directValid?.isSome && resultFree then
-          evalTactic (← `(tactic|
-            refine VerexIR.Proofs.Denote.wp_call_strict $proofSyntax rfl ?_ ?_ ?_ ?_ ?_))
-        else
-          evalTactic (← `(tactic|
-            refine VerexIR.Proofs.Denote.wp_call_strict_valid $proofSyntax rfl ?_ ?_ ?_ ?_ ?_))
+      let strict ← try
+        evalTactic (← `(tactic| refine wp_call_strict_valid_eq (Result := $resultDomain) $proofSyntax rfl
+          $validArgsTerm $validResultTerm ?_ ?_ ?_ ?_ ?_))
         pure true
       catch _ =>
         saved.restore
         pure false
-    else pure false
-  unless contractForms || strict do
-    if directValid?.isSome && resultFree then
-      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call $proofSyntax ?_ ?_ ?_ ?_ ?_))
-    else
-      evalTactic (← `(tactic| refine VerexIR.Proofs.Denote.wp_call_valid $proofSyntax ?_ ?_ ?_ ?_ ?_))
+      unless strict do
+        evalTactic (← `(tactic| refine wp_call_valid_eq (Result := $resultDomain) $proofSyntax
+          $validArgsTerm $validResultTerm ?_ ?_ ?_ ?_ ?_))
+      pure strict
   -- A callee's theorem assumes the natives it reaches, a generic one's
   -- at every family and instantiation, and that the in-body assumptions
   -- of the functions it relies on hold; the caller assumes them too.
@@ -3186,36 +3064,13 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
             | .const (.str _ part) _ => part.startsWith "lemmaTrusted_"
             | _ => false))
       if native then id.assumption
-  let rawSubgoals ← (← getGoals).filterM fun g => return !(← g.isAssigned)
-  let usedFourRule := directValid?.isSome && resultFree
-  let (subgoals, postIndex, preMaxIndex, hasValidResult) ← do
-    if rawSubgoals.length == 5 then
-      let validGoal := if usedFourRule then rawSubgoals[4]! else rawSubgoals[0]!
-      let assigned ← try
-        validGoal.withContext do
-          let goalTy ← instantiateMVars (← validGoal.getType)
-          let proof? ← match directValid? with
-            | some p => pure (some p)
-            | none => proveDirectValidType? goalTy
-          match proof? with
-          | some p =>
-              if ← withDefault (isDefEq goalTy (← inferType p)) then
-                validGoal.assign p
-                pure true
-              else
-                pure false
-          | none => pure false
-      catch _ =>
-        pure false
-      if assigned then
-        let remaining := if usedFourRule then rawSubgoals.take 4 else rawSubgoals.drop 1
-        pure (remaining, 2, 1, !usedFourRule)
-      else if usedFourRule then
-        pure (rawSubgoals, 2, 1, false)
-      else
-        pure (rawSubgoals, 3, 2, true)
-    else
-      pure (rawSubgoals, 3, 2, true)
+  let subgoals ← (← getGoals).filterM fun g => return !(← g.isAssigned)
+  -- The roles of the rule's obligations: the arguments' validity, what the
+  -- callee's theorem assumes, its precondition, the continuation, and the
+  -- permitted failures.
+  let validIndex := 0
+  let preMaxIndex := 2
+  let postIndex := 3
   for (subgoal, index) in subgoals.toArray.zipIdx do
     -- The callee's result is named after the callee in the continuation.
     let subgoal ← if index == postIndex then subgoal.withContext do
@@ -3238,9 +3093,6 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         -- In a step proof, the result's scope entry comes with it.
         let index := max (← nextScopeIndex) (← get).scopeIndex
         modify fun s => { s with scopeIndex := index + 1 }
-        -- A call result enters the context at the native type's canonical
-        -- spelling, so its construction certificate is immediately visible.
-        let domain := (← canonicalFamilyResult domain).expr
         let subgoal ← scopedBinderGoal subgoal name domain body info index
         -- The call's premises are named after the callee, as its clauses
         -- are: its result validity, the ensures, the frame, and that the call returned.
@@ -3252,9 +3104,22 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         let orderedPremises := if strict || contractForms then
             [premises[2]!, premises[0]!, premises[1]!]
           else premises
-        namePremises subgoal (if hasValidResult then validName :: orderedPremises else orderedPremises)
+        let subgoal ← namePremises subgoal (validName :: orderedPremises)
+        -- The result's validity enters the context as one fact per atom: a
+        -- result stating one keeps the premise's name, a result whose
+        -- components state invariants gets one name per atom, numbered in the
+        -- order of the condition, and a result stating none leaves no premise.
+        introValidityAtoms subgoal validName fun atoms index =>
+          if atoms == 1 then validName else Name.mkSimple s!"{validName.toString}_{index + 1}"
       else pure subgoal
     setGoals [subgoal]
+    let call := ctx.callNumber step.callSite
+    -- The arguments' validity: its own normal form, split by argument, each
+    -- fact opened to the invariants it reads (`consumeArgumentValidity`).
+    if index == validIndex then
+      timedStep "call-release" (releaseContinuations ctx.normalization held walkFixedPoints)
+      consumeArgumentValidity ctx (← getGoals) calleeName call
+      continue
     -- Unfold and normalize the contract in one pass, around the continuations.
     -- Normal forms of the contract are normalized again where the call's
     -- values instantiate them.
@@ -3269,9 +3134,8 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
     -- and failed case enumeration before its first tactic runs.
     if index == postIndex && !ctx.handOver then
       evalTactic (← `(tactic| all_goals (try verex_timed "call-cases" verex_call_result_cases)))
-    -- Argument validity, what the callee's theorem assumes, and its precondition,
-    -- then the continuation and the failures.
-    let call := ctx.callNumber step.callSite
+    -- What the callee's theorem assumes and its precondition, then the
+    -- continuation and the failures.
     let origin := if index ≤ preMaxIndex then some (Provenance.precondition calleeName call)
       else if index == postIndex then some (.continuation calleeName call) else none
     queue (← getGoals) origin (if index ≤ preMaxIndex then #[] else clauses)
@@ -3357,7 +3221,8 @@ owe, on the paths after its calls too, and a callee's precondition its callers
 owe, with no clause of its own. -/
 private def summaryStates (provenance : Option Provenance) (clauses : Array ObligationRange) : Bool :=
   clauses.isEmpty &&
-    (provenance matches none | some .returns | some (.continuation ..) | some (.precondition ..))
+    (provenance matches none | some .returns | some (.continuation ..) | some (.precondition ..) |
+      some (.callArgument ..))
 
 /-- The leading binders of a goal, `∀` and `let`. -/
 private partial def leadingBinders : Lean.Expr → Nat
@@ -3945,12 +3810,14 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
     let target ← instantiateMVars (← goal.getType)
     return (← statesBehavior #[target]) &&
       (target.find? (·.isAppOf ``VerexIR.Proofs.wp)).isNone
+  let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
+  -- Whether the context holds an entry relation still to open.
+  let holdsEntry : SolveM Bool := goal.withContext do
+    (← getLCtx).anyM fun decl => do
+      let type ← instantiateMVars decl.type
+      return type.getAppFn.constName?.any entries.contains
   if ctx.labeled || shared then
-    let entries := (← get).regions.filterMap (fun region => region.node.relation?.map (·.constName!))
-    let hasEntry ← if (← get).activeEntryOpened then pure true else goal.withContext do
-      (← getLCtx).anyM fun decl => do
-        let type ← instantiateMVars decl.type
-        return type.getAppFn.constName?.any entries.contains
+    let hasEntry ← if (← get).activeEntryOpened then pure true else holdsEntry
     let needsEntry ← if !hasEntry || ctx.labeled || observesBehavior then pure hasEntry
       else goal.withContext do
         -- Structural introductions may already have moved the invocation's
@@ -3981,10 +3848,26 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
       evalTactic (← `(tactic| all_goals verex_subst_vars))
       evalTactic (← `(tactic| all_goals verex_reduce_projections))
       evalTactic (← `(tactic| all_goals (try verex_normalize_context_stage)))
-      modify fun s => { s with activeEntryOpened := false }
+      modify fun s => { s with activeEntryOpened := false, activeTargetLinked := false }
       queue (← getGoals) provenance clauses
       charge "entry observations" stageStart
       return none
+  -- The entry was opened for the clause's whole group, and the opening
+  -- normalized the facts it rewrote: the target reads the arrival's values as
+  -- the suffix stated it over the abstract row. Where nothing is left to open,
+  -- it is put in the walk normal form, as a leaf that opens its own entry has
+  -- it (`exposeNormalEntries`): a clause every value settles closes before
+  -- any observation or decider. The goals queued from here keep the form.
+  -- This is a step of the walk, within the allowance of the clause's owner.
+  let goal? ← if !(← get).activeTargetLinked then pure (some goal) else do
+    modify fun s => { s with activeTargetLinked := false }
+    if ← holdsEntry then pure (some goal) else
+      setGoals [goal]
+      timedStep "routed target"
+        (normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization #[])
+      pure (← getGoals).head?
+  let some goal := goal?
+    | charge "routed target" stageStart; return none
   -- Decide completed observations before introducing hypothetical aborts
   -- and runs. In particular, an early return can already fix a conditional
   -- result without observing any invocation on its unreachable other arm.
@@ -3996,7 +3879,7 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
     unless closed do restoreCaches
     charge "early call observations" started
     if closed then return none
-  let goal ← introduceBehaviors goal
+  let some goal ← introduceBehaviors goal | return none
   if let some cases ← behaviorAlternatives? goal then
     queue cases provenance clauses
     charge "behavior alternatives" stageStart
@@ -4008,7 +3891,7 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
   if ← denotedRunStep ctx { step with goal := goal } then return none
   -- A literal closure's behavior, by its target's theorem.
   let behaviorStart ← IO.getNumHeartbeats
-  let goal ← terminatingRuns goal
+  let goal ← terminatingRuns goal ctx.callees
   let terminatingDone ← IO.getNumHeartbeats
   let some goal ← rewriteResultOf goal
     | charge "result/state rewriting" terminatingDone; return none
@@ -4017,7 +3900,15 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
   if ← behaviorWitness goal ctx.callees then
     charge "behavior witness" derivationStart
     return none
-  let dispatched ← dispatchBehavior goal ctx.callees
+  -- The argument validity a behavior rule states is discharged as a call's
+  -- is, and what stays open is a residual of the argument it belongs to
+  -- (`openValidityGoal`, `Provenance.callArgument`).
+  let owed ← IO.mkRef #[]
+  let dispatched ← dispatchBehavior goal ctx.callees (owed := some owed)
+  let residuals ← owed.get
+  unless residuals.isEmpty do
+    queueOpenedResiduals ctx (residuals.toList.map fun (origin, goal) => (goal, some origin))
+      clauses false
   let now ← IO.getNumHeartbeats
   let costs := #[("terminating facts", terminatingDone - behaviorStart),
     ("result/state rewriting", rewritingDone - terminatingDone),
@@ -4025,8 +3916,14 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
   modify fun s => { s with stageCost := s.stageCost ++ costs }
   return dispatched
 
-/-- Reporting and the final decision are separate from preparation: the
-decision already charges the same owner, without double-debiting its work. -/
+/-- Reporting and the final decision are separate from preparation. The
+decision runs outside the owners' ledger: each attempt has its own
+`verex.leafHeartbeats` window (`budgeted` in `solveLeaf`) under the target's
+cap, and neither reads nor debits an owner's allowance. The entry opening at
+the leaf (`exposeNormalEntries`, `verex_shared_entry`) likewise neither reads
+nor debits an owner's allowance; it runs under the target's cap, outside those
+per-attempt windows. An owner's allowance therefore bounds the walk's work for
+its clause, not the whole work of the clause. -/
 private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := do
   let { goal, provenance, clauses, .. } := step
   setGoals [goal]
@@ -4037,8 +3934,9 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
     unless summaryStates provenance clauses do
       throwError "a path owes an obligation of the callee's own: \
         {(provenance.map fun p => s!"{p.key.kind} {p.key.callee}").getD "none"}, {clauses.size} clauses"
-    -- A callee's precondition holds, or is what its callers owe.
-    if provenance matches some (.precondition ..) then
+    -- A callee's precondition and the validity of a call's arguments hold,
+    -- or are what its callers owe.
+    if provenance matches some (.precondition ..) | some (.callArgument ..) then
       let saved ← Tactic.saveState
       let (closed, _) ← solveLeaf ctx.normalization goal provenance clauses #[]
       if closed then return
@@ -4422,7 +4320,7 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let (goal, clauses) ← match provenance with
     | some (.loopEntry _) | some (.loopIteration _) | some .assertion | some .mutationEnd
     | some .construction | some .publish | some .memoryWritten | some .callReturned
-    | some (.precondition _ _) | some (.joinPremise _ _) =>
+    | some (.precondition _ _) | some (.callArgument ..) | some (.joinPremise _ _) =>
         stripObligations goal clauses
     | _ => pure (goal, clauses)
   let goal ← markPointSites ctx goal
@@ -4510,7 +4408,10 @@ private def runOwned (ctx : SolveContext) (owners : Array (List Bool × SharedBu
     (action : SolveM α) : SolveM (SharedBudgets.Outcome α) := do
   if owners.isEmpty then return .done (← action)
   let state ← get
-  let (outcome, _) ← runAutomatic ctx.budgets (owners.map (·.2)) .leaf (action.run state)
+  let (outcome, cost) ← runAutomatic ctx.budgets (owners.map (·.2)) .leaf (action.run state)
+  if ctx.debug then
+    IO.println s!"  owned by {owners.map (·.2)}: {cost / 1000}k\
+      {if outcome matches .exhausted then ", exhausted" else ""}"
   match outcome with
   | .done (value, state) => set state; return .done value
   | .exhausted => return .exhausted
@@ -4519,7 +4420,7 @@ private def runOwned (ctx : SolveContext) (owners : Array (List Bool × SharedBu
 /-- Share one scoped discriminator before separating source clauses. Every
 case keeps every proof destination and the same owners; no allowance is
 renewed. Deeper proof search remains with the ordinary leaf pipeline. -/
-private def splitSharedCase (step : SolveStep) : SolveM Bool := do
+private def splitSharedCase (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let state ← get
   let owners := state.activeOwners
   if owners.size < 2 || owners.any (·.1.isEmpty) then return false
@@ -4539,9 +4440,18 @@ private def splitSharedCase (step : SolveStep) : SolveM Bool := do
     let failures ← IO.mkRef #[]
     let goals ← SharedContinuations.exposeEntries step.goal entries closeFrameWrites
       (exposeObserver false failures)
+    -- The facts the suffix stated over the abstract row read the arrival's
+    -- values now: in the walk normal form over them, as the target's are
+    -- where a leaf opens the relation (`exposeNormalEntries`).
+    let known := (← step.goal.getDecl).lctx
+    let goals ← if goals == [step.goal] then pure goals else
+      goals.filterMapM fun alternative => do
+        setGoals [alternative]
+        renormalizeSubstituted ctx.normalization known
+        return (← getGoals).head?
     countAlternatives goals
     reportExposure (← failures.get) goals
-    modify fun s => { s with activeEntryOpened := true }
+    modify fun s => { s with activeEntryOpened := true, activeTargetLinked := true }
     queue goals step.provenance step.clauses
     charge "common entry" step.stageStart
     return true
@@ -4684,6 +4594,7 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
       activeOwners := s.goalOwners[goal]?.getD #[]
       activeDebits := s.goalDebits[goal]?.getD #[]
       activeEntryOpened := s.openedEntries.contains goal
+      activeTargetLinked := s.linkedTargets.contains goal
       activeOwed := s.goalOwed[goal]?
       activeSummary := s.goalSummaries.contains goal }
     if ← goal.isAssigned then continue
@@ -4695,7 +4606,7 @@ private partial def traverseSteps (ctx : SolveContext) : SolveM Unit := do
       continue
     let owners := (← get).activeOwners
     if owners.size > 1 && owners.all (!·.1.isEmpty) then
-      match ← runOwned ctx owners (splitSharedCase step) with
+      match ← runOwned ctx owners (splitSharedCase ctx step) with
       | .done true => continue
       | .done false | .exhausted | .failed _ => pure ()
     if ← partitionOwners ctx step then continue
@@ -5499,18 +5410,21 @@ def nameTypedMaps : TacticM Unit := focusGoal do
   let isFact (ty : Lean.Expr) : MetaM Bool := do
     try isProp ty catch _ => pure false
   -- Substituting equal carriers can bring two previously named views
-  -- together. Reuse one witness, retaining a summary parameter if present.
+  -- together. Reuse one witness, where the substitution may eliminate the
+  -- other (`eliminatedSide?`).
   for _ in [:16] do
     let goal ← getMainGoal
     let duplicate? ← goal.withContext do
+      let kept ← keptLocals goal
+      let lctx ← getLCtx
       let mut reads : Array (Lean.Expr × Lean.Expr × FVarId) := #[]
-      for decl in ← getLCtx do
+      for decl in lctx do
         if decl.isImplementationDetail then continue
         let some (_, lhs, rhs) := (← instantiateMVars decl.type).eq? | continue
         unless (typedMap? lhs).isSome && rhs.isFVar do continue
         for (view, named, witness) in reads do
           unless lhs.appArg! == view.appArg! && rhs != named do continue
-          if (← isSummaryParameter named.fvarId!) && (← isSummaryParameter rhs.fvarId!) then continue
+          if (← eliminatedSide? lctx kept {} named rhs).isNone then continue
           if ← withDefault (isDefEq lhs view) then
             return some (witness, decl.fvarId)
         reads := reads.push (lhs, rhs, decl.fvarId)
@@ -5890,6 +5804,7 @@ syntax (name := keyAssert) &"assert" num
   (&"of" ((&"at" verexPoint) <|> (&"after" verexSite)))? : verexKey
 syntax (name := keyInvariant) &"invariant" num (&"of" &"loop" num)? (&"entry" <|> &"step") : verexKey
 syntax (name := keyRequires) &"requires" (num)? &"of" ident (&"at" &"call" num)? : verexKey
+syntax (name := keyArgument) &"argument" (num)? &"of" ident (&"at" &"call" num)? : verexKey
 syntax (name := keyDataInvariant) &"data" &"invariant" (num)? (&"of" ident)? : verexKey
 syntax (name := keyModuleInvariant) &"module" &"invariant" : verexKey
 syntax (name := keyStoredInvariant) &"stored" &"invariant" (num)? : verexKey
@@ -5940,6 +5855,9 @@ def keyPattern {m : Type → Type} [Monad m] [MonadError m] (stx : Syntax) : m O
       pure { kind := "invariant", index := k.getNat, phase := "step", loop := loop?.map (·.getNat) }
   | `(verexKey| requires $[$k?:num]? of $callee:ident $[at call $call?:num]?) =>
       pure { kind := "requires", index := k?.map (·.getNat), callee := callee.getId.toString,
+             call := call?.map (·.getNat) }
+  | `(verexKey| argument $[$k?:num]? of $callee:ident $[at call $call?:num]?) =>
+      pure { kind := "argument", index := k?.map (·.getNat), callee := callee.getId.toString,
              call := call?.map (·.getNat) }
   | `(verexKey| data invariant $[$k?]? $[of $owner?:ident]?) =>
       pure { kind := "data invariant", index := k?.map (·.getNat),

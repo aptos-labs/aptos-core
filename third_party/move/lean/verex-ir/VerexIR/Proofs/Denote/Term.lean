@@ -281,10 +281,10 @@ def Which.inject : {names : List String} → {rows : NRows} → {σs : NRow} →
 /-- Project a variant's field row out of the enum's sum carrier, when it is that variant. -/
 def Which.project? : {names : List String} → {rows : NRows} → {σs : NRow} →
     Which names rows σs → variantCarrier names rows → Option (HList σs)
-  | _, _, _, .here, .inl values => some values
-  | _, _, _, .here, .inr _ => none
-  | _, _, _, .there _, .inl _ => none
-  | _, _, _, .there later, .inr value => later.project? value
+  -- Read with `Sum.elim`, as `variantName` reads a value: the choice alone
+  -- decides the reading, so it reduces before the value is a constructor.
+  | _, _, _, .here => Sum.elim some fun _ => none
+  | _, _, _, .there later => Sum.elim (fun _ => none) later.project?
 
 @[simp] theorem Which.inject_here {name : String} {names : List String} {fields : NRow}
     {rest : NRows} (values : HList fields) :
@@ -423,6 +423,26 @@ omit [Carriers] in
 @[simp, vir_denote_norm] theorem withSome_none {α β : Type}
     (found : (x : α) → (none : Option α) = some x → β) (missing : β) :
     withSome none found missing = missing := rfl
+
+omit [Carriers] in
+/-- The congruence of a reading of an option: the option rewrites, and the
+branches are compared at what the rewritten option states, the branch that
+reads a value at the equation transported along that rewriting.  The
+congruence a normal form derives for `withSome` holds the option fixed, since
+the type of the branch reading it mentions it; with this one a normal form
+that decides the option reaches it, and `withSome_some`/`withSome_none` then
+reduce the reading. -/
+@[congr] theorem withSome_congr {α β : Type} {option option' : Option α}
+    {found : (a : α) → option = some a → β} {found' : (a : α) → option' = some a → β}
+    {missing missing' : β} (options : option = option')
+    (founds : ∀ (a : α) (reads : option' = some a),
+      found a (options.trans reads) = found' a reads)
+    (missings : missing = missing') :
+    withSome option found missing = withSome option' found' missing' := by
+  subst options missings
+  cases option with
+  | none => rfl
+  | some a => exact founds a rfl
 
 omit [Carriers] in
 /-- `withSome` at an option a context equation says is there: what a step
@@ -589,14 +609,14 @@ theorem Which.project?_eq_some_iff : {names : List String} → {rows : NRows} �
     (fields : HList σs) →
     choice.project? value = some fields ↔ value = choice.inject fields
   | _, _, _, .here, .inl value, fields => by
-      simp only [Which.project?, Which.inject, Option.some.injEq]
+      simp only [Which.project?_here_inl, Which.inject, Option.some.injEq]
       exact ⟨fun h => h ▸ rfl, fun h => Sum.inl.inj h⟩
   | _, _, _, .here, .inr value, fields => by
-      simp [Which.project?, Which.inject]
+      simp [Which.project?_here_inr, Which.inject]
   | _, _, _, .there later, .inl value, fields => by
-      simp [Which.project?, Which.inject]
+      simp [Which.project?_there_inl, Which.inject]
   | _, _, _, .there later, .inr value, fields => by
-      simp only [Which.project?, Which.inject]
+      simp only [Which.project?_there_inr, Which.inject]
       exact (Which.project?_eq_some_iff later value fields).trans
         ⟨fun h => h ▸ rfl, fun h => Sum.inr.inj h⟩
 
@@ -621,16 +641,16 @@ are distinct. -/
 theorem Which.project?_eq_none_iff : {names : List String} → {rows : NRows} → {σs : NRow} →
     (choice : Which names rows σs) → (value : variantCarrier names rows) → names.Nodup →
     (choice.project? value = none ↔ (variantName names rows value == choice.name) = false)
-  | _, _, _, .here, .inl _, _ => by simp [Which.project?, variantName_inl]
+  | _, _, _, .here, .inl _, _ => by simp [Which.project?_here_inl, variantName_inl]
   | _, _, _, .here, .inr value, distinct => by
-      simp only [Which.project?, Which.name, variantName_inr, true_iff]
+      simp only [Which.project?_here_inr, Which.name, variantName_inr, true_iff]
       exact beq_eq_false_iff_ne.mpr fun h =>
         (List.nodup_cons.mp distinct).1 (h ▸ variantName_mem _ _ value)
   | _, _, _, .there later, .inl _, distinct => by
-      simp only [Which.project?, Which.name, variantName_inl, true_iff]
+      simp only [Which.project?_there_inl, Which.name, variantName_inl, true_iff]
       exact beq_eq_false_iff_ne.mpr fun h => (List.nodup_cons.mp distinct).1 (h ▸ Which.name_mem later)
   | _, _, _, .there later, .inr value, distinct => by
-      simp only [Which.project?, Which.name, variantName_inr]
+      simp only [Which.project?_there_inr, Which.name, variantName_inr]
       exact Which.project?_eq_none_iff later value (List.nodup_cons.mp distinct).2
 
 /-- A selection with one choice is that variant's field, when it is the
@@ -5196,24 +5216,6 @@ theorem wp_call_valid {Args Result : Type} {function : Args → Spec State Failu
       failing error ((verified args initial valid assumed permitted).2.1 error execution),
     (verified args initial valid assumed permitted).2.2⟩
 
-omit [Carriers] in
-theorem wp_call {Args Result : Type} {function : Args → Spec State Failure Result}
-    {contract : Contract (State) Failure Args Result} {args : Args}
-    {ensures : Result → State → Prop} {aborts : Failure → Prop} {initial : State}
-    (verified : Satisfies function contract)
-    (assumed : contract.assumes args initial)
-    (permitted : contract.requires args initial)
-    (post : ∀ result final,
-      (¬contract.mayAbort args initial → contract.ensures args initial result final) →
-      contract.frame args initial result final → ¬contract.mustAbort args initial →
-      ensures result final)
-    (failing : ∀ error, contract.aborts args initial error → aborts error)
-    (valid : contract.validArgs args := by trivial) :
-    wp (function args) ensures aborts initial :=
-  wp_call_valid verified valid assumed permitted
-    (fun result final _ ensured framed refuted => post result final ensured framed refuted)
-    failing
-
 /-! ## Weakest preconditions of the flow combinators
 
 A bind on a literal outcome reduces directly; only a symbolic outcome goes
@@ -5791,7 +5793,6 @@ attribute [vir_denote high] Choices.select?_single Choices.update?_single
 attribute [vir_denote] Flow.pure_shortCircuit_and Flow.pure_shortCircuit_or
 attribute [vir_denote, vir_denote_norm] Which.project?_eq_some_iff Which.project?_eq_none_iff
 attribute [vir_denote] Skolems.writePlain_allocationResource Skolems.writePlain_allocationResource_fun
-attribute [vir_denote, vir_denote_norm high] Skolems.isSome_plainAt
 
 -- The denotation rewrites by its equations; unfolding remains the fallback
 -- where an equation's type indices do not match the term's at reducible

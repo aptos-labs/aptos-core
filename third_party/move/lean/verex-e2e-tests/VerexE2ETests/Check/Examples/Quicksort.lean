@@ -415,8 +415,6 @@ verex module 0x42::quicksort where
     -- element compared at the scan is the one found there.
     all_goals (try rw [lookup_of_found (found := ‹original.values[_]? = some _›)])
     all_goals (try first | rfl | omega | assumption | verex_instance)
-    case ensures_3.isTrue =>
-      rw [show lo.val = pivot_index.val by omega]
     case invariant_3_step_2.isTrue =>
       rw [show lo.val = scan.val by omega,
         lookup_of_found (found := ‹values.values[scan.val.toNat]? = some _›)]

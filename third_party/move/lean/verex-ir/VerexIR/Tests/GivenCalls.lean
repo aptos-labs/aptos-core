@@ -98,14 +98,21 @@ theorem given_direct_caller (G : GivenFrame) (State : Type) (unit : Validation.V
 open Lean Elab Command in
 run_cmd do
   let callRules : Array Name := #[
-    ``wp_call_strict, ``wp_call_strict_valid,
-    ``wp_call_normal, ``wp_call_normal_valid,
-    ``wp_call_equations, ``wp_call_equations_valid,
-    ``wp_call, ``wp_call_valid
+    ``wp_call_strict_valid, ``wp_call_normal_valid,
+    ``wp_call_equations_valid, ``wp_call_valid
   ]
+  -- A call may apply a rule stating the contract's conditions by their normal
+  -- forms, which the solver holds privately; the private prefix comes off the
+  -- name, the namespace does not.
+  let ruleNames := callRules ++ #[
+    `VerexIR.Proofs.Denote.wp_call_valid_eq,
+    `VerexIR.Proofs.Denote.wp_call_strict_valid_eq,
+    `VerexIR.Proofs.Denote.wp_call_normal_valid_eq]
   for name in [``given_caller, ``given_direct_caller] do
     let .thmInfo theoremInfo ← getConstInfo name | throwError "expected theorem"
-    unless (theoremInfo.value.find? fun expression => callRules.any expression.isConstOf).isSome do
+    unless (theoremInfo.value.find? fun expression => match expression.constName? with
+        | some rule => ruleNames.contains (privateToUserName rule)
+        | none => false).isSome do
       throwError "{name} did not use the callee contract rule"
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do

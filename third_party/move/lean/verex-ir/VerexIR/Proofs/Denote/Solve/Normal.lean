@@ -39,6 +39,7 @@ private def nominalResourceHandle? (type : Lean.Expr) : MetaM (Option (Lean.Expr
   unless isNominalType (← getEnv) owner do return none
   let view ← nativeTypeView owner
   let isStruct := view.isAppOfArity ``NTy.struct 3
+  unless isStruct || view.isAppOfArity ``NTy.enum 5 do return none
   let theoremName := if resolved then
       if isStruct then ``NTy.handle?_resolve_struct else ``NTy.handle?_resolve_enum
     else if isStruct then ``NTy.handle?_struct else ``NTy.handle?_enum
@@ -192,9 +193,41 @@ dsimproc ↓ [vir_denote, vir_denote_norm] nominalSettle
   unless isNominalType (← getEnv) τ do return .continue
   return .done value
 
-/-- Resource dispatch observes only the identity of a named declaration. -/
+/-- Resource dispatch observes only the identity of a named declaration: at
+its own frame, and where a frame resolves it, which keeps the declaration
+(`nominalResourceHandle?`).  The resolution of a type that is no named
+declaration, a type parameter's among them, is not observed. -/
 simproc [vir_denote_norm] nominalHandle (NTy.handle? _) := fun e => do
-  nominalOperation e (e.getArg! 0) #[``NTy.handle?_struct] #[``NTy.handle?_enum]
+  let type := (e.getArg! 0).consumeMData
+  unless type.isAppOfArity ``Skolems.resolve 4 do
+    return ← nominalOperation e (e.getArg! 0) #[``NTy.handle?_struct] #[``NTy.handle?_enum]
+  let some (handle, observed) ← nominalResourceHandle? type | return .continue
+  -- The equation is stated at the declaration's view; the term names it.
+  let proof ← withDefault (mkExpectedTypeHint observed (← mkEq e handle))
+  return .done { expr := handle, proof? := some proof }
+
+/-- The head field of a named struct's value moved to the frame of its type
+arguments is that field moved there (`Skolems.reframe_struct_fst`): the
+declaration is observed at the projection, and the field keeps its type's
+name. The pattern also reaches the primitive projection of a pair, which is
+no application of `Prod.fst` and carries no argument to read: declined, as
+`reframeStructFst` declines it. -/
+simproc [vir_denote_norm] nominalReframeHead (Prod.fst _) := fun e => do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``Prod.fst 3 do return .continue
+  let moved := e.appArg!.consumeMData
+  unless moved.isAppOfArity ``Skolems.reframe 8 do return .continue
+  nominalOperation e (moved.getArg! 5) #[``Skolems.reframe_struct_fst] #[]
+
+/-- And the rest of its fields are the rest of the row moved there
+(`Skolems.reframe_struct_snd`), whose own head the structural law reads. A
+primitive projection is declined here as it is at the head. -/
+simproc [vir_denote_norm] nominalReframeRest (Prod.snd _) := fun e => do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``Prod.snd 3 do return .continue
+  let moved := e.appArg!.consumeMData
+  unless moved.isAppOfArity ``Skolems.reframe 8 do return .continue
+  nominalOperation e (moved.getArg! 5) #[``Skolems.reframe_struct_snd] #[]
 
 /-- A named declaration carries an invariant slot (`NTy.invariantFree`). -/
 simproc [vir_denote, vir_denote_norm] reduceNominalInvariantFree
@@ -730,14 +763,20 @@ dsimproc ↓ [vir_denote, vir_denote_norm] reduceEraseRows
 /-- A frame's parameter replacement constructs the same named declaration
 at its replaced arguments. Only the explicit arguments are traversed; the
 field layout stays behind the descriptor. Unknown argument syntax retains
-its substitution rather than being assumed independent of parameters. -/
+its substitution rather than being assumed independent of parameters. A
+parameter stands for its entry with the mark dropped (`NTy.substWith`), so
+the replacement spells that drop; `NTy.unmark` of a spelled entry evaluates
+(`reduceUnmark`), and of a frame's reading is itself
+(`Skolems.unmark_type`). -/
 dsimproc ↓ [vir_denote, vir_denote_norm] reduceNominalParameterReplacement
     (NTy.substWith _ _) := fun e => do
   let_expr NTy.substWith types owner := e | return .continue
   let env ← getEnv
   unless isNominalType env owner && spelledNTy owner (some env) do return .continue
   let replaced := owner.replace fun term =>
-    if term.isAppOfArity ``NTy.param 1 then some (mkApp types term.appArg!).headBeta else none
+    if term.isAppOfArity ``NTy.param 1 then
+      some (mkApp (mkConst ``NTy.unmark) (mkApp types term.appArg!).headBeta)
+    else none
   return .visit replaced
 
 /-- The substitution of a literal row evaluates (`reduceParameterSubst`). -/
@@ -845,6 +884,24 @@ dsimproc ↓ [vir_denote, vir_denote_norm] typedReadValue
   if read == e then return .continue
   return .visit read
 
+/-- Evaluate a typed value's native value (`NTy.unread`) from its original
+native type: at a named declaration the value itself, the inverse of the
+identity `typedReadValue` reads it by. -/
+dsimproc ↓ [vir_denote, vir_denote_norm] typedUnreadValue
+    (@VerexIR.Proofs.Denote.NTy.unread ?carriers _ _) := fun e => do
+  let args := e.getAppArgs
+  let some family := args[0]? | return .continue
+  let some τ := args[1]? | return .continue
+  unless args.size ≥ 3 do return .continue
+  let env ← getEnv
+  let τ ← NativeMaps.nativeTypeHead τ
+  unless isNominalType env τ ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 ||
+      τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 do return .continue
+  let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) family τ
+  let unread : Lean.Expr := .lam `value carrier (.bvar 0) .default
+  return .visit (mkAppN unread (args.extract 3 args.size)).headBeta
+
 /-- A result shape as the constructor it reduces to, with that
 constructor's arguments: the shape a function's result type names is the
 generated `<fn>.shape` abbreviation, which reduction unfolds and matching
@@ -857,6 +914,49 @@ private def resultShape? (shape : Lean.Expr) : MetaM (Option (Name × Array Lean
       constructor == ``VerexIR.Proofs.Denote.ResultShape.one do
     return none
   return some (constructor, reduced.getAppArgs)
+
+/-- The domain a call binds its result at, from the result type its meaning
+states, the carrier of a result shape at a family: `Unit` without a result,
+and with one the carrier of its native type, at the family the call is made
+at. A callee's type arguments are substituted into that type, those of the
+shape and, where the family is one type arguments induce, the family's, so
+the domain is at the family below them. None where the type is not the
+carrier of a shape that reduces to a constructor. -/
+def callResultDomain? (result : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let result := result.consumeMData
+  unless result.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.carrier 2 do return none
+  let env ← getEnv
+  let shape := (result.getArg! 1).consumeMData
+  -- A substitution by a spelled row into a shape is evaluated on the shape's
+  -- type; any other shape is read as the constructor it reduces to.
+  let substituted? ← if shape.isAppOfArity ``VerexIR.Proofs.Denote.ResultShape.subst 2 then do
+      let row ← spelledRow (shape.getArg! 0)
+      if spelledSpine row then
+        match ← resultShape? (shape.getArg! 1) with
+        | some (constructor, #[τ]) =>
+            if constructor == ``VerexIR.Proofs.Denote.ResultShape.one then
+              pure ((substituteNTy row τ (some env)).map fun τ' =>
+                (``VerexIR.Proofs.Denote.ResultShape.one, #[τ']))
+            else pure none
+        | some (constructor, #[]) => pure (some (constructor, #[]))
+        | _ => pure none
+      else pure none
+    else pure none
+  let some (constructor, arguments) ← match substituted? with
+      | some resolved => pure (some resolved)
+      | none => resultShape? shape
+    | return none
+  if constructor == ``VerexIR.Proofs.Denote.ResultShape.none then return some (mkConst ``Unit)
+  let #[τ] := arguments | return none
+  let mut family := result.getArg! 0
+  let mut τ := τ
+  repeat
+    let some (θ, outer) := inducedCarriers? family | break
+    let some row := substitutionRow? θ | break
+    let some τ' := substituteNTy row τ (some env) | break
+    family := outer
+    τ := τ'
+  return some (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) family τ)
 
 /-- Literal scalar arguments of a map construction, without unfolding named
 values or maps. These are the closed constructions the typed map evaluator
@@ -916,6 +1016,23 @@ private def hasBaseFamilyConstant (env : Environment) (e : Lean.Expr) : Bool :=
   (e.find? fun t => match t with
     | .const (.str pkg "functionCarriersBase") _ => env.contains (Name.str pkg "functionCarriers")
     | _ => false).isSome
+
+/-- The arguments a rebuilding branch keeps stand over the arguments it
+changed, so the types expected of them changed with them. Check that
+boundary where it is crossed: from `boundary` on, each argument's own type
+converts with the type the rebuilt application expects of it. The check
+inspects the two types, not the value or proof they describe. -/
+private def keptArgumentsConvert (fn : Lean.Expr) (args : Array Lean.Expr)
+    (boundary : Nat) : MetaM Bool := do
+  if boundary ≥ args.size then return true
+  let functionType ← inferType fn
+  for index in [boundary:args.size] do
+    let bound ← instantiateForall functionType (args.extract 0 index)
+    let .forallE _ expected _ _ := bound | return false
+    if expected.hasLooseBVars then return false
+    let actual ← inferType args[index]!
+    unless expected == actual || (← withNewMCtxDepth (isDefEq actual expected)) do return false
+  return true
 
 private def isCarrierFamilyHead (name : Name) : Bool :=
   name == ``VerexIR.Proofs.Denote.Skolems.toCarriers ||
@@ -1034,7 +1151,10 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
       match ← typedReadSpelling head family τ rest with
       | some t' => return .done t'
       | none => return .continue
-    let rebuilt : Option Lean.Expr := do
+    -- The index past the arguments a branch changes: the arguments from
+    -- there on are kept over a changed type or row, so that is the
+    -- dependency boundary the rebuilding has to check.
+    let rebuilt : Option (Lean.Expr × Nat) := do
       let family ← args[0]?
       let (outer, row) ← induced family
       if head == ``VerexIR.Proofs.Denote.NTy.carrier ||
@@ -1042,21 +1162,23 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
           head == ``VerexIR.Proofs.Denote.NTy.Holds then
         let τ ← args[1]?
         let τ' ← substituteNTy row τ
-        pure (mkAppN t.getAppFn (#[outer, τ'] ++ args.extract 2 args.size))
+        pure (mkAppN t.getAppFn (#[outer, τ'] ++ args.extract 2 args.size), 2)
       else if head == ``VerexIR.Proofs.Denote.HList ||
           head == ``VerexIR.Proofs.Denote.HList.Holds then
         let fields ← args[1]?
         let fields' ← substituteNRow row fields
-        pure (mkAppN t.getAppFn (#[outer, fields'] ++ args.extract 2 args.size))
+        pure (mkAppN t.getAppFn (#[outer, fields'] ++ args.extract 2 args.size), 2)
       else if head == ``VerexIR.Proofs.Denote.variantCarrier ||
           head == ``VerexIR.Proofs.Denote.variantCarrier.Holds then
         let names ← args[1]?
         let rows ← args[2]?
         let rows' ← substituteNRows row rows
-        pure (mkAppN t.getAppFn (#[outer, names, rows'] ++ args.extract 3 args.size))
+        pure (mkAppN t.getAppFn (#[outer, names, rows'] ++ args.extract 3 args.size), 3)
       else none
     match rebuilt with
-    | some t' => return .done t'
+    | some (t', boundary) =>
+        if ← keptArgumentsConvert t'.getAppFn t'.getAppArgs boundary then return .done t'
+        else return .continue
     | none =>
     -- Any other native operation at an induced family: at the outer family,
     -- each type and index it takes substituted.
@@ -1092,6 +1214,26 @@ private partial def convertsAtSites (left right : Lean.Expr) : MetaM Bool := do
       else if left.getAppFn.constName?.any isCarrierFamilyHead &&
           right.getAppFn.constName?.any isCarrierFamilyHead then
         pure false
+      -- What a primitive projection erases is the structure's type
+      -- parameters: the application converts even where one of them does
+      -- not, so each parameter is converted at its own site, and the
+      -- application itself then carries the owner through the projection. A
+      -- constructor erases nothing and reduces nothing away, so every
+      -- argument of one is converted at its own site.
+      else if ← pure sameHead <&&> (do
+          let some name := left.getAppFn.constName? | pure false
+          pure (((← getEnv).find? name).any (· matches .ctorInfo _))) then
+        arguments.size.allM fun index _ => isDefEq arguments[index]! arguments'[index]!
+      else if ← pure sameHead <&&> (do
+          let some name := left.getAppFn.constName? | pure false
+          pure (← getProjectionFnInfo? name).isSome) then
+        let some name := left.getAppFn.constName? | isDefEq left right
+        let some info ← getProjectionFnInfo? name | isDefEq left right
+        if ← (min info.numParams arguments.size).allM fun index _ =>
+            isDefEq arguments[index]! arguments'[index]! then
+          isDefEq left right
+        else
+          pure false
       else isDefEq left right
     | _, _ => isDefEq left right
   unless left.hasMVar || right.hasMVar do conversions.modify (·.insert (left, right) result)
@@ -1100,7 +1242,19 @@ private partial def convertsAtSites (left right : Lean.Expr) : MetaM Bool := do
 /-- The canonical spelling of an expression's families, where it converts.
 An expression the search left as it was is not searched again. Conversion uses
 default transparency so a caller restricting simp transparency cannot suppress
-a valid conversion of nominal types. -/
+a valid conversion of nominal types.
+
+The input is typed and every branch rebuilds a site by a type-preserving
+construction, so the respelling is well typed without a second global check:
+a changed type, index or operation prefix converts at the application where
+it stands (`respellOperation?` checks the prefix through its last changed
+type or index; the carrier, `Holds`, `HList` and variant branches check the
+arguments they keep over a changed one with `keptArgumentsConvert`), while
+the fallback, read and result-shape branches rest on the construction they
+perform, which changes no dependency boundary. The conversion of a whole
+term is not that check either — a projection converts even where a type
+parameter it erases does not — so `convertsAtSites` converts a projection's
+parameters, and every argument of a constructor, at its own site. -/
 def canonicalFamilyResult (e : Lean.Expr) : MetaM Simp.Result := withDefault do
   if (← (← targetState).canonicalForms.get).contains e then return { expr := e }
   -- A pass takes off one level of induced families: a callee's callee at
@@ -1109,11 +1263,11 @@ def canonicalFamilyResult (e : Lean.Expr) : MetaM Simp.Result := withDefault do
   if canonical == e then
     unless e.hasMVar do (← targetState).canonicalForms.modify (·.insert e)
     return { expr := e }
-  unless ← convertsAtSites e canonical <&&> isTypeCorrect canonical do return { expr := e }
+  unless ← convertsAtSites e canonical do return { expr := e }
   repeat
     let next ← canonicalFamilies canonical
     if next == canonical then break
-    unless ← convertsAtSites canonical next <&&> isTypeCorrect next do break
+    unless ← convertsAtSites canonical next do break
     canonical := next
   return { expr := canonical }
 
@@ -2716,11 +2870,13 @@ private partial def projectionsAgree (goal : MVarId) (value : FVarId) : MetaM Bo
 
 open Lean Meta Simp in
 /-- A choice's projection at a frame type arguments induce, at the outer
-frame with the types substituted: equal, case by case on the value, though
-not convertible, since the projection matches on the choice and the value
-together, which keeps it an atom where the value is unknown. A step proof's
-leaf reads a callee's results so (`verex_step_obligation`); the automatic
-normal form keeps the callee's spelling. -/
+frame with the types substituted: convertible where the two frames' carriers
+unfold to the same type, and equal case by case on the value otherwise, since
+the rows a choice carries are data, which no transparency respells. The
+projection itself reduces on the choice alone, reading its value with
+`Sum.elim`. A step proof's leaf reads a callee's results so
+(`verex_step_obligation`); the automatic normal form keeps the callee's
+spelling. -/
 simproc_decl whichProjectFamily
     (@VerexIR.Proofs.Denote.Which.project? ?carriers _ _ _ _ _) := fun e => do
   let e := e.consumeMData
@@ -2738,11 +2894,10 @@ simproc_decl whichProjectFamily
 
 open Lean Meta Simp in
 /-- A choice selection at a frame type arguments induce, at the outer
-frame with the types substituted: equal, case by case on the value, as a
-variant projection is (`whichProjectFamily`), and not convertible for the same
-reason — the projection inside it matches on the choice and the value
-together, and a position witness's rows are data, which no transparency
-respells. -/
+frame with the types substituted: established as a variant projection is
+(`whichProjectFamily`), by conversion where the two frames' carriers unfold
+to the same type and case by case on the value otherwise, since a position
+witness's rows are data, which no transparency respells. -/
 simproc ↓ [vir_denote, vir_denote_norm] choicesSelectFamily
     (@VerexIR.Proofs.Denote.Choices.select? ?carriers _ _ _ _ _) :=
     fun e => do
@@ -3545,7 +3700,8 @@ simproc [vir_denote_norm] literalCertifiedRead (VerexIR.SpecInt.val _) := fun e 
   return .done { expr := rhs, proof? := some (← mkExpectedTypeHint proof (← mkEq e rhs)) }
 
 /-- Optional and certified reads of the same integer literals must share a
-normal form. Keep the actual fallback, including at out-of-bounds positions. -/
+normal form. The fallback is kept as the read states it, whatever it is,
+including at out-of-bounds positions. -/
 simproc [vir_denote_norm] literalOptionalCertifiedRead (VerexIR.SpecInt.val _) := fun e => do
   if e.hasLooseBVars || !e.isAppOfArity ``VerexIR.SpecInt.val 3 then return .continue
   let element := e.getArg! 2
@@ -3556,9 +3712,8 @@ simproc [vir_denote_norm] literalOptionalCertifiedRead (VerexIR.SpecInt.val _) :
       if element.isAppOfArity ``VerexIR.SpecInt.mk 4 then some (element.getArg! 2) else none
     | return .continue
   let fallback := element.getArg! 2
-  unless fallback.isAppOfArity ``VerexIR.SpecInt.mk 4 do return .continue
   let rhs ← mkAppM ``Option.getD #[
-    ← mkAppM ``GetElem?.getElem? #[values, lookup.getArg! 6], fallback.getArg! 2]
+    ← mkAppM ``GetElem?.getElem? #[values, lookup.getArg! 6], ← mkAppM ``VerexIR.SpecInt.val #[fallback]]
   let proof ← mkAppM ``val_getD_getElem?_map_val #[lookup.getArg! 5, lookup.getArg! 6, fallback]
   return .done { expr := rhs, proof? := some (← mkExpectedTypeHint proof (← mkEq e rhs)) }
 
@@ -3654,31 +3809,6 @@ attribute [vir_denote_norm] VerexIR.Proofs.Denote.Weave.supplying_nil
 -- A type parameter's value defaults under an induced family to its
 -- argument's value.
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.Carriers.default_instantiate
-
-theorem Carriers.holds_instantiate (outer : Carriers) (θ : TypeArgs)
-    (index : Nat) (value : @(Carriers.instantiate θ outer).carrier index) :
-    @(Carriers.instantiate θ outer).holds index value =
-      @NTy.Holds outer ((NTy.param index).subst θ.1) value :=
-  propext ⟨NTy.Holds.intro, NTy.Holds.deepHolds⟩
-
-simproc ↓ [vir_denote, vir_denote_norm] holdsOuterFamily
-    (@VerexIR.Proofs.Denote.Carriers.holds ?family _ _) := fun e => do
-  let e := e.consumeMData
-  let_expr VerexIR.Proofs.Denote.Carriers.holds family index value := e | return .continue
-  if e.hasLooseBVars then return .continue
-  let some (θ, outer) := inducedCarriers? family.consumeMData | return .continue
-  let some row := substitutionRow? θ | return .continue
-  let param := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) index
-  let some substituted := substituteNTy row param (some (← getEnv)) | return .continue
-  let some (rhs, equation) ← (try withTransparency .default do
-      let rhs := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) outer substituted value
-      let proof ← mkAppOptM ``VerexIR.Proofs.Denote.Carriers.holds_instantiate
-        #[some outer, some θ, some index, some value]
-      unless ← isDefEq (← inferType proof) (← mkEq e rhs) do return none
-      pure (some (rhs, ← mkExpectedTypeHint proof (← mkEq e rhs)))
-    catch _ => pure none)
-    | return .continue
-  return .visit { expr := rhs, proof? := some equation }
 
 theorem NTy.holds_instantiate_heq {outer : Carriers} (θ : TypeArgs) (τ : NTy)
     (value : @NTy.carrier (Carriers.instantiate θ outer) τ)
@@ -4714,9 +4844,26 @@ attribute [vir_denote_eval] reduceCtorEq Nat.reduceAdd Nat.reduceSub Nat.reduceD
   Int.reduceNatCast' Int.reduceToNat String.reduceBEq String.reduceEq String.reduceBNe
   String.reduceNe dite_true dite_false
 
+/-- An induced frame's carriers, as the family its arguments give over the
+caller's: a contract hands a specification function the frame's carriers
+unapplied, where the transport of an operation reads them applied. -/
+theorem Skolems.toCarriers_instantiate {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] (θ : TypeArgs) (Θ : Skolems unit) :
+    (Skolems.instantiate θ Θ).toCarriers = Carriers.instantiate θ Θ.toCarriers := rfl
+
+/-- The same frame's types, as a function: each parameter's reading
+(`Skolems.type_instantiate`) where a contract hands the types unapplied, as
+it does to a recursive specification function. -/
+theorem Skolems.types_instantiate {unit : Validation.ValidatedUnit}
+    [FunctionCarriers unit] (θ : TypeArgs) (Θ : Skolems unit) :
+    (Skolems.instantiate θ Θ).type =
+      fun index => ((NTy.param index).subst θ.1).substWith Θ.type :=
+  funext (Skolems.type_instantiate θ Θ)
+
 -- The transport normal form (`vir_transport`): values, operations and
 -- contracts at a call's induced frame read at the caller's.
-attribute [vir_transport] instantiatedEqInCallerView mapTransportIdentity optionTransportIdentity
+attribute [vir_transport] Skolems.toCarriers_instantiate Skolems.types_instantiate
+  instantiatedEqInCallerView mapTransportIdentity optionTransportIdentity
   paramFreeValueTransport paramFreeVariantTransport paramFreeRowTransport variantNameTransport
   variantNameOuterFamily equalOuterFamily variantToSkolemConstructor hlistToSkolemConstructor
   ofSkolemIdentity
@@ -4725,7 +4872,7 @@ attribute [vir_transport] instantiatedEqInCallerView mapTransportIdentity option
   NativeMaps.NTy.read_param_instantiate
   NativeMaps.NTy.unread_param_instantiate
   NativeMaps.ofEntriesTransport
-  Carriers.orders_instantiate Carriers.erasures_instantiate holdsOuterFamily NTy.holds_param
+  Carriers.orders_instantiate Carriers.erasures_instantiate
   NTy.ofSkolem_toSkolem
   NTy.toSkolem_unit NTy.toSkolem_bool NTy.toSkolem_int NTy.toSkolem_num NTy.toSkolem_param
   NTy.toSkolem_tuple NTy.toSkolem_struct NTy.toSkolem_enum NTy.toSkolem_ref NTy.toSkolem_ghost

@@ -6,19 +6,32 @@ import VerexSL.Tests.NominalQuotation
 open Lean Meta Elab Command VerexSL VerexSL.Contract VerexIR.Proofs.Denote
 
 -- Parameter replacement constructs the descriptor at its replaced explicit
--- arguments, including nested and phantom arguments. An unknown argument is
--- kept under substitution because it may itself contain parameters.
-/--
-error: nominal parameter replacement changed its type
--/
-#guard_msgs in
+-- arguments, including nested and phantom arguments: a parameter stands for
+-- its entry with the mark dropped (`NTy.substWith`), so the replacement
+-- spells that drop and is the type it replaces in, while keeping the mark is
+-- another type. The drop evaluates on a spelled entry (`reduceUnmark`), and a
+-- frame reads a parameter as its own drop (`Skolems.unmark_type`), so under
+-- the denotation rules a frame's reading replaces to the descriptor at the
+-- readings, by a proof the kernel accepts. An unknown argument is kept under
+-- substitution because it may itself contain parameters.
 run_cmd do
   let some unit := registeredUnit? (← getEnv) `«0x42».nominal_quotation
     | throwError "missing nominal quotation fixture"
   let name ← ensureUnitDefinition #["0x42", "nominal_quotation"] unit
   liftTermElabM <| withNominalUnit name do
     let procs ← Simp.SimprocsArray.add #[] ``reduceNominalParameterReplacement false
+    let procs ← procs.add ``reduceUnmark false
     let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
+    -- What the declaration's structure says the replacement is: its own
+    -- descriptors, each parameter leaf standing for `entry`.
+    let rec atEntries (entry : Nat → Lean.Expr) (owner : Lean.Expr) : MetaM Lean.Expr := do
+      if owner.isAppOfArity ``NTy.param 1 then
+        let some index := owner.appArg!.nat?
+          | throwError "a quoted parameter is not a literal: {owner}"
+        return entry index
+      unless isNominalType (← getEnv) owner do
+        throwError "a quoted declaration is not a descriptor application: {owner}"
+      return mkAppN owner.getAppFn (← owner.getAppArgs.mapM (atEntries entry))
     let typeFunction ← mkArrow (mkConst ``Nat) (mkConst ``NTy)
     withLocalDeclD `types typeFunction fun types => do
       withLocalDeclD `unknown (mkConst ``NTy) fun unknown => do
@@ -33,25 +46,66 @@ run_cmd do
         let (result, _) ← simp operation context procs
         unless result.expr == operation do
           throwError "parameter replacement guessed an unknown argument"
+      let dropped (index : Nat) : Lean.Expr :=
+        mkApp (mkConst ``NTy.unmark) (mkApp types (toExpr index))
+      let kept (index : Nat) : Lean.Expr := mkApp types (toExpr index)
+      let mut distinguished := false
       for index in [0, 1, 4, 5] do
         let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
         let owner ← quoteNTy schema
-        let replaced ← quoteResolvedNTy types schema
         let operation := mkApp2 (mkConst ``NTy.substWith) types owner
         let (result, _) ← simp operation context procs
-        unless result.expr == replaced do
+        unless result.expr == (← atEntries dropped owner) do
           throwError "parameter replacement did not retain its descriptor: {result.expr}"
         unless ← withDefault (isDefEq operation result.expr) do
           throwError "nominal parameter replacement changed its type"
+        let keeping ← atEntries kept owner
+        unless keeping == result.expr do
+          distinguished := true
+          if ← withDefault (isDefEq operation keeping) then
+            throwError "a replacement keeping the mark was accepted as the type it replaces in"
+      unless distinguished do
+        throwError "no fixture declaration distinguished the dropped mark"
       let some schema := structNTy unit ⟨⟨0⟩, 0⟩ | throwError "missing fixture schema"
       let some nested := structNTy unit ⟨⟨0⟩, 4⟩ | throwError "missing nested schema"
       let nested := schema.subst (.cons nested .nil)
       let nestedOwner ← quoteNTy nested
       let nestedOperation := mkApp2 (mkConst ``NTy.substWith) types nestedOwner
       let (nestedResult, _) ← simp nestedOperation context procs
-      unless nestedResult.expr == (← quoteResolvedNTy types nested) &&
+      unless nestedResult.expr == (← atEntries dropped nestedOwner) &&
           (← withDefault (isDefEq nestedOperation nestedResult.expr)) do
         throwError "nested nominal arguments did not replace canonically"
+    -- A marked entry: the drop evaluates, so the replacement names the
+    -- referent.
+    let some schema0 := structNTy unit ⟨⟨0⟩, 0⟩ | throwError "missing fixture schema"
+    let owner0 ← quoteNTy schema0
+    let marked ← withLocalDeclD `index (mkConst ``Nat) fun index =>
+      mkLambdaFVars #[index] (mkApp (mkConst ``NTy.observed) (mkConst ``NTy.bool))
+    let markedOperation := mkApp2 (mkConst ``NTy.substWith) marked owner0
+    let (markedResult, _) ← simp markedOperation context procs
+    unless markedResult.expr == (← atEntries (fun _ => mkConst ``NTy.bool) owner0) do
+      throwError "a marked entry's dropped mark did not evaluate: {markedResult.expr}"
+    unless ← withDefault (isDefEq markedOperation markedResult.expr) do
+      throwError "a marked entry's replacement changed its type"
+    -- A frame's reading, under the denotation rules alone: the law that the
+    -- reading is its own drop belongs to the same set as the replacement.
+    let some denote ← getSimpExtension? `vir_denote
+      | throwError "missing denotation rules"
+    let frameContext ← Simp.mkContext
+      { zeta := false, beta := false, iota := false, proj := false } #[← denote.getTheorems]
+    withLocalDeclD `functions (mkApp (mkConst ``FunctionCarriers) (mkConst name)) fun functions =>
+      withLocalDeclD `frame (mkApp2 (mkConst ``Skolems) (mkConst name) functions) fun frame => do
+        let reading := mkApp3 (mkConst ``Skolems.type) (mkConst name) functions frame
+        let frameOperation := mkApp2 (mkConst ``NTy.substWith) reading owner0
+        let (frameResult, _) ← simp frameOperation frameContext procs
+        unless frameResult.expr == (← atEntries (fun index => mkApp reading (toExpr index)) owner0) do
+          throwError "a frame's reading did not replace to its descriptor: {frameResult.expr}"
+        let statement ← mkForallFVars #[functions, frame]
+          (← mkEq frameOperation frameResult.expr)
+        let value ← mkLambdaFVars #[functions, frame] (← frameResult.getProof)
+        let law := name ++ `replacementAtFrame
+        addDecl (.thmDecl
+          { name := law, levelParams := [], type := statement, value := value })
 
 -- Concrete named layouts compare by value; symbolic parameters and handle
 -- comparisons retain their native comparison rather than acquiring this rule.
@@ -194,6 +248,50 @@ run_cmd do
                 throwError "order did not select its declaration: {result.expr}"
               let some proof := result.proof? | throwError "order has no equation"
               unless ← isTypeCorrect proof do throwError "order equation is ill typed"
+
+-- A typed value's native value (`NTy.unread`) in the normal form: an
+-- unresolved parameter keeps its family's, an integer's is cut to its width,
+-- and a named declaration's is the value itself, as its typed read is the
+-- identity.
+run_cmd do
+  let some unit := registeredUnit? (← getEnv) `«0x42».nominal_quotation
+    | throwError "missing nominal quotation fixture"
+  let name ← ensureUnitDefinition #["0x42", "nominal_quotation"] unit
+  liftTermElabM <| withNominalUnit name do
+    let some rules ← getSimpExtension? `vir_denote_norm
+      | throwError "missing normal-form rules"
+    let some procedures ← Simp.getSimprocExtension? `vir_denote_norm
+      | throwError "missing normal-form procedures"
+    let context ← Simp.mkContext { zeta := false, iota := false, proj := false }
+      #[← rules.getTheorems]
+    let procs : Simp.SimprocsArray := #[← procedures.getSimprocs]
+    let normalUnread (family τ : Lean.Expr) (check : Lean.Expr → Lean.Expr → Lean.Expr → MetaM Unit) :
+        MetaM Unit := do
+      let inhabitable ← mkEq (mkApp (mkConst ``NTy.inhabitable) τ) (mkConst ``Bool.true)
+      withLocalDeclD `inhabitable inhabitable fun inhabitable =>
+        withLocalDeclD `typed (mkApp2 (mkConst ``NTy.readCarrier) family τ) fun typed => do
+          let unread := mkApp4 (mkConst ``NTy.unread) family τ inhabitable typed
+          let (result, _) ← simp unread context procs
+          check unread typed result.expr
+    withLocalDeclD `family (mkConst ``Carriers) fun family => do
+      normalUnread family (mkApp (mkConst ``NTy.param) (mkNatLit 0)) fun unread _ result => do
+        unless result == unread do
+          throwError "an unresolved parameter's native value was evaluated: {result}"
+      normalUnread family (mkApp2 (mkConst ``NTy.int) (mkNatLit 8) (mkConst ``Bool.false))
+        fun _ typed result => do
+          unless result != typed && result.isAppOf ``VerexIR.SpecInt.ofInt do
+            throwError "an integer's native value is not cut to its width: {result}"
+      for index in [0, 5] do
+        let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
+        for concrete in [false, true] do
+          let owner ← quoteNTy (if concrete then schema.subst (.cons .bool .nil) else schema)
+          unless isNominalType (← getEnv) owner do
+            throwError "the fixture's declaration is not quoted as a descriptor: {owner}"
+          normalUnread family owner fun unread typed result => do
+            unless result == typed do
+              throwError "a named declaration's native value keeps its read-back: {result}"
+            unless ← withDefault (isDefEq unread typed) do
+              throwError "a named declaration's native value is not the typed value"
 
 -- Distinct declaration handles remain distinct when a symbolic frame
 -- resolves their type parameters; their fields are irrelevant to dispatch.

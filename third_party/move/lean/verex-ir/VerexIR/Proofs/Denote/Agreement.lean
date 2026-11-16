@@ -372,8 +372,7 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
       Satisfies (propheticRun executable typeInstantiation handle σs shape) contract)
     (preservedValid : letI : Skolems unit := Skolems.runtime unit
       ∀ args resolved, contract.validArgs args → HList.ResolvedHolds σs args resolved →
-        contract.validArgs resolved := by
-          intros _ _ _ _; trivial) :
+        contract.validArgs resolved) :
     letI : Skolems unit := Skolems.runtime unit
     SatisfiesFunctionAt executable handle typeInstantiation
       (contract.prophetic unit σs shape) := by

@@ -1148,12 +1148,23 @@ private def declarationLocalValues (unit : ValidatedUnit) (owner : VerexIR.Struc
       locals := locals.set! position (some (← (domainOf localType).binderOfNative contents))
   return locals
 
+/-- The type arguments a declaration is read at, as a context's
+`typeArgumentTypes`: each argument's native type, under which a type
+parameter of the declaration stands for the argument's native type and a
+declared type is read at the arguments rather than substituted
+(`Context.ntyOf?`, `Context.readAtArguments`). -/
+def atArgumentTypes :
+    Option VerexIR.Proofs.Denote.NRow → Array (Option VerexIR.Proofs.Denote.NTy)
+  | none => #[]
+  | some row => row.toList.toArray.map some
+
 /-- Specialize every invariant declared by `ty` to a native value of its
 instance type `τ`. Struct invariant locals are the fields in declaration
 order; enum invariants receive the whole value as local zero and bind
 payloads in their own logical match. -/
 private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Array Scoped)
-    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
+    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
   let some (owner, ns, declaration) := nominalDeclaration? context.unit ty
     | return #[]
@@ -1168,14 +1179,19 @@ private def declaredInvariantTerms (context : Context) (ty : IrTy) (scope : Arra
     let some localType := ns.typeOf localDecl.type.typeId
       | throwError "data invariant local type {localDecl.type.typeId.index} is out of range"
     pure localType
-  let typeArgumentTypes := scope.map (Scoped.toNative? context.unit namespaceId)
+  -- At an instance row the parameters stand for the row's entries, which need
+  -- not be types the declaring namespace names.
+  let typeArgumentTypes := match atArguments with
+    | some _ => atArgumentTypes atArguments
+    | none => scope.map (Scoped.toNative? context.unit namespaceId)
   let locals ← declarationLocalValues context.unit owner ns declaration localTypes
     (← context.carriers) τ value
   let invariantContext : Context := {
     context with
     namespaceId, ns, locals, localTypes, oldLocals := locals
     localNames := declaration.locals.map (·.name)
-    results := #[], resultTypes := #[], typeArgumentTypes }
+    results := #[], resultTypes := #[], typeArgumentTypes
+    readAtArguments := context.readAtArguments || atArguments.isSome }
   -- An invariant reading memory, through a behavioral predicate, holds in
   -- every memory: what a value satisfies does not change with the memory
   -- around it.
@@ -1282,10 +1298,11 @@ private def functionShape (results : VerexIR.Proofs.Denote.NRow) :
   | .cons τ .nil => pure (.one τ)
   | _ => throwError "a function value returning several results is not carried"
 
-/-- The frame a function-valued field's runs keep, of the field's function
-value `value` of native type `fieldType` in the whole native value `whole`
-of type `τ`: its `modifies_of` frame over the invocation's arguments, or,
-with none, keeping memory. -/
+/-- What a function-valued field's runs keep and return, of the field's
+function value `value` of native type `fieldType` in the whole native value
+`whole` of type `τ`: the frame its `modifies_of` clause names or, with none,
+keeping memory, and, where its result type states an invariant, that its
+invocations return valid results (`ValidResultsAt`). -/
 private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
     (declaration : VerexIR.StructDecl) (index : Nat) (scope : Array Scoped)
     (τ : VerexIR.Proofs.Denote.NTy) (whole : Lean.Expr) (fieldType : VerexIR.Proofs.Denote.NTy)
@@ -1303,15 +1320,25 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   let shape ← quoteShape (← functionShape results)
   -- Over a model, the frame is of the model's invocations.
   let invoke? ← modelInvoke? executable skolems
+  -- A stored function value whose result type states an invariant carries
+  -- that its invocations return valid results; a result type that states
+  -- none needs no fact.
+  let validity? ← if invoke?.isSome ||
+      (← VerexIR.Proofs.Denote.isInvariantFreeNRow (← quoteRow results)) then pure none
+    else pure (some (← mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.ValidResultsAt)
+      unitExpr functions executable skolems) #[row, sharing, shape, value]))
+  let withValidity (fact : Lean.Expr) : MetaM Lean.Expr := do
+    let some valid := validity? | pure fact
+    if fact.isConstOf ``True then pure valid else mkAppM ``And #[valid, fact]
   let some frame := declaration.contract.parameterFrames.find? (·.parameter.index == index)
-    | match invoke? with
+    | withValidity (← match invoke? with
       | some invoke =>
           mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.KeepsMemoryAtOf) unitExpr functions skolems
             invoke) #[row, sharing, shape, value]
       | none =>
           mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.KeepsMemoryAt)
-            unitExpr functions executable skolems) #[row, sharing, shape, value]
-  if frame.modifiesAll then return mkConst ``True
+            unitExpr functions executable skolems) #[row, sharing, shape, value])
+  if frame.modifiesAll then return ← withValidity (mkConst ``True)
   let some ns := context.unit.namespaces[owner.index]?
     | throwError "a field frame's namespace is out of range"
   let localTypes ← declaration.locals.mapM fun localDecl => do
@@ -1347,13 +1374,13 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
           oldLocals := active.oldLocals.set! formal.index (some binder) }
       let slots ← frame.modifies.mapM (modifiedSlotTerm active)
       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
-  match invoke? with
-  | some invoke =>
-      mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr functions skolems invoke)
-        #[row, sharing, shape, frameTerm, value]
-  | none =>
-      mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAt)
-        unitExpr functions executable skolems) #[row, sharing, shape, frameTerm, value]
+  withValidity (← match invoke? with
+    | some invoke =>
+        mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAtOf) unitExpr functions skolems invoke)
+          #[row, sharing, shape, frameTerm, value]
+    | none =>
+        mkAppM' (mkApp4 (mkConst ``VerexIR.Proofs.FramedAt)
+          unitExpr functions executable skolems) #[row, sharing, shape, frameTerm, value])
 
 /-- The native type of a variant's field of an enum type. -/
 private def variantFieldType? (τ : VerexIR.Proofs.Denote.NTy) (variant : String) (index : Nat) :
@@ -1608,7 +1635,8 @@ at every depth, so a declaration's `Carriers.own` states one level and
 nothing is owed twice (`doc/designs/data-invariants.md`, "Data
 invariants"). -/
 private def ownInvariantTerms (context : Context) (ty : IrTy)
-    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr) :
+    (τ : VerexIR.Proofs.Denote.NTy) (value : Lean.Expr)
+    (atArguments : Option VerexIR.Proofs.Denote.NRow := none) :
     MetaM (Array (Lean.Expr × ObligationRange)) := do
   let .nominal _ uses := ty | return #[]
   let some (owner, ns, declaration) := nominalDeclaration? context.unit ty | return #[]
@@ -1616,7 +1644,7 @@ private def ownInvariantTerms (context : Context) (ty : IrTy)
     throwError "modifies_of on enum fields is not carried yet"
   let carriers ← context.carriers
   let scope := Scoped.ofNominal #[] uses
-  let mut terms ← declaredInvariantTerms context ty scope τ value
+  let mut terms ← declaredInvariantTerms context ty scope τ value atArguments
   -- An owner's entries are valid under its discipline.  The values it holds
   -- have their own invariants by their type, not by the owner's.
   if let some model := mapModel? context.unit ty then
@@ -2242,6 +2270,27 @@ def dataOwnTerms (unit : ValidatedUnit) : MetaM DataOwn := do
           cases := cases.push case
   return { carriers, types, cases, behavioural, unsupported }
 
+/-- The clauses a declaration states of its own values (`dataOwnTerms`), read
+at a frame over a value of the declaration at an instance row: the same source
+clauses by the same translation, the declaration's type parameters standing
+for the row's entries, so that every type-directed choice is the one a reader
+at that frame and row makes.  Each clause with its source range, in the order
+of the installed ones; an error where a clause has no translation there. -/
+def ownClausesAt (unit : ValidatedUnit) (owner : VerexIR.StructHandle)
+    (row : VerexIR.Proofs.Denote.NRow) (frame value : Lean.Expr) :
+    MetaM (Array (Lean.Expr × ObligationRange)) := do
+  let some ns := unit.namespaces[owner.namespaceId.index]?
+    | throwError "internal: a declaration's namespace is out of range"
+  let some declaration := ns.structs[owner.structId]?
+    | throwError "internal: a declaration is out of its namespace"
+  let some σ := VerexIR.Proofs.Denote.structNTy unit owner
+    | throwError "internal: a declaration with a data invariant has no native type"
+  let ty : IrTy := .nominal (ns.nameId declaration.name) #[]
+  let context : Context := {
+    unit, namespaceId := owner.namespaceId, ns, locals := #[], results := #[]
+    types := some (← frameTypes frame) }
+  ownInvariantTerms context ty (σ.subst row) value (atArguments := some row)
+
 /-- Declaration-owned clauses in given parameter sorts. The same clause
 translator reads a carrier value in an own-independent scaffold; the resulting
 predicate is installed in the actual verification family by `withDeclarations`.
@@ -2359,16 +2408,6 @@ def storedInvariantAt (unit : ValidatedUnit) (predicate : Lean.Expr) (executable
     | throwError "the stored invariants read the executable unit, which this contract does \
         not take"
   return mkApp atUnit executable
-
-/-- The type arguments a declaration is read at, as a context's
-`typeArgumentTypes`: each argument's native type, under which a type
-parameter of the declaration stands for the argument's native type and a
-declared type is read at the arguments rather than substituted
-(`Context.ntyOf?`, `Context.readAtArguments`). -/
-def atArgumentTypes :
-    Option VerexIR.Proofs.Denote.NRow → Array (Option VerexIR.Proofs.Denote.NTy)
-  | none => #[]
-  | some row => row.toList.toArray.map some
 
 /-- The conjunction of a loop annotation's `invariant` clauses over the
 given local binders: the clause translation the contracts use, with no
@@ -3916,6 +3955,11 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     signature.params
   let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) (signature.frame.carriers)
     signature.shape
+  -- The domain a clause binds the result at: the carrier of its native type,
+  -- as every other value of a clause is typed, and `Unit` without a result.
+  let resultDomain := match signature.resultType with
+    | some ty => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) signature.frame.carriers ty
+    | none => mkConst ``Unit
   let runtimeState := signature.frame.state
   let failure := mkConst ``VerexIR.Proofs.Failure
   /- In a one-state clause a parameter denotes its entry value; in
@@ -3962,7 +4006,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
       mkLambdaFVars #[arguments, state] body
   let ensuresTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `state runtimeState fun state =>
-      withLocalDeclD `result resultType fun result =>
+      withLocalDeclD `result resultDomain fun result =>
         withLocalDeclD `final runtimeState fun final => do
           let parameterBound ← parameterBinders signature.frame.carriers parameterSlots signature.argumentTypes arguments
           let (resultBound, prophecies, finals, components) ←
@@ -4116,7 +4160,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     else #[]
   let frameTerm ← withLocalDeclD `arguments argumentsType fun arguments =>
     withLocalDeclD `initial runtimeState fun initial =>
-      withLocalDeclD `result resultType fun result =>
+      withLocalDeclD `result resultDomain fun result =>
         withLocalDeclD `final runtimeState fun final => do
           let body ←
             if declaration.contract.modifiesAll || claimsNoFrame then
@@ -4173,6 +4217,15 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                   (signature.frame.leading ++ #[(← signature.frame.concrete), invoked]))
           -- Over a model, the frame is of the model's invocations.
           let invoke? ← modelInvoke? executable (← signature.frame.concrete)
+          -- A function value whose result type states an invariant carries
+          -- that its invocations return valid results; a result type that
+          -- states none needs no fact.
+          unless methodEvidence || invoke?.isSome ||
+              (← VerexIR.Proofs.Denote.isInvariantFreeNRow results) do
+            conjuncts := conjuncts.push (← mkAppM'
+              (mkAppN (mkConst ``VerexIR.Proofs.ValidResultsAt)
+                (signature.frame.leading ++ #[executable, (← signature.frame.concrete)]))
+              #[row, sharing, shape, value])
           -- A compiler-generated static method dictionary carries a checked
           -- non-panicking, memory-preserving contract. Unlike the ordinary
           -- function-value frame, this obligation applies to mutable receivers.

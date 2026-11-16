@@ -250,4 +250,85 @@ run_cmd do
   unless result.count > 0 do throwError "no entry invariant comparison observed"
   unless result.badCount == 0 do throwError "different entry invariant spellings: {result.badCount}/{result.count}"
 
+-- Negative (first): why the conversion of a whole projection is no evidence
+-- for the projection's erased structure parameter. The rewritten spelling
+-- built here is never handed to the comparator; it stands beside the original
+-- to show that the two convert while the parameter the primitive projection
+-- discards does not. `canonicalFamilyResult` is then invoked on the unchanged
+-- original, and what it returns is that original: the respelling is preserved,
+-- which is what this example asserts, not a rejection by the comparator.
+example [family : Carriers] (pair : Nat × Unit) : True := by
+  run_tac withMainContext do
+    let pair := (← getLocalDeclFromUserName `pair).toExpr
+    let family := (← getLocalDeclFromUserName `family).toExpr
+    let arguments ← elabTerm (← `((⟨.cons .bool .nil, rfl⟩ : TypeArgs))) none
+    let induced ← instantiateMVars (mkApp2 (mkConst ``Carriers.instantiate) arguments family)
+    let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
+    let owner := mkConst ``Nat
+    let respelled := mkApp2 (mkConst ``NTy.carrier) induced parameter
+    let original ← mkAppM ``Prod.fst #[pair]
+    let rewritten := original.withApp fun head args => mkAppN head (args.set! 0 respelled)
+    -- The conversion of the whole projection is no evidence: both sides
+    -- reduce to the primitive projection of the same pair.
+    unless ← withDefault (isDefEq original rewritten) do
+      throwError "the two projections did not convert, so this is not the case under test"
+    -- And the parameter the projection erases does not convert.
+    if ← withDefault (isDefEq owner respelled) then
+      throwError "the erased parameter converts, so this is not the case under test"
+    -- The respelling does not produce that rewrite from the original.
+    unless (← canonicalFamilyResult original).expr == original do
+      throwError "the projection was rewritten over a parameter that does not convert: \
+        {(← canonicalFamilyResult original).expr}"
+  trivial
+
+-- Preservation control: a well-typed input whose owner the traversal holds.
+-- What the emission returns is type-correct and converts with its input, in
+-- that position and inside an argument a dependent parent keeps. It does not
+-- assert that a rewrite was refused: this instance's substituted carrier
+-- converts, so the contract holds whether or not the emission rewrites here.
+example [family : Carriers]
+    (pair : @NTy.carrier (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+      (.param 0) × Unit) : True := by
+  run_tac withMainContext do
+    let pair := (← getLocalDeclFromUserName `pair).toExpr
+    let projection ← mkAppM ``Prod.fst #[pair]
+    let held ← canonicalEmission (({} : Std.HashSet Lean.Expr).insert pair) none
+    let emitted ← held projection
+    check emitted
+    unless ← withDefault (isDefEq projection emitted) do
+      throwError "the emitted projection over a held owner changed meaning"
+    let parent ← mkAppM ``Prod.mk #[projection, mkConst ``Unit.unit]
+    let emittedParent ← held parent
+    check emittedParent
+    unless ← withDefault (isDefEq parent emittedParent) do
+      throwError "the emitted parent of a held owner's projection changed meaning"
+  trivial
+
+-- What the emission actually hands on is type-correct and means what its
+-- input means: a dependent constructor that keeps a proof over a changed
+-- field, and a projection of a value at an induced family. The kernel checks
+-- the emitted term here, which is where a check of a whole term belongs.
+example [family : Carriers] (value : @NTy.carrier family (.int 64 false)) : True := by
+  run_tac withMainContext do
+    let canonical ← canonicalEmission {} none
+    let vector ← instantiateMVars (← elabTerm (← `((⟨#[$(mkIdent `value)], by simp⟩ :
+      @NTy.carrier
+        (Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
+        (.vector (.param 0))))) none)
+    let rebuilt ← canonical vector
+    check rebuilt
+    unless ← withDefault (isDefEq vector rebuilt) do
+      throwError "the emitted vector changed meaning"
+    let pair ← instantiateMVars (← elabTerm (← `(((($(mkIdent `value)), true) :
+      @NTy.carrier
+          (Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
+          (.param 0) × Bool).fst)) none)
+    let projected ← canonical pair
+    check projected
+    unless ← withDefault (isDefEq pair projected) do
+      throwError "the emitted projection changed meaning"
+    unless (← canonical projected) == projected do
+      throwError "the emitted projection is not stable: {projected}"
+  trivial
+
 end VerexSL.Tests.CanonicalEmission

@@ -237,6 +237,55 @@ its certificate came:
 | A field | the owner's fact, opened | derived |
 | An equation | from `Holds τ c` and `c = p` | derived |
 
+### One form at an interface
+
+Where a producer hands terms to consumers, each kind of thing has one form.
+The producer emits it and the consumers read only it. Two forms of one thing
+at the same interface are a defect of the producer that emits the second; it
+is repaired there, not by a consumer that accepts both, a recognizer that
+folds one into the other, or a step run again until the two meet. The form is
+stated here, independently of what the normalizer happens to leave, and the
+normalization is idempotent on it. Structural steps (a case split, an
+injection, a substitution) preserve the form at their output: however a step
+is implemented, it does not expose another spelling to the next consumer.
+
+At the prepared leaf, for what its consumers are presented with:
+
+- A fact is `NTy.Holds τ v`, folded, with this one head, also at a type
+  parameter over a family that is not known. `Carriers.holds` appears only
+  where the family is known and its predicate reduces (section 6).
+- A type is resolved: no substitution pending on a spelled declaration, and a
+  frame's reading of a parameter is that reading, with no dropped mark left
+  around it. A native value's type uses the descriptor of the caller's
+  family; no unfolded carrier, as a raw product or sum or a projection of the
+  frame's carriers, stands in its place.
+- A value at the caller's family has no transport around it.
+- A proposition has neither the wrapper of a default argument nor the marker
+  of an obligation. Which obligation it was, and where in the source it
+  came from, stay in the diagnostic record, and an obligation that is still
+  owed keeps its identity until it is decided.
+- A statement the kernel makes is instantiated by the solver, which does not
+  state its telescope again or encode the same fact a second way.
+- A read over a container operation, where the facts in hand decide the
+  conditions of the operation's lookup law, is reduced by that law to the
+  value written or to the read of the base at the index the law gives.
+  Where they do not, the leaf keeps the read of the operation's result and
+  the normalization does not expand it into the cases; a proof applies the
+  law and splits its conditions where it needs to.
+
+Forms that differ because their roles do are not two forms of one thing, and
+each has its stage and its conversion: the runtime encoding and the native
+value at the codec; a local's plain value and the cell of storage that holds
+only valid values; a folded fact and the clauses it opens to; a fact over a
+generic family and its transport to the caller's; the resolution of a type
+and a substitution into it; a container operation and a read of its result;
+a function value's carrier and the behavioural predicates about it; a slice
+view backed by its container's loan and a slice reference standing alone.
+
+The check of a prepared leaf, which rejects runtime values, is extended to
+the specific forms the list above excludes and the implementation names, and
+it reports the boundary, the term and its origin where one is known.
+
 ### Prophecies
 
 A prophecy is chosen among valid values, as today: a local borrow's, a global
@@ -305,6 +354,18 @@ frame states the same for the slots its body changes.
   invocation does so through its invocation contract, and a recursive call
   through the contract it is proved by induction against. No call path gains
   an entry fact it did not discharge.
+- An invocation of a function value whose target the walk does not see
+  receives the validity of its result from a behavioural fact of that value:
+  at arguments that hold, every result of a run holds its type's fact. The
+  fact stands beside the other behavioural facts of a function value (that it
+  keeps memory, that it is scalar). A function with a function-typed
+  parameter assumes it; a call that passes a function value proves it, from
+  the target's contract, whose result validity is unconditional, or from the
+  caller's own assumption where a parameter is passed through; a stored
+  function value carries it in the behavioural stored invariant. It is stated
+  once and the method contract of a trait method reads the same statement.
+  It is not part of `NTy.Holds`, which stays `True` at a function value, and
+  it is not stated for a result type without invariants.
 - A call the walk inlines: there is no boundary, the facts remain, and the
   hand-over check stays (section 3).
 - An exit proves the validity of its results, which is unconditional

@@ -321,10 +321,6 @@ def quoteResource (skolems : Lean.Expr) (unit : ValidatedUnit) (namespaceId : Ve
   return (mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.resource)
     ((← frameLeading skolems) ++ #[skolems, nativeType, ← quoteRow resource.arguments]), nativeType)
 
-/-- A memory's slot at a resource type and a storage key. -/
-def memorySlot (memory resource key : Lean.Expr) : Lean.Expr :=
-  mkApp2 memory resource key
-
 /-- A frame's plain storage read (`Skolems.plainAt`) at a resource's native type,
 quoted arguments row, and storage key. -/
 def plainSlot (skolems nativeType argumentsExpr key memory : Lean.Expr) : MetaM Lean.Expr := do
@@ -1560,15 +1556,23 @@ def nativeOwner (carriers : Lean.Expr) (owner : VerexIR.Proofs.Denote.NTy) (valu
 
 /-- An owner's map discipline observes only keys. Keep its values in their
 native representation so generic and concrete clauses construct the same
-validity predicate, independently of their specification value readers. -/
+validity predicate, independently of their specification value readers. The
+map's keys, values and entries are stated at one family, the one the owner's
+table is at: its keys are read by that family's typed view of the key type,
+a type parameter of an instantiated family included. -/
 def NativeOwner.valid (owner : NativeOwner) (model : MapModel) : MetaM Lean.Expr := do
-  let .forallE _ nativeValue _ _ ← whnfR (← inferType owner.typed.values.read)
-    | throwError "internal: a map value reader is not a function"
+  let_expr VerexIR.Proofs.Denote.NTy.carrier carriers table :=
+      (← instantiateMVars (← inferType owner.table)).consumeMData
+    | throwError "internal: an owner's table is not at a native type"
+  let_expr VerexIR.Proofs.Denote.NTy.table key value := table.consumeMData
+    | throwError "internal: an owner's table is not at a table type"
+  let some keys ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers key (resolve := false)
+    | throwError "the map's keys of type {key} have no typed view"
+  let nativeValue := carrierType carriers value
   let identity ← withLocalDeclD `value nativeValue fun value => mkLambdaFVars #[value] value
-  let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries
-    owner.typed.keys.read identity owner.table
-  mkAppOptM ``VerexIR.SpecMap.Valid
-    #[owner.typed.keys.carrier, nativeValue, ← owner.typed.discipline model, map]
+  let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries keys.read identity owner.table
+  let typed : TypedTable := { owner.typed with keys, map }
+  mkAppOptM ``VerexIR.SpecMap.Valid #[keys.carrier, nativeValue, ← typed.discipline model, map]
 
 /-- The table a typed map is written back as (`SpecMap.writeBack`): its
 entries, each key and value its native value (`NTy.unread`). -/

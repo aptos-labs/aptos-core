@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Proofs.Denote.Solve.Normal
+import VerexIR.Proofs.BehaviorReframe
 
 /-!
 # The solver: leaf deciders
@@ -459,19 +460,56 @@ elab "verex_specs_to_base" : tactic => focusGoal do
   unless progress do throwError "no recursive specification function unfolds at the leaf's values"
   replaceMainGoal [goal]
 
+/-- The rules that state a container's size: a vector's certificate, a slice
+reference's current and final vector, and a swap. A condition about a
+position within a size is read through them where the context states the
+size only in one of these forms. -/
+def sizeRulesContext : TacticM (Simp.Context × Simp.SimprocsArray) := do
+  let vectorSize := mkIdent `VerexIR.Proofs.Denote.vectorCertificateSize
+  let (context, simprocs, _) ← rulesSimpContext (← `(tactic| simp only
+    [Array.size_swapIfInBounds, $vectorSize:ident,
+    VerexIR.SpecSliceRef.currentVector_size, VerexIR.SpecSliceRef.finalVector_size])) #[]
+  return (context, simprocs)
+
+/-- A condition about a position within a container's size, proved by
+`prove`, and where that fails, proved in the form the size rules give it. A
+guarded write and a prophetic vector state their size through those rules
+only, so the position is in bounds in that form and not as it stands. One
+mechanism for a lookup rule's side condition and for naming a read. -/
+def provedThroughSizes {m : Type → Type} [Monad m] [MonadLiftT MetaM m]
+    (sizes : Simp.Context) (simprocs : Simp.SimprocsArray)
+    (prove : Lean.Expr → m (Option Lean.Expr)) (condition : Lean.Expr) :
+    m (Option Lean.Expr) := do
+  if let some proof ← prove condition then return some proof
+  let (normal, _) ← liftM (m := m) (simp condition sizes simprocs)
+  if normal.expr == condition then return none
+  let some proof ← prove normal.expr | return none
+  return some (← liftM (m := m) (normal.mkEqMPR proof))
+
+/-- Whether a constant is an operation whose reads the lookup laws decide
+(`verex_lookups_after_writes`): the write, removal, insertion or swap of an
+array's element, each as the array's own operation, as the one guarded by its
+bounds, and as a bounded vector's. -/
+def isLookupOperation (e : Lean.Expr) : Bool :=
+  e.isConstOf ``Array.setIfInBounds ||
+  e.isConstOf ``Array.eraseIdx || e.isConstOf ``Array.eraseIdxIfInBounds ||
+  e.isConstOf ``VerexIR.Proofs.Denote.eraseBounded ||
+  e.isConstOf ``Array.insertIdx || e.isConstOf ``Array.insertIdxIfInBounds ||
+  e.isConstOf ``VerexIR.Proofs.Denote.insertBounded ||
+  e.isConstOf ``Array.swapIfInBounds || e.isConstOf ``VerexIR.Proofs.Denote.swapBounded
+
 /-- Read positions of written arrays: a lookup at a position omega tells
 apart from the written one reads the array before the write, and a lookup
 at the written position within bounds reads the written value; a lookup
 into an array with an element removed or inserted reads the array before
-where omega places the position against the removed or inserted one. Runs
-only where the context holds a write, so other leaves pay nothing. -/
+where omega places the position against the removed or inserted one, and a
+lookup into a swapped array reads it at the position the swap moved there.
+Runs only where the context holds such an operation (`isLookupOperation`),
+so other leaves pay nothing. -/
 elab "verex_lookups_after_writes" : tactic => focusGoal do
   if (← getGoals).isEmpty then return
   let goal ← getMainGoal
-  let isWrite (e : Lean.Expr) := (e.find? fun e => e.isConstOf ``Array.setIfInBounds ||
-    e.isConstOf ``Array.eraseIdx || e.isConstOf ``Array.insertIdx ||
-    e.isConstOf ``VerexIR.Proofs.Denote.eraseBounded ||
-    e.isConstOf ``Array.eraseIdxIfInBounds || e.isConstOf ``Array.insertIdxIfInBounds).isSome
+  let isWrite (e : Lean.Expr) := (e.find? isLookupOperation).isSome
   let (inTarget, written) ← goal.withContext do
     let inTarget := isWrite (← instantiateMVars (← goal.getType))
     let written ← (← goal.getNondepPropHyps).filterM fun fvarId => do
@@ -486,7 +524,13 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
     let (ctx, simprocs, _) ← rulesSimpContext (← `(tactic| simp only
       [Array.size_swapIfInBounds, $vectorSize:ident,
       VerexIR.SpecSliceRef.currentVector_size, VerexIR.SpecSliceRef.finalVector_size,
-      VerexIR.Proofs.Denote.eraseBounded_values, Array.getElem?_setIfInBounds_ne, Array.getElem?_setIfInBounds_self_of_lt,
+      VerexIR.Proofs.Denote.eraseBounded_values, VerexIR.Proofs.Denote.swapBounded_values,
+      VerexIR.Proofs.Denote.insertBounded_values,
+      VerexIR.Proofs.Denote.getElem_swapIfInBounds_left,
+      VerexIR.Proofs.Denote.getElem_swapIfInBounds_right,
+      VerexIR.Proofs.Denote.getElem?_swapIfInBounds_left,
+      VerexIR.Proofs.Denote.getElem?_swapIfInBounds_right,
+      Array.getElem?_setIfInBounds_ne, Array.getElem?_setIfInBounds_self_of_lt,
       Array.getElem_setIfInBounds_ne, Array.getElem_setIfInBounds_self,
       VerexIR.Proofs.Denote.eraseIdxIfInBounds_of_lt,
       VerexIR.Proofs.Denote.insertIdxIfInBounds_of_le, Array.size_eraseIdx, Array.size_insertIdx,
@@ -495,19 +539,12 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
       VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_lt,
       VerexIR.Proofs.Denote.getElem?_insertIdx_toNat_of_gt, Array.getElem?_insertIdx_self])) #[]
     let discharge ← goalDischarge goal
-    let (sizeContext, sizeSimprocs, _) ← rulesSimpContext (← `(tactic| simp only
-      [Array.size_swapIfInBounds, $vectorSize:ident,
-      VerexIR.SpecSliceRef.currentVector_size, VerexIR.SpecSliceRef.finalVector_size])) #[]
-    let dischargeSizes : Simp.Discharge := fun condition => do
-      if let some proof ← discharge condition then return some proof
-      -- A guarded write can ask for a size before that observation exists
-      -- in the goal. Read it through certification and prior swaps using
-      -- the same size rules as ordinary normalization, then use the leaf's
-      -- existing bounds. Keep the vector itself in its canonical form.
-      let (normal, _) ← simp condition sizeContext sizeSimprocs
-      if normal.expr == condition then return none
-      let some proof ← discharge normal.expr | return none
-      return some (← normal.mkEqMPR proof)
+    let (sizeContext, sizeSimprocs) ← sizeRulesContext
+    -- A guarded write can ask for a size before that observation exists in
+    -- the goal: the condition goes through the size rules and the leaf's
+    -- existing bounds decide it there. Keep the vector in its canonical form.
+    let dischargeSizes : Simp.Discharge :=
+      provedThroughSizes sizeContext sizeSimprocs discharge
     let (result, _) ← simpGoal goal ctx simprocs (some dischargeSizes)
       (simplifyTarget := inTarget) (fvarIdsToSimp := written)
     pure result
@@ -2481,9 +2518,33 @@ elab "verex_split" : tactic => splitFirst true
 which a leaf reaches after it tried the variants of its tested locals. -/
 elab "verex_split_conditional" : tactic => splitFirst false
 
+/-- The locals a value is written with: the value itself where it is a local,
+and the locals at the fields of a constructor's application, to any depth.
+Only a local that is a value counts: a type, a proof, a frame and a memory
+are none, wherever they sit. -/
+private partial def valueLocals (value : Lean.Expr) (found : Array FVarId := #[]) :
+    MetaM (Array FVarId) := do
+  let value := value.consumeMData
+  if value.isFVar then
+    let type ← whnfR (← instantiateMVars (← inferType value))
+    if type.isSort || type.isAppOf ``VerexIR.Proofs.Denote.Memory || (← isProp type) ||
+        (← isClass? type).isSome then
+      return found
+    return found.push value.fvarId!
+  let .const name _ := value.getAppFn | return found
+  let some (.ctorInfo constructor) := (← getEnv).find? name | return found
+  let mut found := found
+  for field in value.getAppArgs.extract constructor.numParams value.getAppNumArgs do
+    found ← valueLocals field found
+  return found
+
 /-- A memory read fixed by a program step may still be conditional on a
-write's address aliasing the read's. Split only a read equation whose
-conditional branch is a memory lookup the goal actually uses. -/
+write's address aliasing the read's. Split only a read equation the leaf
+reads: one whose conditional branch is a memory lookup the goal uses, or one
+whose conditional gives a value the goal's target states, which is how a leaf
+holds the read of a written resource at a key the write does not decide. The
+target states the value where a local the equation gives it as (`valueLocals`)
+occurs in it; a frame, a type or a memory the two share is no such occurrence. -/
 elab "verex_memory_aliases" : tactic => focusGoal do
   let goal ← getMainGoal
   let candidate ← goal.withContext do
@@ -2493,28 +2554,325 @@ elab "verex_memory_aliases" : tactic => focusGoal do
         e.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.plainAt 7 ||
         e.isAppOfArity ``VerexIR.Proofs.Denote.InterpreterOps.read 8)
       #[target]).filterM fun e => do isStorageReadLHS e
-    if reads.isEmpty then return none
     for decl in ← getLCtx do
       if decl.isImplementationDetail then continue
       let some (_, left, right) := (← instantiateMVars decl.type).eq? | continue
-      for conditional in #[left, right] do
+      for (conditional, fixed) in #[(left, right), (right, left)] do
         unless conditional.isAppOfArity ``ite 5 do continue
         unless (conditional.getArg! 1).isAppOfArity ``Eq 3 do continue
-        unless ← reads.anyM (fun read => do
+        if ← reads.anyM (fun read => do
             return (← sameStorageRead read (conditional.getArg! 3)) ||
-              (← sameStorageRead read (conditional.getArg! 4))) do continue
+              (← sameStorageRead read (conditional.getArg! 4))) then
+          return some (decl.fvarId, conditional)
+        -- One branch is the lookup the write left and the equation gives
+        -- the value read as locals the target states, so the alias stands
+        -- between the goal and the read that gives that value its fact.
+        unless (← isStorageReadLHS (conditional.getArg! 3)) ||
+            (← isStorageReadLHS (conditional.getArg! 4)) do continue
+        let fixed := fixed.consumeMData
+        unless fixed.isAppOfArity ``Option.some 2 do continue
+        unless (← valueLocals (fixed.getArg! 1)).any (target.containsFVar ·) do continue
         return some (decl.fvarId, conditional)
     return none
   let some (hypothesis, conditional) := candidate
     | throwError "the goal reads no unresolved memory alias"
+  let name ← goal.withContext hypothesis.getUserName
   let (yes, no) ← goal.byCasesDec (conditional.getArg! 1) (conditional.getArg! 2)
     (← mkFreshUserName `alias)
   let mut goals := []
   for branch in [yes.mvarId, no.mvarId] do
     setGoals [branch]
     normalizeContext (target := false) (select := fun id => id == hypothesis)
-    goals := goals ++ (← getGoals)
+    for sub in ← getGoals do
+      -- The branch reads the resource where the split left it: the written
+      -- value in one, the memory before the write in the other. Where that
+      -- is a read, the value it gives carries the read's own fact, and a
+      -- fact entering a prepared leaf is opened where it enters: the opener
+      -- takes that fact alone, with what derives from it.
+      let (stated, fact?) ← sub.withContext do
+        match (← getLCtx).findFromUserName? name with
+        | some decl => statedReadFact sub decl.toExpr
+        | none => pure (sub, none)
+      match fact? with
+      | none => goals := goals ++ [sub]
+      | some fact =>
+        setGoals [stated]
+        try
+          assertCertifiedClauses
+            (fun statement => return (← canonicalFamilyResult statement).expr)
+            (introduced := some #[fact])
+        catch _ => pure ()
+        goals := goals ++ (← getGoals)
   setGoals goals
+
+/-! ## Validity conditions
+
+The normal form a validity condition of a call or of a function's entry has,
+and the consumers of that form on the goal and on the hypothesis side. -/
+
+/-- An argument of a `simp only` call. -/
+private abbrev SimpArgument := TSyntax [`Lean.Parser.Tactic.simpStar,
+  ``Lean.Parser.Tactic.simpErase, ``Lean.Parser.Tactic.simpLemma]
+
+/-- The readings of the validity normal form: a row's, a wrapper's and a
+tuple's fact, the transports of a fact and of a value between a callee's
+family and the caller's, and the certificate-free forms of a fact. They open
+no declaration's `NTy.Holds`. -/
+private def validityReadings : TacticM (Array SimpArgument) := do
+  let `(tactic| simp only [$readings,*]) ← `(tactic|
+    simp only [
+      VerexIR.Proofs.Denote.ResultShape.Holds,
+      VerexIR.Proofs.Denote.HList.holds_nil, VerexIR.Proofs.Denote.HList.holds_cons,
+      VerexIR.Proofs.Denote.NTy.holds_ref, VerexIR.Proofs.Denote.NTy.holds_tuple,
+      VerexIR.Proofs.Denote.NTy.holds_ghost, VerexIR.Proofs.Denote.NTy.holds_observed,
+      VerexIR.Proofs.Denote.NTy.holds_toSkolem_iff,
+      VerexIR.Proofs.Denote.NTy.holds_ofSkolem_iff,
+      VerexIR.Proofs.Denote.HList.holds_toSkolem_iff,
+      VerexIR.Proofs.Denote.HList.holds_ofSkolem_iff,
+      VerexIR.Proofs.Denote.variantCarrier.holds_toSkolem_iff,
+      VerexIR.Proofs.Denote.variantCarrier.holds_ofSkolem_iff,
+      ↓ ntyHoldsOuterFamily,
+      ↓ ofSkolemIdentity, ↓ toSkolemIdentity,
+      ↓ hlistOfSkolemIdentity, ↓ hlistToSkolemIdentity,
+      ↓ variantOfSkolemIdentity, ↓ variantToSkolemIdentity,
+      hlistToSkolemConstructor,
+      holdsWithoutCertificates, variantWithoutCertificates,
+      Prod.fst, Prod.snd])
+    | throwError "the validity normal form is no list of readings"
+  return readings.getElems
+
+/-- The normal form of a validity condition: the constants of the contract
+whose condition is read, `lemmas`, and the readings (`validityReadings`), as
+one rule set built for that contract. -/
+def validityNormalization (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) :
+    TacticM (Simp.Context × Simp.SimprocsArray) := do
+  let own : Array SimpArgument := lemmas.map fun lemma => ⟨lemma.raw⟩
+  let rules := own ++ (← validityReadings)
+  let (ctx, simprocs) ← simpContextOf (← `(tactic| simp only [$rules,*]))
+  return (← Simp.mkContext { ctx.config with failIfUnchanged := false } ctx.simpTheorems
+    ctx.congrTheorems, simprocs)
+
+/-- The same normal form for the conditions a leaf reads beside a call's:
+the readings' rules built once per target (`TargetState.validityReadings`),
+and the constants of a contract, if the condition is one's, beside them. -/
+def leafValidityNormalization (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) :
+    TacticM (Simp.Context × Simp.SimprocsArray) := do
+  let cache := (← targetState).validityReadings
+  let (ctx, simprocs) ← match ← cache.get with
+    | some known => pure known
+    | none =>
+        let built ← simpContextOf (← `(tactic| simp only [$(← validityReadings),*]))
+        cache.set (some built)
+        pure built
+  let (theorems, simprocs) ← if lemmas.isEmpty then pure (ctx.simpTheorems, simprocs) else do
+    let (own, ownSimprocs) ← simpContextOf (← `(tactic| simp only [$lemmas,*]))
+    pure (ctx.simpTheorems ++ own.simpTheorems, simprocs ++ ownSimprocs)
+  return (← Simp.mkContext { ctx.config with failIfUnchanged := false } theorems
+    ctx.congrTheorems, simprocs)
+
+/-- A validity condition in `validityNormalization`'s normal form: a
+right-nested conjunction with one conjunct per row position, each `True`, an
+atomic fact at the caller's family, or the conjunction a wrapper or a tuple
+reads. -/
+def validityNormalForm (normalization : Simp.Context × Simp.SimprocsArray)
+    (condition : Lean.Expr) : MetaM Simp.Result := do
+  let (ctx, simprocs) := normalization
+  let (result, _) ← Simp.main condition ctx (methods := Simp.mkDefaultMethodsCore simprocs)
+  return result
+
+/-- The atoms one conjunct of a validity condition in normal form states: the
+conjunct itself, or, where a wrapper or a tuple was read, the fact of each
+component; a `True` states nothing and is closed. -/
+partial def validityAtoms (goal : MVarId) (found : Array MVarId) :
+    MetaM (Array MVarId) := goal.withContext do
+  let target := (← instantiateMVars (← goal.getType)).consumeMData
+  if target.isConstOf ``True then
+    goal.assign (mkConst ``True.intro)
+    return found
+  unless target.isAppOfArity ``And 2 do return found.push goal
+  let [head, tail] ← goal.apply (mkConst ``And.intro) | return found.push goal
+  validityAtoms tail (← validityAtoms head found)
+
+/-- The atoms of a validity condition in normal form with their row
+positions: conjunct `k` of the right-nested conjunction is argument `k`, and
+the atoms a wrapper's or a tuple's reading left inside it are that argument's
+too. -/
+partial def argumentValidityGoals (goal : MVarId) (position : Nat)
+    (found : Array (Nat × MVarId)) : MetaM (Array (Nat × MVarId)) := goal.withContext do
+  let target := (← instantiateMVars (← goal.getType)).consumeMData
+  if target.isConstOf ``True then
+    goal.assign (mkConst ``True.intro)
+    return found
+  unless target.isAppOfArity ``And 2 do return found.push (position, goal)
+  let [head, tail] ← goal.apply (mkConst ``And.intro) | return found.push (position, goal)
+  let found := found ++ (← validityAtoms head #[]).map (position, ·)
+  argumentValidityGoals tail (position + 1) found
+
+/-- A goal stating a validity condition, discharged as a contract call's
+argument validity is: the condition in validity normal form, split into the
+atoms of each position, and each of them opened to the invariants it reads
+(`validityNormalForm`, `openHoldsGoal`). What stays open is returned with
+the position of the argument it belongs to. The condition is read in the
+goal's own context, and the normal form's rules are elaborated at the goal
+itself, whatever goals and context the caller holds. -/
+def openValidityGoal (lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma)) (goal : MVarId) :
+    TacticM (Array (Nat × MVarId)) := goal.withContext do
+  let condition ← instantiateMVars (← goal.getType)
+  let goals ← getGoals
+  setGoals [goal]
+  let normalization ← try leafValidityNormalization lemmas finally setGoals goals
+  let result ← validityNormalForm normalization condition
+  let restated ← mkFreshExprSyntheticOpaqueMVar result.expr
+  goal.assign (← result.mkEqMPR restated)
+  let mut owed := #[]
+  for (position, atom) in ← argumentValidityGoals restated.mvarId! 0 #[] do
+    for opened in ← openHoldsGoal atom do
+      owed := owed.push (position, opened)
+  return owed
+
+/-- The equation a normalization's result states of `condition`, as the rules
+taking a contract's conditions by equations need it: the result's own proof,
+or a reflexivity at the reduced form, where every rewrite was definitional
+and `Simp` left no proof although it reduced the term. -/
+def normalFormEquation (condition : Lean.Expr) (result : Simp.Result) : MetaM Lean.Expr := do
+  match result.proof? with
+  | some proof => pure proof
+  | none => mkExpectedTypeHint (← mkEqRefl condition) (← mkEq condition result.expr)
+
+/-- The atoms a validity statement in normal form states, in the order of
+the statement, each with its proof from a proof of the statement: a conjunct
+of the row, or, where a wrapper or a tuple was read inside one, the fact of
+each component; a `True` states none. -/
+partial def validityAtomProofs (statement proof : Lean.Expr)
+    (found : Array (Lean.Expr × Lean.Expr) := #[]) :
+    MetaM (Array (Lean.Expr × Lean.Expr)) := do
+  let statement := (← instantiateMVars statement).consumeMData
+  if statement.isConstOf ``True then return found
+  unless statement.isAppOfArity ``And 2 do return found.push (statement, proof)
+  let found ← validityAtomProofs (statement.getArg! 0) (← mkAppM ``And.left #[proof]) found
+  validityAtomProofs (statement.getArg! 1) (← mkAppM ``And.right #[proof]) found
+
+/-- The position of the binder named `name` among a goal's leading binders. -/
+partial def premisePosition? (target : Lean.Expr) (name : Name) (position : Nat := 0) :
+    Option Nat :=
+  match target with
+  | .forallE binder _ body _ =>
+      if binder == name then some position else premisePosition? body name (position + 1)
+  | _ => none
+
+/-- A validity statement entering the context as one hypothesis per atom: the
+binder `premise` of the goal, which states the validity in normal form, is
+replaced by one binder per atom the statement states, named by `naming` from
+the number of atoms and the atom's index among them, counting the atoms of
+the whole statement once and in its order. A statement of no atom leaves no
+binder, and the binders after it keep the names they were given.
+
+Neither the types of the binders after `premise` nor the conclusion may
+depend on its proof: they are taken over as they stand, while the proof
+itself is replaced by the atoms'. -/
+def introValidityAtoms (goal : MVarId) (premise : Name)
+    (naming : Nat → Nat → Name) : MetaM MVarId := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  let some position := premisePosition? target premise | return goal
+  let atoms (binders : Array Lean.Expr) : MetaM (Array (Lean.Expr × Lean.Expr)) := do
+    let hypothesis := binders[position]!
+    validityAtomProofs (← inferType hypothesis) hypothesis
+  let type ← forallTelescope target fun binders conclusion => do
+    let found ← atoms binders
+    let declarations := found.toList.mapIdx fun index (statement, _) =>
+      (naming found.size index, fun _ => pure statement)
+    withLocalDeclsD declarations.toArray fun introduced =>
+      mkForallFVars (binders.extract 0 position ++ introduced ++
+        binders.extract (position + 1) binders.size) conclusion
+  let next ← mkFreshExprSyntheticOpaqueMVar type (← goal.getTag)
+  goal.assign (← forallTelescope target fun binders _ => do
+    let found ← atoms binders
+    mkLambdaFVars binders (mkAppN next (binders.extract 0 position ++ found.map (·.2) ++
+      binders.extract (position + 1) binders.size)))
+  return next.mvarId!
+
+/-- A validity fact as one hypothesis per atom: the hypothesis, which states
+the fact in validity normal form, is replaced by one hypothesis per atom that
+form states (`validityAtomProofs`), under the fact's own name where it states
+one and under that name numbered in the statement's order where it states
+several. A fact stating nothing leaves no hypothesis. -/
+def splitValidityHypothesis (goal : MVarId) (hypothesis : FVarId) : MetaM MVarId :=
+  goal.withContext do
+    let declaration ← hypothesis.getDecl
+    let fact := declaration.userName
+    let statement := (← instantiateMVars declaration.type).consumeMData
+    let atoms ← validityAtomProofs statement declaration.toExpr
+    if atoms.size == 1 && atoms[0]!.1 == statement then return goal
+    let hypotheses := atoms.mapIdx fun index (statement, proof) =>
+      { userName := if atoms.size == 1 then fact
+          else Name.mkSimple s!"{fact.toString}_{index + 1}"
+        type := statement, value := proof : Hypothesis }
+    let (_, goal) ← goal.assertHypotheses hypotheses
+    goal.clear hypothesis
+
+/-- The validity fact named `fact` as one hypothesis per atom
+(`splitValidityHypothesis`). -/
+def splitValidityFact (goal : MVarId) (fact : Name) : MetaM MVarId := goal.withContext do
+  let some declaration := (← getLCtx).findFromUserName? fact | return goal
+  splitValidityHypothesis goal declaration.fvarId
+
+/-- A validity fact a statement the leaf opened hands over (`HList.Holds` of
+a row a behavioral predicate quantifies, `NTy.Holds` of a prophecy), as its
+consumers read one: the hypothesis restated in validity normal form
+(`validityNormalForm`) and left as one hypothesis per atom
+(`splitValidityHypothesis`). -/
+def assertValidityAtoms (goal : MVarId) (hypothesis : FVarId) : TacticM MVarId := do
+  let goals ← getGoals
+  -- The normal form's rules are elaborated at the goal the fact belongs to.
+  setGoals [goal]
+  try
+    goal.withContext do
+      let statement ← instantiateMVars (← hypothesis.getType)
+      let result ← validityNormalForm (← leafValidityNormalization #[]) statement
+      let restated ← goal.replaceLocalDecl hypothesis result.expr
+        (← normalFormEquation statement result)
+      splitValidityHypothesis restated.mvarId restated.fvarId
+  finally setGoals goals
+
+/-- A goal stating the validity of a row of values or of a value, closed
+from the facts the leaf holds: the condition discharged as a call's argument
+validity is (`openValidityGoal`). Where a fact is missing the goal and the
+context are left as they were. -/
+def closeValidity? (goal : MVarId) : TacticM Bool := do
+  let saved ← saveState
+  let closed ← try
+      let remaining ← openValidityGoal #[] goal
+      if verex.solverDebug.get (← getOptions) then
+        for (position, atom) in remaining do
+          IO.println s!"validity: position {position + 1} unpaid: {← ppExpr (← atom.getType)}"
+      pure remaining.isEmpty
+    catch error =>
+      if verex.solverDebug.get (← getOptions) then
+        IO.println s!"validity: not read: {← error.toMessageData.toString}"
+      pure false
+  unless closed do saved.restore
+  return closed
+
+/-- The validity `statement` states, from the facts the leaf holds
+(`closeValidity?`); `none` where a fact is missing. -/
+def rowValidity? (statement : Lean.Expr) : TacticM (Option Lean.Expr) := do
+  let valid ← mkFreshExprSyntheticOpaqueMVar statement
+  if ← closeValidity? valid.mvarId! then return some (← instantiateMVars valid)
+  return none
+
+/-- The validity `statement` states as a goal owes it where the leaf does not
+hold it: the statement in validity normal form, the conjunction of the atoms
+of each position (`validityNormalForm`), and the proof of the statement from
+it. -/
+def owedValidity (statement : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
+  let anchor ← mkFreshExprSyntheticOpaqueMVar statement
+  let goals ← getGoals
+  setGoals [anchor.mvarId!]
+  let normalization ← try leafValidityNormalization #[] finally setGoals goals
+  let result ← validityNormalForm normalization statement
+  let proof ← withLocalDeclD `owed result.expr fun owed => do
+    mkLambdaFVars #[owed] (← result.mkEqMPR owed)
+  return (result.expr, proof)
 
 /-- The behaviors a clause states of a function value at the entry values of
 its arguments, each with the behavior of an arguments row it is the reading
@@ -2524,6 +2882,23 @@ private def entryBehaviorReadings : Array (Name × Name × Name) :=
       ``VerexIR.Proofs.ensuresOfEntries_of_ensuresOf),
     (``VerexIR.Proofs.AbortsOfEntries, ``VerexIR.Proofs.AbortsOf,
       ``VerexIR.Proofs.abortsOfEntries_of_abortsOf)]
+
+/-- A behavior of an arguments row read at the row's entry values
+(`entryBehaviorReadings`): the reading takes the row's validity, which is
+discharged from the facts the leaf holds of its values as a call's argument
+validity is (`closeValidity?`). `none` where a fact is missing. -/
+private def entryReading? (reading : Name) (run : Lean.Expr) : TacticM (Option Lean.Expr) := do
+  let saved ← saveState
+  let rule ← mkConstWithFreshMVarLevels reading
+  let (arguments, _, _) ← forallMetaTelescope (← inferType rule)
+  let some stated := arguments.back? | return none
+  let some valid := arguments[arguments.size - 2]? | return none
+  if ← isDefEq stated run then
+    if ← closeValidity? valid.mvarId! then
+      let proof ← instantiateMVars (mkAppN rule arguments)
+      unless proof.hasExprMVar do return some proof
+  saved.restore
+  return none
 
 /-- A premise stating a behavior of a function value at the entry values of
 its arguments, from a hypothesis stating that behavior of an arguments row.
@@ -2545,16 +2920,11 @@ elab "verex_entry_behavior" : tactic => focusGoal do
     let statement := StatedFacts.unmarked (← instantiateMVars decl.type)
     unless statement.isAppOf behavior do continue
     let saved ← saveState
-    let rule ← mkConstWithFreshMVarLevels reading
-    let (arguments, _, conclusion) ← forallMetaTelescope (← inferType rule)
-    let some run := arguments.back? | continue
-    if ← isDefEq run decl.toExpr then
-      if ← isDefEq conclusion target then
-        let proof ← instantiateMVars (mkAppN rule arguments)
-        unless proof.hasExprMVar do
-          goal.assign proof
-          replaceMainGoal []
-          return
+    if let some proof ← entryReading? reading decl.toExpr then
+      if ← isDefEq (← inferType proof) target then
+        goal.assign proof
+        replaceMainGoal []
+        return
     saved.restore
   -- A run stated at a row that certifies a value the clause names plain reads
   -- at that value once its settled row is evaluated.
@@ -2567,7 +2937,8 @@ elab "verex_entry_behavior" : tactic => focusGoal do
         target.getAppNumArgs ≥ 6 && functionOf statement 5 == functionOf target 6 do continue
     let saved ← saveState
     try
-      let fact ← mkAppM reading #[decl.toExpr]
+      let some fact ← entryReading? reading decl.toExpr
+        | throwError "the run's arguments are not known valid"
       -- The reading proves the statement the goal marks.
       let stated ← mkFreshExprSyntheticOpaqueMVar target
       let asserted ← stated.mvarId!.assert `verexEntryReading (← inferType fact) fact
@@ -4169,6 +4540,7 @@ private def arrayLookups (terms : Array Lean.Expr) : Array Lean.Expr :=
 elab_rules : tactic
   | `(tactic| verex_name_lookups) => focusGoal do
     let mut goal ← getMainGoal
+    let (sizeContext, sizeSimprocs) ← sizeRulesContext
     let lookups ← goal.withContext do
       let hypotheses ← (← goal.getNondepPropHyps).mapM fun fvarId => do
         instantiateMVars (← fvarId.getType)
@@ -4220,9 +4592,11 @@ elab_rules : tactic
       let attempt ← saveState
       try
         let (fact, next) ← goal.withContext do
-          let inBounds ← mkFreshExprMVar (← mkAppM ``LT.lt #[index, ← mkAppM ``Array.size #[array]])
-          decideByOmega inBounds.mvarId!
-          let read ← mkAppOptM ``Array.getElem?_eq_getElem #[none, array, index, ← instantiateMVars inBounds]
+          let condition ← mkAppM ``LT.lt #[index, ← mkAppM ``Array.size #[array]]
+          let some inBounds ← provedThroughSizes (m := MetaM) sizeContext sizeSimprocs
+              (omegaProof? goal) condition
+            | throwError "the position is not within the array's size"
+          let read ← mkAppOptM ``Array.getElem?_eq_getElem #[none, array, index, inBounds]
           let statement ← withLocalDeclD `element element fun v => do
             mkLambdaFVars #[v] (← mkEq lookup (← mkAppM ``Option.some #[v]))
           let witness := ((← inferType read).getArg! 2).appArg!
@@ -4819,7 +5193,9 @@ private def rangesOverIntegerType (type : Lean.Expr) : MetaM Bool := do
 
 /-- Whether the written deciders can decide the leaf at all: they decide
 instances of hypotheses quantified over integer positions, lookups after
-writes, and the position facts produced by searches. A leaf with none of
+writes (`isLookupOperation`, and a bounded vector's write, which the leaf's
+normalization states as its array's), and the position facts produced by
+searches. A leaf with none of
 these (a storage leaf, or one whose quantifiers range over the values of a
 type, such as keys) is prepared only when it holds atoms `grind` relates
 (`verex_has_atoms`), and is otherwise left to the pipeline, whose normalization would only be paid
@@ -4828,9 +5204,7 @@ elab "verex_prepared_applies" : tactic => focusGoal do
   let goal ← getMainGoal
   let applies ← goal.withContext do
     let needsPreparation (e : Lean.Expr) : Bool :=
-      e.isConstOf ``Array.setIfInBounds || e.isConstOf ``VerexIR.SpecVector.set ||
-      e.isConstOf ``Array.eraseIdxIfInBounds || e.isConstOf ``Array.insertIdxIfInBounds ||
-      e.isConstOf ``findIndex?
+      isLookupOperation e || e.isConstOf ``VerexIR.SpecVector.set || e.isConstOf ``findIndex?
     if ((← instantiateMVars (← goal.getType)).find? needsPreparation).isSome then return true
     (← getLCtx).anyM fun decl => do
       if decl.isImplementationDetail then return false
@@ -5159,6 +5533,82 @@ private def resourceFrame? (unit functions σ arguments resource : Lean.Expr) :
   let_expr Skolems.resolve _ _ frame _ := type | return none
   if ← atFrame frame then return some (frame, none) else return none
 
+/-- A behavioral clause of a function value moved to the frame of its
+resource's type arguments (`Skolems.reframe`), stated at that frame, as the
+clause at the frame the value was moved from: the validity of its results
+(`ValidResultsAt.reframe_iff`), at rows decided free of references, the frame
+it keeps (`FramedAt.reframe_iff`), read at the arguments moved, and the memory
+it keeps (`KeepsMemoryAt.reframe_iff`).  None where the term is no such
+clause, where it is stated at another frame than the one its value was moved
+to, and where a row of a validity clause is not decided free of references:
+the clause then stays as it is. -/
+def behaviorAtFrame? (clause : Lean.Expr) : MetaM (Option Simp.Result) := do
+  let some (law, premises, frame?) :=
+      if clause.isAppOfArity ``VerexIR.Proofs.ValidResultsAt 8 then
+        some (``VerexIR.Proofs.ValidResultsAt.reframe_iff, 2, none)
+      else if clause.isAppOfArity ``VerexIR.Proofs.KeepsMemoryAt 8 then
+        some (``VerexIR.Proofs.KeepsMemoryAt.reframe_iff, 0, none)
+      else if clause.isAppOfArity ``VerexIR.Proofs.FramedAt 9 then
+        some (``VerexIR.Proofs.FramedAt.reframe_iff, 0, some (clause.getArg! 7))
+      else none
+    | return none
+  let arguments := clause.getAppArgs
+  let_expr Skolems.reframe unit functions frame params own _ bounded function :=
+      arguments.back!.consumeMData
+    | return none
+  let induced := mkAppN (mkConst ``Skolems.instance) #[unit, functions, frame, params, own]
+  unless ← withReducible (isDefEq arguments[3]! induced) do return none
+  let mut transport := mkAppN (mkConst law)
+    #[unit, functions, frame, params, own, arguments[2]!, arguments[4]!, arguments[5]!,
+      arguments[6]!]
+  -- The conditions of its rows, decided.
+  for _ in [0:premises] do
+    let .forallE _ condition _ _ ← whnfR (← inferType transport) | return none
+    let some decided ← decidedFrameFree? condition | return none
+    transport := mkApp transport decided
+  transport := mkAppN transport (#[bounded] ++ frame?.toArray ++ #[function])
+  let stated ← try withDefault (do Meta.check transport; whnfR (← inferType transport))
+    catch _ => return none
+  let_expr Iff moved atFrame := stated | return none
+  unless ← withDefault (isDefEq moved clause) do return none
+  -- A frame given as a predicate is applied to the arguments moved.
+  let atFrame ← Core.betaReduce atFrame
+  return some { expr := atFrame
+                proof? := some (← mkExpectedTypeHint (← mkPropExt transport)
+                  (← mkEq clause atFrame)) }
+
+/-- The clause of a selected case of a stored value moved to the frame of its
+resource's type arguments, in the spelling of the frame it was moved from:
+the case's own definition exposed, the fields of the moved value read as the
+fields moved (`Skolems.reframe_struct_fst`, `nominalReframeHead`), and each
+behavioral clause of a moved function value transported
+(`behaviorAtFrame?`), in one normalization of that clause.  Nothing else is
+rewritten: the clauses' markers stay, with their labels.  The statement and
+its equation with the clause given; none where no behavioral clause is
+transported, and the clause is then left as it is. -/
+def callerClause? (clause : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let exposed := (← unfoldDefinition? clause).getD clause
+  let mut theorems : SimpTheorems := {}
+  for rule in [``Skolems.reframe_struct_fst, ``Skolems.reframe_struct_snd] do
+    theorems ← theorems.addConst rule
+  let observations ← Simp.SimprocsArray.add #[] ``nominalReframeHead true
+  let observations ← observations.add ``nominalReframeRest true
+  let context ← Simp.mkContext
+    { zeta := false, beta := false, iota := false, proj := false } #[theorems]
+    (← getSimpCongrTheorems)
+  let observed := Simp.mkDefaultMethodsCore observations
+  let transported ← IO.mkRef false
+  let methods := { observed with post := fun term => do
+    match ← behaviorAtFrame? term with
+    | some atFrame =>
+        transported.set true
+        return .done atFrame
+    | none => observed.post term }
+  let (result, _) ← Simp.main exposed context (methods := methods)
+  unless ← transported.get do return none
+  return some (result.expr,
+    ← mkExpectedTypeHint (← result.getProof) (← mkEq clause result.expr))
+
 /-- A stored value's invariant (`StoredCase`) as the case of the value at its
 resource's type arguments, from the frame it is read or written at
 (`resourceFrame?`): the frame they induce, where the resource spells it, or
@@ -5168,7 +5618,7 @@ the stored invariant; none where the resource is not one of the
 declaration's. -/
 -- Retired with doc/plan/data-and-global-invariants.md, "The stored-invariant layer
 -- still exists for the declarations the carriers do not state": the carrier replaces it.
-private def storedCase? (type : Lean.Expr) (direct : Bool := false) :
+private def storedCase? (type : Lean.Expr) :
     TacticM (Option (Lean.Expr × (Lean.Expr → MetaM Lean.Expr) × (Lean.Expr → MetaM Lean.Expr))) := do
   unless type.isAppOfArity ``StoredCase 7 do return none
   let #[unit, functions, σ, arguments, holds, resource, value] := type.getAppArgs
@@ -5178,32 +5628,45 @@ private def storedCase? (type : Lean.Expr) (direct : Bool := false) :
   | some θ =>
       let atInstance := mkApp5 (mkConst ``Skolems.resource) unit functions frame σ arguments
       let same ← mkExpectedTypeHint (← mkEqRefl resource) (← mkEq resource atInstance)
-      -- A read of a declaration without type parameters (`direct`) is of the
-      -- stored value itself, as its invariant is stated at the runtime frame.
-      let read := mkApp5 (mkConst ``Skolems.ofRuntime) unit functions frame σ value
-      let read ← if direct && arguments.isConstOf ``NRow.nil then do
-          if ← withDefault (isDefEq read value) then pure value else pure read
-        else pure read
-      let statement := mkApp2 holds θ read
       let inhabitable := θ.appArg!
-      return some (statement,
-        fun held => mkAppOptM ``StoredCase.intro
-          #[some unit, some functions, none, none, none, none, none,
-            some inhabitable, some same, some held],
+      -- The statement is the one `StoredCase.intro` owes of this value, read
+      -- off the rule, so that the solver and the kernel spell it once.
+      let intro ← mkAppOptM ``StoredCase.intro
+        #[some unit, some functions, some σ, some arguments, some holds, some resource,
+          some value, some inhabitable, some same]
+      let .forallE _ statement _ _ ← whnfR (← inferType intro) | return none
+      return some (statement, fun held => pure (mkApp intro held),
         fun fact => mkExpectedTypeHint (mkApp2 fact inhabitable same) statement)
   | none =>
-      -- The declaration's parameters and the bound of its type, decided.
+      -- The rule's premises, the declaration's parameters and the bound of
+      -- its type, decided, up to the value it is stated of.
       let mut atFrame := mkAppN (mkConst ``StoredCase.atFrame)
         #[unit, functions, frame, σ, arguments, holds]
-      for _ in [0:2] do
-        let .forallE _ condition _ _ ← whnfR (← inferType atFrame) | return none
+      let mut stated ← whnfR (← inferType atFrame)
+      repeat
+        let .forallE _ condition body _ := stated | return none
+        if body.isAppOfArity ``Iff 2 then break
         let some decided ← decidedFrameFree? condition | return none
         atFrame := mkApp atFrame decided
-      let iff := mkApp atFrame value
-      let stated ← whnfR (← inferType iff)
-      let_expr Iff _ statement := stated | return none
-      return some (statement, fun held => mkAppM ``Iff.mpr #[iff, held],
-        fun fact => mkAppM ``Iff.mp #[iff, fact])
+        stated ← whnfR (← inferType atFrame)
+      -- The rule is stated of a value of the frame's resource, which the
+      -- stored value's resource is: the value is applied at that carrier.
+      let .forallE _ carrier conclusion _ := stated | return none
+      let_expr Iff _ statement := conclusion | return none
+      unless ← withDefault (isDefEq (← inferType value) carrier) do return none
+      let iff := mkApp atFrame (← mkExpectedTypeHint value carrier)
+      -- The case is stated of the value as the leaf spells it.
+      let statement := statement.instantiate1 value
+      let intro (held : Lean.Expr) : MetaM Lean.Expr := mkAppM ``Iff.mpr #[iff, held]
+      let elim (fact : Lean.Expr) : MetaM Lean.Expr := do
+        mkExpectedTypeHint (← mkAppM ``Iff.mp #[iff, fact]) statement
+      -- A behavioral clause of the case is handed over at the frame the case
+      -- is read or written at, in both directions.
+      match ← callerClause? statement with
+      | none => return some (statement, intro, elim)
+      | some (atCaller, same) =>
+          return some (atCaller, fun held => do intro (← mkEqMPR same held),
+            fun fact => do mkEqMP same (← elim fact))
 
 section
 variable {unit : Validation.ValidatedUnit} [functions : FunctionCarriers unit]
@@ -5421,114 +5884,35 @@ elab "verex_stored_cases" : tactic => do
     goals := goals.push rewritten
   setGoals goals.toList
 
-private def nominalReframeEquation_ (equation type : Lean.Expr) : MetaM Lean.Expr := do
-  unless isNominalType (← getEnv) type do return equation
-  let view ← nativeTypeView type
-  unless view.isAppOfArity ``NTy.struct 3 || view.isAppOfArity ``NTy.enum 5 do return equation
-  let statement ← instantiateMVars (← inferType equation)
-  let replaceType (e : Lean.Expr) : Lean.Expr :=
-    e.replace fun sub => if sub == type then some view else none
-  let canonical := statement.replace fun term =>
-    if term.isAppOfArity ``Skolems.reframe 8 && term.getArg! 5 == type then
-      let args := term.getAppArgs
-      some (mkAppN term.getAppFn ((args.set! 5 view).set! 6 (replaceType args[6]!)))
-    else if term.isAppOfArity ``Skolems.reframeAtBase 13 && term.getArg! 10 == type then
-      let args := term.getAppArgs
-      some (mkAppN term.getAppFn ((args.set! 10 view).set! 11 (replaceType args[11]!)))
-    else none
-  if canonical == statement then return equation
-  unless ← withNewMCtxDepth (withDefault (isDefEq statement canonical)) do return equation
-  return ← mkExpectedTypeHint equation canonical
-
 /-- A goal stating a declaration's data invariant of a row encoded at the
 leaf's frame, restated with the row at the base frame the declaration's type
 arguments induce, where the clauses are stated: the two frames give a row
-the same encoding (`Skolems.encode_reframeAtBase`), and the invariant is
-a predicate of the encoding.
+the same encoding (`reframedOwnAtInstance`), and the invariant is a predicate
+of the encoding.
 
 Taking the two frames for one instead rests on reducing the leaf frame's
 `Skolems.resolve`, a projection of a local frame, which the elaborator takes
 and the kernel refuses, so the step's proof is accepted and then rejected
-(`rowInhabitable?`).  The declaration's parameter row and its type carry no
-frame, so the framing bounds are decided (`decidedFrameFree?`). -/
+(`rowInhabitable?`). -/
 private def reframeOwnRow (goal : MVarId)
-    (unit functions base frame σ params typeArgs row : Lean.Expr) : MetaM MVarId := do
-  let some own ← decidedFrameFree? (← mkEq
-      (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.isParamsFrom) (mkNatLit 0) params)
-      (mkConst ``Bool.true))
-    | throwError "the type arguments {params} of the declaration are not its parameters"
-  let some inhabitable ← rowInhabitable? typeArgs
-    | throwError "the type arguments {typeArgs} are not known to be inhabitable"
-  let functionsCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.carrier)
-    unit functions
-  let baseCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.carrier)
-    unit base
-  let functionsFunctions := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.functions)
-    unit functions
-  let baseFunctions := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.functions)
-    unit base
-  let functionsNominals := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.nominals)
-    unit functions
-  let baseNominals := mkApp2 (mkConst ``VerexIR.Proofs.Denote.FunctionCarriers.nominals)
-    unit base
-  let sameCarrierType ← mkEq functionsCarrier baseCarrier
-  let sameFunctionsType ← mkHEq functionsFunctions baseFunctions
-  let sameNominalsType ← mkEq functionsNominals baseNominals
-  let reflFunctions ← mkHEqRefl baseFunctions
-  unless (← withDefault (isDefEq functionsCarrier baseCarrier)) &&
-      (← withDefault (isDefEq (← inferType reflFunctions) sameFunctionsType)) &&
-      (← withDefault (isDefEq functionsNominals baseNominals)) do
-    throwError "the unit's function carriers {functions} and base {base} do not share carriers"
-  let sameCarrier ← mkExpectedTypeHint (← mkEqRefl baseCarrier) sameCarrierType
-  let sameFunctions ← mkExpectedTypeHint reflFunctions sameFunctionsType
-  let sameNominals ← mkExpectedTypeHint (← mkEqRefl baseNominals) sameNominalsType
-  let reframing := mkAppN
-    (mkConst ``VerexIR.Proofs.Denote.Skolems.encode_reframeAtBase)
-    #[unit, functions, base, sameCarrier, sameFunctions, sameNominals,
-      frame, params, own, inhabitable, σ]
-  let some bounded ← decidedFrameFree? (← whnf (← inferType reframing)).bindingDomain!
-    | throwError "the declaration's type {σ} is not over its own parameters"
-  let equation ← nominalReframeEquation_ (mkApp2 reframing bounded row) σ
+    (unit functions base frame declared σ typeArgs row : Lean.Expr) : TacticM MVarId := do
+  let (same?, equation, _) ← reframedOwnAtInstance unit functions base frame declared σ typeArgs row
+  -- The row the goal carries read as the move states it: an argument of
+  -- `OwnAtArguments`, which quantifies its own inhabitability, so the goal
+  -- reads it by that equation alone.
+  let goal ← match same? with
+    | none => pure goal
+    | some same => do
+        let read ← goal.rewrite (← goal.getType) same (symm := true)
+        goal.replaceTargetEq read.eNew read.eqProof
   let rewritten ← goal.rewrite (← goal.getType) equation (symm := true)
   goal.replaceTargetEq rewritten.eNew rewritten.eqProof
 
-/-- A row of type arguments with each frame's resolution of a type without
-parameters replaced by that type (`Skolems.resolve_paramFree`), and the
-equation; none where no entry is such a resolution. -/
-private partial def closedResolutions? (row : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
-  let row := row.consumeMData
-  unless row.isAppOfArity ``VerexIR.Proofs.Denote.NRow.cons 2 do return none
-  let (τ, rest) := (row.getArg! 0, row.getArg! 1)
-  let tail? ← closedResolutions? rest
-  let resolved := τ.consumeMData
-  let head? ← if resolved.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.resolve 4 then
-      let type := resolved.appArg!.consumeMData
-      match ← decidedFrameFree? (← mkEq (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.paramFree) type)
-          (mkConst ``Bool.true)) with
-      | some free =>
-          let arguments := resolved.getAppArgs
-          pure (some (type, mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.resolve_paramFree)
-            #[arguments[0]!, arguments[1]!, arguments[2]!, type, free]))
-      | none => pure none
-    else pure none
-  if head?.isNone && tail?.isNone then return none
-  let (head, headEq) ← match head? with
-    | some found => pure found
-    | none => pure (τ, ← mkEqRefl τ)
-  let (tail, tailEq) ← match tail? with
-    | some found => pure found
-    | none => pure (rest, ← mkEqRefl rest)
-  let cons := mkConst ``VerexIR.Proofs.Denote.NRow.cons
-  return some (mkApp2 cons head tail, ← mkCongr (← mkCongrArg cons headEq) tailEq)
-
 /-- A goal stating a declaration's data invariant of an encoding, with the
 row at the frame the type arguments induce: unchanged where it is already
-there, moved where the row is stated at the leaf's frame over the
-declaration's own parameters (`reframeOwnRow`), and spelled without the
-frame's resolutions of closed types where the instance is closed: a closed
-instance's row reads no parameter, so it is the same term at both frames.
-An instance over other parameters is refused by `reframeOwnRow`. -/
-private def ownRowAtArguments (goal : MVarId) : MetaM MVarId := do
+there, and moved by the one move for any instance row where it is stated at
+the leaf's frame (`reframeOwnRow`). -/
+private def ownRowAtArguments (goal : MVarId) : TacticM MVarId := do
   let target ← instantiateMVars (← goal.getType)
   unless target.isAppOf ``VerexIR.Proofs.Denote.OwnAtArguments do
     throwError "the goal does not state a data invariant of an encoding"
@@ -5551,26 +5935,8 @@ private def ownRowAtArguments (goal : MVarId) : MetaM MVarId := do
   let view ← nativeTypeView σ
   unless view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 ||
       view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.struct 3 do return goal
-  let params := (view.getArg! 1).consumeMData
-  let own ← decidedFrameFree? (← mkEq
-      (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.isParamsFrom) (mkNatLit 0) params)
-      (mkConst ``Bool.true))
-  if own.isSome then
-    reframeOwnRow goal (carriers.getArg! 0) (carriers.getArg! 1) arguments[1]! frame σ params
-      arguments[4]! (value.getArg! 2)
-  else if (← decidedFrameFree? (← mkEq (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.paramFree) σ)
-      (mkConst ``Bool.true))).isSome then
-    -- A closed instance's row reads no parameter, so it is the same term at
-    -- both frames once the invariant's arguments are spelled without the
-    -- leaf frame's resolutions of closed types.
-    let some (_, same) ← closedResolutions? arguments[4]! | return goal
-    let rewritten ← goal.rewrite target same
-    goal.replaceTargetEq rewritten.eNew rewritten.eqProof
-  else
-    -- An instance over other parameters has no move yet: the reframing
-    -- refuses it with its reason.
-    reframeOwnRow goal (carriers.getArg! 0) (carriers.getArg! 1) arguments[1]! frame σ params
-      arguments[4]! (value.getArg! 2)
+  reframeOwnRow goal (carriers.getArg! 0) (carriers.getArg! 1) arguments[1]! frame
+    arguments[2]! σ arguments[4]! (value.getArg! 2)
 
 /-- Open a nominal obligation already stated at its own interpretation.
 The raw predicate quantifies decoded rows. Its encoding determines that row
@@ -5796,7 +6162,7 @@ elab "verex_stored_reads" : tactic => focusGoal do
       let fact ← normalized rawFact
       -- The selected case, at the resource's own type arguments.
       let case ← whnfR (← inferType fact)
-      match ← storedCase? case (direct := true) with
+      match ← storedCase? case with
       | some (_, _, elim) =>
           let selected ← normalized (← elim fact)
           let stated ← inferType selected
@@ -6257,12 +6623,13 @@ def decidePreparedCases (goals : List MVarId) (attempt : TacticM Unit → Tactic
           left := left ++ (← getUnsolvedGoals)
         setGoals left
     catch failure =>
-      -- Under `verex.solverDebug`, the prepared goal the attempt failed on.
+      -- Under `verex.solverDebug`, the goal as it stood before the attempt,
+      -- its preparation undone: the state a report of the failure reads.
       if verex.solverDebug.get (← getOptions) then
         saved.restore
         IO.println (← (m!"prepared attempt not decided: {failure.toMessageData}").toString)
         setGoals [goal]
-        evalTactic (← `(tactic| verex_trace_state "undecided attempt"))
+        evalTactic (← `(tactic| verex_trace_state "goal before the undecided attempt"))
       throw failure
     pending := (← getUnsolvedGoals) ++ pending
   return others.toList
@@ -6762,11 +7129,27 @@ private def clauseFailure (origin : Option Provenance) (snippet : String) : Mess
       m!"the precondition `{snippet}` of `{callee}` does not hold at this call"
   | some (.precondition callee (some call)) =>
       m!"the precondition `{snippet}` of `{callee}` does not hold at call {call}"
+  | some (.callArgument callee none position) =>
+      m!"the data invariant `{snippet}` does not hold for argument {position} of the call to \
+        `{callee}`"
+  | some (.callArgument callee (some call) position) =>
+      m!"the data invariant `{snippet}` does not hold for argument {position} of call {call} of \
+        `{callee}`"
+  | some .copyOut =>
+      m!"the data invariant `{snippet}` does not hold where a value is copied out of a mutable \
+        reference"
+  | some .exitMutationEnd =>
+      m!"the data invariant `{snippet}` does not hold where a mutable parameter's loan ends, at \
+        the function's exit"
   | some .storedWrite =>
       m!"the data invariant `{snippet}` does not hold for a value written to memory"
   | some .ghostWrite =>
       m!"the update `{snippet}` writes a value out of the ghost field type's domain"
-  | _ => m!"the specification clause `{snippet}` is not established"
+  -- A clause owed after a call, on a path a bound cut short, at a proof's
+  -- point, or where the function returns: the clause itself locates it.
+  | some (.continuation _ _) | some (.unrollBound _) | some (.pointAssert _ _) | some .returns
+  | none =>
+      m!"the specification clause `{snippet}` is not established"
 
 /-- A value's variant name without the tables it is read through, in the goals
 and messages a proof author reads. -/

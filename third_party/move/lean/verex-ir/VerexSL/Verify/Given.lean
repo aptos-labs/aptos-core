@@ -146,6 +146,26 @@ private def givenVerificationAttempt (ns : VerexIR.Validation.ValidatedNamespace
   finally
     modifyEnv (targetStateExt.setState · previous)
 
+/-- The names a proof gives a function's parameters: the declared name, and
+`argument{index}` for a parameter declared without one. -/
+def parameterNames (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Array String :=
+  declaration.signature.parameters.mapIdx fun index parameter =>
+    if parameter.name.isEmpty then s!"argument{index}" else parameter.name
+
+/-- The entry's validity as one fact per parameter, for the parameters a
+proof names `names`: the facts, `{parameter}_valid` in the parameters' order;
+the step that states them from the entry's validity `validArgs`, taken before
+the setup normalizes it (`verex_entry_validity`); and the step that leaves one
+hypothesis per atom of each once the setup has normalized them
+(`verex_entry_atoms`). -/
+def entryValidity {m : Type → Type} [Monad m] [MonadQuotation m] (names : Array String)
+    (validArgs : Ident) : m (Array Term × TSyntax `tactic × TSyntax `tactic) := do
+  let facts := names.map fun name => mkIdent (Name.mkSimple s!"{name}_valid")
+  return (facts.map fun fact => ⟨fact.raw⟩,
+    ← `(tactic| verex_entry_validity $validArgs:ident [$facts,*]),
+    ← `(tactic| verex_entry_atoms $facts*))
+
 /-- Prove the actual compiled body against the shared translated contract.
 Every external callable is an explicit Satisfies premise at this same carrier
 family. The concrete export separately requires relational transfer evidence. -/
@@ -267,19 +287,27 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
             | none => pure (← `(tactic| verex_solve_goals [$loopPairs,*] with [$calleePairs,*]),
                 ← `(tactic| skip))
           let errorsBefore := (← Core.getMessageLog).reportedPlusUnreported.toArray.countP (·.severity == .error)
+          -- The entry's facts are named after the locals the destructuring
+          -- binds: the parameters' names in a proof in steps, and the
+          -- pattern's positional names otherwise.
+          let validArgs := mkIdent `validArgs
+          let (entryFacts, entrySplit, entryAtoms) ← entryValidity
+            (if scopedArguments?.isSome then parameterNames declaration
+              else (Array.range compiled.params.length).map (s!"argument_{·}")) validArgs
           let proof ← Term.elabTerm (← `(term| by
             apply VerexIR.Proofs.satisfies_of_wp_valid
-            intro $arguments:ident initialState validArgs assumed permitted
+            intro $arguments:ident initialState $validArgs:ident assumed permitted
             have := VerexIR.Proofs.Denote.FunctionStart.intro $handleTerm $arguments initialState
             $destructure:tactic
+            all_goals $entrySplit:tactic
             simp only [$(rootIdent functionName):ident, $(rootIdent contractName):ident,
               VerexIR.Proofs.Denote.Function.denoteIn,
-              VerexIR.Proofs.Denote.Carriers.holds,
               VerexIR.Proofs.Denote.GivenFrame.holds_param, vir_denote_norm,
               reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq,
-              String.reduceBNe, String.reduceNe] at validArgs assumed permitted ⊢
+              String.reduceBNe, String.reduceNe] at $entryFacts* assumed permitted ⊢
             all_goals try simp only [VerexIR.Proofs.Obligation_eq] at permitted
-            all_goals verex_normalize at validArgs permitted ⊢
+            all_goals verex_normalize at $entryFacts* permitted ⊢
+            all_goals $entryAtoms:tactic
             all_goals $automatic:tactic
             all_goals $authored:tactic)) (some statement)
           Term.synthesizeSyntheticMVarsNoPostponing
@@ -308,7 +336,6 @@ def declareGivenFunction (unit : ValidatedUnit) (handle : FunctionHandle)
   try
     elabCommand (← `(command|
       attribute [local vir_denote_norm]
-        VerexIR.Proofs.Denote.Carriers.holds
         VerexIR.Proofs.Denote.GivenFrame.holds_param))
     declareGivenFunctionCore unit handle compiled base strategy? own? authored scopedArguments?
   finally

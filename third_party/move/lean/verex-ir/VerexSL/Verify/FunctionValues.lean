@@ -1138,13 +1138,38 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     let state := mkIdent `state
     let pre := mkIdent `pre
     let post := mkIdent `post
+    let held := mkIdent `held
     let meaning ← `(@VerexIR.Proofs.Denote.closureMeaning $unitIdent _ $executable $runtimeFrame)
+    -- A behavior at the woven entry values is stated of a valid row, the
+    -- captures among it, so the equation holds of captures that hold their
+    -- data invariants: a premise where the captured row states one, and by
+    -- the row's types alone where it states none.  An equation without the
+    -- premise is a normalization rule; one with it is the site's, read by
+    -- the leaf that holds the captures' fact (`guardedWovenExtension`).
+    let stateEquation (name : Name) : CommandElabM Unit := do
+      if site.captured.invariantFree then
+        elabCommand (← `(command| attribute [vir_denote_norm] $(rootIdent name):ident))
+      else
+        modifyEnv fun environment => guardedWovenExtension.addEntry environment
+          (family ++ Name.mkSimple s!"site{index}", name)
+    let capturesValid : Array (TSyntax ``Lean.Parser.Term.bracketedBinder) ←
+      if site.captured.invariantFree then pure #[]
+      else do
+        let binder ← `(Lean.Parser.Term.bracketedBinderF|
+          ($held : @VerexIR.Proofs.Denote.HList.Holds $runtimeCarriers $row $captures))
+        pure #[⟨binder.raw⟩]
+    let heldTerm ← if site.captured.invariantFree then
+        `((@VerexIR.Proofs.Denote.HList.holds_iff $runtimeCarriers $row $captures).mpr
+          (@VerexIR.Proofs.Denote.HList.deepHolds_of_invariantFree $runtimeCarriers $row
+            (by decide) $captures))
+      else `($held)
     let woven ← `(@VerexIR.Proofs.Denote.Weave.compose $unitIdent _ $runtimeFrame $fullRow $row
       $parameters $weave $captures $entries)
     elabCommand (← `(command|
-      @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenAborts{index}")):ident
+      theorem $(rootIdent (family ++ Name.mkSimple s!"wovenAborts{index}")):ident
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
           ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          $capturesValid*
           ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
           ($state : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
           @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
@@ -1153,12 +1178,14 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
               $namedShared $shape ($namedCtor ()) $woven $state := by
         letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
         exact VerexIR.Proofs.abortsOfEntries_closureOf_woven (named_shared := $namedShared)
-          $weave (by decide) #[] $captures $shared $shape ($ctor $captures) ($closure $captures)
-          ($namedCtor ()) ($namedClosure ()) $entries $state))
+          $weave (by decide) #[] $captures $heldTerm $shared $shape ($ctor $captures)
+          ($closure $captures) ($namedCtor ()) ($namedClosure ()) $entries $state))
+    stateEquation (family ++ Name.mkSimple s!"wovenAborts{index}")
     elabCommand (← `(command|
-      @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"wovenEnsures{index}")):ident
+      theorem $(rootIdent (family ++ Name.mkSimple s!"wovenEnsures{index}")):ident
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
           ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          $capturesValid*
           ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
           ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
             (VerexIR.Proofs.Denote.NRow.finals $parameters))
@@ -1172,19 +1199,21 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
               $pre $post := by
         letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
         exact VerexIR.Proofs.ensuresOfEntries_closureOf_woven (named_shared := $namedShared)
-          (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $shared
-          $shape ($ctor $captures) ($closure $captures) ($namedCtor ()) ($namedClosure ())
-          $entries HEq.rfl $result $pre $post))
+          (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $heldTerm
+          $shared $shape ($ctor $captures) ($closure $captures) ($namedCtor ())
+          ($namedClosure ()) $entries HEq.rfl $result $pre $post))
+    stateEquation (family ++ Name.mkSimple s!"wovenEnsures{index}")
     -- A target returning a mutable reference: the clause reads the result as
     -- its current value (`EnsuresOfSettled`).
     if let .cons (.ref referent) .nil := site.results then
       let σ ← typeIdent family referent
       let current := mkIdent `current
       elabCommand (← `(command|
-        @[vir_denote_norm] theorem
+        theorem
             $(rootIdent (family ++ Name.mkSimple s!"wovenEnsuresSettled{index}")):ident
             ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
             ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+            $capturesValid*
             ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
             ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
               (VerexIR.Proofs.Denote.NRow.finals $parameters))
@@ -1196,9 +1225,10 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
                 $namedShared $σ ($namedCtor ()) $woven $finals $current $pre $post := by
           letI : VerexIR.Proofs.Denote.Skolems $unitIdent := $runtimeFrame
           exact VerexIR.Proofs.ensuresOfSettled_closureOf_woven (named_shared := $namedShared)
-            (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $shared
-            $σ ($ctor $captures) ($closure $captures) ($namedCtor ()) ($namedClosure ())
+            (finals := $finals) (finals' := $finals) $weave (by decide) #[] $captures $heldTerm
+            $shared $σ ($ctor $captures) ($closure $captures) ($namedCtor ()) ($namedClosure ())
             $entries HEq.rfl $current $pre $post))
+      stateEquation (family ++ Name.mkSimple s!"wovenEnsuresSettled{index}")
 
 /-- Declare a unit's function values once, before its first theorem: the
 generated family where the link set has closure sites, the library's

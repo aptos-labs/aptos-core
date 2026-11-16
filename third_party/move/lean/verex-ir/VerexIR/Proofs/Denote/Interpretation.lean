@@ -77,6 +77,8 @@ is introduced into generic clauses. -/
     letI : Carriers := frame.operations
     exact { compare := (Carriers.orders index).order rank,
             lawful := inferInstance, trans := inferInstance }
+  order_encode := fun rank left right =>
+    ((frame.operations.orders index).order_encode rank left right).symm
 
 /-- Choose the canonical representation of each given parameter. While the
 Given route is parked (`U2`), parameter well-formedness in the frame stays

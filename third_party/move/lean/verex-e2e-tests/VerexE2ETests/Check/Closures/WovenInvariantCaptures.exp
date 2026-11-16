@@ -1,0 +1,17 @@
+VerexE2ETests/Check/Closures/WovenInvariantCaptures.lean:27:4: error: the data invariant `invariant value <= 100` does not hold where a value is constructed
+VerexE2ETests/Check/Closures/WovenInvariantCaptures.lean:70:7: error: verex verification failed: the automatic verification of `scaling_unchecked` failed; provide a proof in the module:
+  verify scaling_unchecked by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/WovenInvariantCaptures.lean:78:4: error: the specification clause `ensures ∀ (x : u64),
+      aborts_of<result>(x) == aborts_of<function[Fn(Percent, u64) -> u64](scale)>(q, x)` is not established
+VerexE2ETests/Check/Closures/WovenInvariantCaptures.lean:76:7: error: verex verification failed: the automatic verification of `scaling_other` failed; provide a proof in the module:
+  verify scaling_other by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

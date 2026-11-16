@@ -1,0 +1,34 @@
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:25:4: error: the data invariant `invariant value <= 100` does not hold where a value is constructed
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:28:4: error: the data invariant `f : Fn(u64) -> Percent has Copy, Drop, Store` does not hold where a value is constructed
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:62:7: error: verex verification failed: the automatic verification of `publish_unjustified` failed; provide a proof in the module:
+  verify publish_unjustified by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:108:4: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:106:7: error: verex verification failed: the automatic verification of `apply_stored_total` failed; provide a proof in the module:
+  verify apply_stored_total by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:115:4: error: the specification clause `ensures result == result_of<probe>(7)` is not established
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:113:7: error: verex verification failed: the automatic verification of `apply_stored_same` failed; provide a proof in the module:
+  verify apply_stored_same by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:36:4: error: the data invariant `h : Fn(u64) -> T has Copy, Drop, Store` does not hold where a value is constructed
+VerexE2ETests/Check/Closures/StoredResultValidity.lean:122:7: error: verex verification failed: the automatic verification of `publish_box_writer` failed; provide a proof in the module:
+  verify publish_box_writer by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

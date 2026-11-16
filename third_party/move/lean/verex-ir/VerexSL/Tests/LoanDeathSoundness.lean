@@ -300,8 +300,8 @@ run_cmd do
     (← `(command| verify 0x42::reborrow_death::whole_either_swapped_bad by lean =>
       verex_obligations
       all_goals (verex_prepare <;> (exfalso; omega))))
-  expectUnestablished `«0x42».reborrow_death.ancestor_left_open_bad [ordered]
-    (← `(command| verify 0x42::reborrow_death::ancestor_left_open_bad))
+  expectCuts `«0x42».reborrow_death.ancestor_left_open_bad [(ordered, exit)]
+    (← `(command| verify 0x42::reborrow_death::ancestor_left_open_bad)) (some [])
   expectScriptFails `«0x42».reborrow_death.ancestor_left_open_bad
     (← `(command| verify 0x42::reborrow_death::ancestor_left_open_bad by lean =>
       verex_obligations
@@ -330,8 +330,8 @@ run_cmd do
     (← `(command| verify 0x42::reborrow_death::escapes_to_callee by lean =>
       verex_obligations
       all_goals (verex_prepare <;> (exfalso; omega))))
-  expectUnestablished `«0x42».reborrow_death.left_of_bad [percent]
-    (← `(command| verify 0x42::reborrow_death::left_of_bad))
+  expectCuts `«0x42».reborrow_death.left_of_bad [(percent, exit)]
+    (← `(command| verify 0x42::reborrow_death::left_of_bad)) (some [])
   expectScriptFails `«0x42».reborrow_death.left_of_bad
     (← `(command| verify 0x42::reborrow_death::left_of_bad by lean =>
       verex_obligations

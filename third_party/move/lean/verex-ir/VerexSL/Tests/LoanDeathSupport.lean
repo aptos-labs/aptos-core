@@ -70,9 +70,12 @@ def rejectedDiagnostics (base : Name) (command : TSyntax `command) :
   return diagnostics
 
 /-- The automatic verification is rejected, and the cuts it names are exactly
-the expected ones: a clause and where it is owed. -/
+the expected ones: a clause and where it is owed. `clauses` are the source
+clauses the report may also name as unestablished; `none` allows any, as a
+mixed report has them. -/
 def expectCuts (base : Name) (expected : List (String × String))
-    (command : TSyntax `command) : Command.CommandElabM Unit := do
+    (command : TSyntax `command) (clauses : Option (List String) := none) :
+    Command.CommandElabM Unit := do
   unless !expected.isEmpty do
     throwError "{base}: expected cuts list must be non-empty"
   let diagnostics ← rejectedDiagnostics base command
@@ -93,6 +96,12 @@ def expectCuts (base : Name) (expected : List (String × String))
     s!"the data invariant `{clause}` does not hold {boundary}"
   unless cuts == wanted do
     throwError "{base}: expected the cuts {wanted}, found {diagnostics}"
+  if let some clauses := clauses then
+    let named := diagnostics.filter (·.startsWith "the specification clause ")
+    let wantedClauses := clauses.map fun clause =>
+      s!"the specification clause `{clause}` is not established"
+    unless named == wantedClauses do
+      throwError "{base}: expected the clauses {wantedClauses}, found {diagnostics}"
 
 /-- The automatic verification is rejected while the report names the clause
 as one the proof does not establish, not as a cut of its own: the obligation

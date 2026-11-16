@@ -2166,4 +2166,27 @@ def siteEquationsAt? (environment : Lean.Environment) (constructor : Lean.Name) 
     Option SiteEquations :=
   (siteEquationsExtension.getState environment).byConstructor.find? constructor
 
+/-- A table of sites' equations with one added to its site's. -/
+def addGuardedWoven (table : Lean.NameMap (Array Lean.Name)) (entry : Lean.Name × Lean.Name) :
+    Lean.NameMap (Array Lean.Name) :=
+  table.insert entry.1 (((table.find? entry.1).getD #[]).push entry.2)
+
+/-- The generated equations of a closure site's behaviors at the woven row
+that take the captures' fact, by the site's constructor: a site whose
+captured row states a data invariant behaves as the value naming its target
+at captures that hold it, so no normalization applies these equations; the
+leaf that holds the captures' fact does (`guardedWovenAt`). -/
+initialize guardedWovenExtension :
+    Lean.SimplePersistentEnvExtension (Lean.Name × Lean.Name) (Lean.NameMap (Array Lean.Name)) ←
+  Lean.registerSimplePersistentEnvExtension {
+    addEntryFn := addGuardedWoven
+    addImportedFn := fun entries => Lean.mkStateFromImportedEntries addGuardedWoven {} entries }
+
+/-- The equations of a site's behaviors that take its captures' fact
+(`guardedWovenExtension`), by its constructor; none for a site whose captured
+row states no invariant. -/
+def guardedWovenAt (environment : Lean.Environment) (constructor : Lean.Name) :
+    Array Lean.Name :=
+  ((guardedWovenExtension.getState environment).find? constructor).getD #[]
+
 end VerexIR.Proofs.Denote

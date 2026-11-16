@@ -483,7 +483,7 @@ theorem satisfies_of_wp (function : Args → Spec σ ε Result)
           ¬contract.mustAbort args initial)
         (contract.aborts args initial)
         initial)
-    (validRes : ∀ r, contract.validResult r := by intros; trivial) :
+    (validRes : ∀ r, contract.validResult r) :
     Satisfies function contract := by
   intro args initial _ assumed permitted
   have step := proof args initial assumed permitted
@@ -628,7 +628,7 @@ theorem wp_of_satisfies
     (assumed : contract.assumes args initial)
     (permitted : contract.requires args initial)
     (noAbort : ¬contract.mayAbort args initial := by simp)
-    (valid : contract.validArgs args := by trivial) :
+    (valid : contract.validArgs args) :
     wp (function args)
       (fun result final =>
         contract.ensures args initial result final ∧
@@ -649,7 +649,7 @@ theorem aborts_of_satisfies
     (verified : Satisfies function contract)
     (assumed : contract.assumes args initial)
     (permitted : contract.requires args initial)
-    (valid : contract.validArgs args := by trivial) :
+    (valid : contract.validArgs args) :
     ∀ error, (function args).aborts initial error →
       contract.aborts args initial error :=
   (verified args initial valid assumed permitted).2.1
@@ -707,7 +707,7 @@ theorem satisfies_fix_of_wp
             ¬contract.mustAbort args initial)
           (contract.aborts args initial)
           initial)
-    (validRes : ∀ r, contract.validResult r := by intros; trivial) :
+    (validRes : ∀ r, contract.validResult r) :
     Satisfies (Spec.fix body) contract := by
   apply satisfies_fix body contract
   intro recursive recursiveVerified
@@ -738,16 +738,18 @@ theorem wp_withInvariant_fix {Args Result : Type}
     mustAbort := fun _ _ => False
     frame := fun _ _ _ _ => True }
   have verified : Satisfies (Spec.fix body) contract := by
-    apply satisfies_fix_of_wp body contract
+    apply satisfies_fix_of_wp body contract (validRes := fun _ => trivial)
     intro recursive recursiveVerified args store _ permitted
     have hypothesis : ∀ args store, invariant args store →
         wp (recursive args) ensures aborts store := fun args store holds =>
-      wp_mono (wp_of_satisfies recursiveVerified trivial holds (noAbort := fun h => h))
+      wp_mono (wp_of_satisfies recursiveVerified trivial holds (noAbort := fun h => h)
+          (valid := trivial))
         (fun _ _ h => h.1) (fun _ h => h)
     exact wp_mono (step recursive hypothesis args store permitted)
       (fun _ _ h => ⟨fun _ => h, trivial, fun h' => h'⟩) (fun _ h => h)
   show wp (Spec.fix body init) ensures aborts initial
-  exact wp_mono (wp_of_satisfies verified trivial entry (noAbort := fun h => h))
+  exact wp_mono (wp_of_satisfies verified trivial entry (noAbort := fun h => h)
+      (valid := trivial))
     (fun _ _ h => h.1) (fun _ h => h)
 
 /-- Loop verification for a loop that leaves the store as it found it: the
@@ -816,7 +818,7 @@ theorem satisfies_fixFamily_of_wp
             ¬(contracts index).mustAbort args initial)
           ((contracts index).aborts args initial)
           initial)
-    (validRes : ∀ index r, (contracts index).validResult r := by intros; trivial) :
+    (validRes : ∀ index r, (contracts index).validResult r) :
     ∀ index, Satisfies (Spec.fixFamily body index) (contracts index) := by
   apply satisfies_fixFamily body contracts
   intro recursive recursiveVerified index

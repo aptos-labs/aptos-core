@@ -181,7 +181,7 @@ error: verex verification failed: the automatic verification of `break_second_bo
 verify folded_boundary_and_loop_invariants::break_second_boundary
 
 /--
-error: the specification clause `invariant low < 10` is not established
+error: the data invariant `invariant low < 10` does not hold where a mutable parameter's loan ends, at the function's exit
 ---
 error: verex verification failed: the automatic verification of `break_holder` failed; provide a proof in the module:
   verify break_holder by lean =>
@@ -313,9 +313,11 @@ verex namespace given_nested_param_ref where
 
 verify given_nested_param_ref::keep_holder_param
 verify given_nested_param_ref::branch_nested_param
+-- The entry's fact at a type parameter is closed by the preparation itself, so
+-- the authored proof needs no decision after it.
 verify given_nested_param_ref::prepare_nested_param by lean =>
   verex_obligations
-  all_goals (verex_prepare; verex_decide)
+  all_goals verex_prepare
 
 open Lean Elab Command VerexSL.Verify in
 run_cmd do

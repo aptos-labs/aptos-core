@@ -17,7 +17,11 @@ the written element's named obligation rather than falling back to elementwise
 quantification over the updated backing array; when unselected (no old-container
 fact in hand, an out-of-bounds spec write, or a declared nominal container with
 its own cross-element invariant), the opener takes the structural or elementwise
-reading directly. -/
+reading directly. The same selection governs the two other readings of a
+container's fact: the element a goal reads at a position, which the fact gives
+where the read carries its bounds proof, and the whole-container operations
+`eraseBounded` and `swapBounded`, whose result holds where their operand's
+fact is in hand. -/
 
 open Lean Meta Elab Tactic VerexIR VerexIR.Proofs VerexIR.Proofs.Denote VerexSL
 
@@ -85,6 +89,142 @@ verex namespace written_container_holds where
     requires amount <= 100
     panics_if false
 
+-- A removal reads its element as the one optional read of a container, so the
+-- element's own fact is opened into its fields' and a clause about a field of
+-- the removed element is decided from them. An insertion is an operation of
+-- its own, whose result holds where the vector and the inserted element do,
+-- and an append is the insertion at the length.
+verex module 0x42::written_vector_elements where
+  pragma verify = false
+
+  struct Entry {K has Copy, Drop, Store} {V has Copy, Drop, Store} has Copy, Drop, Store where
+    key : K
+    value : V
+
+  struct Rows {K has Copy, Drop, Store} {V has Copy, Drop, Store} has Copy, Drop, Store where
+    items : Vector<Entry<K, V> >
+
+  struct Plain {K has Copy, Drop, Store} has Copy, Drop, Store where
+    items : Vector<K>
+
+  -- A removal returning a field of the removed element.
+  fun remove_rows {K has Copy, Drop, Store} {V has Copy, Drop, Store}(box : &mut Rows<K, V>,
+      index : u64) -> V := do
+    let items := &mut box.items
+    let (removed, rest) := core.prim.removeVector(*items, index)
+    *items := rest
+    removed.value
+  spec remove_rows where
+    requires index < box.items.length
+    ensures box.items.length + 1 == old(box).items.length
+
+  -- The removed element itself, at the parameter's type; and a field of an
+  -- element read without a removal.
+  fun remove_plain {K has Copy, Drop, Store}(box : &mut Plain<K>, index : u64) -> K := do
+    let items := &mut box.items
+    let (removed, rest) := core.prim.removeVector(*items, index)
+    *items := rest
+    removed
+  spec remove_plain where
+    requires index < box.items.length
+    ensures box.items.length + 1 == old(box).items.length
+
+  fun remove_rows_whole {K has Copy, Drop, Store} {V has Copy, Drop, Store}(box : &mut Rows<K, V>,
+      index : u64) -> Entry<K, V> := do
+    let items := &mut box.items
+    let (removed, rest) := core.prim.removeVector(*items, index)
+    *items := rest
+    removed
+  spec remove_rows_whole where
+    requires index < box.items.length
+    ensures box.items.length + 1 == old(box).items.length
+
+  fun read_rows {K has Copy, Drop, Store} {V has Copy, Drop, Store}(box : &Rows<K, V>,
+      index : u64) -> V :=
+    box.items[index].value
+  spec read_rows where
+    requires index < box.items.length
+
+  struct LimitedRows {K has Copy, Drop, Store} {V has Copy, Drop, Store} has Copy, Drop, Store where
+    items : Vector<Entry<K, V> >
+  spec LimitedRows where
+    invariant items.length <= 100
+
+  -- An insertion written back through a mutable borrow, at a type parameter
+  -- and at a closed instance.
+  fun insert_plain {K has Copy, Drop, Store}(box : &mut Plain<K>, index : u64, key : K) -> Unit := do
+    let items := &mut box.items
+    *items := core.prim.insertVector(*items, index, key)
+  spec insert_plain where
+    requires index <= box.items.length
+    ensures box.items.length == old(box).items.length + 1
+
+  fun insert_limited_rows_closed(box : &mut LimitedRows<u64, u64>, index : u64, key : u64,
+      value : u64) -> Unit := do
+    let items := &mut box.items
+    *items := core.prim.insertVector(*items, index, new Entry<u64, u64> { key := key, value := value })
+  spec insert_limited_rows_closed where
+    requires index <= box.items.length && box.items.length < 100
+    ensures box.items.length == old(box).items.length + 1
+
+  struct Share has Copy, Drop, Store where
+    value : u64
+  spec Share where
+    invariant value <= 100
+
+  enum Payment has Copy, Drop, Store where
+    | None
+    | Direct (amount : u64)
+  spec Payment where
+    invariant match this with
+      | Payment::None {} => true
+      | Payment::Direct { amount := amount } => amount > 0
+
+  -- An append of an element whose fact is in hand, to a vector of its type.
+  fun push_struct_ok(v : Vector<Share>, p : Share) -> Vector<Share> :=
+    core.prim.pushVector(v, p)
+  spec push_struct_ok where
+    aborts_if false
+    ensures result.length == v.length + 1
+    ensures result[v.length] == p
+
+  fun push_enum_ok(v : Vector<Payment>, amount : u64) -> Vector<Payment> :=
+    core.prim.pushVector(v, new Payment::Direct { amount })
+  spec push_enum_ok where
+    requires amount > 0
+    aborts_if false
+    ensures result.length == v.length + 1
+
+  -- An append of a value its type's invariant refuses, and an append that
+  -- does not leave the length it was given.
+  fun push_struct_bad(v : Vector<Share>) -> Vector<Share> :=
+    core.prim.pushVector(v, new Share { value := 101 })
+  spec push_struct_bad where
+    aborts_if false
+
+  fun push_enum_bad(v : Vector<Payment>) -> Vector<Payment> :=
+    core.prim.pushVector(v, new Payment::Direct { amount := 0 })
+  spec push_enum_bad where
+    aborts_if false
+
+  fun push_struct_length_bad(v : Vector<Share>, p : Share) -> Vector<Share> :=
+    core.prim.pushVector(v, p)
+  spec push_struct_length_bad where
+    aborts_if false
+    ensures result.length == v.length
+
+  -- The removal drops one element, so the length it leaves is not the one it
+  -- was given.
+  fun remove_rows_length_bad {K has Copy, Drop, Store} {V has Copy, Drop, Store}
+      (box : &mut Rows<K, V>, index : u64) -> V := do
+    let items := &mut box.items
+    let (removed, rest) := core.prim.removeVector(*items, index)
+    *items := rest
+    removed.value
+  spec remove_rows_length_bad where
+    requires index < box.items.length
+    ensures box.items.length == old(box).items.length
+
 -- Elaborate the unit's carrier family before running negative and tactic controls.
 run_cmd do
   let some unit := VerexSL.registeredUnit? (← getEnv) `written_container_holds
@@ -99,12 +239,25 @@ open LoanDeathControls in
 run_cmd do
   let percent := "invariant value <= 100"
   let ordered := "invariant items[0].value <= items[1].value"
-  expectUnestablished `written_container_holds.vec_write_invalid_bad [percent]
-    (← `(command| verify written_container_holds::vec_write_invalid_bad))
-  expectUnestablished `written_container_holds.array_two_writes_second_invalid_bad [percent]
-    (← `(command| verify written_container_holds::array_two_writes_second_invalid_bad))
+  expectCuts `written_container_holds.vec_write_invalid_bad [(percent, exit)]
+    (← `(command| verify written_container_holds::vec_write_invalid_bad)) (some [])
+  expectCuts `written_container_holds.array_two_writes_second_invalid_bad [(percent, exit)]
+    (← `(command| verify written_container_holds::array_two_writes_second_invalid_bad)) (some [])
   expectCuts `written_container_holds.ordered_pair_cross_clause_bad [(ordered, mutationEnd)]
     (← `(command| verify written_container_holds::ordered_pair_cross_clause_bad))
+  expectUnestablished `«0x42».written_vector_elements.remove_rows_length_bad
+    ["ensures box.items.length == old(box).items.length"]
+    (← `(command| verify 0x42::written_vector_elements::remove_rows_length_bad))
+  let payment := "invariant match this with\n" ++
+    "      | Payment::None {} => true\n" ++
+    "      | Payment::Direct { amount := amount } => amount > 0"
+  expectCuts `«0x42».written_vector_elements.push_struct_bad [(percent, construction)]
+    (← `(command| verify 0x42::written_vector_elements::push_struct_bad)) (some [])
+  expectCuts `«0x42».written_vector_elements.push_enum_bad [(payment, construction)]
+    (← `(command| verify 0x42::written_vector_elements::push_enum_bad)) (some [])
+  expectUnestablished `«0x42».written_vector_elements.push_struct_length_bad
+    ["ensures result.length == v.length"]
+    (← `(command| verify 0x42::written_vector_elements::push_struct_length_bad))
 
 open LoanDeathControls in
 run_cmd do
@@ -433,6 +586,341 @@ theorem pos_chained_symbolic_two_element_write_closes
   assert_no_lookup_in_goals
   all_goals verex_decide
 
+-- 2.4. Tactic-level controls for the element a goal reads out of a container:
+-- selected only when that container's own fact is in hand, otherwise the
+-- element's own type is read structurally.
+
+theorem neg_read_element_without_container_fact_reads_structurally
+    (v : (NTy.vector PercentTy).carrier) (inBounds : 0 < v.values.size)
+    (hBound : (v.values[0]'inBounds).1.val ≤ 100) :
+    NTy.Holds PercentTy (v.values[0]'inBounds) := by
+  verex_holds
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_scalar_clause_goals 1
+  omega
+
+theorem neg_read_element_of_other_container_reads_structurally
+    (v w : (NTy.vector PercentTy).carrier)
+    (_hw : NTy.Holds (.vector PercentTy) w) (inBounds : 0 < v.values.size)
+    (hBound : (v.values[0]'inBounds).1.val ≤ 100) :
+    NTy.Holds PercentTy (v.values[0]'inBounds) := by
+  verex_holds
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_scalar_clause_goals 1
+  omega
+
+theorem pos_read_element_of_vector_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (idx : Nat)
+    (inBounds : idx < v.values.size) :
+    NTy.Holds PercentTy (v.values[idx]'inBounds) := by
+  verex_holds
+
+theorem pos_read_element_of_array_closes
+    (r : (NTy.array PercentTy 2).carrier)
+    (hr : NTy.Holds (.array PercentTy 2) r)
+    (inBounds : 0 < r.vector.values.size) :
+    NTy.Holds PercentTy (r.vector.values[0]'inBounds) := by
+  verex_holds
+
+theorem pos_read_element_of_slice_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.slice PercentTy) v) (idx : Nat)
+    (inBounds : idx < v.values.size) :
+    NTy.Holds PercentTy (v.values[idx]'inBounds) := by
+  verex_holds
+
+theorem pos_read_element_of_sliceRef_current_closes
+    (r : (NTy.sliceRef PercentTy).carrier)
+    (hr : NTy.Holds (.sliceRef PercentTy) r)
+    (inBounds : 0 < r.currentVector.values.size) :
+    NTy.Holds PercentTy (r.currentVector.values[0]'inBounds) := by
+  verex_holds
+
+-- 2.5. Tactic-level controls for the whole-container operations that preserve
+-- a container's fact: selected only when the operand's own fact is in hand,
+-- otherwise the opener takes the elementwise reading.
+
+private def emptyPercents : (NTy.vector PercentTy).carrier := ⟨#[], by decide⟩
+
+theorem neg_eraseBounded_of_other_container_reads_elementwise
+    (w : (NTy.vector PercentTy).carrier)
+    (_hw : NTy.Holds (.vector PercentTy) w) :
+    NTy.Holds (.vector PercentTy) (eraseBounded emptyPercents 0) := by
+  verex_holds
+  assert_elementwise_reading
+  rename_i elem hMem
+  simp [emptyPercents, eraseBounded_values] at hMem
+
+theorem pos_eraseBounded_preserves_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (i : Nat) :
+    NTy.Holds (.vector PercentTy) (eraseBounded v i) := by
+  verex_holds
+
+theorem pos_swapBounded_preserves_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (i j : Nat) :
+    NTy.Holds (.vector PercentTy) (swapBounded v i j) := by
+  verex_holds
+
+theorem pos_eraseBounded_of_swapBounded_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (i j : Nat) :
+    NTy.Holds (.vector PercentTy) (eraseBounded (swapBounded v i j) j) := by
+  verex_holds
+
+theorem pos_eraseBounded_of_array_fact_closes
+    (r : (NTy.array PercentTy 2).carrier)
+    (hr : NTy.Holds (.array PercentTy 2) r) (i : Nat) :
+    NTy.Holds (.slice PercentTy) (eraseBounded r.vector i) := by
+  verex_holds
+
+-- 2.5b. Tactic-level controls for an insertion: it keeps the elements its
+-- vector holds and adds one of its own, so each inserted element owes its
+-- clause, no earlier insertion is dead, and the position may be the length.
+
+-- Negative (first): two insertions at the same position, the first element
+-- invalid. Both inserted elements are in the result, so both clauses stay and
+-- the invalid one is the obligation that is not met.
+theorem neg_two_insertions_same_index_keep_the_first_element_clause
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (firstBounded : (v.values.insertIdxIfInBounds 0 percent101).size < 2 ^ 64)
+    (secondBounded :
+      ((insertBounded v 0 percent101 firstBounded).values.insertIdxIfInBounds 0 percent50).size <
+        2 ^ 64)
+    (hImpossible : (101 : Int) ≤ 100) :
+    NTy.Holds (.vector PercentTy)
+      (insertBounded (insertBounded v 0 percent101 firstBounded) 0 percent50 secondBounded) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 2
+  all_goals unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 2
+  · exact hImpossible
+  · omega
+
+-- Positive: the same two insertions with both elements valid.
+theorem pos_two_insertions_same_index_both_valid_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (firstBounded : (v.values.insertIdxIfInBounds 0 percent80).size < 2 ^ 64)
+    (secondBounded :
+      ((insertBounded v 0 percent80 firstBounded).values.insertIdxIfInBounds 0 percent50).size <
+        2 ^ 64) :
+    NTy.Holds (.vector PercentTy)
+      (insertBounded (insertBounded v 0 percent80 firstBounded) 0 percent50 secondBounded) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 2
+  all_goals unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 2
+  all_goals omega
+
+-- Positive: at the length, where no element is written, and into a vector
+-- that has none.
+theorem pos_insert_at_size_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (bounded : (v.values.insertIdxIfInBounds v.values.size percent50).size < 2 ^ 64) :
+    NTy.Holds (.vector PercentTy) (insertBounded v v.values.size percent50 bounded) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_scalar_clause_goals 1
+  omega
+
+theorem pos_insert_into_empty_closes
+    (hEmpty : NTy.Holds (.vector PercentTy) emptyPercents)
+    (bounded : (emptyPercents.values.insertIdxIfInBounds 0 percent50).size < 2 ^ 64) :
+    NTy.Holds (.vector PercentTy) (insertBounded emptyPercents 0 percent50 bounded) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_scalar_clause_goals 1
+  omega
+
+-- Negative: without the vector's own fact the operation is not selected and
+-- the opener takes the elementwise reading, as it does for a removal.
+theorem neg_insertBounded_of_other_container_reads_elementwise
+    (w : (NTy.vector PercentTy).carrier)
+    (_hw : NTy.Holds (.vector PercentTy) w)
+    (hFifty : NTy.Holds PercentTy percent50)
+    (bounded : (emptyPercents.values.insertIdxIfInBounds 0 percent50).size < 2 ^ 64) :
+    NTy.Holds (.vector PercentTy) (insertBounded emptyPercents 0 percent50 bounded) := by
+  verex_holds
+  assert_elementwise_reading
+  rename_i elem hMem
+  simp only [insertBounded_values, emptyPercents, Array.insertIdxIfInBounds] at hMem
+  have inserted : elem = percent50 := by simpa using hMem
+  subst inserted
+  exact hFifty.deepHolds.1
+
+-- 2.5c. Tactic-level controls for an append, the insertion at the length:
+-- its result holds where the vector and the appended element do, the element
+-- owes its clause, and so does every element inserted before it.
+
+-- Negative (first): an appended element its type refuses leaves exactly its
+-- clause, which is not met.
+theorem neg_push_invalid_element_leaves_its_clause
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (hImpossible : (101 : Int) ≤ 100) :
+    NTy.Holds (.vector PercentTy) (v.push percent101) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 1
+  exact hImpossible
+
+-- Negative: an append after the insertion of a refused element keeps that
+-- element's clause beside its own.
+theorem neg_push_after_invalid_insertion_keeps_the_inserted_clause
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (bounded : (v.values.insertIdxIfInBounds 0 percent101).size < 2 ^ 64)
+    (hImpossible : (101 : Int) ≤ 100) :
+    NTy.Holds (.vector PercentTy) ((insertBounded v 0 percent101 bounded).push percent50) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 2
+  all_goals unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 2
+  · exact hImpossible
+  · omega
+
+-- Negative: without the vector's own fact the append is not selected and the
+-- opener takes the elementwise reading, as it does for an insertion.
+theorem neg_push_of_other_container_reads_elementwise
+    (w : (NTy.vector PercentTy).carrier)
+    (_hw : NTy.Holds (.vector PercentTy) w)
+    (hFifty : NTy.Holds PercentTy percent50) :
+    NTy.Holds (.vector PercentTy) (emptyPercents.push percent50) := by
+  verex_holds
+  assert_elementwise_reading
+  rename_i elem hMem
+  have appended : elem = percent50 := by
+    simpa [emptyPercents, VerexIR.SpecVector.push] using hMem
+  subst appended
+  exact hFifty.deepHolds.1
+
+-- Positive: an appended element its type accepts.
+theorem pos_push_valid_element_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) :
+    NTy.Holds (.vector PercentTy) (v.push percent50) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_scalar_clause_goals 1
+  omega
+
+-- 2.6. Tactic-level controls for a fact at a type parameter, whose family is
+-- not known: it is the fact of a value as any other, and the opener leaves the
+-- goal as it stands where no fact of it or of its container is in hand.
+
+theorem neg_param_element_without_container_fact_is_not_read
+    (v : (NTy.vector (NTy.param 0)).carrier) (idx : Nat)
+    (inBounds : idx < v.values.size)
+    (hElement : NTy.Holds (.param 0) (v.values[idx]'inBounds)) :
+    NTy.Holds (.param 0) (v.values[idx]'inBounds) := by
+  fail_if_success (clear hElement; verex_holds)
+  exact hElement
+
+theorem pos_param_element_in_hand_closes
+    (v : (NTy.vector (NTy.param 0)).carrier) (idx : Nat)
+    (inBounds : idx < v.values.size)
+    (hElement : NTy.Holds (.param 0) (v.values[idx]'inBounds)) :
+    NTy.Holds (.param 0) (v.values[idx]'inBounds) := by
+  verex_holds
+
+theorem pos_param_read_element_closes
+    (v : (NTy.vector (NTy.param 0)).carrier)
+    (hv : NTy.Holds (.vector (NTy.param 0)) v) (idx : Nat)
+    (inBounds : idx < v.values.size) :
+    NTy.Holds (.param 0) (v.values[idx]'inBounds) := by
+  verex_holds
+
+-- 2.7. Tactic-level controls for an element read out of an inserting
+-- expression: the read at the written position is the inserted element, so
+-- the opener leaves exactly that element's clause and no elementwise lookup,
+-- and it closes where that element's fact is in hand.  A moving operation over
+-- the written base leaves the same clause.
+
+theorem neg_read_element_of_written_vector_leaves_inserted_clause
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (_ : 0 < v.values.size)
+    (inBounds : 0 < (v.set 0 percent101).values.size)
+    (hImpossible : (101 : Int) ≤ 100) :
+    NTy.Holds PercentTy ((v.set 0 percent101).values[0]'inBounds) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 1
+  exact hImpossible
+
+theorem pos_read_element_of_written_vector_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (element : (PercentTy : NTy).carrier)
+    (hElement : NTy.Holds PercentTy element)
+    (_ : 0 < v.values.size)
+    (inBounds : 0 < (v.set 0 element).values.size) :
+    NTy.Holds PercentTy ((v.set 0 element).values[0]'inBounds) := by
+  verex_holds
+
+theorem pos_swapped_written_vector_holds_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (element : (PercentTy : NTy).carrier)
+    (hElement : NTy.Holds PercentTy element)
+    (_ : 0 < v.values.size)
+    (left right : Nat) :
+    NTy.Holds (.vector PercentTy) (swapBounded (v.set 0 element) left right) := by
+  verex_holds
+
+theorem neg_read_element_of_swapped_written_vector_leaves_inserted_clause
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v)
+    (_ : 0 < v.values.size)
+    (left right idx : Nat)
+    (inBounds : idx < (swapBounded (v.set 0 percent101) left right).values.size)
+    (hImpossible : (101 : Int) ≤ 100) :
+    NTy.Holds PercentTy
+      ((swapBounded (v.set 0 percent101) left right).values[idx]'inBounds) := by
+  verex_holds
+  assert_no_lookup_in_goals
+  all_goals verex_normalize
+  assert_named_clause_goals 1
+  unseal_own_goal
+  assert_no_lookup_in_goals
+  assert_scalar_clause_goals 1
+  exact hImpossible
+
 end
 end VerexSL.Tests.WrittenContainerHolds
 
@@ -444,6 +932,16 @@ verify written_container_holds::vec_write_symbolic_ok
 verify written_container_holds::array_chained_two_writes_ok
 verify written_container_holds::vec_repaired_before_death_ok
 verify written_container_holds::ordered_pair_write_symbolic_ok
+
+-- The removed element's own fact, and its fields', at the one read form.
+verify 0x42::written_vector_elements::remove_rows
+verify 0x42::written_vector_elements::remove_plain
+verify 0x42::written_vector_elements::remove_rows_whole
+verify 0x42::written_vector_elements::read_rows
+verify 0x42::written_vector_elements::insert_plain
+verify 0x42::written_vector_elements::insert_limited_rows_closed
+verify 0x42::written_vector_elements::push_struct_ok
+verify 0x42::written_vector_elements::push_enum_ok
 
 run_cmd do
   let env ← getEnv
@@ -462,10 +960,45 @@ run_cmd do
       `VerexSL.Tests.WrittenContainerHolds.pos_sliceRef_withCurrent_single_and_nested_closes,
       `VerexSL.Tests.WrittenContainerHolds.pos_chained_two_element_write_closes,
       `VerexSL.Tests.WrittenContainerHolds.pos_chained_symbolic_two_element_write_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_read_element_without_container_fact_reads_structurally,
+      `VerexSL.Tests.WrittenContainerHolds.neg_read_element_of_other_container_reads_structurally,
+      `VerexSL.Tests.WrittenContainerHolds.pos_read_element_of_vector_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_read_element_of_array_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_read_element_of_slice_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_read_element_of_sliceRef_current_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_eraseBounded_of_other_container_reads_elementwise,
+      `VerexSL.Tests.WrittenContainerHolds.pos_eraseBounded_preserves_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_swapBounded_preserves_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_eraseBounded_of_swapBounded_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_eraseBounded_of_array_fact_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_two_insertions_same_index_keep_the_first_element_clause,
+      `VerexSL.Tests.WrittenContainerHolds.pos_two_insertions_same_index_both_valid_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_insert_at_size_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_insert_into_empty_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_insertBounded_of_other_container_reads_elementwise,
+      `VerexSL.Tests.WrittenContainerHolds.neg_push_invalid_element_leaves_its_clause,
+      `VerexSL.Tests.WrittenContainerHolds.neg_push_after_invalid_insertion_keeps_the_inserted_clause,
+      `VerexSL.Tests.WrittenContainerHolds.neg_push_of_other_container_reads_elementwise,
+      `VerexSL.Tests.WrittenContainerHolds.pos_push_valid_element_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_param_element_without_container_fact_is_not_read,
+      `VerexSL.Tests.WrittenContainerHolds.pos_param_element_in_hand_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_param_read_element_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_read_element_of_written_vector_leaves_inserted_clause,
+      `VerexSL.Tests.WrittenContainerHolds.pos_read_element_of_written_vector_closes,
+      `VerexSL.Tests.WrittenContainerHolds.pos_swapped_written_vector_holds_closes,
+      `VerexSL.Tests.WrittenContainerHolds.neg_read_element_of_swapped_written_vector_leaves_inserted_clause,
       `written_container_holds.vec_write_symbolic_ok.typedVerified,
       `written_container_holds.array_chained_two_writes_ok.typedVerified,
       `written_container_holds.vec_repaired_before_death_ok.typedVerified,
-      `written_container_holds.ordered_pair_write_symbolic_ok.typedVerified] do
+      `written_container_holds.ordered_pair_write_symbolic_ok.typedVerified,
+      `«0x42».written_vector_elements.remove_rows.typedVerified,
+      `«0x42».written_vector_elements.remove_plain.typedVerified,
+      `«0x42».written_vector_elements.remove_rows_whole.typedVerified,
+      `«0x42».written_vector_elements.read_rows.typedVerified,
+      `«0x42».written_vector_elements.insert_plain.typedVerified,
+      `«0x42».written_vector_elements.insert_limited_rows_closed.typedVerified,
+      `«0x42».written_vector_elements.push_struct_ok.typedVerified,
+      `«0x42».written_vector_elements.push_enum_ok.typedVerified] do
     unless env.contains name do throwError "written-container control {name} did not verify"
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do

@@ -1038,7 +1038,9 @@ theorem not_abortsOf_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgre
 
 /-- An invocation that returns from `state` does not abort from it on
 arguments of its own entry values: `aborts_of` as a clause states it
-(`AbortsOfEntries`), which names no prophecy. -/
+(`AbortsOfEntries`), which names no prophecy.  The run excludes an abort at
+every row of those entry values, the valid ones the predicate ranges over
+among them, so it needs no validity of its own arguments. -/
 theorem not_abortsOfEntries_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
@@ -1046,7 +1048,7 @@ theorem not_abortsOfEntries_of_ok {executable : ExecutableUnit unit} (agrees : R
     {state post : Memory unit} {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post) :
     ¬AbortsOfEntries (closureMeaning executable) σs shared shape function entries state := by
-  rintro ⟨args', settles, aborts⟩
+  rintro ⟨args', -, settles, aborts⟩
   exact not_abortsOf_of_ok agrees flat (same.trans settles.symm) ok aborts
 
 /-- A call that returns from `state` does not abort from it. -/
@@ -1071,39 +1073,45 @@ theorem not_callAborts_of_ok {executable : ExecutableUnit unit} (agrees : RunsAg
     exact aborted
   exact closureRun_not_aborts_of_ok agrees flat rfl run ⟨error, failed⟩
 
-/-- `result_of` is the settled result of every run from `state` on
-arguments of the same entry values. -/
+/-- `result_of` is the valid, settled result of every run from `state` on
+valid arguments of the same entry values: such a run is a candidate
+(`SettledRun`), and the candidates agree. -/
 theorem resultOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
     (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HList σs}
+    (valid : HList.Holds σs args)
     (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
-    (settled : shape.Settled result) (default : shape.carrier) :
+    (settled : shape.Settled result) (validResult : shape.Holds result)
+    (default : shape.carrier) :
     ResultOf (closureMeaning executable) σs shared shape function entries state default = result := by
-  obtain ⟨chosen, ⟨sameChosen, settledChosen, okChosen⟩, chosenResult, _⟩ :=
+  obtain ⟨chosen, ⟨-, -, sameChosen, settledChosen, okChosen⟩, chosenResult, _⟩ :=
     settledEncoding_choose (invoke := closureMeaning executable)
-      ⟨runEncoding σs shape (args, result, post), (args, result, post), ⟨same, settled, ok⟩, rfl⟩
+      ⟨runEncoding σs shape (args, result, post), (args, result, post),
+        ⟨valid, validResult, same, settled, ok⟩, rfl⟩
       default
   rw [chosenResult]
   exact (closureRun_ok_agree agrees flat shapeFlat (same.trans sameChosen.symm) settled
     settledChosen ok okChosen).1.symm
 
-/-- `state_of` is the final memory of every run from `state` on arguments
-of the same entry values that returns a settled result. -/
+/-- `state_of` is the final memory of every run from `state` on valid
+arguments of the same entry values that returns a valid, settled result. -/
 theorem stateOf_eq_of_ok {executable : ExecutableUnit unit} (agrees : RunsAgree executable)
     {σs : NRow} (flat : σs.lentFlat = true) {shape : ResultShape}
     {shared : Sharing} {function : (NTy.function σs shared shape.row).carrier}
     (shapeFlat : shape.row.lentFlat = true) {args : HList σs} {entries : HList σs}
+    (valid : HList.Holds σs args)
     (same : HList.settle σs args = entries) {state post : Memory unit}
     {result : shape.carrier}
     (ok : EnsuresOf (closureMeaning executable) σs shared shape function args result state post)
-    (settled : shape.Settled result) :
+    (settled : shape.Settled result) (validResult : shape.Holds result) :
     StateOf (closureMeaning executable) σs shared shape function entries state = post := by
-  obtain ⟨chosen, ⟨sameChosen, settledChosen, okChosen⟩, _, chosenState⟩ :=
+  obtain ⟨chosen, ⟨-, -, sameChosen, settledChosen, okChosen⟩, _, chosenState⟩ :=
     settledEncoding_choose (invoke := closureMeaning executable)
-      ⟨runEncoding σs shape (args, result, post), (args, result, post), ⟨same, settled, ok⟩, rfl⟩
+      ⟨runEncoding σs shape (args, result, post), (args, result, post),
+        ⟨valid, validResult, same, settled, ok⟩, rfl⟩
       result
   rw [chosenState]
   exact (closureRun_ok_agree agrees flat shapeFlat (same.trans sameChosen.symm) settled
@@ -1136,11 +1144,12 @@ theorem ResultShape.lend_plain : (shape : ResultShape) → shape.row.refFree = t
       subst member
       exact NTy.encode_plain τ result
 
-/-- An invocation of a typed closure a proof cannot see, on typed arguments
-from typed global memory, has the weakest precondition its behavioral
-predicates state: a run is one `ensures_of` names, `aborts_of` does not
-hold, and its result and final memory are `result_of` and `state_of`; an
-abort is one `aborts_of` names. -/
+/-- An invocation of a typed closure a proof cannot see, on valid typed
+arguments from typed global memory, has the weakest precondition its
+behavioral predicates state: a run is one `ensures_of` names, `aborts_of`
+does not hold, and where its result holds its data invariants, the result
+and final memory are `result_of` and `state_of`; an abort is one `aborts_of`
+names. -/
 theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     [Skolems unit] (natives : NativesTyped executable)
@@ -1151,15 +1160,16 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
     (typed : ClosureTyped unit ((Carriers.functions σs shared shape.row).closure function).function ((Carriers.functions σs shared shape.row).closure function).mask
       ((Carriers.functions σs shared shape.row).closure function).typeInstantiation ((Carriers.functions σs shared shape.row).closure function).captures parameters results)
     (decodes : RowDecodes unit shape results) {initial : Memory unit}
+    (validArgs : HList.Holds σs args)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (returns : ∀ result final,
       EnsuresOf (closureMeaning executable) σs shared shape function args result initial final →
       ¬AbortsOfEntries (closureMeaning executable) σs shared shape function
         (HList.settle σs args) initial →
-      (∀ default, ResultOf (closureMeaning executable) σs shared shape function
-        (HList.settle σs args) initial default = result) →
-      StateOf (closureMeaning executable) σs shared shape function (HList.settle σs args) initial =
-        final →
+      (shape.Holds result → ∀ default, ResultOf (closureMeaning executable) σs shared shape
+        function (HList.settle σs args) initial default = result) →
+      (shape.Holds result → StateOf (closureMeaning executable) σs shared shape function
+        (HList.settle σs args) initial = final) →
       ensures result final)
     (fails : ∀ error, AbortsOf (closureMeaning executable) σs shared shape function args initial →
       AbortsOfEntries (closureMeaning executable) σs shared shape function
@@ -1171,11 +1181,13 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
   refine (wp_closureRun_typed executable natives _ args free shapeFree typed decodes
     ensures aborts).mpr
     ⟨fun result final run => ?_, fun error aborted =>
-      fails error ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf ⟨error, aborted⟩)⟩
+      fails error ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf validArgs ⟨error, aborted⟩)⟩
   have settled := ResultShape.settled_of_refFree shape shapeFree result
   exact returns result final run (not_abortsOfEntries_of_ok agrees flat rfl run)
-    (resultOf_eq_of_ok agrees flat shapeFlat rfl run settled)
-    (stateOf_eq_of_ok agrees flat shapeFlat rfl run settled)
+    (fun validResult => resultOf_eq_of_ok agrees flat shapeFlat validArgs rfl run settled
+      validResult)
+    (fun validResult => stateOf_eq_of_ok agrees flat shapeFlat validArgs rfl run settled
+      validResult)
 
 end Rule
 
@@ -1526,10 +1538,11 @@ theorem RowDecodes.ofResolved {unit : ValidatedUnit} [FunctionCarriers unit] [Sk
 @[vir_denote_norm] theorem Denote.ResultShape.row_one (τ : NTy) :
     (ResultShape.one τ).row = .cons τ .nil := rfl
 
-/-- `wp_named` where runs agree: the call's run also rules out an abort of
-the function value naming the target at the call's entry values and, with
-its returned reference settled, is the result and final memory `result_of`
-and `state_of` read of it. -/
+/-- `wp_named` where runs agree, at valid arguments: the call's run also
+rules out an abort of the function value naming the target at the call's
+entry values and, with its returned reference settled and its result
+holding its data invariants, is the result and final memory `result_of` and
+`state_of` read of it. -/
 theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit) [Skolems unit]
     (agrees : RunsAgree executable)
@@ -1538,17 +1551,18 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
     {shared : Sharing} {named : (NTy.function full shared shape.row).carrier}
     (naming : (Carriers.functions full shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
-    {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
+    {args : HList full} (validArgs : HList.Holds full args)
+    {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     {initial : Memory unit}
     (continued : wp (propheticMeaning executable typeInstantiation handle full shape args)
       (fun result final =>
         EnsuresOf (closureMeaning executable) full shared shape named args result initial final →
         ¬AbortsOfEntries (closureMeaning executable) full shared shape named
           (HList.settle full args) initial →
-        (shape.Settled result → ∀ default,
+        (shape.Settled result → shape.Holds result → ∀ default,
           ResultOf (closureMeaning executable) full shared shape named (HList.settle full args)
             initial default = result) →
-        (shape.Settled result →
+        (shape.Settled result → shape.Holds result →
           StateOf (closureMeaning executable) full shared shape named (HList.settle full args)
             initial = final) →
         ensures result final)
@@ -1564,11 +1578,12 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
   wp_named naming ⟨fun result final execution ensuresOf => continued.1 result final execution
       ensuresOf
       (not_abortsOfEntries_of_ok agrees fullFlat same ensuresOf)
-      (fun settled default => resultOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled
-        default)
-      (fun settled => stateOf_eq_of_ok agrees fullFlat shapeFlat same ensuresOf settled),
+      (fun settled validResult default => resultOf_eq_of_ok agrees fullFlat shapeFlat validArgs
+        same ensuresOf settled validResult default)
+      (fun settled validResult => stateOf_eq_of_ok agrees fullFlat shapeFlat validArgs same
+        ensuresOf settled validResult),
     fun error aborted abortsOf =>
-      continued.2.1 error aborted abortsOf (abortsOfEntries_of_abortsOf abortsOf),
+      continued.2.1 error aborted abortsOf (abortsOfEntries_of_abortsOf validArgs abortsOf),
     continued.2.2⟩
 
 /-- `wp_call_runs` where runs agree: the call's run also rules out its abort. -/
@@ -1596,11 +1611,16 @@ theorem wp_call_runs_agree {unit : ValidatedUnit} [FunctionCarriers unit]
     continued.2.1, continued.2.2⟩
 
 /-- Runs of the unit's functions end, at a family: an invocation of a typed
-closure on typed arguments from typed global memory returns or aborts. -/
+closure on valid typed arguments from typed global memory returns or aborts.
+The arguments are those an invocation passes, which hold their data
+invariants (`HList.Holds`); of the result it states that the run returns
+one and not that it holds its own, which is the function value's fact
+(`ValidResultsAt`) and no part of this assumption. -/
 def TerminatingAt {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit) [Skolems unit] : Prop :=
   ∀ (closure : ClosureValue) (σs : NRow) (shape : ResultShape) (args : HList σs)
     (parameters results : List SemTy) (initial : Memory unit),
+    HList.Holds σs args →
     σs.refFree = true → shape.row.refFree = true →
     ClosureTyped unit closure.function closure.mask closure.typeInstantiation closure.captures
       parameters results →
@@ -1659,10 +1679,12 @@ theorem ClosureTyped.ofTypes {unit : ValidatedUnit} {function : FunctionHandle} 
     .inl ⟨rfl, fun _ _ _ resolves => ?_⟩, bound, capturesTyped, rfl⟩
   rwa [empty] at resolves
 
-/-- A function value whose runs on arguments of `parameters` from typed
-global memory keep a frame: what a function-typed parameter's `modifies_of`
-permits an invocation to change, at its arguments. Vacuous at rows with
-references. -/
+/-- A function value whose runs on valid arguments of `parameters` from
+typed global memory, to a valid result, keep a frame: what a function-typed
+parameter's `modifies_of` permits an invocation to change, at its arguments.
+Vacuous at rows with references.  It states nothing of a run whose result
+does not hold its data invariants: a reader holds the result's fact of the
+run it reads the frame at (`FramedAt.at_run`). -/
 def FramedAt {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
@@ -1670,7 +1692,7 @@ def FramedAt {unit : ValidatedUnit} [FunctionCarriers unit]
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
   parameters.refFree = true → shape.row.refFree = true →
     ∀ (args : HList parameters) (result : shape.carrier) (pre post : Memory unit),
-      MemoryTyped unit pre →
+      HList.Holds parameters args → shape.Holds result → MemoryTyped unit pre →
       EnsuresOf (closureMeaning executable) parameters shared shape function args result pre post →
       frame args pre post
 
@@ -1682,6 +1704,90 @@ abbrev KeepsMemoryAt {unit : ValidatedUnit} [FunctionCarriers unit]
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
   FramedAt executable parameters shared shape (fun _ pre post => post = pre) function
 
+/-- A result of a shape that states no invariant holds its invariant. -/
+theorem Denote.ResultShape.holds_of_invariantFree [Denote.Carriers] :
+    (shape : ResultShape) → shape.row.invariantFree = true → (value : shape.carrier) →
+      shape.Holds value
+  | .none, _, _ => trivial
+  | .one τ, free, value =>
+      NTy.holds_of_invariantFree τ
+        (by simpa only [ResultShape.row, NRow.invariantFree, Bool.and_true] using free) value
+
+/-- A function value whose successful invocations return valid results: at
+arguments that hold their data invariants, every result of a run of its
+meaning holds its own (`ResultShape.Holds`).  The fact a function-typed
+parameter carries where its result type states an invariant; a verified
+target establishes it of every result unconditionally
+(`Contract.validResult`). -/
+def ValidResultsAt {unit : ValidatedUnit} [FunctionCarriers unit]
+    (executable : ExecutableUnit unit) [Skolems unit]
+    (parameters : NRow) (shared : Sharing) (shape : ResultShape)
+    (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
+  ∀ (args : HList parameters) (result : shape.carrier) (pre post : Memory unit),
+    HList.Holds parameters args →
+    EnsuresOf (closureMeaning executable) parameters shared shape function args result pre post →
+    shape.Holds result
+
+/-- A result shape that states no invariant: every result is valid, whatever
+the function value. -/
+theorem ValidResultsAt.of_invariantFree {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (free : shape.row.invariantFree = true) :
+    ValidResultsAt executable parameters shared shape function :=
+  fun _ result _ _ _ _ => Denote.ResultShape.holds_of_invariantFree shape free result
+
+/-- The results of a function value are valid at the frame a call's type
+arguments induce where they are at the caller's frame: the invocation there is
+the invocation here (`closureMeaning_instantiate`), and the value's validity
+moves with it (`NTy.holds_toSkolem_iff`). -/
+theorem ValidResultsAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit}
+    [Θ : Skolems unit] (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
+    {shared : Sharing} {shape : ResultShape}
+    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (valid : ValidResultsAt executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
+      (shape.functionOfSkolem θ parameters shared function)) :
+    @ValidResultsAt unit _ executable (Skolems.instantiate θ Θ) parameters shared shape
+      function := by
+  intro args result pre post holds ensures
+  unfold EnsuresOf at ensures
+  rw [closureMeaning_instantiate executable θ free parameters shared shape function args] at ensures
+  simp only [Spec.bind_ok, Spec.pure_ok] at ensures
+  obtain ⟨value, middle, run, rfl, rfl⟩ := ensures
+  have held := valid (HList.ofSkolem θ parameters args) value pre _
+    ((HList.holds_ofSkolem_iff θ parameters args).mpr holds) run
+  cases shape with
+  | none => trivial
+  | one τ => exact (NTy.holds_toSkolem_iff θ τ value).mpr held
+
+/-- A literal closure of a verified target returns valid results: the
+target's theorem applies at the woven arguments, and its contract's result
+validity is the result's own fact. -/
+theorem ValidResultsAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit] {handle : FunctionHandle}
+    {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (capturedFree : captured.refFree = true) {shared : Sharing} (shape : ResultShape)
+    (typeInstantiation : Array (TypeId × TypeId))
+    (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
+    (function : (NTy.function supplied shared shape.row).carrier)
+    (closed : (Carriers.functions supplied shared shape.row).closure function =
+      closureOf handle weave.mask typeInstantiation captures)
+    {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
+    (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
+    (held : ∀ (args : HList supplied) (pre : Memory unit), HList.Holds supplied args →
+      contract.validArgs (weave.compose captures args) ∧
+        contract.assumes (weave.compose captures args) pre ∧
+        contract.requires (weave.compose captures args) pre)
+    (valid : ∀ result, contract.validResult result → shape.Holds result) :
+    ValidResultsAt executable supplied shared shape function := by
+  intro args result pre post holds ensures
+  obtain ⟨validArgs, assumed, permitted⟩ := held args pre holds
+  exact valid result (ensuresOf_closureOf_verified weave capturedFree coherent captures args
+    verified ensures closed assumed permitted validArgs).1
+
 /-- A frame holds of a function value wherever a narrower one does. -/
 theorem FramedAt.mono {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Skolems unit]
@@ -1691,8 +1797,9 @@ theorem FramedAt.mono {unit : ValidatedUnit} [FunctionCarriers unit]
     (framed : FramedAt executable parameters shared shape narrow function)
     (within : ∀ args pre post, narrow args pre post → wide args pre post) :
     FramedAt executable parameters shared shape wide function :=
-  fun free shapeFree args result pre post typed ensures =>
-    within args pre post (framed free shapeFree args result pre post typed ensures)
+  fun free shapeFree args result pre post valid validResult typed ensures =>
+    within args pre post
+      (framed free shapeFree args result pre post valid validResult typed ensures)
 
 /-- A frame at the frame a call's type arguments induce holds of a function
 value where the frame read in the caller's view does at the caller's: the
@@ -1709,7 +1816,7 @@ theorem FramedAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
       (fun args => frame (HList.toSkolem θ parameters args))
       (shape.functionOfSkolem θ parameters shared function)) :
     @FramedAt unit _ executable (Skolems.instantiate θ Θ) parameters shared shape frame function := by
-  intro parametersFree shapeFree args result pre post typed ensures
+  intro parametersFree shapeFree args result pre post valid validResult typed ensures
   unfold EnsuresOf at ensures
   rw [closureMeaning_instantiate executable θ free parameters shared shape function args] at ensures
   simp only [Spec.bind_ok, Spec.pure_ok] at ensures
@@ -1718,7 +1825,9 @@ theorem FramedAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
     rw [ResultShape.row_subst]
     exact NRow.refFree_subst θ.1 free shape.row shapeFree
   have := framed (NRow.refFree_subst θ.1 free parameters parametersFree) substFree
-    (HList.ofSkolem θ parameters args) value pre _ typed run
+    (HList.ofSkolem θ parameters args) value pre _
+    ((HList.holds_ofSkolem_iff θ parameters args).mpr valid)
+    ((ResultShape.holds_toSkolem_iff θ shape value).mp validResult) typed run
   simpa only [HList.toSkolem_ofSkolem] using this
 
 theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
@@ -1730,19 +1839,65 @@ theorem FramedAt.of_refFree_false {unit : ValidatedUnit} [FunctionCarriers unit]
     FramedAt executable parameters shared shape frame function :=
   fun free => by simp [references] at free
 
-/-- A static method dictionary's checked contract: at valid arguments, every
-invocation is defined, cannot panic, preserves global memory, and establishes
-result validity (`shape.Holds`). Mutable receiver state remains in the
-arguments' prophecies; it is not required to stay unchanged. Concrete
-dictionaries discharge this obligation using their target's theorem. -/
-def MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
+/-- A frame read at a run of a function value whose results are valid: the
+result's fact, which the frame is stated under, is the value's own
+(`ValidResultsAt`) at the run's valid arguments. -/
+theorem FramedAt.at_run {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {frame : HList parameters → Memory unit → Memory unit → Prop}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (framed : FramedAt executable parameters shared shape frame function)
+    (validResults : ValidResultsAt executable parameters shared shape function)
+    (free : parameters.refFree = true) (shapeFree : shape.row.refFree = true)
+    {args : HList parameters} {result : shape.carrier} {pre post : Memory unit}
+    (valid : HList.Holds parameters args) (typed : MemoryTyped unit pre)
+    (ensures : EnsuresOf (closureMeaning executable) parameters shared shape function args result
+      pre post) :
+    frame args pre post :=
+  framed free shapeFree args result pre post valid
+    (validResults args result pre post valid ensures) typed ensures
+
+/-- A static method dictionary's checked contract: its invocations return
+valid results (`ValidResultsAt`), and at valid arguments every invocation is
+defined, cannot panic, and preserves global memory. Mutable receiver state
+remains in the arguments' prophecies; it is not required to stay unchanged.
+Concrete dictionaries discharge this obligation using their target's
+theorem. The contract is one fact: it is stated, assumed and moved between
+frames by its head, and its two halves are its fields. -/
+structure MethodContract {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit) [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
-  ∀ (args : HList parameters) (initial : Memory unit),
+    (function : (NTy.function parameters shared shape.row).carrier) : Prop where
+  /-- The results of the dictionary's invocations are valid: the half of its
+  contract that states it, which a consumer of the fact reads here. -/
+  validResults : ValidResultsAt executable parameters shared shape function
+  /-- At valid arguments an invocation is defined, cannot panic, and
+  preserves global memory. -/
+  safe : ∀ (args : HList parameters) (initial : Memory unit),
     HList.Holds parameters args →
     wp (closureMeaning executable parameters shared shape function args)
-      (fun result final => final = initial ∧ shape.Holds result) (fun _ => False) initial
+      (fun _ final => final = initial) (fun _ => False) initial
+
+/-- A dictionary's contract from the single obligation a walk of its body
+proves: at valid arguments, the invocation is defined, cannot panic, keeps
+memory, and returns a valid result.  The postcondition states the result's
+fact of every run, which is the validity of its results
+(`ValidResultsAt`). -/
+theorem MethodContract.of_wp {unit : ValidatedUnit} [FunctionCarriers unit]
+    {executable : ExecutableUnit unit} [Skolems unit]
+    {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {function : (NTy.function parameters shared shape.row).carrier}
+    (checked : ∀ (args : HList parameters) (initial : Memory unit),
+      HList.Holds parameters args →
+      wp (closureMeaning executable parameters shared shape function args)
+        (fun result final => final = initial ∧ shape.Holds result) (fun _ => False) initial) :
+    MethodContract executable parameters shared shape function :=
+  ⟨fun args result pre post validArgs ensures =>
+      ((checked args pre validArgs).1 result post ensures).2,
+   fun args initial validArgs =>
+      ⟨fun result final run => ((checked args initial validArgs).1 result final run).1,
+       (checked args initial validArgs).2.1, (checked args initial validArgs).2.2⟩⟩
 
 theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Θ : Skolems unit]
@@ -1754,17 +1909,14 @@ theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers u
       (shape.functionOfSkolem θ parameters shared function)) :
     @MethodContract unit _ executable (Skolems.instantiate θ Θ)
       parameters shared shape function := by
+  refine @MethodContract.mk unit _ executable (Skolems.instantiate θ Θ) parameters shared shape
+    function (ValidResultsAt.of_instantiate θ free checked.validResults) ?_
   intro args initial validArgs
   rw [closureMeaning_instantiate executable θ free parameters shared shape function args]
   simp only [wp_bind, wp_pure]
-  have safe := checked (HList.ofSkolem θ parameters args) initial
+  have safe := checked.safe (HList.ofSkolem θ parameters args) initial
     ((HList.holds_ofSkolem_iff θ parameters args).mpr validArgs)
-  refine ⟨fun result final run => ?_, safe.2.1, safe.2.2⟩
-  obtain ⟨rfl, validResult⟩ := safe.1 result final run
-  refine ⟨rfl, ?_⟩
-  cases shape with
-  | none => trivial
-  | one τ => exact (NTy.holds_toSkolem_iff θ τ result).mpr validResult
+  exact ⟨fun result final run => safe.1 result final run, safe.2.1, safe.2.2⟩
 
 /-- Use a checked dictionary without assuming reference-free arguments. The
 success hypothesis retains result validity and the entire receiver transition
@@ -1782,14 +1934,16 @@ theorem MethodContract.invoke {unit : ValidatedUnit} [FunctionCarriers unit]
       EnsuresOf (closureMeaning executable) parameters shared shape function args result initial initial →
       ensures result initial) :
     wp (closureMeaning executable parameters shared shape function args) ensures aborts initial := by
-  have safe := checked args initial validArgs
+  have safe := checked.safe args initial validArgs
   refine ⟨fun result final run => ?_, fun error run => False.elim (safe.2.1 error run), safe.2.2⟩
-  obtain ⟨rfl, validResult⟩ := safe.1 result final run
-  exact returns result validResult run
+  have holds := checked.validResults args result initial final validArgs run
+  obtain rfl := safe.1 result final run
+  exact returns result holds run
 
 /-- A literal closure keeps a frame where every run of its target from
-typed memory, at any arguments, keeps it: the frame its body establishes,
-whatever its precondition. -/
+typed memory, at any valid arguments, keeps it: the frame its body
+establishes, whatever its precondition.  The body's obligation is of every
+run, whatever its result, which is more than the frame states. -/
 theorem FramedAt.ofBody {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
@@ -1801,19 +1955,21 @@ theorem FramedAt.ofBody {unit : ValidatedUnit} [FunctionCarriers unit]
     (closed : (Carriers.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
-    (kept : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
+    (kept : ∀ (args : HList supplied) (pre : Memory unit), HList.Holds supplied args →
+      MemoryTyped unit pre →
       wp (propheticMeaning executable typeInstantiation handle full shape (weave.compose captures args))
         (fun _ post => frame args pre post) (fun _ => True) pre) :
     FramedAt executable supplied shared shape frame
       function := by
-  intro _ _ args result pre post memoryTyped ensures
-  have holds := kept args pre memoryTyped
+  intro _ _ args result pre post valid _ memoryTyped ensures
+  have holds := kept args pre valid memoryTyped
   rw [← closureMeaning_closureOf_coherent executable weave capturedFree coherent captures shared
     shape function closed args] at holds
   exact holds.1 result post ensures
 
 /-- A literal closure of a verified target keeps a frame where the target's
-theorem applies at every typed memory and its frame lies within it. -/
+theorem applies at every valid argument and typed memory and its frame lies
+within it. -/
 theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit} [Skolems unit]
     {handle : FunctionHandle}
@@ -1827,17 +1983,19 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
     {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
     (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
-    (held : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
+    (held : ∀ (args : HList supplied) (pre : Memory unit), HList.Holds supplied args →
+      MemoryTyped unit pre →
       contract.validArgs (weave.compose captures args) ∧
         contract.assumes (weave.compose captures args) pre ∧
         contract.requires (weave.compose captures args) pre)
     (framed : ∀ (args : HList supplied) (pre post : Memory unit) (result : shape.carrier),
+      shape.Holds result →
       contract.frame (weave.compose captures args) pre result post → frame args pre post) :
     FramedAt executable supplied shared shape frame
       function := by
-  intro _ _ args result pre post memoryTyped ensures
-  obtain ⟨valid, assumed, permitted⟩ := held args pre memoryTyped
-  exact framed args pre post result
+  intro _ _ args result pre post holds validResult memoryTyped ensures
+  obtain ⟨valid, assumed, permitted⟩ := held args pre holds memoryTyped
+  exact framed args pre post result validResult
     (ensuresOf_closureOf_verified weave capturedFree coherent captures args verified ensures closed
       assumed permitted valid).2.2.1
 
@@ -1855,15 +2013,17 @@ section Model
 open Denote
 variable {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
 
-/-- A function value whose invocations over a meaning, from typed memory,
-keep a frame: what a function-typed parameter's `modifies_of` permits an
-invocation to change, at its arguments. -/
+/-- A function value whose invocations over a meaning on valid arguments,
+from typed memory, to a valid result, keep a frame: what a function-typed
+parameter's `modifies_of` permits an invocation to change, at its arguments
+(`FramedAt`).  It states nothing of a run whose result does not hold its
+data invariants. -/
 def FramedAtOf (invoke : InvokeMeaning) (parameters : NRow) (shared : Sharing)
     (shape : ResultShape) (frame : HList parameters → Memory unit → Memory unit → Prop)
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
   ∀ (args : HList parameters) (result : shape.carrier) (pre post : Memory unit),
-    MemoryTyped unit pre → (invoke parameters shared shape function args).ok pre result post →
-      frame args pre post
+    HList.Holds parameters args → shape.Holds result → MemoryTyped unit pre →
+      (invoke parameters shared shape function args).ok pre result post → frame args pre post
 
 /-- A function value whose invocations over a meaning leave global memory as
 they found it. -/
@@ -1878,11 +2038,13 @@ theorem FramedAtOf.mono {invoke : InvokeMeaning} {parameters : NRow} {shared : S
     (framed : FramedAtOf invoke parameters shared shape narrow function)
     (within : ∀ args pre post, narrow args pre post → wide args pre post) :
     FramedAtOf invoke parameters shared shape wide function :=
-  fun args result pre post typed run =>
-    within args pre post (framed args result pre post typed run)
+  fun args result pre post valid validResult typed run =>
+    within args pre post (framed args result pre post valid validResult typed run)
 
 /-- A function value routed to a target's meaning on the woven arguments
-keeps a frame where that meaning keeps it, from every typed memory. -/
+keeps a frame where that meaning keeps it, at every valid argument and from
+every typed memory.  The meaning's obligation is of every run, whatever its
+result, which is more than the frame states. -/
 theorem FramedAtOf.ofRouted {invoke : InvokeMeaning} {full captured supplied : NRow}
     {shape : ResultShape} {self : HList full → Comp unit shape.carrier}
     (weave : Weave full captured supplied) (captures : HList captured) {shared : Sharing}
@@ -1890,21 +2052,23 @@ theorem FramedAtOf.ofRouted {invoke : InvokeMeaning} {full captured supplied : N
     (routes : ∀ (args : HList supplied),
       invoke supplied shared shape function args = self (weave.compose captures args))
     {frame : HList supplied → Memory unit → Memory unit → Prop}
-    (kept : ∀ (args : HList supplied) (pre : Memory unit), MemoryTyped unit pre →
+    (kept : ∀ (args : HList supplied) (pre : Memory unit), HList.Holds supplied args →
+      MemoryTyped unit pre →
       wp (self (weave.compose captures args)) (fun _ post => frame args pre post) (fun _ => True)
         pre) :
     FramedAtOf invoke supplied shared shape frame function := by
-  intro args result pre post memoryTyped run
+  intro args result pre post valid _ memoryTyped run
   rw [routes] at run
-  exact (kept args pre memoryTyped).1 result post run
+  exact (kept args pre valid memoryTyped).1 result post run
 
 /-- An invocation of a function value the proof does not see, over a
-meaning: defined by hypothesis, its runs and aborts stated by the
-behavioral predicates. -/
+meaning, on valid arguments: defined by hypothesis, its runs and aborts
+stated by the behavioral predicates. -/
 theorem wp_invoke_unseen (invoke : InvokeMeaning) {σs : NRow} {shared : Sharing}
     {shape : ResultShape} (function : (NTy.function σs shared shape.row).carrier) (args : HList σs)
     {initial : Memory unit} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     (defined : ¬(invoke σs shared shape function args).undefined initial)
+    (validArgs : HList.Holds σs args)
     (returns : ∀ result final, EnsuresOf invoke σs shared shape function args result initial final →
       ensures result final)
     (fails : ∀ error, (invoke σs shared shape function args).aborts initial error →
@@ -1913,7 +2077,8 @@ theorem wp_invoke_unseen (invoke : InvokeMeaning) {σs : NRow} {shared : Sharing
       aborts error) :
     wp (invoke σs shared shape function args) ensures aborts initial :=
   ⟨returns, fun error aborted =>
-    fails error aborted ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf ⟨error, aborted⟩), defined⟩
+    fails error aborted ⟨error, aborted⟩ (abortsOfEntries_of_abortsOf validArgs ⟨error, aborted⟩),
+    defined⟩
 
 omit [Skolems unit] in
 /-- What a verified function's contract states of one of its runs, including
@@ -1924,7 +2089,7 @@ theorem runOfSatisfies_valid {Args Result : Type} {function : Args → Comp unit
     {args : Args} {initial final : Memory unit} {result : Result}
     (run : (function args).ok initial result final)
     (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
-    (valid : contract.validArgs args := by trivial) :
+    (valid : contract.validArgs args) :
     contract.validResult result ∧
       (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
       contract.frame args initial result final ∧ ¬contract.mustAbort args initial :=
@@ -1938,7 +2103,7 @@ theorem runOfSatisfies {Args Result : Type} {function : Args → Comp unit Resul
     {args : Args} {initial final : Memory unit} {result : Result}
     (run : (function args).ok initial result final)
     (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
-    (valid : contract.validArgs args := by trivial) :
+    (valid : contract.validArgs args) :
     (¬contract.mayAbort args initial → contract.ensures args initial result final) ∧
       contract.frame args initial result final ∧ ¬contract.mustAbort args initial :=
   ((verified args initial valid assumed permitted).1 result final run).2
@@ -1951,7 +2116,7 @@ theorem abortOfSatisfies {Args Result : Type} {function : Args → Comp unit Res
     {args : Args} {initial : Memory unit}
     (aborted : ∃ error, (function args).aborts initial error)
     (assumed : contract.assumes args initial) (permitted : contract.requires args initial)
-    (valid : contract.validArgs args := by trivial) :
+    (valid : contract.validArgs args) :
     ∃ error, contract.aborts args initial error :=
   aborted.imp fun error h => (verified args initial valid assumed permitted).2.1 error h
 

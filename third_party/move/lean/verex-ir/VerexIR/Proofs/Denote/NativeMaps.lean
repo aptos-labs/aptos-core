@@ -746,8 +746,8 @@ private partial def resolvedType (carriers τ : Lean.Expr) :
   let parameter := mkApp (mkConst ``NTy.param) index
   -- The row the frame substitutes: `TypeArgs` is an abbreviation of the
   -- subtype of a row by its inhabitability, so the row is that subtype's
-  -- value and a projection of `TypeArgs` names nothing.
-  let row := mkProj ``Subtype 0 θ
+  -- value, emitted as the named field application other producers use.
+  let row ← mkAppM ``Subtype.val #[θ]
   let resolved := mkApp2 (mkConst ``NTy.subst) row parameter
   -- The argument's inhabitability, from the frame's: a parameter itself has
   -- values, so the row's default does (`NRow.getD_inhabitable`).
@@ -835,12 +835,18 @@ def canonicalMapOfEntries? (map : Lean.Expr) : MetaM (Option Lean.Expr) := do
 open Lean Meta in
 /-- The typed view of a native type's values: integers by their values for
 integers and `num`, the family's reads for a type parameter, the values
-themselves where the type is inhabitable; `none` otherwise. Observable
-off-domain lookups (`SpecMap.valueAt`, `SpecMap.keyAt`) use the uninterpreted
-`NTy.plainFallback` witness rather than concrete structural defaults or
-`NTy.readBack`. -/
-def typedView? (carriers τ : Lean.Expr) : MetaM (Option TypedView) := do
-  let (carriers, τ, resolved?) ← resolvedType carriers τ
+themselves where the type is a constructor's application or a declared
+nominal and is inhabitable; `none` otherwise. A type that is neither, such as
+an argument of a symbolic row, is read as its family reads it, like a type
+parameter: its values are not known to be held as they are. With `resolve`
+off the view is decided on the family and type given, a parameter of an
+instantiated family included, so that it reads values of that family.
+Observable off-domain lookups (`SpecMap.valueAt`, `SpecMap.keyAt`) use the
+uninterpreted `NTy.plainFallback` witness rather than concrete structural
+defaults or `NTy.readBack`. -/
+def typedView? (carriers τ : Lean.Expr) (resolve : Bool := true) : MetaM (Option TypedView) := do
+  let (carriers, τ, resolved?) ← if resolve then resolvedType carriers τ
+    else pure (carriers, ← nativeTypeHead τ, none)
   let int := mkConst ``Int
   let inhabitable := mkApp (mkConst ``NTy.inhabitable) τ
   -- The type has values: evaluated where the type is known, and otherwise
@@ -876,7 +882,8 @@ def typedView? (carriers τ : Lean.Expr) : MetaM (Option TypedView) := do
     return some { carriers, type := τ, carrier, read, inhabited,
                   decEq := mkApp2 (mkConst ``NTy.decEq) carriers τ, integer := false,
                   identity := true, unread := read }
-  if τ.isAppOfArity ``NTy.param 1 then
+  let constructed := isNominalType (← getEnv) τ || (← isConstructorApp τ)
+  if τ.isAppOfArity ``NTy.param 1 || !constructed then
     let typedCarrier := mkApp2 (mkConst ``NTy.readCarrier) carriers τ
     let read := mkApp2 (mkConst ``NTy.read) carriers τ
     let inhabited := mkApp2 (mkConst ``Inhabited.mk [Level.one]) typedCarrier (mkApp read fallback)

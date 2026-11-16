@@ -35,6 +35,29 @@ run_cmd liftTermElabM do
   if (← NativeMaps.typedView? (mkConst ``Carriers.ground) quotedEmpty).isSome then
     throwError "an uninhabited enum acquired a typed map view"
 
+-- A frame's type arguments are read by the named field of their subtype, the
+-- form clause and write-back producers emit: the view of a parameter at a
+-- symbolic induced frame holds no primitive projection, and its terms, the
+-- resolution's inhabitability proof among them, type-check as they stand
+-- (`resolvedType`).
+open Lean Meta Elab Command in
+run_cmd liftTermElabM do
+  let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
+  withLocalDeclD `arguments (mkConst ``TypeArgs) fun arguments =>
+    withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
+      let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments outer
+      let some view ← NativeMaps.typedView? induced parameter
+        | throwError "a symbolic frame's parameter lost its typed view"
+      for (name, term) in #[("type", view.type), ("carrier", view.carrier),
+          ("reader", view.read), ("inhabited", view.inhabited), ("decEq", view.decEq),
+          ("unread", view.unread)] do
+        if (term.find? fun e => match e with
+            | .proj owner _ _ => owner == ``Subtype
+            | _ => false).isSome then
+          throwError "the {name} of a resolved parameter holds a primitive projection \
+            of the frame's type arguments: {term}"
+        check term
+
 -- A concrete non-integer reader is the identity by construction over the single carrier.
 example [Θ : Carriers] :
     NTy.read byteVector = (fun value : @NTy.carrier Θ byteVector => value) := rfl
@@ -142,3 +165,53 @@ run_cmd liftTermElabM do
       #[int, int, int, int, identity, identity, rawProjection]
     unless (← canonicalFamilyResult oldMap).expr == expected do
       throwError "a materialized map's table field was not reconstructed"
+
+-- A variant's field selection (`Choices.select?`) at an induced family is
+-- the outer family's at the substituted rows, apart from the value it is
+-- applied to: the selection of another field does not convert, the
+-- respelling of the operation alone does, and a clause applying it to a
+-- value that is no constructor is stated at the outer family.
+open Lean Meta Elab Command in
+run_cmd liftTermElabM do
+  let closed (term : TSyntax `term) : TermElabM Lean.Expr := do
+    let value ← Term.elabTerm term none
+    Term.synthesizeSyntheticMVarsNoPostponing
+    instantiateMVars value
+  let genericFirst ← closed (← `((Choices.cons (Which.there (Which.there Which.here)) Var.here .nil :
+    Choices ["None", "Direct", "Split"]
+      (.cons .nil (.cons (.cons (.param 0) .nil)
+        (.cons (.cons (.int 64 false) (.cons (.param 0) .nil)) .nil))) (.int 64 false))))
+  let booleanFirst ← closed (← `((Choices.cons (Which.there (Which.there Which.here)) Var.here .nil :
+    Choices ["None", "Direct", "Split"]
+      (.cons .nil (.cons (.cons .bool .nil)
+        (.cons (.cons (.int 64 false) (.cons .bool .nil)) .nil))) (.int 64 false))))
+  let booleanSecond ← closed (← `((Choices.cons (Which.there (Which.there Which.here))
+      (Var.there Var.here) .nil :
+    Choices ["None", "Direct", "Split"]
+      (.cons .nil (.cons (.cons .bool .nil)
+        (.cons (.cons (.int 64 false) (.cons .bool .nil)) .nil))) .bool)))
+  let arguments ← closed (← `((⟨.cons .bool .nil, rfl⟩ : TypeArgs)))
+  let select (family chosen : Lean.Expr) : MetaM Lean.Expr := do
+    let type ← whnfR (← inferType chosen)
+    return mkAppN (mkConst ``Choices.select?) (#[family] ++ type.getAppArgs ++ #[chosen])
+  withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
+    let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments outer
+    let first ← select induced genericFirst
+    let firstOuter ← select outer booleanFirst
+    let secondOuter ← select outer booleanSecond
+    if ← withNewMCtxDepth (withDefault (isDefEq first secondOuter)) then
+      throwError "the selections of two fields convert"
+    unless (← FamilyTransport.respellOperation? first) == some firstOuter do
+      throwError "a variant's field selection kept its induced family"
+    let carrier ← withDefault do
+      let .forallE _ carrier _ _ ← whnf (← inferType first)
+        | throwError "a selection is not a function of its value"
+      pure carrier
+    withLocalDeclD `value carrier fun value => do
+      let clause ← mkEq (mkApp first value) (mkApp first value)
+      let canonical := (← canonicalFamilyResult clause).expr
+      unless (canonical.find? fun term => term.isAppOf ``Choices.select? &&
+          term.getAppArgs[0]? == some induced).isNone do
+        throwError "a clause selecting a field of an unsplit value kept the induced family"
+      unless (canonical.find? fun term => term == mkApp firstOuter value).isSome do
+        throwError "the clause's selection is not the outer family's at the substituted rows"

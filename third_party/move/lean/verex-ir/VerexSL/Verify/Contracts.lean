@@ -5,6 +5,7 @@ import VerexSL.Contract
 import VerexSL.Modules
 import VerexIR.Proofs.Denote.Agreement
 import VerexIR.Proofs.Denote.FamilyTransport
+import VerexSL.Verify.OwnBridge
 
 /-!
 # Verification: compiled functions, contracts, and loop invariants
@@ -1904,6 +1905,64 @@ private def contractConditions : Array Name :=
     ``VerexIR.Proofs.Contract.frame, ``VerexIR.Proofs.Contract.validArgs,
     ``VerexIR.Proofs.Contract.validResult]
 
+/-- A generated definition a specialized condition applies at the frame the
+call's type arguments induce: the definition, the condition that applies it,
+and the frame argument it stands at. -/
+structure DefinitionAtInducedFrame where
+  definition : Name
+  condition : Name
+  frame : Lean.Expr
+
+/-- The arguments of a generated definition's application that carry its
+frame: the carriers (or frame) binder, and the types binder beside it where
+the definition takes the two apart, as `ensureDefinitionTransport` reads them
+when it states the definition's transport. -/
+private def frameArguments (definition : Name) (args : Array Lean.Expr) :
+    MetaM (Array Lean.Expr) := do
+  let some info := (← getEnv).find? definition | return #[]
+  forallTelescope info.type fun binders _ => do
+    let parameters := binders.pop
+    let some frameIndex ← parameters.findIdxM? fun parameter => do
+        let type ← inferType parameter
+        return type.isAppOfArity ``Skolems 2 || type.isConstOf ``Carriers
+      | return #[]
+    let slots := if (← inferType parameters[frameIndex]!).isConstOf ``Carriers then
+        #[frameIndex, parameters.size - 1]
+      else #[frameIndex]
+    return slots.filterMap (args[·]?)
+
+/-- The first generated definition a condition applies at a frame type
+arguments induce, where one is left: a definition the normal form did not
+transport to the caller's frame. Only the application's frame arguments are
+read (`frameArguments`), so a value or a state that mentions an induced frame
+of its own is none of the definition's business. -/
+def definitionAtInducedFrame? (condition : Name) (reading : Lean.Expr) :
+    MetaM (Option DefinitionAtInducedFrame) := do
+  let keys := definitionKeys.getState (← getEnv)
+  let inducedFrame? (argument : Lean.Expr) : Option Lean.Expr :=
+    argument.find? fun sub =>
+      sub.isAppOf ``Skolems.instantiate || sub.isAppOf ``Carriers.instantiate
+  let found ← IO.mkRef none
+  reading.forEach' fun sub => do
+    if (← found.get).isSome then return false
+    let some definition := sub.getAppFn.constName? | return true
+    unless keys.contains definition do return true
+    for argument in ← frameArguments definition sub.getAppArgs do
+      if let some frame := inducedFrame? argument then
+        found.set (some { definition, condition, frame })
+        return false
+    return true
+  found.get
+
+/-- What a definition left at an induced frame is reported as: the condition
+that applies it, the contract and the type arguments it is specialized at,
+and the frame the application stands at. -/
+def DefinitionAtInducedFrame.message (found : DefinitionAtInducedFrame) (generic : Name)
+    (θ : VerexIR.Proofs.Denote.NRow) : MessageData :=
+  m!"the condition `{found.condition}` of the contract `{generic}` applies the definition \
+    `{found.definition}` at the frame the type arguments \
+    `{Contract.typeArgumentsSpelling θ}` induce, which has no transport: {found.frame}"
+
 /-- The contract `generic`, specialized at type arguments `θ` of a
 caller's frame (`doc/designs/native-verification.md`, "Specialized
 contracts"): the generic contract at the frame `θ` induces, read in the
@@ -1988,7 +2047,14 @@ def ensureSpecialization (unit : ValidatedUnit) (generic : Name) (θ : TypeArgs)
           mkEqTrans equation
             (← mkExpectedTypeHint (← mkEqRefl result.expr) (← mkEq result.expr respelled))
         return (← mkLambdaFVars arguments respelled, ← mkLambdaFVars arguments equation)
-      conditions := conditions.push (← instantiateMVars condition)
+      let condition ← instantiateMVars condition
+      -- A specialized condition states the callee's definitions at the
+      -- caller's frame: one applied at the frame the type arguments induce
+      -- is a definition whose transport the normal form did not reach, and
+      -- the contract would state one frame in two forms.
+      if let some found ← definitionAtInducedFrame? (.mkSimple projection.getString!) condition then
+        throwError (found.message generic θ.1)
+      conditions := conditions.push condition
       equations := equations.push (← mkLambdaFVars binders (← instantiateMVars equation))
     let readType ← whnfR (← inferType read)
     let contract := mkAppN (mkConst ``VerexIR.Proofs.Contract.mk) (readType.getAppArgs ++ conditions)
@@ -2212,6 +2278,139 @@ def ensureDataOwn (segments : Array String) (unit : ValidatedUnit) :
         mkLambdaFVars #[source, arguments, value] selected
     defineWithEquation name predicate 3
   return { own with predicate := some (mkConst name) }
+
+/-- The declarations at rows a bridge was asked for, by the bridge's name:
+each is built, or found to have none, once. -/
+private initialize ownBridgeRequests : SimplePersistentEnvExtension Name NameSet ←
+  registerSimplePersistentEnvExtension {
+    addEntryFn := fun names name => names.insert name
+    addImportedFn := fun entries =>
+      mkStateFromImportedEntries (fun names name => names.insert name) {} entries }
+
+/-- Name of the bridge of a declaration's own invariant at an instance row,
+under the declaration's installed clauses (`<unit>.dataOwn.case{i}`). -/
+def ownBridgeName (installed : Name) (row : NRow) : Name :=
+  Name.str (Name.str installed (Contract.typeArgumentsSpelling row)) "bridge"
+
+/-- Declare once, per declaration whose data invariant `Carriers.own` carries
+and per instance row, the bridge of its own invariant
+(`VerexSL.Verify.OwnBridge.build`): the theorem stating a value's fact at a
+caller's frame as the declaration's clauses read at that frame over the value
+and the facts of its fields, recorded for the solver under the unit, the
+declaration and the row (`VerexIR.Proofs.Denote.OwnBridge.bridge?`).  Where
+the construction stops, the declaration has no bridge at the row and the
+clause and the operator or obligation it stopped at are recorded instead
+(`VerexIR.Proofs.Denote.OwnBridge.gap?`); its facts are then read as the
+installed clauses.  Needs the unit's function values, which the installed
+predicate is a field of.  The bridge's name, where there is one. -/
+def ensureOwnBridge (segments : Array String) (unit : ValidatedUnit)
+    (owner : VerexIR.StructHandle) (row : NRow) :
+    CommandElabM (Option Name) := withNominalUnitCommand (Contract.unitName segments) do
+  let own ← ensureDataOwn segments unit
+  let some index := own.carriers.findIdx? (· == owner) | return none
+  let unitName := Contract.unitName segments
+  let functionsName := Contract.functionCarriersName segments
+  unless (← getEnv).contains functionsName do return none
+  let installed := Contract.dataOwnName segments ++ Name.mkSimple s!"case{index}"
+  let name := ownBridgeName installed row
+  if (ownBridgeRequests.getState (← getEnv)).contains name then
+    return if (← getEnv).contains name then some name else none
+  modifyEnv (ownBridgeRequests.addEntry · name)
+  let declaration : String := (do
+      let ns ← unit.namespaces[owner.namespaceId.index]?
+      let declaration ← ns.structs[owner.structId]?
+      let qualified ← ns.nameOf declaration.name
+      pure qualified.name).getD s!"{repr owner}"
+  let rowSpelling := Contract.typeArgumentsSpelling row
+  -- The outcome is listed in the stage log, and printed under the solver's
+  -- debug option, so that the rows with and without a bridge can be read off
+  -- a run.
+  let report (line : String) : CommandElabM Unit := do
+    stageLog line
+    if (← getOptions).getBool `verex.solverDebug then IO.println line
+  let prefix_ := unitName.getPrefix
+  let generated (constant : Name) : Bool :=
+    let constant := (privateToUserName? constant).getD constant
+    prefix_.isPrefixOf constant && constant != unitName && constant != functionsName
+  let built ← liftTermElabM <| OwnBridge.build unit unitName functionsName
+    (Contract.functionCarriersBaseName segments) installed generated owner row
+  let gap (stopped : OwnBridge.Stopped) : CommandElabM (Option Name) := do
+    let gap : VerexIR.Proofs.Denote.OwnBridge.Gap := {
+      unit := unitName, source := stopped.source, row := stopped.row, declaration, rowSpelling
+      clause := stopped.clause, reason := stopped.reason }
+    modifyEnv (VerexIR.Proofs.Denote.OwnBridge.registry.addEntry · (.gap gap))
+    report gap.describe
+    return none
+  match built with
+  | .error stopped => gap stopped
+  | .ok bridge =>
+      let declared ← liftTermElabM (try
+          addDecl (.thmDecl {
+            name, levelParams := [], type := bridge.statement, value := bridge.proof })
+          pure none
+        catch error => pure (some (← error.toMessageData.toString)))
+      if let some reason := declared then
+        return ← gap { source := bridge.source, row := bridge.row, clause := ""
+                       reason := s!"the kernel does not accept the equivalence: {reason}" }
+      let entry : VerexIR.Proofs.Denote.OwnBridge.Entry := {
+        unit := unitName, source := bridge.source, row := bridge.row, theoremName := name
+        declaration, rowSpelling, clauses := bridge.clauses }
+      modifyEnv (VerexIR.Proofs.Denote.OwnBridge.registry.addEntry · (.bridge entry))
+      report entry.describe
+      return some name
+
+mutual
+/-- The declarations at rows a type mentions, at any depth. -/
+partial def declaredInstances (τ : NTy) (found : Array (VerexIR.StructHandle × NRow)) :
+    Array (VerexIR.StructHandle × NRow) :=
+  match τ with
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .param _ => found
+  | .tuple elements => declaredRowInstances elements found
+  | .struct source arguments fields =>
+      let found := if found.contains (source, arguments) then found else found.push (source, arguments)
+      declaredRowInstances fields (declaredRowInstances arguments found)
+  | .enum source arguments _ rows _ =>
+      let found := if found.contains (source, arguments) then found else found.push (source, arguments)
+      declaredRowsInstances rows (declaredRowInstances arguments found)
+  | .vector element | .slice element | .array element _ | .ghost element | .ref element
+  | .sliceRef element | .observed element => declaredInstances element found
+  | .table key value => declaredInstances value (declaredInstances key found)
+  | .function parameters _ results => declaredRowInstances results (declaredRowInstances parameters found)
+  | .nominal source arguments _ =>
+      let found := if found.contains (source, arguments) then found else found.push (source, arguments)
+      declaredRowInstances arguments found
+
+partial def declaredRowInstances (row : NRow) (found : Array (VerexIR.StructHandle × NRow)) :
+    Array (VerexIR.StructHandle × NRow) :=
+  match row with
+  | .nil => found
+  | .cons head rest => declaredRowInstances rest (declaredInstances head found)
+
+partial def declaredRowsInstances (rows : NRows) (found : Array (VerexIR.StructHandle × NRow)) :
+    Array (VerexIR.StructHandle × NRow) :=
+  match rows with
+  | .nil => found
+  | .cons fields rest => declaredRowsInstances rest (declaredRowInstances fields found)
+end
+
+/-- The bridges of the declarations at rows the given types mention
+(`ensureOwnBridge`): the types of the values a proof holds facts of. -/
+def ensureOwnBridges (segments : Array String) (unit : ValidatedUnit) (types : Array NTy) :
+    CommandElabM Unit := do
+  let instances := types.foldl (fun found τ => declaredInstances τ found) #[]
+  for (owner, row) in instances do
+    discard <| ensureOwnBridge segments unit owner row
+
+/-- The bridges of the declarations at the rows the values of compiled bodies
+have: the types of their parameters, locals and results, at any depth. -/
+def ensureFrameOwnBridges (segments : Array String) (unit : ValidatedUnit)
+    (bodies : Array (Function unit)) : CommandElabM Unit :=
+  ensureOwnBridges segments unit <| bodies.foldl (init := #[]) fun types body =>
+    let types := types ++ body.frame.toList.toArray
+    match body.result with
+    | .one τ => types.push τ
+    | .none => types
 
 /-- Define the typed and public contracts of a function, once: the contract
 over its native arguments, and its runtime form. -/

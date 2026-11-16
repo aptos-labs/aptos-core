@@ -1,0 +1,69 @@
+VerexE2ETests/Check/Closures/ResultValidity.lean:49:4: error: the specification clause `ensures result.value == 40` is not established
+VerexE2ETests/Check/Closures/ResultValidity.lean:48:7: error: verex verification failed: the automatic verification of `apply_fifty_incorrect` failed; provide a proof in the module:
+  verify apply_fifty_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/ResultValidity.lean:76:7: error: the precondition of `apply_opaque` is not established
+VerexE2ETests/Check/Closures/ResultValidity.lean:76:7: error: verex verification failed: the automatic verification of `apply_opaque_double` failed; provide a proof in the module:
+  verify apply_opaque_double by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_apply_opaque => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/ResultValidity.lean:109:7: error: verification failed with a residual obligation:
+executable✝ : VerexIR.Validation.ExecutableUnit «0x99».result_validity.unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable «0x99».result_validity.unit
+verexAgree : VerexIR.Proofs.TypesAgree «0x99».result_validity.unit
+verexResources : VerexIR.Proofs.ResourcesTyped «0x99».result_validity.unit
+f :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.NRow.cons 0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰
+        VerexIR.Proofs.Denote.NRow.nil)).carrier
+x : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory «0x99».result_validity.unit
+assumed :
+  VerexIR.Proofs.ValidResultsAt executable✝
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one 0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰) f
+permitted validArgs : True
+x_lower : 0 ≤ x.val
+x_upper : x.val ≤ 18446744073709551615
+⊢ VerexIR.Proofs.wp
+    (VerexIR.Proofs.Denote.closureMeaning executable✝
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one 0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰) f (x, ()))
+    (fun result final =>
+      0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰.Holds result ∧
+        VerexIR.Proofs.EnsuresOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
+            { parameters := [false], results := [false] }
+            (VerexIR.Proofs.Denote.ResultShape.one 0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰) f
+            (x, ()) () result initialState✝ final ∧
+          final = initialState✝)
+    (fun failure => True) initialState✝
+VerexE2ETests/Check/Closures/ResultValidity.lean:109:7: error: verex verification failed: the automatic verification of `apply_opaque_percent` failed; provide a proof in the module:
+  verify apply_opaque_percent by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/Check/Closures/ResultValidity.lean:119:7: error: the precondition of `apply_opaque_percent` at call 1 is not established
+VerexE2ETests/Check/Closures/ResultValidity.lean:119:7: error: verex verification failed: the automatic verification of `apply_opaque_at_most` failed; provide a proof in the module:
+  verify apply_opaque_at_most by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_apply_opaque_percent_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

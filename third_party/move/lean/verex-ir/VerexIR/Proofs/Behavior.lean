@@ -124,29 +124,38 @@ values: it holds of some row that passes them.  A clause names no prophecy
 of a mutable reference, and of two rows of the same entry values an
 invocation aborts alike (`not_abortsOf_of_ok`), so `aborts_of` is stated
 this way — of an invocation (`AbortsOfEntries`) and of a known target read
-directly, whose call or whose contract takes the row itself. -/
-def Denote.AtEntries (σs : NRow) (holds : HList σs → Prop) (entries : HList σs) : Prop :=
-  ∃ args, HList.settle σs args = entries ∧ holds args
+directly, whose call or whose contract takes the row itself.
 
-/-- A property of an arguments row holds of their entry values. -/
+The row is one of valid values (`HList.Holds`): an invocation passes values
+that hold their data invariants, a mutable reference's prophecy among them,
+and the row a clause quantifies ranges over those and no others.  The entry
+value of a reference is its current, whose validity is the hand-over's and
+is not stated here. -/
+def Denote.AtEntries (σs : NRow) (holds : HList σs → Prop) (entries : HList σs) : Prop :=
+  ∃ args, HList.Holds σs args ∧ HList.settle σs args = entries ∧ holds args
+
+/-- A property of a valid arguments row holds of their entry values. -/
 theorem Denote.atEntries_of_holds {σs : NRow} {holds : HList σs → Prop} {args : HList σs}
-    (held : holds args) : AtEntries σs holds (HList.settle σs args) :=
-  ⟨args, rfl, held⟩
+    (valid : HList.Holds σs args) (held : holds args) :
+    AtEntries σs holds (HList.settle σs args) :=
+  ⟨args, valid, rfl, held⟩
 
 /-- A property of an arguments row as a clause states it of their entry
-values and of the finals of its mutable references: it holds of some row
-that passes both.  Settling replaces the prophecies with entry values, so
-the finals a clause names of them pin them (`HList.finals`). -/
+values and of the finals of its mutable references: it holds of some row of
+valid values that passes both (`AtEntries`).  Settling replaces the
+prophecies with entry values, so the finals a clause names of them pin them
+(`HList.finals`); a final value a clause names is therefore a valid one. -/
 def Denote.AtEntryFinals (σs : NRow) (holds : HList σs → Prop) (entries : HList σs)
     (finals : HList (NRow.finals σs)) : Prop :=
-  ∃ args, HList.settle σs args = entries ∧ HList.finals σs args = finals ∧ holds args
+  ∃ args, HList.Holds σs args ∧ HList.settle σs args = entries ∧
+    HList.finals σs args = finals ∧ holds args
 
-/-- A property of an arguments row holds of their entry values and of the
-finals of its mutable references. -/
+/-- A property of a valid arguments row holds of their entry values and of
+the finals of its mutable references. -/
 theorem Denote.atEntryFinals_of_holds {σs : NRow} {holds : HList σs → Prop} {args : HList σs}
-    (held : holds args) :
+    (valid : HList.Holds σs args) (held : holds args) :
     AtEntryFinals σs holds (HList.settle σs args) (HList.finals σs args) :=
-  ⟨args, rfl, rfl, held⟩
+  ⟨args, valid, rfl, rfl, held⟩
 
 /-- The two components a settled row's equation gives: the settled head value
 and the settled tail. -/
@@ -217,6 +226,17 @@ theorem Denote.HList.settle_finals_injective : (row : NRow) → ∀ {left right 
       Prod.ext (HList.settle_cons_inj settled).1
         (HList.settle_finals_injective rest (HList.settle_cons_inj settled).2 finals)
 
+/-- The row a statement over entry values and finals quantifies is the row
+whose settling and finals they are: where a row of those entry values and
+finals is known, the statement's property and validity are that row's
+(`HList.settle_finals_injective`). -/
+theorem Denote.AtEntryFinals.at_row {σs : NRow} {holds : HList σs → Prop} {args : HList σs}
+    (stated : AtEntryFinals σs holds (HList.settle σs args) (HList.finals σs args)) :
+    HList.Holds σs args ∧ holds args := by
+  obtain ⟨row, valid, settled, finals, held⟩ := stated
+  obtain rfl := Denote.HList.settle_finals_injective σs settled finals
+  exact ⟨valid, held⟩
+
 end
 
 section
@@ -230,8 +250,15 @@ def EnsuresOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : 
   (invoke σs shared shape function args).ok pre result post
 
 /-- `ensures_of<f>(x, r, f̄)` as a clause states it: the invocation runs
-from `pre` to `post` returning `result` on arguments of the entry values
-`entries` whose mutable references end at the final values `finals`. -/
+from `pre` to `post` returning `result` on valid arguments of the entry
+values `entries` whose mutable references end at the final values `finals`.
+
+The predicate observes a run and ranges over plain results: it states the
+validity of the row it quantifies (`AtEntryFinals`), from which the finals'
+validity follows as the witness's own (`AtEntryFinals.at_row`), and nothing
+of `result`.  The result's fact is the function value's
+(`ValidResultsAt`, a target's `Contract.validResult`); the run `result_of`
+reads and a call need that evidence and do not take it from here. -/
 def EnsuresOfEntries (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (finals : HList (NRow.finals σs)) (result : shape.carrier)
@@ -239,42 +266,46 @@ def EnsuresOfEntries (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (s
   AtEntryFinals σs
     (fun args => EnsuresOf invoke σs shared shape function args result pre post) entries finals
 
-/-- A run of an invocation is a run on the entry values of its arguments
-and the finals of its mutable references. -/
+/-- A run of an invocation on valid arguments is a run on the entry values
+of its arguments and the finals of its mutable references. -/
 theorem ensuresOfEntries_of_ensuresOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
     {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
     {args : HList σs} {result : shape.carrier} {pre post : Memory unit}
+    (valid : HList.Holds σs args)
     (ensures : EnsuresOf invoke σs shared shape function args result pre post) :
     EnsuresOfEntries invoke σs shared shape function (HList.settle σs args)
       (HList.finals σs args) result pre post :=
-  Denote.atEntryFinals_of_holds ensures
+  Denote.atEntryFinals_of_holds valid ensures
 
 /-- `ensures_of<f>(x, r, f̄)` where `f` returns a mutable reference: the
 run returns a settled reference (`ResultShape.Settled`) whose current value
 is `current`, the one the clause names.  A clause sees a returned reference
 as its current value and holds no prophecy of it, as it holds none of a
 mutable argument, so the prophecy the run returns is quantified here and
-identified with `current` (`EnsuresOfEntries`). -/
+identified with `current` (`EnsuresOfEntries`).  The prophecy is a valid
+value (`NTy.Holds`), as every prophecy is by its choice; its equation with
+`current` states which value it is and not that it holds. -/
 def EnsuresOfSettled (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (σ : NTy)
     (function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier)
     (entries : HList σs) (finals : HList (NRow.finals σs)) (current : σ.carrier)
     (pre post : Memory unit) : Prop :=
-  ∃ prophecy : σ.carrier, prophecy = current ∧
+  ∃ prophecy : σ.carrier, NTy.Holds σ prophecy ∧ prophecy = current ∧
     EnsuresOfEntries invoke σs shared (.one (.ref σ)) function entries finals
       (prophecy, prophecy) pre post
 
-/-- A run returning a settled reference is an `EnsuresOfSettled` run at its
-prophecy. -/
+/-- A run returning a settled reference of a valid prophecy is an
+`EnsuresOfSettled` run at that prophecy. -/
 theorem ensuresOfSettled_of_ensuresOfEntries {invoke : InvokeMeaning} {σs : NRow}
     {shared : Sharing} {σ : NTy}
     {function : (NTy.function σs shared (ResultShape.one (.ref σ)).row).carrier}
     {entries : HList σs} {finals : HList (NRow.finals σs)} {prophecy : σ.carrier}
     {pre post : Memory unit}
+    (valid : NTy.Holds σ prophecy)
     (ensures : EnsuresOfEntries invoke σs shared (.one (.ref σ)) function entries finals
       (prophecy, prophecy) pre post) :
     EnsuresOfSettled invoke σs shared σ function entries finals prophecy
       pre post :=
-  ⟨prophecy, rfl, ensures⟩
+  ⟨prophecy, valid, rfl, ensures⟩
 
 /-- `aborts_of<f>(x)`: the invocation of `function` on `args` aborts from
 `state`. -/
@@ -282,30 +313,34 @@ def AbortsOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : R
     (function : (NTy.function σs shared shape.row).carrier) (args : HList σs) (state : Memory unit) : Prop :=
   ∃ error, (invoke σs shared shape function args).aborts state error
 
-/-- `aborts_of<f>(x)` as a clause states it: the invocation aborts on
+/-- `aborts_of<f>(x)` as a clause states it: the invocation aborts on valid
 arguments of the entry values of `x` (`AtEntries`). -/
 def AbortsOfEntries (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (state : Memory unit) : Prop :=
-  ∃ args, HList.settle σs args = entries ∧ AbortsOf invoke σs shared shape function args state
+  AtEntries σs (fun args => AbortsOf invoke σs shared shape function args state) entries
 
-/-- An abort of an invocation is an abort on the entry values of its
-arguments. -/
+/-- An abort of an invocation on valid arguments is an abort on the entry
+values of its arguments. -/
 theorem abortsOfEntries_of_abortsOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
     {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier} {args : HList σs}
-    {state : Memory unit} (aborts : AbortsOf invoke σs shared shape function args state) :
+    {state : Memory unit} (valid : HList.Holds σs args)
+    (aborts : AbortsOf invoke σs shared shape function args state) :
     AbortsOfEntries invoke σs shared shape function (HList.settle σs args) state :=
-  ⟨args, rfl, aborts⟩
+  Denote.atEntries_of_holds valid aborts
 
-/-- A run `result_of` and `state_of` read: from `state`, on arguments of the
-entry values `entries`, returning a settled result.  A row of entry values
-is settled, as the clause layer builds it (`Invocation.entryArguments`): no run's
-settled arguments meet an unsettled row, and the labels then read their
-defaults. -/
+/-- A run `result_of` and `state_of` read: from `state`, on valid arguments
+of the entry values `entries`, returning a valid, settled result.  A row of
+entry values is settled, as the clause layer builds it
+(`Invocation.entryArguments`): no run's settled arguments meet an unsettled
+row, and the labels then read their defaults.  A run on arguments or to a
+result that does not hold its data invariants is no candidate, so the result
+`result_of` reads of a run holds its own (`holds_resultOf`). -/
 def SettledRun (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function σs shared shape.row).carrier) (entries : HList σs)
     (state : Memory unit) (run : HList σs × shape.carrier × Memory unit) : Prop :=
-  HList.settle σs run.1 = entries ∧ shape.Settled run.2.1 ∧
+  HList.Holds σs run.1 ∧ shape.Holds run.2.1 ∧
+    HList.settle σs run.1 = entries ∧ shape.Settled run.2.1 ∧
     EnsuresOf invoke σs shared shape function run.1 run.2.1 state run.2.2
 
 /-- A run's encodings: its arguments', its result's, and its final memory,
@@ -325,7 +360,11 @@ def SettledEncoding (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
 open Classical in
 /-- `result_of<f>(x)`: the result of a settled run on the entry values
 `entries` from `state`, chosen among the runs' encodings, so that every view
-of a frame names the same run; `default` where there is none. -/
+of a frame names the same run; `default` where there is none.  The run it
+chooses is a candidate (`SettledRun`), on valid arguments and to a valid
+result, so the result it reads of one holds its data invariants
+(`holds_resultOf`); the default it falls back to is the value it was given,
+of which no validity is stated. -/
 noncomputable def ResultOf (invoke : InvokeMeaning) (σs : NRow) (shared : Sharing)
     (shape : ResultShape) (function : (NTy.function σs shared shape.row).carrier)
     (entries : HList σs)
@@ -378,6 +417,19 @@ theorem settledRun_resultOf {invoke : InvokeMeaning} {σs : NRow} {shared : Shar
   refine ⟨chosen.1, ?_⟩
   rw [result, final]
   exact settled
+
+/-- Where a settled run returns, `result_of` holds its data invariants: it
+is the result of a candidate run (`SettledRun`).  Where none returns it is
+the default it was given, of which nothing is stated. -/
+theorem holds_resultOf {invoke : InvokeMeaning} {σs : NRow} {shared : Sharing}
+    {shape : ResultShape} {function : (NTy.function σs shared shape.row).carrier}
+    {entries : HList σs} {state : Memory unit}
+    (returns : ∃ encoded, SettledEncoding invoke σs shared shape function entries state encoded)
+    (default : shape.carrier) :
+    shape.Holds (ResultOf invoke σs shared shape function entries state default) := by
+  obtain ⟨run, settled, result, -⟩ := settledEncoding_choose returns default
+  rw [result]
+  exact settled.2.1
 
 end
 
@@ -441,27 +493,28 @@ def RequiresOf (requires : RequiresMeaning unit) (σs : NRow) (shared : Sharing)
     (HList.toRuntime σs args) state
 
 /-- `requires_of<f>(x)` as a clause states it: the declared precondition of
-the function value holds at every arguments row whose entry values are
+the function value holds at every valid arguments row whose entry values are
 `entries`.  A clause names no prophecy of a mutable reference it passes, and
 a precondition reads a reference's entry value, so it holds alike at two
 rows of the same entry values; stated so, the predicate is provable where
 the entry values are known and usable at a call, which an existential form
-would not be. -/
+would not be.  The rows it ranges over are those an invocation passes: rows
+of values that hold their data invariants (`HList.Holds`). -/
 def RequiresOfEntries (requires : RequiresMeaning unit) (σs : NRow) (shared : Sharing)
     (results : NRow) (function : (NTy.function σs shared results).carrier)
     (entries : HList σs) (state : Memory unit) : Prop :=
-  ∀ args : HList σs, HList.settle σs args = entries →
+  ∀ args : HList σs, HList.Holds σs args → HList.settle σs args = entries →
     RequiresOf requires σs shared results function args state
 
-/-- The declared precondition at an arguments row, where it holds at every
-row of the row's entry values: what a call reads of a clause's
+/-- The declared precondition at a valid arguments row, where it holds at
+every valid row of the row's entry values: what a call reads of a clause's
 `requires_of`. -/
 theorem requiresOf_of_entries {requires : RequiresMeaning unit} {σs : NRow} {shared : Sharing}
     {results : NRow} {function : (NTy.function σs shared results).carrier} {args : HList σs}
-    {state : Memory unit}
+    {state : Memory unit} (valid : HList.Holds σs args)
     (holds : RequiresOfEntries requires σs shared results function (HList.settle σs args) state) :
     RequiresOf requires σs shared results function args state :=
-  holds args rfl
+  holds args valid rfl
 
 omit Θ in
 /-- At the base frame, `requires_of` is the requires meaning of the value at
@@ -788,7 +841,7 @@ theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle 
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) pre)
     (permitted : contract.requires (weave.compose captures args) pre)
-    (valid : contract.validArgs (weave.compose captures args) := by trivial) :
+    (valid : contract.validArgs (weave.compose captures args)) :
     contract.validResult result ∧
       (¬contract.mayAbort (weave.compose captures args) pre →
           contract.ensures (weave.compose captures args) pre result post) ∧
@@ -816,7 +869,7 @@ theorem abortsOf_closureOf_verified {executable : ExecutableUnit unit} {handle :
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) state)
     (permitted : contract.requires (weave.compose captures args) state)
-    (valid : contract.validArgs (weave.compose captures args) := by trivial) :
+    (valid : contract.validArgs (weave.compose captures args)) :
     ∃ failure, contract.aborts (weave.compose captures args) state failure := by
   obtain ⟨failure, runs⟩ := abortsOf_closureOf weave capturedFree coherent captures args aborts closed
   exact ⟨failure, (verified _ state valid assumed permitted).2.1 failure runs⟩
@@ -1091,6 +1144,25 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
   | .one (.slice _), _ | .one (.table _ _), _ | .one (.ghost _), _ | .one (.function _ _ _), _
   | .one (.nominal _ _ _), _ | .one (.observed _), _ => Iff.rfl
 
+/-- A result holds its data invariants in either view alike. -/
+theorem Denote.ResultShape.holds_ofSkolem_iff [Θ : Carriers] (θ : TypeArgs) :
+    (shape : ResultShape) →
+    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    ((shape.subst θ.1).Holds (ResultShape.ofSkolem θ shape value) ↔
+      @ResultShape.Holds (Carriers.instantiate θ Θ) shape value)
+  | .none, _ => Iff.rfl
+  | .one τ, value => NTy.holds_ofSkolem_iff θ τ value
+
+/-- A result read at the induced frame holds its data invariants where it
+does at the outer frame. -/
+theorem Denote.ResultShape.holds_toSkolem_iff [Θ : Skolems unit] (θ : TypeArgs) :
+    (shape : ResultShape) → (value : (shape.subst θ.1).carrier) →
+    (@ResultShape.Holds (Skolems.instantiate θ Θ).toCarriers shape
+        (ResultShape.toSkolem θ shape value) ↔
+      (shape.subst θ.1).Holds value)
+  | .none, _ => Iff.rfl
+  | .one τ, value => NTy.holds_toSkolem_iff θ τ value
+
 /-- A result encodes alike in either view. -/
 theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) :
     (shape : ResultShape) →
@@ -1121,9 +1193,11 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
   funext encoded
   apply propext
   constructor
-  · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
+  · rintro ⟨⟨values, result, final⟩, ⟨valid, validResult, settles, settled, ran⟩, rfl⟩
     refine ⟨(HList.ofSkolem θ σs values, ResultShape.ofSkolem θ shape result, final),
-      ⟨?_, ?_, ?_⟩, ?_⟩
+      ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+    · exact (HList.holds_ofSkolem_iff θ σs values).mpr valid
+    · exact (ResultShape.holds_ofSkolem_iff θ shape result).mpr validResult
     · show HList.settle _ (HList.ofSkolem θ σs values) = HList.ofSkolem θ σs entries
       rw [HList.settle_ofSkolem θ free]
       exact congrArg (HList.ofSkolem θ σs) settles
@@ -1133,9 +1207,11 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
           (resultCodec (shape.subst θ.1)).encode (ResultShape.ofSkolem θ shape result), final) = _
       rw [HList.encode_ofSkolem, resultCodec_encode_ofSkolem]
       rfl
-  · rintro ⟨⟨values, result, final⟩, ⟨settles, settled, ran⟩, rfl⟩
+  · rintro ⟨⟨values, result, final⟩, ⟨valid, validResult, settles, settled, ran⟩, rfl⟩
     refine ⟨(HList.toSkolem θ σs values, ResultShape.toSkolem θ shape result, final),
-      ⟨?_, ?_, ?_⟩, ?_⟩
+      ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+    · exact (HList.holds_toSkolem_iff θ σs values).mpr valid
+    · exact (ResultShape.holds_toSkolem_iff θ shape result).mpr validResult
     · have := congrArg (HList.toSkolem θ σs) settles
       rw [← HList.ofSkolem_toSkolem θ σs values, HList.settle_ofSkolem θ free,
         HList.toSkolem_ofSkolem, HList.toSkolem_ofSkolem] at this
@@ -1338,8 +1414,7 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
       args result pre post)
     (assumed : contract.assumes (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
     (permitted : contract.requires (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre)
-    (valid : contract.validArgs (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) := by
-      trivial) :
+    (valid : contract.validArgs (HList.toSkolem θ full ((weave.subst θ.1).compose captures args))) :
     contract.validResult (ResultShape.toSkolem θ shape result) ∧
       (¬contract.mayAbort (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre →
         contract.ensures (HList.toSkolem θ full ((weave.subst θ.1).compose captures args)) pre
@@ -1481,22 +1556,23 @@ theorem Denote.Weave.finals_compose_iff {full captured supplied : NRow}
     exact eq_of_heq ((woven.trans (heq_of_eq held)).trans same.symm)
 
 /-- `aborts_of` of a meaning at a row, as a clause states it: the run on
-arguments of the entry values `entries` aborts from `state`.  Of an invocation
+valid arguments of the entry values `entries` aborts from `state`
+(`AtEntries`).  Of an invocation
 meaning at a function value (`abortsOfEntries_eq_abortsOfMeaning`) and of a known
 target's meaning at its full row alike. -/
 def AbortsOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
     (entries : HList σs) (state : Memory unit) : Prop :=
-  ∃ args, HList.settle σs args = entries ∧ CallAborts (run args) state
+  AtEntries σs (fun args => CallAborts (run args) state) entries
 
 /-- `ensures_of` of a meaning at a row, as a clause states it: the run on
-arguments of the entry values `entries` runs from `pre` to `post`, its
+valid arguments of the entry values `entries` runs from `pre` to `post`, its
 mutable references ending at `finals` and returning `result`
-(`EnsuresOfEntries`). -/
+(`AtEntryFinals`, `EnsuresOfEntries`).  As there, `result` is a plain value
+of which the predicate states no validity. -/
 def EnsuresOfMeaning (σs : NRow) (shape : ResultShape) (run : HList σs → Comp unit shape.carrier)
     (entries : HList σs) (finals : HList (NRow.finals σs)) (result : shape.carrier)
     (pre post : Memory unit) : Prop :=
-  ∃ args : HList σs, HList.settle σs args = entries ∧
-    HList.finals σs args = finals ∧ CallEnsures (run args) result pre post
+  AtEntryFinals σs (fun args => CallEnsures (run args) result pre post) entries finals
 
 /-- `aborts_of` of a function value is its invocation meaning at the value,
 read at the value's own row. -/
@@ -1528,53 +1604,123 @@ theorem atEntryFinals_callEnsures_eq_ensuresOfMeaning {σs : NRow} {shape : Resu
     AtEntryFinals σs (fun args => CallEnsures (run args) result pre post) entries finals =
       EnsuresOfMeaning σs shape run entries finals result pre post := rfl
 
+/-- `aborts_of` of a meaning at a row the captures of a weave fill in part,
+at the woven entry values: a valid row of the supplied arguments is, woven
+with valid captures, a valid row of the target's. -/
+theorem abortsOfMeaning_weave {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (valid : HList.Holds captured captures) (entries : HList supplied) (state : Memory unit)
+    (stated : AbortsOfMeaning supplied shape (fun args => run (weave.compose captures args))
+      entries state) :
+    AbortsOfMeaning full shape run (weave.compose captures entries) state := by
+  obtain ⟨args, holds, settled, aborts⟩ := stated
+  exact ⟨weave.compose captures args, (weave.holds_compose captures args).mpr ⟨valid, holds⟩,
+    by rw [weave.settle_compose free, settled], aborts⟩
+
+/-- `aborts_of` of a meaning at the woven entry values, read at the supplied
+row: the supplied arguments of a valid woven row are valid
+(`Weave.holds_split`), whatever the captures. -/
+theorem abortsOfMeaning_unweave {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (entries : HList supplied) (state : Memory unit)
+    (stated : AbortsOfMeaning full shape run (weave.compose captures entries) state) :
+    AbortsOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries
+      state := by
+  obtain ⟨woven, holds, settled, aborts⟩ := stated
+  have split := weave.compose_split woven
+  rw [← split, weave.settle_compose free] at settled
+  obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
+  refine ⟨(weave.split woven).2, ((weave.holds_split woven).mp holds).2, argsEq, ?_⟩
+  show CallAborts (run (weave.compose captures (weave.split woven).2)) state
+  rw [← capturesEq, split]
+  exact aborts
+
+/-- A behavior stated at woven entry values states that the captures hold
+their data invariants: a capture holds no reference, so the valid row the
+statement quantifies carries the capture itself.  The equations of a
+closure's behavior at its target therefore hold of valid captures only
+(`abortsOfMeaning_woven`). -/
+theorem holds_captures_of_abortsOfMeaning {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (entries : HList supplied) (state : Memory unit)
+    (stated : AbortsOfMeaning full shape run (weave.compose captures entries) state) :
+    HList.Holds captured captures := by
+  obtain ⟨woven, holds, settled, -⟩ := stated
+  have split := weave.compose_split woven
+  rw [← split, weave.settle_compose free] at settled
+  obtain ⟨capturesEq, -⟩ := weave.compose_injective settled
+  rw [← capturesEq]
+  exact ((weave.holds_split woven).mp holds).1
+
 /-- `aborts_of` of a meaning at a row, read at a row the captures of a weave
 fill in part, is that meaning at the woven entry values: the equation of a
-closure's behavior at its target, in the meaning and with no closure in it. -/
+closure's behavior at its target, in the meaning and with no closure in it.
+It holds of valid captures (`holds_captures_of_abortsOfMeaning`). -/
 theorem abortsOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
     (free : captured.refFree = true) {shape : ResultShape}
     (run : HList full → Comp unit shape.carrier) (captures : HList captured)
-    (entries : HList supplied) (state : Memory unit) :
+    (valid : HList.Holds captured captures) (entries : HList supplied) (state : Memory unit) :
     AbortsOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries state =
-      AbortsOfMeaning full shape run (weave.compose captures entries) state := by
-  apply propext
-  constructor
-  · rintro ⟨args, settled, aborts⟩
-    exact ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], aborts⟩
-  · rintro ⟨woven, settled, aborts⟩
-    have split := weave.compose_split woven
-    rw [← split, weave.settle_compose free] at settled
-    obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
-    refine ⟨(weave.split woven).2, argsEq, ?_⟩
-    show CallAborts (run (weave.compose captures (weave.split woven).2)) state
-    rw [← capturesEq, split]
-    exact aborts
+      AbortsOfMeaning full shape run (weave.compose captures entries) state :=
+  propext ⟨abortsOfMeaning_weave weave free run captures valid entries state,
+    abortsOfMeaning_unweave weave free run captures entries state⟩
+
+/-- `ensures_of` of a meaning at a row the captures of a weave fill in part,
+at the woven entry values (`abortsOfMeaning_weave`); the finals are the
+supplied arguments', a capture naming none (`Weave.finals_compose_iff`). -/
+theorem ensuresOfMeaning_weave {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (valid : HList.Holds captured captures)
+    (entries : HList supplied) {finals : HList (NRow.finals supplied)}
+    {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
+    (result : shape.carrier) (pre post : Memory unit)
+    (stated : EnsuresOfMeaning supplied shape (fun args => run (weave.compose captures args))
+      entries finals result pre post) :
+    EnsuresOfMeaning full shape run (weave.compose captures entries) finals' result pre post := by
+  obtain ⟨args, holds, settled, finalsEq, ensures⟩ := stated
+  refine ⟨weave.compose captures args, (weave.holds_compose captures args).mpr ⟨valid, holds⟩,
+    by rw [weave.settle_compose free, settled], ?_, ensures⟩
+  exact (weave.finals_compose_iff free captures args same).mpr finalsEq
+
+/-- `ensures_of` of a meaning at the woven entry values, read at the
+supplied row (`abortsOfMeaning_unweave`). -/
+theorem ensuresOfMeaning_unweave {full captured supplied : NRow}
+    (weave : Weave full captured supplied) (free : captured.refFree = true) {shape : ResultShape}
+    (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (entries : HList supplied) {finals : HList (NRow.finals supplied)}
+    {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
+    (result : shape.carrier) (pre post : Memory unit)
+    (stated : EnsuresOfMeaning full shape run (weave.compose captures entries) finals' result
+      pre post) :
+    EnsuresOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries finals
+      result pre post := by
+  obtain ⟨woven, holds, settled, finalsEq, ensures⟩ := stated
+  have split := weave.compose_split woven
+  rw [← split, weave.settle_compose free] at settled
+  obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
+  rw [← split, capturesEq] at finalsEq ensures
+  refine ⟨(weave.split woven).2, ((weave.holds_split woven).mp holds).2, argsEq, ?_, ensures⟩
+  exact (weave.finals_compose_iff free captures (weave.split woven).2 same).mp finalsEq
 
 /-- `ensures_of` of a meaning at a row, at the woven entry values
-(`abortsOfMeaning_woven`); the finals are the supplied arguments', a capture naming
-none (`Weave.finals_compose_iff`). -/
+(`abortsOfMeaning_woven`), of valid captures. -/
 theorem ensuresOfMeaning_woven {full captured supplied : NRow} (weave : Weave full captured supplied)
     (free : captured.refFree = true) {shape : ResultShape}
     (run : HList full → Comp unit shape.carrier) (captures : HList captured)
+    (valid : HList.Holds captured captures)
     (entries : HList supplied) {finals : HList (NRow.finals supplied)}
     {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
     (result : shape.carrier) (pre post : Memory unit) :
     EnsuresOfMeaning supplied shape (fun args => run (weave.compose captures args)) entries finals
         result pre post =
       EnsuresOfMeaning full shape run (weave.compose captures entries)
-        finals' result pre post := by
-  apply propext
-  constructor
-  · rintro ⟨args, settled, finalsEq, ensures⟩
-    refine ⟨weave.compose captures args, by rw [weave.settle_compose free, settled], ?_, ensures⟩
-    exact (weave.finals_compose_iff free captures args same).mpr finalsEq
-  · rintro ⟨woven, settled, finalsEq, ensures⟩
-    have split := weave.compose_split woven
-    rw [← split, weave.settle_compose free] at settled
-    obtain ⟨capturesEq, argsEq⟩ := weave.compose_injective settled
-    rw [← split, capturesEq] at finalsEq ensures
-    refine ⟨(weave.split woven).2, argsEq, ?_, ensures⟩
-    exact (weave.finals_compose_iff free captures (weave.split woven).2 same).mp finalsEq
+        finals' result pre post :=
+  propext ⟨ensuresOfMeaning_weave weave free run captures valid entries same result pre post,
+    ensuresOfMeaning_unweave weave free run captures entries same result pre post⟩
 
 /-- Invoking a function value whose target, weave, and captures a proof sees
 is invoking the function value naming its target, at the woven arguments. -/
@@ -1595,12 +1741,13 @@ theorem closureMeaning_closureOf_named {executable : ExecutableUnit unit} {handl
     closureRun_closureOf_woven executable handle weave free typeInstantiation captures shape args]
 
 /-- `aborts_of` as a clause states it (`AbortsOfEntries`) of a function value
-capturing values, as of the function value naming its target (`named`) at the
-woven entry values. -/
+capturing valid values, as of the function value naming its target (`named`)
+at the woven entry values. -/
 theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     {handle : FunctionHandle} {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (valid : HList.Holds captured captures)
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
     (closed : (Carriers.functions supplied shared shape.row).closure function =
@@ -1618,16 +1765,17 @@ theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
           (weave.compose captures args) from
       funext fun args => closureMeaning_closureOf_named weave free typeInstantiation captures
         shared shape function closed named naming args]
-  exact abortsOfMeaning_woven weave free _ captures entries state
+  exact abortsOfMeaning_woven weave free _ captures valid entries state
 
 /-- `ensures_of` as a clause states it (`EnsuresOfEntries`) of a function
-value capturing values, as of the function value naming its target at the
-woven entry values; the two rows name the same final values
+value capturing valid values, as of the function value naming its target at
+the woven entry values; the two rows name the same final values
 (`Weave.finals_compose_iff`). -/
 theorem ensuresOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     {handle : FunctionHandle} {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (valid : HList.Holds captured captures)
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
     (closed : (Carriers.functions supplied shared shape.row).closure function =
@@ -1648,15 +1796,17 @@ theorem ensuresOfEntries_closureOf_woven {executable : ExecutableUnit unit}
           (weave.compose captures args) from
       funext fun args => closureMeaning_closureOf_named weave free typeInstantiation captures
         shared shape function closed named naming args]
-  exact ensuresOfMeaning_woven weave free _ captures entries same result pre post
+  exact ensuresOfMeaning_woven weave free _ captures valid entries same result pre post
 
 /-- `ensures_of` of a function value returning a mutable reference
-(`EnsuresOfSettled`), as of the function value naming its target at the woven
-entry values (`ensuresOfEntries_closureOf_woven`). -/
+(`EnsuresOfSettled`) and capturing valid values, as of the function value
+naming its target at the woven entry values
+(`ensuresOfEntries_closureOf_woven`). -/
 theorem ensuresOfSettled_closureOf_woven {executable : ExecutableUnit unit}
     {handle : FunctionHandle} {full captured supplied : NRow}
     (weave : Weave full captured supplied) (free : captured.refFree = true)
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList captured)
+    (valid : HList.Holds captured captures)
     (shared : Sharing) (σ : NTy)
     (function : (NTy.function supplied shared (ResultShape.one (.ref σ)).row).carrier)
     (closed : (Carriers.functions supplied shared (ResultShape.one (.ref σ)).row).closure
@@ -1676,12 +1826,14 @@ theorem ensuresOfSettled_closureOf_woven {executable : ExecutableUnit unit}
   unfold EnsuresOfSettled
   apply propext
   constructor
-  · rintro ⟨prophecy, settled, ensures⟩
-    exact ⟨prophecy, settled, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
-      captures shared _ function closed named naming entries same _ pre post) ▸ ensures⟩
-  · rintro ⟨prophecy, settled, ensures⟩
-    exact ⟨prophecy, settled, (ensuresOfEntries_closureOf_woven weave free typeInstantiation
-      captures shared _ function closed named naming entries same _ pre post).symm ▸ ensures⟩
+  · rintro ⟨prophecy, holds, settled, ensures⟩
+    exact ⟨prophecy, holds, settled, (ensuresOfEntries_closureOf_woven weave free
+      typeInstantiation captures valid shared _ function closed named naming entries same _ pre
+      post) ▸ ensures⟩
+  · rintro ⟨prophecy, holds, settled, ensures⟩
+    exact ⟨prophecy, holds, settled, (ensuresOfEntries_closureOf_woven weave free
+      typeInstantiation captures valid shared _ function closed named naming entries same _ pre
+      post).symm ▸ ensures⟩
 
 end
 

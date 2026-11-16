@@ -4,6 +4,7 @@
 import Lean
 import VerexIR.Proofs.Denote.Join
 import VerexIR.Proofs.Denote.NominalQuote
+import VerexIR.Proofs.Denote.VectorOperations
 
 /-!
 # Checked shared continuations
@@ -66,6 +67,9 @@ private partial def normalExits (action : Lean.Expr) (flow : Bool) : MetaM Nat :
       exits := min 2 (exits + (← normalExits alternative flow))
       if exits == 2 then break
     return exits
+  -- A read of a vector's element is the match on its two branches.
+  if action.isAppOfArity ``withVectorElem 9 then
+    return min 2 ((← normalExits (action.getArg! 7) flow) + (← normalExits (action.getArg! 8) flow))
   if (action.isAppOf ``branchAt || action.isAppOf ``armAt) && action.getAppNumArgs ≥ 1 then
     return ← normalExits action.appArg! flow
   if action.isAppOf ``loopAt then return 2

@@ -595,6 +595,32 @@ theorem Weave.resolvedHolds_compose : {full captured supplied : NRow} →
       simp only [Weave.compose, HList.ResolvedHolds]
       exact and_congr Iff.rfl (rest.resolvedHolds_compose captures args.2 values.2)
 
+/-- A woven row holds its data invariants exactly where its captures and its
+supplied arguments hold theirs: the row's fact is one fact per position, and
+every position is a capture's or an argument's. -/
+theorem Weave.holds_compose : {full captured supplied : NRow} →
+    (weave : Weave full captured supplied) → (captures : HList captured) →
+    (args : HList supplied) →
+    (HList.Holds full (weave.compose captures args) ↔
+      HList.Holds captured captures ∧ HList.Holds supplied args)
+  | _, _, _, .nil, _, _ => ⟨fun _ => ⟨trivial, trivial⟩, fun _ => trivial⟩
+  | _, _, _, .captured rest, captures, args => by
+      simp only [Weave.compose, HList.holds_cons, rest.holds_compose captures.2 args, and_assoc]
+  | _, _, _, .supplied rest, captures, args => by
+      simp only [Weave.compose, HList.holds_cons, rest.holds_compose captures args.2]
+      exact and_left_comm
+
+/-- A row holds its data invariants exactly where the captures and the
+supplied arguments a weave reads of it hold theirs (`Weave.holds_compose`). -/
+theorem Weave.holds_split {full captured supplied : NRow} (weave : Weave full captured supplied)
+    (values : HList full) :
+    HList.Holds full values ↔
+      HList.Holds captured (weave.split values).1 ∧
+        HList.Holds supplied (weave.split values).2 := by
+  have composed := weave.holds_compose (weave.split values).1 (weave.split values).2
+  rw [weave.compose_split] at composed
+  exact composed
+
 /-- Running a closure whose target, weave, and captures are known is running
 the target on the captures and the supplied arguments woven into its
 parameter row. -/

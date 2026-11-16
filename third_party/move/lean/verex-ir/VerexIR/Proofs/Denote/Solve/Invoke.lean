@@ -103,6 +103,32 @@ def renormalizeCut (normalization : Simp.Context × Simp.SimprocsArray)
       goals := goals.push goal
   setGoals goals.toList
 
+/-- Normalize the hypotheses of the main goal a substitution stated or
+rewrote after `known` was taken: those `known` does not hold, and those it
+holds at another type, since a hypothesis rewritten in place keeps its
+identity and changes its type. Such a hypothesis is normal over the variables
+the substitution replaced, not over the values it put in their place, where a
+projection now meets the constructor it reads. A hypothesis `known` holds at
+its present type is left as it is, and so is the target. -/
+def renormalizeSubstituted (normalization : Simp.Context × Simp.SimprocsArray)
+    (known : LocalContext) : TacticM Unit := do
+  let some goal := (← getGoals).head? | return
+  let rewritten ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      if let some before := known.find? decl.fvarId then
+        if before.type == decl.type then return found
+      return if ← isProp (← instantiateMVars decl.type) then found.push decl.fvarId else found
+  if rewritten.isEmpty then return
+  let (ctx, simprocs) := normalization
+  let saved ← saveState
+  try
+    match ← simpGoal goal ctx simprocs (simplifyTarget := false) (fvarIdsToSimp := rewritten) with
+    | (none, _) => replaceMainGoal []
+    | (some (_, next), _) => replaceMainGoal [next]
+  catch _ =>
+    saved.restore
+
 /-- Normalize a hypothesis that instantiates a normalized predicate at
 fresh variables, as `verex_normalize` would. The predicate's
 clauses, the contents of its `Obligation` markers, are normal there: only
@@ -369,21 +395,29 @@ private def splitReadingAction? (goal : MVarId) (target reading : Lean.Expr) :
   let cases ← observing? do
     goal.assign (mkAppN (mkConst ``withSome_cases)
       #[α, β, motive, option, found, missing, isSome, isNone])
-    let (_, taken) ← isSome.mvarId!.introNP 2
+    let (read, taken) ← isSome.mvarId!.introNP 2
     let (_, missed) ← isNone.mvarId!.introNP 1
     -- The branch the reading takes reads the pattern its case fixed, so its
     -- match reduces.  The branch past it reduces where it is a pattern of its
     -- own, and is the next reading of a chain where it is not: that match is
     -- kept, for this rule to take again.
     let reduced ← observing? (reduceCaseMatcher missed)
-    pure [← reduceCaseMatcher taken, reduced.getD missed]
+    -- The value this case read, with the fact its read states.
+    let (taken, _) ← statedReadFact (← reduceCaseMatcher taken) (.fvar read[1]!)
+    pure [taken, reduced.getD missed]
   return cases
 
 /-- The cases of a weakest precondition over a match on one discriminant,
 by cases on that discriminant at the goal's own instance: each case states
-the pattern it took (`d = some x`) and runs its alternative. `none` where
-the match has several discriminants or a dependent motive. -/
-def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.withContext do
+the pattern it took (`d = some x`) and runs its alternative. A discriminant
+that reads storage also states the fact of the value read (`statedReadFact`).
+`readFact` states the fact of the value a case read, from the case's goal
+and equation; a read of storage by default.
+`none` where the match has several discriminants or a dependent motive. -/
+def splitMatchAction? (goal : MVarId)
+    (readFact : MVarId → Lean.Expr → MetaM MVarId :=
+      fun goal equation => return (← statedReadFact goal equation).1) :
+    MetaM (Option (List MVarId)) := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
   -- The action as the walk reads it, under the elaborator's annotations.
@@ -412,8 +446,49 @@ def splitMatchAction? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.wit
     let caseTarget ← instantiateMVars (← case.mvarId.getType)
     let .reduced alternative ← reduceMatcher? (caseTarget.getArg! 3)
       | throwError "a match on a constructor does not reduce"
-    case.mvarId.replaceTargetDefEq
+    let reduced ← case.mvarId.replaceTargetDefEq
       (mkAppN caseTarget.getAppFn (caseTarget.getAppArgs.set! 3 alternative.headBeta))
+    readFact reduced (case.subst.apply (.fvar introduced[1]!))
+
+/-- The cases of a weakest precondition over a program's read of a vector's
+element (`withVectorElem`): the read is the match on the optional read of the
+vector's array (`withVectorElem_eq_match`), split as any match on one
+discriminant is, so each case states the read's pattern.  The case that
+reads an element also states that element's fact, where the context proves
+the fact of the vector whole (`closedVectorHolds?`): the read names its
+vector here and no later, as the normal form of the read's equation is of
+the vector's array.  An element of a vector whose fact the context does not
+prove gets none here, and an element type that states no invariant has none
+to state; where that vector is an operation's result, the case keeps what
+the element's fact owes to the result's (`owedElementFact`), for the fact
+that arrives later.  `none` where the goal runs no such read. -/
+def splitVectorRead? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
+  let action := (target.getArg! 3).consumeMData
+  unless action.isAppOfArity ``withVectorElem 9 do return none
+  let arguments := action.getAppArgs
+  let (carriers, τ, values, index) := (arguments[0]!, arguments[4]!, arguments[5]!, arguments[6]!)
+  let stateless ← isInvariantFreeNTy τ
+  let held? ← if stateless then pure none else closedVectorHolds? carriers τ values
+  -- A read of an operation's result names no vector once it is normalized:
+  -- what it owes to the fact of that result is kept here.
+  let owes := !stateless && held?.isNone && isOperatedVector values
+  if verex.solverDebug.get (← getOptions) then
+    IO.println s!"    vector read of {((toString (← ppExpr values)).replace "\n" " ").take 200}: {
+      if held?.isSome then "its element's fact is stated"
+      else if owes then "its element's fact is owed to the vector's" else "no element fact"}"
+  let unfolded := mkAppN (mkConst ``withVectorElem_eq_match) arguments
+  let some (_, _, matched) := (← inferType unfolded).eq? | return none
+  let motive ← withLocalDeclD `action (← inferType action) fun action =>
+    mkLambdaFVars #[action] (mkAppN target.getAppFn (target.getAppArgs.set! 3 action))
+  let next ← goal.replaceTargetEq
+    (mkAppN target.getAppFn (target.getAppArgs.set! 3 matched)) (← mkCongrArg motive unfolded)
+  splitMatchAction? next fun case equation => do
+    if let some held := held? then
+      return ← statedElementFact case carriers τ values index held equation
+    if owes then return ← owedElementFact case carriers τ values index equation
+    return case
 
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
@@ -486,6 +561,12 @@ def splitOnce (goal : MVarId) (obligations : Bool := true) (cases : Bool := obli
   let matching ← if target.isAppOfArity ``VerexIR.Proofs.wp 7 then
       isMatcherApp (target.getArg! 3).consumeMData
     else pure false
+  if target.isAppOfArity ``VerexIR.Proofs.wp 7 &&
+      (target.getArg! 3).consumeMData.isAppOfArity ``withVectorElem 9 then
+    let known ← goal.withContext do return (← getLCtx).getFVarIds
+    if let some cases ← splitVectorRead? goal then
+      return some (← statePatterns known cases, true)
+    saved.restore
   if matching then
     setGoals [goal]
     evalTactic (← `(tactic| try verex_memory_reads))
@@ -1487,6 +1568,8 @@ private def openAtEntries (goal : MVarId) : TacticM MVarId := do
       else (`verexEntryValues).appendIndexAfter round
     let finalsName := if round == 0 then `verexEntryFinals
       else (`verexEntryFinals).appendIndexAfter round
+    let validName := if round == 0 then `verexArgsValid
+      else (`verexArgsValid).appendIndexAfter round
     let found ← current.withContext do
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
@@ -1530,7 +1613,13 @@ private def openAtEntries (goal : MVarId) : TacticM MVarId := do
           (givenNames := #[⟨false, [rowName, `verexAtEntries]⟩])
         let some subgoal := opened[0]? | return current
         let some conjunction := subgoal.fields[1]? | return current
+        -- The witness is a row of valid values: its validity first, then the
+        -- equation that it passes the entry values and the property.
         let parts ← subgoal.mvarId.cases conjunction.fvarId!
+          (givenNames := #[⟨false, [validName, `verexAtEntries]⟩])
+        let some part := parts[0]? | return current
+        let some passing := part.fields[1]? | return current
+        let parts ← part.mvarId.cases passing.fvarId!
           (givenNames := #[⟨false, [equationName, `verexHolds]⟩])
         let some part := parts[0]? | return current
         let mut opened := part.mvarId
@@ -1579,9 +1668,16 @@ private def openAtEntries (goal : MVarId) : TacticM MVarId := do
         if verex.solverDebug.get (← getOptions) then
           logInfo m!"clause entries opened at the row {rowName} names"
         let withEntries ← openEntryValues opened equationName
-        match finals? with
-        | some name => openEntryValues withEntries name
-        | none => pure withEntries
+        let withFinals ← match finals? with
+          | some name => openEntryValues withEntries name
+          | none => pure withEntries
+        -- The witness's validity as the facts of the values the equations
+        -- left in its place, one per atom (`assertValidityAtoms`).
+        let valid? ← withFinals.withContext do
+          return ((← getLCtx).findFromUserName? validName).map (·.fvarId)
+        match valid? with
+        | some valid => assertValidityAtoms withFinals valid
+        | none => pure withFinals
       catch error =>
         if verex.solverDebug.get (← getOptions) then
           IO.println s!"clause entries not opened: {← error.toMessageData.toString}"
@@ -1641,7 +1737,10 @@ private partial def spelledEntries? (carriers row entries : Lean.Expr) :
 position read at the row those values name, and the implication from it
 (`atEntries_of_holds`, `atEntryFinals_of_holds`): a clause owes its
 `aborts_of` of the row its own values name, and a disjunction of such
-statements — the abort conditions of a clause — one row each.  A statement
+statements — the abort conditions of a clause — one row each.  The row's
+validity, which the statement states of it, is taken from the facts the
+leaf holds (`rowValidity?`) and is otherwise owed with the property
+(`owedValidity`).  A statement
 that names the finals of the row's mutable references names the whole row:
 settling gives the currents and the finals the prophecies, so both
 equations are solved for one row (`AtEntryFinals`).  Where unification of a
@@ -1710,10 +1809,25 @@ private partial def strengthenEntries (statement : Lean.Expr) :
     let some args := args? | return none
     let inner ← Core.betaReduce (mkApp view.holds args)
     let rule := if view.finals?.isSome then ``atEntryFinals_of_holds else ``atEntries_of_holds
-    let implication ← withLocalDeclD `held inner fun held =>
-      mkLambdaFVars #[held] (mkAppN (mkConst rule)
-        #[view.carriers, view.row, view.holds, args, held])
-    return some (inner, implication)
+    -- The row is one of valid values: its validity from the facts the leaf
+    -- holds, and owed with the property, as the atoms of its positions,
+    -- where they do not give it (`rowValidity?`, `owedValidity`).
+    let validity := mkApp3 (mkConst ``HList.Holds) view.carriers view.row args
+    match ← rowValidity? validity with
+    | some valid =>
+        let implication ← withLocalDeclD `held inner fun held =>
+          mkLambdaFVars #[held] (mkAppN (mkConst rule)
+            #[view.carriers, view.row, view.holds, args, valid, held])
+        return some (inner, implication)
+    | none =>
+        let (atoms, valid) ← owedValidity validity
+        let owed := mkApp2 (mkConst ``And) atoms inner
+        let implication ← withLocalDeclD `held owed fun held =>
+          mkLambdaFVars #[held] (mkAppN (mkConst rule)
+            #[view.carriers, view.row, view.holds, args,
+              mkApp valid (mkApp3 (mkConst ``And.left) atoms inner held),
+              mkApp3 (mkConst ``And.right) atoms inner held])
+        return some (owed, implication)
   for (connective, rule) in [(``Or, ``Or.imp), (``And, ``And.imp)] do
     unless statement.isAppOfArity connective 2 do continue
     let (left, right) := (statement.getArg! 0, statement.getArg! 1)
@@ -1813,8 +1927,9 @@ private def weakenDeniedEntries (goal : MVarId) : TacticM MVarId := do
 
 /-- A hypothesis stating a run that returns a mutable reference, whose
 prophecy the statement quantifies (`EnsuresOfSettled`): opened by
-elimination into the prophecy, the current it forgets, and the run itself,
-which the rule over entry values opens in turn (`openAtEntries`). -/
+elimination into the prophecy, its validity as a fact
+(`assertValidityAtoms`), the current it settles to, and the run itself, which
+the rule over entry values opens in turn (`openAtEntries`). -/
 private def openSettled (goal : MVarId) : TacticM MVarId := do
   let mut current := goal
   for round in [0:4] do
@@ -1822,6 +1937,8 @@ private def openSettled (goal : MVarId) : TacticM MVarId := do
       else (`verexProphecy).appendIndexAfter round
     let currentName := if round == 0 then `verexSettled
       else (`verexSettled).appendIndexAfter round
+    let validName := if round == 0 then `verexProphecyValid
+      else (`verexProphecyValid).appendIndexAfter round
     let found ← current.withContext do
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
@@ -1848,10 +1965,20 @@ private def openSettled (goal : MVarId) : TacticM MVarId := do
           (givenNames := #[⟨false, [prophecyName, `verexSettledRun]⟩])
         let some subgoal := opened[0]? | return current
         let some conjunction := subgoal.fields[1]? | return current
+        -- The prophecy is a valid value: its fact first, then the current it
+        -- settles to and the run.
         let parts ← subgoal.mvarId.cases conjunction.fvarId!
+          (givenNames := #[⟨false, [validName, `verexSettledRun]⟩])
+        let some part := parts[0]? | return current
+        let some settling := part.fields[1]? | return current
+        let parts ← part.mvarId.cases settling.fvarId!
           (givenNames := #[⟨false, [currentName, `verexSettledRun]⟩])
         let some part := parts[0]? | return current
-        return part.mvarId
+        let valid? ← part.mvarId.withContext do
+          return ((← getLCtx).findFromUserName? validName).map (·.fvarId)
+        match valid? with
+        | some valid => assertValidityAtoms part.mvarId valid
+        | none => return part.mvarId
       catch error =>
         if verex.solverDebug.get (← getOptions) then
           IO.println s!"settled run not opened: {← error.toMessageData.toString}"
@@ -1905,18 +2032,28 @@ private def closeSettled (goal : MVarId) : TacticM MVarId := do
     -- unfolds to its subtype at reducible transparency, which names no type.
     let_expr VerexIR.Proofs.Denote.NTy.carrier carriers σ := domain.consumeMData
       | return none
-    -- The statement's own shape: the current the prophecy settles to, and the
-    -- run at `(prophecy, prophecy)`.  Nothing else quantified over a carrier is witnessed here.
+    -- The statement's own shape: the prophecy's validity, the current it
+    -- settles to, and the run at `(prophecy, prophecy)`.  Nothing else
+    -- quantified over a carrier is witnessed here.
     let shaped ← withLocalDeclD `prophecy domain fun prophecy => do
       let inner ← Core.betaReduce (mkApp body prophecy)
       unless inner.isAppOfArity ``And 2 do return false
-      let some (_, lhs, _) := (inner.getArg! 0).eq? | return false
+      let valid := (inner.getArg! 0).consumeMData
+      unless valid.isAppOfArity ``NTy.Holds 3 && valid.getArg! 2 == prophecy do return false
+      let settling := inner.getArg! 1
+      unless settling.isAppOfArity ``And 2 do return false
+      let some (_, lhs, _) := (settling.getArg! 0).eq? | return false
       unless lhs.consumeMData == prophecy do return false
-      return ((inner.getArg! 1).find? fun e =>
+      return ((settling.getArg! 1).find? fun e =>
         e.isAppOfArity ``Prod.mk 4 && e.getArg! 2 == prophecy && e.getArg! 3 == prophecy).isSome
     unless shaped do return none
     let some prophecy ← returnedProphecy? carriers σ | return none
-    let inner ← Core.betaReduce (mkApp body prophecy)
+    let stated ← Core.betaReduce (mkApp body prophecy)
+    let (validity, settling) := (stated.getArg! 0, stated.getArg! 1)
+    -- The prophecy's validity from the facts the leaf holds; owed with the
+    -- rest where they do not give it.
+    let valid? ← rowValidity? validity
+    let inner := if valid?.isSome then settling else stated
     let innerType := if marked then
         mkAppN (mkConst ``VerexIR.Proofs.Obligation) (target.getAppArgs.pop.push inner)
       else inner
@@ -1926,6 +2063,9 @@ private def closeSettled (goal : MVarId) : TacticM MVarId := do
           (mkAppN (mkConst ``VerexIR.Proofs.Obligation_iff)
             (target.getAppArgs.pop.push inner)) next
       else next
+    let held := match valid? with
+      | some valid => mkApp4 (mkConst ``And.intro) validity settling valid held
+      | none => held
     let proof ← mkAppOptM ``Exists.intro #[some domain, some body, some prophecy, some held]
     let proof := if marked then
         mkApp4 (mkConst ``Iff.mpr) target statement
@@ -1938,14 +2078,92 @@ private def closeSettled (goal : MVarId) : TacticM MVarId := do
   | some next => return next
   | none => return goal
 
+/-- The behaviors a leaf states, at entry values, of a closure site whose
+captured row states a data invariant: such a site behaves as the value
+naming its target at the woven row where its captures hold that invariant,
+which its generated equations state under the captures' fact
+(`guardedWovenAt`).  No normalization holds that fact, so the equations are
+read here: every application the leaf's statements make of such a site is
+taken, each at the captures it spells, its premise discharged as a validity
+condition is (`rowValidity?`), and the statements of that site normalized by
+it.  A site whose captures the leaf does not know valid keeps its statements
+as they are.  `none` where the reading closes the leaf. -/
+def readGuardedWoven (goal : MVarId) : TacticM (Option MVarId) := do
+  let environment ← getEnv
+  -- The sites the leaf spells with their captures, and the executable unit
+  -- their behaviors are stated over.
+  let spelled ← goal.withContext do
+    let mut found : Array (Lean.Expr × Name × Lean.Expr) := #[]
+    let mut statements := #[← instantiateMVars (← goal.getType)]
+    for declaration in ← getLCtx do
+      if declaration.isImplementationDetail then continue
+      statements := statements.push (← instantiateMVars declaration.type)
+    -- Every application the statements make of such a site, in one traversal:
+    -- a statement may name several sites, or one site at several captures.
+    for behavior in sitesWhere (fun term =>
+        (term.isAppOf ``VerexIR.Proofs.AbortsOfEntries ||
+          term.isAppOf ``VerexIR.Proofs.EnsuresOfEntries ||
+          term.isAppOf ``VerexIR.Proofs.EnsuresOfSettled) && term.getAppNumArgs > 7 &&
+        (match (term.getArg! 7).consumeMData with
+          | .app (.const constructor _) captures =>
+              !captures.hasLooseBVars && !(guardedWovenAt environment constructor).isEmpty
+          | _ => false)) statements do
+      let some executable := executableOf? (behavior.getArg! 3) | continue
+      let .app (.const constructor _) captures := (behavior.getArg! 7).consumeMData | continue
+      unless found.any (fun (unit, known, values) =>
+          unit == executable && known == constructor && values == captures) do
+        found := found.push (executable, constructor, captures)
+    return found
+  if spelled.isEmpty then return some goal
+  let mut current := goal
+  for (executable, constructor, captures) in spelled do
+    let saved ← saveState
+    try
+      -- The site's equations at the leaf's captures, each under its fact.
+      let equations ← current.withContext do
+        (guardedWovenAt environment constructor).filterMapM fun name => do
+          let rule := mkApp2 (mkConst name) executable captures
+          let .forallE _ validity _ _ ← whnfR (← inferType rule) | return none
+          let some valid ← rowValidity? validity | return none
+          let stated := mkApp rule valid
+          return some (← inferType stated, stated)
+      if equations.isEmpty then continue
+      let (rules, stated) ← current.assertHypotheses <| equations.mapIdx fun index (type, value) =>
+        { userName := (`verexWoven).appendIndexAfter index, type, value }
+      let next ← stated.withContext do
+        let targets ← (← getLCtx).foldlM (init := #[]) fun targets declaration => do
+          if declaration.isImplementationDetail || rules.contains declaration.fvarId then
+            return targets
+          let type ← instantiateMVars declaration.type
+          return if (type.find? (·.isConstOf constructor)).isSome then
+            targets.push declaration.fvarId else targets
+        -- The site's statements: the hypotheses naming it and the goal where
+        -- it names it. A reading with neither rewrites nothing.
+        let inTarget :=
+          ((← instantiateMVars (← stated.getType)).find? (·.isConstOf constructor)).isSome
+        if targets.isEmpty && !inTarget then return some stated
+        setGoals [stated]
+        simpAt stated (← `(tactic| simp only [vir_denote_norm])) rules targets inTarget
+      match next with
+      | some next => current ← next.tryClearMany rules
+      | none => return none
+    catch error =>
+      if verex.solverDebug.get (← getOptions) then
+        IO.println s!"woven behaviors not read: {← error.toMessageData.toString}"
+      saved.restore
+  return some current
+
 /-- A goal's behavioral predicates as hypotheses (`introducedBehaviors`),
 the clause forms of `ensures_of` and `aborts_of` among them opened
 (`openSettled`, `openAtEntries`), and a goal stating one witnessed by the
 prophecy its call returned (`closeSettled`) and read at the row its entry
-values name (`closeAtEntries`). -/
-def introduceBehaviors (goal : MVarId) : TacticM MVarId :=
-  introducedBehaviors goal >>= openSettled >>= openAtEntries >>= weakenDeniedEntries >>=
-    closeSettled >>= closeAtEntries
+values name (`closeAtEntries`).  The behaviors of a site whose captures
+state an invariant are read first, at its target's woven row
+(`readGuardedWoven`), and the leaf may close there: `none` then. -/
+def introduceBehaviors (goal : MVarId) : TacticM (Option MVarId) := do
+  let some goal ← introducedBehaviors goal >>= readGuardedWoven | return none
+  return some (← openSettled goal >>= openAtEntries >>= weakenDeniedEntries >>=
+    closeSettled >>= closeAtEntries)
 
 /-- Whether an alternative is an abort of a literal closure or of a known
 target read directly (`CallAborts`, and its clause form at entry values,
@@ -2003,11 +2221,41 @@ private def closureWeave? (literal : LiteralValue) :
   let (some captured, some supplied) := (rows[1]?, rows[2]?) | return none
   return some (weave, captured, supplied)
 
+/-- A dictionary's contract owed at the frame a call's type arguments induce
+is the contract at the caller's frame (`MethodContract.of_instantiate`). The
+contract is one fact, compared by its arguments, and its function value is
+typed at the caller's carriers; so the rule is applied at the goal's own
+arguments, the frame among them, and nothing is left for unification or
+instance synthesis. `none` where the goal is no contract at such a frame or
+the type arguments are not decided free of references. -/
+def methodContractAtCaller? (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  unless target.isAppOfArity ``VerexIR.Proofs.MethodContract 8 do return none
+  let some (θ, outer) ← (do
+      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer :=
+          (target.getArg! 3).consumeMData
+        | return none
+      return some (θ, outer))
+    | return none
+  let some free ← decidedTrue? (mkApp (mkConst ``NRow.refFree) (← mkAppM ``Subtype.val #[θ]))
+    | return none
+  let rule ← mkAppOptM ``VerexIR.Proofs.MethodContract.of_instantiate
+    #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free,
+      target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
+  let [next] ← goal.apply rule | return none
+  return some next
+
+/-- `methodContractAtCaller?` as a step of a tactic script. -/
+elab "verex_method_contract_at_caller" : tactic => do
+  let some next ← methodContractAtCaller? (← getMainGoal)
+    | throwError "the goal is no dictionary's contract at a frame type arguments induce"
+  replaceMainGoal [next]
+
 /-- Instantiate a generic closure target's theorem at its actual frame,
 including captured evidence, before reading its postcondition. -/
 private def genericBehavior? (view : BehaviorView) (stated : Lean.Expr)
     (callees : Array (Lean.Expr × String × Lean.Expr)) :
-    TacticM (Option (Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
+    TacticM (Option (String × Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
   let function := view.function.consumeMData
   unless function.isAppOfArity ``functionOfGeneric 15 && view.run?.isSome do return none
   let θ := function.getArg! 5
@@ -2015,7 +2263,7 @@ private def genericBehavior? (view : BehaviorView) (stated : Lean.Expr)
   let shape := function.getArg! 10
   let shared := function.getArg! 11
   let handle := function.getArg! 12
-  let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
+  let some (_, callee, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
       unless ← isDefEq candidate handle do return false
       forallTelescope (← inferType proof) fun _ statement =>
         pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
@@ -2048,17 +2296,17 @@ private def genericBehavior? (view : BehaviorView) (stated : Lean.Expr)
     (function.getArg! 0) executable (function.getArg! 2) #[θ, free, weave,
     capturedFree, shape, handle, function.getArg! 3, function.getArg! 4, coherent,
     function.getArg! 13, shared, function.getArg! 14, view.arguments, verified, stated]
-  return some (theoremProof, theoremArguments, implication)
+  return some (callee, theoremProof, theoremArguments, implication)
 
 private def literalBehavior? (view : BehaviorView) (stated type executable : Lean.Expr)
     (callees : Array (Lean.Expr × String × Lean.Expr)) :
-    TacticM (Option (Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
+    TacticM (Option (String × Lean.Expr × Array Lean.Expr × Lean.Expr)) := do
   let some found := literalFunction? (← getEnv) view.function | return none
   let some closure ← literalValue? found | return none
   let some (weave, captured, _) ← closureWeave? closure | return none
   let handle := closure.handle
   -- A target the call rule inlines is listed by its theorem as well.
-  let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
+  let some (_, callee, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
       unless ← isDefEq candidate handle do return false
       forallTelescope (← inferType proof) fun _ statement =>
         pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
@@ -2087,7 +2335,7 @@ private def literalBehavior? (view : BehaviorView) (stated type executable : Lea
         IO.println s!"behavior dispatch skipped: {← ex.toMessageData.toString}"
       pure none
   let some implication := implication? | return none
-  return some (theoremProof, theoremArguments, implication)
+  return some (callee, theoremProof, theoremArguments, implication)
 
 /-- Whether a statement holds `ensures_of` at entry values at the frame a
 call's type arguments induce. -/
@@ -2111,12 +2359,13 @@ arguments, what the target's contract ensures of the run, or the failures it
 permits (`ensuresOf_closureOf_verified`, `abortsOf_closureOf_verified`).
 `none` where the requires meaning closes the goal. -/
 partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr))
-    (handled : Array Lean.Expr := #[]) :
+    (handled : Array Lean.Expr := #[])
+    (owed : Option (IO.Ref (Array (Provenance × MVarId))) := none) :
     TacticM (Option MVarId) := do
   let target ← goal.withContext do instantiateMVars (← goal.getType)
-  -- `requires_of` of a clause: the precondition at a row of the entry values
-  -- the clause names.  The row and the equation that it passes them are
-  -- introduced, the equation opened per component (`openEntryValues`), and
+  -- `requires_of` of a clause: the precondition at a valid row of the entry
+  -- values the clause names.  The row, its validity and the equation that it
+  -- passes them are introduced, the equation opened per component (`openEntryValues`), and
   -- the precondition then read as of any row (`verex_behavior`), the
   -- components rewritten to the values the clause reads.
   if (unmarked target).isAppOf ``VerexIR.Proofs.RequiresOfEntries then
@@ -2126,8 +2375,17 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
           goal.replaceTargetDefEq (unmarked target)
         else pure goal
       let (_, goal) ← goal.intro `verexArgs
+      -- The row is one of valid values: its validity as facts of its
+      -- components, which the equation's components then name
+      -- (`assertValidityAtoms`, `readEntryValues`).
+      let (_, goal) ← goal.intro `verexArgsValid
       let (_, goal) ← goal.intro `verexEntryValues
       let goal ← openEntryValues goal `verexEntryValues
+      let valid? ← goal.withContext do
+        return ((← getLCtx).findFromUserName? `verexArgsValid).map (·.fvarId)
+      let goal ← match valid? with
+        | some valid => assertValidityAtoms goal valid
+        | none => pure goal
       setGoals [goal]
       -- The components of the entry-value equation are substituted into the
       -- goal where they can be (`openEntryValues`), so the precondition is
@@ -2161,7 +2419,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       setGoals (← (← getGoals).mapM readEntryValues)
       return (← getGoals).head?
     catch _ => state.restore
-  let goal ← introduceBehaviors goal
+  let some goal ← introduceBehaviors goal | return none
   goal.withContext do
   let mut current := goal
   for hypothesis in ← goal.getNondepPropHyps do
@@ -2183,7 +2441,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
       current ← current.replaceLocalDeclDefEq hypothesis proposition
       let cases ← current.cases hypothesis
       let #[next] := cases | throwError "a behavioral conjunction has multiple alternatives"
-      return ← dispatchBehavior next.mvarId callees handled
+      return ← dispatchBehavior next.mvarId callees handled owed
     unless states type do continue
     -- A behavior stated at the frame a call's type arguments induce, as a
     -- generic callee's contract states one of a function value it was passed,
@@ -2229,7 +2487,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
           state.restore
           pure none
       if let some next := transported then
-        return ← dispatchBehavior next callees handled
+        return ← dispatchBehavior next callees handled owed
     let mut stated := Lean.Expr.fvar hypothesis
     let mut held := true
     while type.isArrow do
@@ -2254,7 +2512,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     let dispatched ← if view.function.consumeMData.isAppOf ``functionOfGeneric then
         genericBehavior? view stated callees
       else literalBehavior? view stated type executable callees
-    let some (theoremProof, theoremArguments, implication) := dispatched | continue
+    let some (callee, theoremProof, theoremArguments, implication) := dispatched | continue
     -- The natives the target's theorem assumes, the caller assumes too.
     let mut assumed := true
     for argument in theoremArguments do
@@ -2270,29 +2528,70 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     let constants ← contractConstants (← inferType theoremProof)
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
       `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
-    -- What the target's theorem assumes, its precondition, and argument validity.
+    -- What the target's theorem assumes, its precondition, and argument
+    -- validity, in that order: the validity of the arguments is the last of
+    -- the three premises every behavior rule takes, so a residual queued
+    -- where it stays open is queued only once the others are discharged.
     let mut fact ← instantiateMVars implication
     let mut established := true
+    let mut unproved := none
     for _ in [0:3] do
       let .forallE _ premiseType _ _ ← whnfR (← inferType fact) | established := false; break
       let premise ← mkFreshExprSyntheticOpaqueMVar premiseType
-      unless ← closesBy premise.mvarId! (← `(tactic|
+      -- The validity of the arguments is the condition a call through a
+      -- contract states of them, discharged by that condition's own
+      -- mechanism (`openValidityGoal`). The premise is recognized as the rule
+      -- spells it, an application of the contract's `validArgs`, which a
+      -- reduction would unfold; its row is the one the rule passes the
+      -- target, the weave of the captures and the arguments, at a generic
+      -- target moved to its frame, so the readings of that row belong to the
+      -- condition's normal form here. An atom left open is a residual of the
+      -- target's argument it belongs to, at its position in the target's own
+      -- row, where this dispatch owes residuals. A witness search owes none:
+      -- there the atom is decided on the spot, as the rule's precondition
+      -- is, and the fact is dropped where it stays open.
+      let discharged ← if premiseType.consumeMData.isAppOf ``VerexIR.Proofs.Contract.validArgs then do
+          let state ← saveState
+          let row : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← #[
+            ``VerexIR.Proofs.Contract.ofSkolem, ``VerexIR.Proofs.Denote.Weave.subst,
+            ``VerexIR.Proofs.Denote.Weave.compose].mapM fun name =>
+              `(Lean.Parser.Tactic.simpLemma| $(mkCIdent name):ident)
+          let remaining ← openValidityGoal (lemmas ++ row) premise.mvarId!
+          match owed with
+          | some pending =>
+              pending.modify (· ++ remaining.map fun (position, goal) =>
+                (Provenance.callArgument callee none (position + 1), goal))
+              pure true
+          | none =>
+              if ← remaining.allM fun (_, atom) => do
+                  closesBy atom (← `(tactic| verex_leaf)) then
+                pure true
+              else
+                state.restore
+                pure false
+        else closesBy premise.mvarId! (← `(tactic|
           ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
               Weave.subst, Weave.compose, HList.Holds, vir_transport, vir_denote_norm]) <;>
             verex_split_hypotheses <;> (repeat apply And.intro) <;> first
               | assumption
-              | (apply VerexIR.Proofs.MethodContract.of_instantiate _ (by decide)
+              | (verex_method_contract_at_caller
                  simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
                  assumption)
               | (apply VerexIR.Proofs.ReceiverScopedMethod.of_instantiate _
                  simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
                  assumption)
-              | verex_leaf))) do
+              | verex_leaf)))
+      unless discharged do
         established := false
+        unproved := some premiseType
         break
       fact := mkApp fact (← instantiateMVars premise)
     unless established do
-      if verex.solverDebug.get (← getOptions) then IO.println "behavior dispatch: contract premises unproved"
+      if verex.solverDebug.get (← getOptions) then
+        match unproved with
+        | some premiseType =>
+            IO.println s!"behavior dispatch: contract premise unproved: {← ppExpr premiseType}"
+        | none => IO.println "behavior dispatch: contract premises unproved"
       continue
     let (_, next) ← (← current.assert `verexBehavior (← inferType fact) fact).intro1P
     let (_, next) ← (← next.assert `verexBehaviorDispatched
@@ -2325,7 +2624,7 @@ partial def dispatchBehavior (goal : MVarId) (callees : Array (Lean.Expr × Stri
     -- Read that fact through its verified target too. Keep the observations
     -- already dispatched so a contract repeating its own run is not expanded
     -- again; abstract callback facts simply remain for the leaf deciders.
-    return ← dispatchBehavior current callees (handled.push type)
+    return ← dispatchBehavior current callees (handled.push type) owed
   return some current
 
 /-- Whether a statement reads a behavioral predicate. -/
@@ -2474,11 +2773,13 @@ private def framedFact? (type : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Ex
   return none
 
 /-- A run of a function value a hypothesis frames (`KeepsMemoryAt`,
-`FramedAt`) keeps the frame: of a value that keeps memory, the run's final
+`FramedAt`) keeps the frame, at its valid arguments and to its valid result
+(`validArgs` and `validResults`, the facts the invocation's rule took of the
+arguments and of the value): of a value that keeps memory, the run's final
 memory, `verexFinal`, is substituted by its initial one; of another, its
 frame at the run's arguments is a hypothesis. -/
-private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.Expr) :
-    TacticM MVarId := do
+private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.Expr)
+    (validArgs validResults : Lean.Expr) : TacticM MVarId := do
   let kept? ← goal.withContext do
     let some ensures := (← getLCtx).findFromUserName? `verexEnsures | return none
     let ensuresType ← instantiateMVars ensures.type
@@ -2503,9 +2804,14 @@ private def keptMemory (goal : MVarId) (action : Lean.Expr) (facts : Array Lean.
       unless ← isDefEq shapePlain (mkConst ``Bool.true) do continue
       let some plainFree ← decidedTrue? plain | continue
       let some shapeFree ← decidedTrue? shapePlain | continue
+      -- The frame is of a run to a valid result: the result's fact is the
+      -- value's own, at this run (`FramedAt.at_run`).
+      let validResult := mkAppN validResults #[ensuresType.getArg! 8, ensuresType.getArg! 9,
+        ensuresType.getArg! 10, ensuresType.getArg! 11, validArgs, ensures.toExpr]
       let kept := mkAppN (← frameFactProof fact) #[plainFree,
         shapeFree, ensuresType.getArg! 8, ensuresType.getArg! 9,
-        ensuresType.getArg! 10, ensuresType.getArg! 11, ← instantiateMVars typed, ensures.toExpr]
+        ensuresType.getArg! 10, ensuresType.getArg! 11, validArgs, validResult,
+        ← instantiateMVars typed, ensures.toExpr]
       try check kept catch error =>
         if verex.solverDebug.get (← getOptions) then logInfo m!"frame application: {error.toMessageData}"
         continue
@@ -2672,6 +2978,97 @@ private def normalizeMethodHolds (goal : MVarId) (fvarId : FVarId) (baseName : N
     current ← (try current.clear fvarId catch _ => pure current)
     return some current
 
+/-- The fact that a function value's invocations return valid results
+(`ValidResultsAt`): the one a hypothesis states of this value, or, at a result
+shape that states no invariant, the lemma from `invariantFree`. -/
+private partial def validResultsAt? (facts : Array Lean.Expr) (id : MVarId) : MetaM Bool :=
+  id.withContext do
+    let target ← instantiateMVars (← id.getType)
+    for fact in facts do
+      if ← isDefEq (← inferType fact) target then
+        id.assign fact
+        return true
+    unless target.isAppOfArity ``VerexIR.Proofs.ValidResultsAt 8 do return false
+    -- A dictionary's contract states the validity of its invocations'
+    -- results; the fact is read off it (`MethodContract.validResults`).
+    for fact in facts do
+      unless (← whnfR (← inferType fact)).isAppOf ``VerexIR.Proofs.MethodContract do continue
+      let projected ← try mkAppM ``VerexIR.Proofs.MethodContract.validResults #[fact]
+        catch _ => continue
+      if ← isDefEq (← inferType projected) target then
+        id.assign projected
+        return true
+    let row := mkApp (mkConst ``VerexIR.Proofs.Denote.ResultShape.row) (target.getArg! 6)
+    if let some free ←
+        decidedTrue? (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.invariantFree) row) then
+      let proof ← mkAppOptM ``VerexIR.Proofs.ValidResultsAt.of_invariantFree
+        #[target.getArg! 0, target.getArg! 1, target.getArg! 2, target.getArg! 3, target.getArg! 4,
+          target.getArg! 5, target.getArg! 6, target.getArg! 7, free]
+      if ← isDefEq (← inferType proof) target then
+        id.assign proof
+        return true
+    -- The fact at the frame a call's type arguments induce is the fact at the
+    -- caller's, where the value's result type is the caller's
+    -- (`ValidResultsAt.of_instantiate`).
+    let some (θ, outer) ← (do
+        let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer :=
+            (target.getArg! 3).consumeMData
+          | return none
+        return some (θ, outer))
+      | return false
+    let next? ← try
+        let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+          (← mkEq (mkApp (mkConst ``VerexIR.Proofs.Denote.NRow.refFree)
+            (← mkAppM ``Subtype.val #[θ])) (mkConst ``Bool.true))
+        let rule ← mkAppOptM ``VerexIR.Proofs.ValidResultsAt.of_instantiate
+          #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free,
+            target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
+        let [next] ← id.apply rule | pure none
+        pure (some next)
+      catch _ => pure none
+    let some next := next? | return false
+    validResultsAt? facts next
+
+/-- The arguments of an invocation hold their data invariants: the facts the
+leaf states of them, componentwise. The condition is the invocation's own,
+spelled over the values the walk holds, so it is read in the denotation's
+normal form and not in the validity normal form of a contract's condition
+(`validityNormalization`), which leaves those values as they stand. -/
+private def argumentsHold? (id : MVarId) : TacticM Bool := do
+  let saved ← saveState
+  let goals ← getGoals
+  try
+    setGoals [id]
+    evalTactic (← `(tactic|
+      (try simp only [VerexIR.Proofs.Denote.HList.Holds,
+        VerexIR.Proofs.Denote.ResultShape.Holds,
+        vir_denote, vir_denote_norm, vir_denote_eval, Prod.fst, Prod.snd]) <;>
+        (repeat apply And.intro) <;> (try first | trivial | assumption)))
+    for subgoal in ← getGoals do
+      let closed ← subgoal.withContext do
+        let subType ← instantiateMVars (← subgoal.getType)
+        if let some proof ← findHoldsHypothesis? subType then
+          subgoal.assign proof
+          return true
+        for declaration in ← getLCtx do
+          if declaration.isImplementationDetail then continue
+          if ← isProp declaration.type then
+            for candidate in ← conjuncts declaration.toExpr do
+              if ← isDefEq (← inferType candidate) subType then
+                subgoal.assign candidate
+                return true
+        return false
+      unless closed do
+        saved.restore
+        setGoals goals
+        return false
+    setGoals goals
+    return true
+  catch _ =>
+    saved.restore
+    setGoals goals
+    return false
+
 /-- A dictionary's contract is proved at the caller's frame, then by the
 ordinary verified-target invocation rule at every valid argument and memory. -/
 def methodContract? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.withContext do
@@ -2683,16 +3080,16 @@ def methodContract? (goal : MVarId) : TacticM (Option (List MVarId)) := goal.wit
       if ← isDefEq (← inferType fact) target then
         goal.assign fact
         return some []
-  if let some (θ, outer) ← (do
-      let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := target.getArg! 3
-        | return none
-      return some (θ, outer)) then
-    let free ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
-      (← mkEq (mkApp (mkConst ``NRow.refFree) (← mkAppM ``Subtype.val #[θ])) (mkConst ``Bool.true))
-    let rule ← mkAppOptM ``VerexIR.Proofs.MethodContract.of_instantiate
-      #[target.getArg! 0, target.getArg! 1, target.getArg! 2, outer, θ, free,
-        target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
-    return some (← goal.apply rule)
+  if let some next ← methodContractAtCaller? goal then return some [next]
+  -- The walk introduces the contract: it proves the single obligation whose
+  -- postcondition states the result's fact, from which the contract's two
+  -- halves follow (`MethodContract.of_wp`). The rule is applied at the
+  -- target's own arguments, the frame among them, so that nothing is left
+  -- for instance synthesis.
+  let introduction ← mkAppOptM ``VerexIR.Proofs.MethodContract.of_wp
+    #[target.getArg! 0, target.getArg! 1, target.getArg! 2, target.getArg! 3,
+      target.getArg! 4, target.getArg! 5, target.getArg! 6, target.getArg! 7]
+  let [goal] ← goal.apply introduction | return none
   let (introduced, next) ← goal.introN 3
     [`verexMethodArguments, `verexMethodInitial, `verexMethodValidArgs]
   if let some validId := introduced[2]? then
@@ -2813,6 +3210,10 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
             found ← proveMemoryTyped facts id
           else if type.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 then
             found ← scalarAt? facts id
+          else if type.isAppOfArity ``VerexIR.Proofs.ValidResultsAt 8 then
+            found ← validResultsAt? facts id
+          else if type.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then
+            found ← argumentsHold? id
           else
             for fact in facts do
               if ← isDefEq (← inferType fact) type then
@@ -2825,10 +3226,32 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
         goal.assign (mkAppN rule arguments)
         let some (.mvar returns) := arguments[arguments.size - 2]? | return none
         let some (.mvar fails) := arguments[arguments.size - 1]? | return none
-        let (_, returns) ← returns.introN 6
-          [`verexResult, `verexFinal, `verexEnsures, `verexUnaborted, `verexResultOf,
-            `verexStateOf]
-        let returns ← keptMemory returns action facts
+        -- The arguments' validity and the validity of the value's results,
+        -- as the rule took them: a frame of the value is read at a run on
+        -- valid arguments to a valid result (`keptMemory`).
+        let some validArgs ← arguments.findM? fun argument => do
+            return (← instantiateMVars (← inferType argument)).isAppOfArity
+              ``VerexIR.Proofs.Denote.HList.Holds 3
+          | return none
+        let some validResults ← arguments.findM? fun argument => do
+            return (← instantiateMVars (← inferType argument)).isAppOfArity
+              ``VerexIR.Proofs.ValidResultsAt 8
+          | return none
+        let (validArgs, validResults) :=
+          (← instantiateMVars validArgs, ← instantiateMVars validResults)
+        let (introduced, returns) ← returns.introN 7
+          [`verexResult, `verexFinal, `verexResultHolds, `verexEnsures, `verexUnaborted,
+            `verexResultOf, `verexStateOf]
+        -- The result's own fact, in the form and under the name the route
+        -- through a dictionary's contract gives it; a shape stating no
+        -- invariant leaves no hypothesis.
+        let returns ← match introduced[2]? with
+          | some holdsId =>
+              match ← normalizeMethodHolds returns holdsId `verexResultHolds with
+              | some next => pure next
+              | none => return some [fails]
+          | none => pure returns
+        let returns ← keptMemory returns action facts validArgs validResults
         return some [returns, fails]
     -- Preparation can assign the original goal. A failed match must undo
     -- that preparation as well as the attempted invocation rule.
@@ -2836,9 +3259,10 @@ def unseenInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) :=
     return result
 
 /-- A literal closure keeps a frame (`FramedAt`, `KeepsMemoryAt`) where its
-target's theorem applies at every typed memory and its frame lies within it
-(`FramedAt.ofVerified`), or else where its target's body keeps it, an
-obligation over every argument and typed memory (`FramedAt.ofBody`); any
+target's theorem applies at every valid argument and typed memory and its
+frame lies within it (`FramedAt.ofVerified`), or else where its target's
+body keeps it, an obligation over every valid argument and typed memory
+(`FramedAt.ofBody`); any
 function value does at a row with references, where the frame is vacuous.
 The goals left, if the closure's frame is decided. -/
 partial def literalClosureKeepsMemory? (goal : MVarId)
@@ -2957,19 +3381,19 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let .forallE _ heldType rest _ ← whnfR (← inferType rule) | throwError "no premises"
     let .forallE _ framedType _ _ ← whnfR rest | throwError "no frame premise"
     -- What the target's theorem assumes, then its precondition, at every
-    -- argument and typed memory.
+    -- valid argument and typed memory.
     let held ← mkFreshExprSyntheticOpaqueMVar heldType
     unless ← closesBy held.mvarId! (← `(tactic| (
-        intro _ _ $(mkIdent `verexTyped):ident
+        intro _ _ $(mkIdent `verexHolds):ident $(mkIdent `verexTyped):ident
         (try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
-          Weave.subst, Weave.compose, vir_denote_norm])
+          Weave.subst, Weave.compose, HList.Holds, vir_denote_norm])
         all_goals (repeat apply And.intro)
         all_goals verex_leaf))) do
       throwError "the target's theorem does not apply everywhere"
     -- The target's frame lies within the closure's.
     let framed ← mkFreshExprSyntheticOpaqueMVar framedType
     unless ← closesBy framed.mvarId! (← `(tactic| (
-        intro _ _ _ _ $(mkIdent `verexFrame):ident
+        intro _ _ _ _ _ $(mkIdent `verexFrame):ident
         (try simp only [$lemmas,*, Weave.subst, Weave.compose, vir_denote_norm]
           at $(mkIdent `verexFrame):ident ⊢)
         first
@@ -3002,7 +3426,12 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     let proof ← instantiateMVars (mkApp rule kept)
     unless ← isDefEq (← inferType proof) target do throwError "not the closure"
     goal.assign proof
-    let (_, kept) ← kept.mvarId!.introN 3 [`verexArguments, `verexStart, `verexTyped]
+    let (introduced, kept) ← kept.mvarId!.introN 4
+      [`verexArguments, `verexStart, `verexArgumentsValid, `verexTyped]
+    -- The arguments' validity as one fact per atom, as a parameter's enters.
+    let kept ← match introduced[2]? with
+      | some valid => assertValidityAtoms kept valid
+      | none => pure kept
     return some [kept]
   catch _ =>
     state.restore
@@ -3027,11 +3456,94 @@ def contextFacts (goal : MVarId) : MetaM (Array Lean.Expr) := goal.withContext d
     if ← isProp decl.type then facts := facts ++ (← conjuncts decl.toExpr)
   return facts
 
+/-- A function value passed or stored owes that its invocations return valid
+results (`ValidResultsAt`): at a result shape that states no invariant the
+lemma from `invariantFree` gives it, a value passed through carries the fact
+its own caller assumed, and a literal closure takes it from its target's
+theorem (`ValidResultsAt.ofVerified`). -/
+def closureValidResults? (goal : MVarId)
+    (callees : Array (Lean.Expr × String × Lean.Expr)) : TacticM (Option (List MVarId)) :=
+  goal.withContext do
+    let stated ← instantiateMVars (← goal.getType)
+    let target := if stated.isAppOfArity ``VerexIR.Proofs.Obligation 4 then stated.appArg!
+      else stated
+    unless target.isAppOfArity ``VerexIR.Proofs.ValidResultsAt 8 do return none
+    let goal ← if stated == target then pure goal else goal.replaceTargetDefEq target
+    if ← validResultsAt? (← contextFacts goal) goal then return some []
+    -- A literal closure of a verified target: its contract's result validity
+    -- (`ValidResultsAt.ofVerified`).
+    goal.withContext do
+    let some closure ← literalValue? (target.getArg! 7) | return none
+    let mask := closure.mask
+    unless mask.isAppOfArity ``Weave.mask 4 do return none
+    let weave := mask.appArg!
+    let rows := (← whnfR (← inferType weave)).getAppArgs
+    let some captured := rows[1]? | return none
+    let state ← saveState
+    try
+      let some (_, _, theoremProof) ← callees.findM? fun (candidate, _, proof) => do
+          unless ← isDefEq candidate closure.handle do return false
+          forallTelescope (← inferType proof) fun _ statement =>
+            pure (statement.isAppOfArity ``VerexIR.Proofs.Satisfies 6)
+        | throwError "the target has no theorem"
+      let (theoremArguments, _, statement) ← forallMetaTelescope (← inferType theoremProof)
+      let meaning := statement.getArg! 4
+      unless meaning.isAppOf ``propheticMeaning do throwError "not a function's meaning"
+      unless ← isDefEq (meaning.getArg! 3) (target.getArg! 3) do
+        throwError "the closure and its target theorem use different type families"
+      let capturedFree ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+        (← mkEq (mkApp (mkConst ``NRow.refFree) captured) (mkConst ``Bool.true))
+      let coherent ← mkAppM ``coherent_runtime #[target.getArg! 0, closure.handle]
+      let rule ← mkAppAtFrame ``VerexIR.Proofs.ValidResultsAt.ofVerified
+          (target.getArg! 0) (target.getArg! 2) (target.getArg! 3)
+        #[weave, capturedFree, target.getArg! 6, closure.instantiation, coherent,
+          closure.captures, closure.value, closure.closed,
+          ← instantiateMVars (mkAppN theoremProof theoremArguments)]
+      for argument in theoremArguments do
+        if let .mvar id ← instantiateMVars argument then
+          unless ← id.isAssigned do id.assumption
+      let constants ← contractConstants (← inferType theoremProof)
+      let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
+        `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
+      let .forallE _ heldType rest _ ← whnfR (← inferType rule) | throwError "no premises"
+      let .forallE _ validType _ _ ← whnfR rest | throwError "no validity premise"
+      -- What the target's theorem assumes and its precondition, at every
+      -- argument that holds its own invariants.
+      let held ← mkFreshExprSyntheticOpaqueMVar heldType
+      unless ← closesBy held.mvarId! (← `(tactic| (
+          intro _ _ $(mkIdent `verexHolds):ident
+          (try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
+            Weave.subst, Weave.compose, HList.Holds, vir_denote_norm])
+          all_goals (repeat apply And.intro)
+          all_goals verex_leaf))) do
+        throwError "the target's theorem does not apply at every valid argument"
+      -- The target's result validity is the result's own fact.
+      let valid ← mkFreshExprSyntheticOpaqueMVar validType
+      unless ← closesBy valid.mvarId! (← `(tactic| (
+          intro _ $(mkIdent `verexValid):ident
+          (try simp only [$lemmas,*, VerexIR.Proofs.Denote.ResultShape.Holds,
+            vir_denote_norm] at $(mkIdent `verexValid):ident ⊢)
+          first
+          | exact $(mkIdent `verexValid)
+          | verex_leaf))) do
+        throwError "the target's results are not the value's"
+      let proof ← instantiateMVars (mkApp2 rule held valid)
+      unless ← isDefEq (← inferType proof) target do throwError "not the closure"
+      goal.assign proof
+      return some []
+    catch error =>
+      if verex.solverDebug.get (← getOptions) then
+        IO.println s!"closure results: {← error.toMessageData.toString}"
+      state.restore
+      return none
+
 /-- The run of one literal closure's invocation a hypothesis `hypothesis`
-states not to abort (`aborts` its `aborts_of`), where runs end: asserted at
-the leaf's own spelling, normalized, and its `result_of` rewritten in the
-other hypotheses. -/
+states not to abort (`aborts` its `aborts_of`), where runs end, the
+arguments are known valid and the value's results are: asserted at the
+leaf's own spelling, normalized, and its `result_of` rewritten in the other
+hypotheses. -/
 private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
+    (callees : Array (Lean.Expr × String × Lean.Expr))
     (hypothesis aborts : Lean.Expr) : TacticM MVarId := do
   let proof ← goal.withContext do
     -- The invocation's row, shape, and arguments, as the predicate states them.
@@ -3067,6 +3579,14 @@ private def terminatingRun (goal : MVarId) (facts : Array Lean.Expr)
         unless ← proveMemoryTyped facts id do throwError "memory is not typed"
       else if type.isAppOfArity ``VerexIR.Proofs.ScalarAt 4 then
         unless ← scalarAt? facts id do throwError "a row is not scalar at the frame"
+      else if type.isAppOfArity ``VerexIR.Proofs.ValidResultsAt 8 then
+        -- The validity of the value's results: a fact of the leaf, a result
+        -- shape that states no invariant, or the closure's verified target
+        -- (`closureValidResults?`).
+        unless (← closureValidResults? id callees) == some [] do
+          throwError "the value's results are not known valid"
+      else if type.isAppOfArity ``VerexIR.Proofs.Denote.HList.Holds 3 then
+        unless ← closeValidity? id do throwError "the arguments are not known valid"
       else
         let some fact ← facts.findM? fun fact => do isDefEq (← inferType fact) type
           | throwError "a premise is not held"
@@ -3211,7 +3731,8 @@ literal closure's invocation the leaf knows not to abort returns: a run
 `ensures_of` names, and the result `result_of` reads, which replaces it in
 the hypotheses (`returns_of_terminating`). One invocation a round, so that
 an invocation at another's result is met once that result is read. -/
-def terminatingRuns (goal : MVarId) : TacticM MVarId := do
+def terminatingRuns (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Expr)) :
+    TacticM MVarId := do
   let saved ← getGoals
   let terminating ← goal.withContext do (← contextFacts goal).anyM fun fact => do
     return (← instantiateMVars (← inferType fact)).isAppOfArity ``VerexIR.Proofs.Terminating 3
@@ -3253,7 +3774,7 @@ def terminatingRuns (goal : MVarId) : TacticM MVarId := do
     for (hypothesis, aborts) in candidates do
       let state ← saveState
       try
-        current ← terminatingRun current facts hypothesis aborts
+        current ← terminatingRun current facts callees hypothesis aborts
         handled := handled.push aborts
         progress := true
         break
@@ -3338,12 +3859,13 @@ def routedInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := do
     saved.restore
     return none
 
-/-- A run of an unseen invocation over a model's meaning keeps the frames
+/-- A run of an unseen invocation over a model's meaning keeps, at its valid
+arguments (`validArgs`), the frames
 the hypotheses state of the value (`FramedAtOf`, `KeepsMemoryAtOf`): of a
 value keeping memory, the run's final memory is substituted by its initial
 one; of another, its frame at the run's arguments is a hypothesis. -/
 private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial : Lean.Expr)
-    (result final run : Lean.Expr) (facts : Array Lean.Expr) : TacticM MVarId := do
+    (result final run validArgs : Lean.Expr) (facts : Array Lean.Expr) : TacticM MVarId := do
   let mut goal := goal
   for fact in facts do
     let factType ← goal.withContext do frameFactType (← inferType fact)
@@ -3358,8 +3880,18 @@ private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial
       let typed ← mkFreshExprMVar (← mkAppM ``VerexIR.Proofs.MemoryTyped
         #[factType.getArg! 0, initial])
       unless ← proveMemoryTyped facts typed.mvarId! do return none
+      -- The frame is of a run to a valid result.  A meaning states no
+      -- validity of its results, so the fact is the one a result shape that
+      -- states no invariant gives.
+      let shape := invocation.shape
+      let some shapeFree ← decidedTrue? (mkApp (mkConst ``NRow.invariantFree)
+          (mkApp (mkConst ``ResultShape.row) shape))
+        | return none
+      let validResult ← mkAppM ``VerexIR.Proofs.Denote.ResultShape.holds_of_invariantFree
+        #[shape, shapeFree, result]
       let kept := mkAppN (← frameFactProof fact)
-        #[invocation.arguments, result, initial, final, ← instantiateMVars typed, run]
+        #[invocation.arguments, result, initial, final, validArgs, validResult,
+          ← instantiateMVars typed, run]
       try check kept catch error =>
         if verex.solverDebug.get (← getOptions) then
           logInfo m!"model frame application: {error.toMessageData}"
@@ -3428,11 +3960,19 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     -- The meaning's type as spelled: `InvokeMeaning` is an abbreviation.
     let meaningType ← instantiateMVars (← inferType invocation.invoke)
     unless meaningType.isAppOfArity ``InvokeMeaning 3 do return none
+    -- The arguments' validity, from the facts the leaf states of them.
+    let carriers := mkApp3 (mkConst ``Skolems.toCarriers) (meaningType.getArg! 0)
+      (meaningType.getArg! 1) (meaningType.getArg! 2)
+    let validArgs ← mkFreshExprSyntheticOpaqueMVar
+      (mkApp3 (mkConst ``HList.Holds) carriers invocation.supplied invocation.arguments)
+    unless ← closeValidity? validArgs.mvarId! do return none
+    let validArgs ← instantiateMVars validArgs
     let rule ← mkAppOptM' (mkApp3 (mkConst ``VerexIR.Proofs.wp_invoke_unseen)
         (meaningType.getArg! 0) (meaningType.getArg! 1) (meaningType.getArg! 2))
       #[some invocation.invoke, some invocation.supplied, some invocation.shared,
         some invocation.shape, some invocation.function, some invocation.arguments, some initial,
-        some (target.getArg! 4), some (target.getArg! 5), some (mkApp definedAt requires)]
+        some (target.getArg! 4), some (target.getArg! 5), some (mkApp definedAt requires),
+        some validArgs]
     let .forallE _ returnsType rest _ ← whnfR (← inferType rule) | return none
     let returns ← mkFreshExprSyntheticOpaqueMVar returnsType (← goal.getTag)
     let .forallE _ failsType _ _ ← whnfR (rest.instantiate1 returns) | return none
@@ -3449,7 +3989,7 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     stage.set "frames"
     let (introduced, returns) ← returns.introN 3 [`verexResult, `verexFinal, `verexEnsures]
     let returns ← keptMemoryOf returns invocation initial
-      (.fvar introduced[0]!) (.fvar introduced[1]!) (.fvar introduced[2]!) facts
+      (.fvar introduced[0]!) (.fvar introduced[1]!) (.fvar introduced[2]!) validArgs facts
     -- The abort: the failure, the meaning's abort on it, and the invocation's
     -- abort in both readings, at the arguments and at their entry values
     -- (`AbortsOf`, `AbortsOfEntries`).
@@ -3470,9 +4010,10 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     let decided ← match everywhere? with
       | some name => closesBy requiresGoal (← `(tactic| exact $(mkCIdent name) _ _ _ _ _ _))
       | none => pure false
+    let validSyntax ← requiresGoal.withContext (Lean.Elab.Term.exprToSyntax validArgs)
     let decided ← if decided then pure true else closesBy requiresGoal (← `(tactic| first
       | assumption
-      | exact VerexIR.Proofs.requiresOf_of_entries (by assumption)
+      | exact VerexIR.Proofs.requiresOf_of_entries $validSyntax (by assumption)
       | (verex_behavior; done)))
     if debug then
       IO.println s!"model unseen invocation applied; precondition decided: {decided}"
@@ -3501,7 +4042,7 @@ private def routesOf? (decl : Lean.LocalDecl) (value : Lean.Expr) : MetaM Lean.E
 
 /-- A frame of a literal closure over a model's meaning (`FramedAtOf`,
 `KeepsMemoryAtOf`): by the routed target's meaning on the woven arguments,
-an obligation over every argument and typed memory
+an obligation over every valid argument and typed memory
 (`FramedAtOf.ofRouted`); or a frame a hypothesis states of the same value,
 within it (`FramedAtOf.mono`). The goals left. -/
 def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
@@ -3581,7 +4122,11 @@ def routedClosureFrame? (goal : MVarId) : TacticM (Option (List MVarId)) := do
     let some rule := routed? | throwError "no routing hypothesis for the closure's target"
     let .mvar kept := rule.appArg! | throwError "the frame's obligation is not open"
     goal.assign rule
-    let (_, kept) ← kept.introN 3 [`verexArguments, `verexStart, `verexTyped]
+    let (introduced, kept) ← kept.introN 4
+      [`verexArguments, `verexStart, `verexArgumentsValid, `verexTyped]
+    let kept ← match introduced[2]? with
+      | some valid => assertValidityAtoms kept valid
+      | none => pure kept
     setGoals [kept]
     evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Denote.Weave.compose]))
     return some (← getGoals)
@@ -3962,12 +4507,56 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
       state.restore
   return none
 
+/-- The result and the final memory `result_of` and `state_of` read of a run
+are the run's where its result is a valid value: the rule of a named call
+states the two equations under the result's fact (`wp_named_typed`), which
+arrives after them. Each such hypothesis whose leading conditions the leaf
+holds, discharged as a validity condition is (`closeValidity?`), is replaced
+by what it states under them; one whose condition the leaf does not hold
+stays conditional, and its run is no candidate of the label. -/
+private def validResultEquations (goal : MVarId) : TacticM MVarId := do
+  let candidates ← goal.withContext do
+    (← getLCtx).foldlM (init := #[]) fun found declaration => do
+      if declaration.isImplementationDetail then return found
+      let type ← instantiateMVars declaration.type
+      unless type.isArrow do return found
+      let mut conclusion := type
+      while conclusion.isForall do conclusion := conclusion.bindingBody!
+      unless conclusion.isAppOfArity ``Eq 3 do return found
+      let read := conclusion.getArg! 1
+      unless read.isAppOfArity ``VerexIR.Proofs.ResultOf 11 ||
+          read.isAppOfArity ``VerexIR.Proofs.StateOf 10 do
+        return found
+      return found.push declaration.fvarId
+  let mut current := goal
+  for hypothesis in candidates do
+    let settled ← current.withContext do
+      let mut stated := Lean.Expr.fvar hypothesis
+      let mut statement ← instantiateMVars (← hypothesis.getType)
+      let mut paid := false
+      while statement.isArrow do
+        let condition ← mkFreshExprSyntheticOpaqueMVar statement.bindingDomain!
+        unless ← closeValidity? condition.mvarId! do break
+        stated := mkApp stated (← instantiateMVars condition)
+        statement := statement.bindingBody!
+        paid := true
+      return if paid then some (statement, stated) else none
+    let some (statement, stated) := settled | continue
+    let name ← current.withContext hypothesis.getUserName
+    let (_, next) ← (← current.assert name statement stated).intro1P
+    current ← (try next.clear hypothesis catch _ => pure next)
+  return current
+
 /-- Rewrite a goal's reads of `result_of` by what its hypotheses state the
 invocation returned: by `simp`, which matches the read up to the
 abbreviations the typed spellings use and does not check the goal at
-instances transparency, where a native row's pair is not well typed. None
-where the rewriting closes the goal. -/
-def rewriteResultOf (goal : MVarId) : TacticM (Option MVarId) := goal.withContext do
+instances transparency, where a native row's pair is not well typed. An
+equation a rule states under the result's fact is read where the leaf holds
+that fact (`validResultEquations`). None where the rewriting closes the
+goal. -/
+def rewriteResultOf (goal : MVarId) : TacticM (Option MVarId) := do
+  let goal ← validResultEquations goal
+  goal.withContext do
   let mut goal := goal
   -- The runs' results and states, at every default they are read at, all
   -- at once: a read inside another's arguments rewrites first, and the
@@ -4190,9 +4779,10 @@ private def directCall (goal : MVarId) (throughContract : Bool) (owed : Lean.Exp
 /-- A call of a target taking and returning no reference, where the goal
 owes a behavioral predicate (`obligesBehavior`): its continuations assume
 `ensures_of` and `aborts_of` of the function value naming the target
-(`wp_named`) and, where runs agree and the rows lend flatly, the absence of
-its aborts and the result and state `result_of` and `state_of` read, where
-its returned reference is settled (`wp_named_typed`). Other calls stay as
+(`wp_named`) and, where runs agree, the rows lend flatly and the arguments
+are known valid, the absence of its aborts and the result and state
+`result_of` and `state_of` read, where its returned reference is settled and
+its result valid (`wp_named_typed`). Other calls stay as
 they are. A call through the target's contract states that
 contract itself, so the run and the abort it names are marked read
 (`Denoted`): deriving the contract from them again would add nothing. -/
@@ -4233,10 +4823,15 @@ def namedCall (goal : MVarId) (throughContract : Bool)
         -- them as `sorry`.
         Term.withoutErrToSorry <| withoutRecover <|
           evalTactic (← `(tactic|
-            refine $rule $shiftsSyntax (by decide) (by decide) $namingSyntax ?_))
-        let [named] ← getGoals
-          | throwError m!"the typed named call leaves one goal, not {(← getGoals).length}: \
+            refine $rule $shiftsSyntax (by decide) (by decide) $namingSyntax ?_ ?_))
+        let [valid, named] ← getGoals
+          | throwError m!"the typed named call leaves two goals, not {(← getGoals).length}: \
               {← (← getGoals).mapM fun goal => do pure (← goal.getType)}"
+        -- The rule is one of valid arguments, from the facts the leaf states
+        -- of them.
+        unless ← closeValidity? valid do
+          throwError "the call's arguments are not known valid"
+        setGoals [named]
         return ← if throughContract then markNamedRead named else pure named
     catch failure =>
         saved.restore
@@ -4451,5 +5046,81 @@ def combineLeaves (tag : Name) (leaves : Array MVarId) : MetaM (Option MVarId) :
   let pending ← SharedContinuations.markSharedProof combined.mvarId!
   (← targetState).leafPaths.modify (·.insert pending paths)
   return some pending
+
+/-! ## The entry's validity
+
+A function's entry states one fact per parameter, each taken from the argument
+row's validity at the parameter's position. -/
+
+/-- A projection of a pair of values, read where the pair is written out: the
+component it selects. The projection as it stands otherwise. -/
+private def writtenComponent (projection : Lean.Expr) : Lean.Expr :=
+  if projection.isAppOfArity ``Prod.fst 3 || projection.isAppOfArity ``Prod.snd 3 then
+    let pair := projection.appArg!.consumeMData
+    if pair.isAppOfArity ``Prod.mk 4 then
+      pair.getArg! (if projection.isAppOf ``Prod.fst then 2 else 3)
+    else projection
+  else projection
+
+/-- A function's entry validity as one fact per parameter: the hypothesis
+`premise`, which states the validity of the argument row (`HList.Holds`), is
+replaced by one hypothesis per position of the row, named by `facts` in the
+row's order and stating that position's fact as the row's own equation gives
+it (`HList.holds_cons`). A fact so has the parameter it is stated of from the
+row itself, whatever a normalization later leaves of its statement.
+
+It throws where `premise` states no row's validity, where the row is not
+written out, and where the row and `facts` differ in length. -/
+def splitEntryValidity (goal : MVarId) (premise : Name) (facts : Array Name) :
+    MetaM MVarId := goal.withContext do
+  let some declaration := (← getLCtx).findFromUserName? premise
+    | throwError "the entry states no validity `{premise}`"
+  let mut statement ← whnfHeadPred (← instantiateMVars declaration.type) fun statement =>
+    return !statement.isAppOfArity ``HList.Holds 3
+  let mut proof := declaration.toExpr
+  let mut hypotheses : Array Hypothesis := #[]
+  repeat
+    unless statement.isAppOfArity ``HList.Holds 3 do
+      throwError "the entry's validity `{premise}` is not a row's: {statement}"
+    let row ← whnfD (statement.getArg! 1)
+    if row.isConstOf ``NRow.nil then break
+    unless row.isAppOfArity ``NRow.cons 2 do
+      throwError "the entry's validity `{premise}` is stated over a row not written out: {row}"
+    let some name := facts[hypotheses.size]?
+      | throwError "the entry's validity `{premise}` states more positions than the \
+          {facts.size} named {facts}"
+    let equation ← mkAppOptM ``HList.holds_cons
+      #[some (statement.getArg! 0), some (row.getArg! 0), some (row.getArg! 1),
+        some (statement.getArg! 2)]
+    let both ← mkEqMP equation proof
+    let some (head, tail) := (← inferType both).and?
+      | throwError "the entry's validity `{premise}` has no reading at {row}"
+    let fact := mkAppN head.getAppFn
+      (head.getAppArgs.modify (head.getAppNumArgs - 1) writtenComponent)
+    hypotheses := hypotheses.push
+      { userName := name, type := fact
+        value := ← mkExpectedTypeHint (← mkAppM ``And.left #[both]) fact }
+    statement := mkAppN tail.getAppFn
+      (tail.getAppArgs.modify (tail.getAppNumArgs - 1) writtenComponent)
+    proof ← mkExpectedTypeHint (← mkAppM ``And.right #[both]) statement
+  unless hypotheses.size == facts.size do
+    throwError "the entry's validity `{premise}` states {hypotheses.size} positions for the \
+      {facts.size} named {facts}"
+  let (_, goal) ← goal.assertHypotheses hypotheses
+  goal.clear declaration.fvarId
+
+/-- The entry validity `premise` of a function, as one fact per parameter
+under the names given in the parameters' order (`splitEntryValidity`). -/
+elab "verex_entry_validity" premise:ident "[" facts:ident,* "]" : tactic => do
+  replaceMainGoal [← splitEntryValidity (← getMainGoal) premise.getId
+    (facts.getElems.map (·.getId))]
+
+/-- The entry facts named, each as one hypothesis per atom it states
+(`splitValidityFact`). -/
+elab "verex_entry_atoms" facts:ident* : tactic => do
+  let mut goal ← getMainGoal
+  for fact in facts do
+    goal ← splitValidityFact goal fact.getId
+  replaceMainGoal [goal]
 
 end VerexIR.Proofs.Denote

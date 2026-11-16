@@ -194,8 +194,7 @@ def functionScope (unit : ValidatedUnit) (ns : ValidatedNamespace)
 private def argumentPattern (unit : ValidatedUnit)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (params : NRow) :
     CommandElabM (TSyntax `rcasesPat) := do
-  let names := declaration.signature.parameters.mapIdx fun index parameter =>
-    if parameter.name.isEmpty then s!"argument{index}" else parameter.name
+  let names := parameterNames declaration
   if names.isEmpty then `(rcasesPat| _)
   else
     let parts := (params.toList.zip names.toList).map fun (τ, name) => carrierPattern unit name τ
@@ -212,8 +211,7 @@ pattern takes it, which rewrites its entry. -/
 private def scopedArguments (unit : ValidatedUnit) (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) (params : NRow)
     (withResult : Bool) : CommandElabM (TSyntax `tactic) := do
-  let names := declaration.signature.parameters.mapIdx fun index parameter =>
-    if parameter.name.isEmpty then s!"argument{index}" else parameter.name
+  let names := parameterNames declaration
   let scope ← match functionScope unit ns declaration withResult with
     | .ok scope => pure scope
     | .error message => throwError message
@@ -3782,6 +3780,7 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
   -- contract states nothing of at its boundary (`ensureDataOwn`).
   let dataOwn ← ensureDataOwn caller.segments unit
   let stored ← ensureStoredInvariant caller.segments unit dataOwn.carriers
+  ensureFrameOwnBridges caller.segments unit #[compiled]
   liftTermElabM do
     addAbbrev contractName (← typedContractOf unit handle.namespaceId.index ns
       (ContractView.implementation.of declaration) compiled.params compiled.result
@@ -3794,6 +3793,7 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
   let assumed := mkIdent `assumed
   let permitted := mkIdent `permitted
   let introduction ← introductionTactic m stored pattern validArgs assumed permitted
+  let (entryFacts, entrySplit, entryAtoms) ← entryValidity (parameterNames declaration) validArgs
   let unitFact ← unitFactTactic m assumesTyping
   let (solve, _) ← liftTermElabM <| solverTactics m #[(handle, ns, declaration, compiled)] #[] #[] #[] #[] #[]
   let scopedEntry ← if compiled.scopedMethods.isEmpty then `(tactic| skip) else `(tactic| (
@@ -3856,14 +3856,16 @@ private def verifyOpaqueInstance (caller : Member) (handle : FunctionHandle)
       apply VerexIR.Proofs.satisfies_of_wp_valid
       $introduction:tactic
       all_goals
-        (simp only [$body:ident, $row:ident, $params:ident, $locals:ident,
+        ($entrySplit:tactic
+         simp only [$body:ident, $row:ident, $params:ident, $locals:ident,
           $shape:ident, $mutables:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
           List.all_nil, $(rootIdent contractName):ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe] at $validArgs:ident $assumed:ident $permitted:ident ⊢
+          String.reduceNe] at $entryFacts* $assumed:ident $permitted:ident ⊢
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
          all_goals $scopedEntry:tactic
-         all_goals verex_normalize at $validArgs:ident $permitted:ident ⊢
+         all_goals verex_normalize at $entryFacts* $permitted:ident ⊢
+         all_goals $entryAtoms:tactic
          all_goals $solve:tactic))
   let before := countErrors (← get).messages
   elabCommand command
@@ -4114,6 +4116,11 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let dataOwn ← ensureDataOwn segments unit
   let stored ← ensureStoredInvariant segments unit dataOwn.carriers
   stageLog s!"{function}: stored invariant"
+  -- The bridges of the declarations' own invariants at the rows the proof's
+  -- values have: those of this body and of every body it is given inlined.
+  ensureFrameOwnBridges segments unit (#[compiled] ++ inlined.map (·.2.2.2) ++
+    callees.instances.map (·.2.2.2) ++ callees.rowOwners.map (·.compiled))
+  stageLog s!"{function}: own bridges"
   -- The invariants of the loops and the conditions of the assertions the
   -- proof meets: the function's own and those of its inlined callees, each
   -- keyed by its site and function.
@@ -4216,6 +4223,7 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
   let permitted := mkIdent `permitted
   let assumed := mkIdent `assumed
   let introduction ← introductionTactic m stored pattern validArgs assumed permitted
+  let (entryFacts, entrySplit, entryAtoms) ← entryValidity (parameterNames declaration) validArgs
   let unitFact ← unitFactTactic m assumesTyping
   stageLog s!"{function}: unit facts"
   let (automaticTactic, scriptTactic) ← liftTermElabM <| proofTactics script? opens solveTactic obligationsTactic
@@ -4376,16 +4384,18 @@ private def proveMember (m : Member) (opens : Array (TSyntax ``Lean.Parser.Comma
         $markReturns:tactic
         verex_timed "setup introduction" $introduction:tactic
         all_goals
-        (verex_timed "setup unfold" (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
+        (verex_timed "setup validity" $entrySplit:tactic
+         verex_timed "setup unfold" (simp only [$bodyIdent:ident, $row:ident, $paramsTerm:ident, $localsTerm:ident,
           $shapeTerm:ident, $mutablesTerm:ident, $scopedMethodsTerm:ident, VerexIR.scopedValues,
           List.all_nil, $typedContract:ident, vir_denote_norm,
           reduceCtorEq, Nat.reduceEqDiff, String.reduceBEq, String.reduceEq, String.reduceBNe,
-          String.reduceNe, $memberSignatures,*] at $validArgs:ident $assumed:ident $permitted:ident ⊢)
+          String.reduceNe, $memberSignatures,*] at $entryFacts* $assumed:ident $permitted:ident ⊢)
          -- The function assumes its preconditions; their markers locate
          -- them for its callers only.
          all_goals try simp only [VerexIR.Proofs.Obligation_eq] at $permitted:ident
          all_goals $scopedEntry:tactic
-         all_goals verex_timed "setup normalize" (verex_normalize at $validArgs:ident $permitted:ident ⊢)
+         all_goals verex_timed "setup normalize" (verex_normalize at $entryFacts* $permitted:ident ⊢)
+         all_goals verex_timed "setup validity atoms" $entryAtoms:tactic
          all_goals $automaticTactic:tactic)
         -- A variant the setup refutes leaves the script no goal.
         all_goals $scriptTactic:tactic)

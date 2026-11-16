@@ -314,16 +314,17 @@ def Invocation.directEnsures (invocation : Invocation) (direct : DirectTarget)
       mkAppM ``And #[(contract.getArg! 6).beta stated, (contract.getArg! 10).beta stated]
 
 /-- A statement of a run that returns a mutable reference, under the
-prophecy the run returns: the current value read off that prophecy is the
-one the clause names (`EnsuresOfSettled`).  What a predicate read directly
-of a known target states of such a result, where no definition of the
-predicate carries the quantifier. -/
+prophecy the run returns: a valid value (`NTy.Holds`), and the current value
+read off it is the one the clause names (`EnsuresOfSettled`).  What a
+predicate read directly of a known target states of such a result, where no
+definition of the predicate carries the quantifier. -/
 def settledResult (carriers σ current : Lean.Expr)
     (predicate : Lean.Expr → MetaM Lean.Expr) : MetaM Lean.Expr := do
   withLocalDeclD `prophecy (carrierType carriers σ) fun prophecy => do
     let returned ← mkAppM ``Prod.mk #[prophecy, prophecy]
-    let body ← mkAppM ``And #[← mkEq prophecy current, ← predicate returned]
-    mkAppM ``Exists #[← mkLambdaFVars #[prophecy] body]
+    let valid := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) carriers σ prophecy
+    let settling ← mkAppM ``And #[← mkEq prophecy current, ← predicate returned]
+    mkAppM ``Exists #[← mkLambdaFVars #[prophecy] (← mkAppM ``And #[valid, settling])]
 
 /-- A value of a specification binder at a type, as a bundle component: an
 integer, a Boolean decided, a string, or a native value. -/

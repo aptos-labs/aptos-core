@@ -229,7 +229,13 @@ example {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
         exact ⟨fresh, lent ▸ raw.property, encoded⟩
     | cons => simp at lent
   · rintro ⟨fresh, plain, encoded⟩
-    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩, ⟨⟨trivial⟩, trivial⟩, rfl⟩,
+    -- The frame the type arguments induce states nothing of a parameter's
+    -- values, so a plain argument's data invariant is immediate; the frame is
+    -- named, as the fact carries its family.
+    let frame := (Skolems.instantiate (unit := unit) ⟨.cons (.param 0) .nil, rfl⟩
+      (Skolems.runtime unit)).toCarriers
+    exact ⟨⟨[], (⟨value, plain⟩, ()), ⟨List.nodup_nil, by simp, fresh⟩,
+      ⟨@NTy.Holds.intro frame _ _ trivial, trivial⟩, rfl⟩,
       encoded, fun _ _ _ _ _ _ => trivial⟩
 
 -- A generic function's public theorem holds of its runs at the instantiation a

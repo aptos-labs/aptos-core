@@ -45,8 +45,8 @@ run_cmd do
   expectCuts `slice_provenance.slice_settle_open_bad
     [(percent, mutationEnd)]
     (← `(command| verify slice_provenance::slice_settle_open_bad))
-  expectUnestablished `slice_provenance.slice_exit_open_bad [percent]
-    (← `(command| verify slice_provenance::slice_exit_open_bad))
+  expectCuts `slice_provenance.slice_exit_open_bad [(percent, exit)]
+    (← `(command| verify slice_provenance::slice_exit_open_bad)) (some [])
 
 open LoanDeathControls in
 run_cmd do

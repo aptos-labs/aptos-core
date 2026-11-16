@@ -46,4 +46,17 @@ verex module 0x42::callee_frames where
     ensures global<Config>(addr) == old(global<Config>(addr))
     modifies global<Counter>(addr)
 
+  -- A publish after the call tests the resource at the memory the call
+  -- left; the clause tests it before the call, and the callee's frame
+  -- carries the one read to the other.
+  fun publish_after_call(account : &Signer, addr : Address) -> Unit := do
+    set_counter(addr, 3)
+    move_to<Config>(account, new Config { limit := 1 })
+  spec publish_after_call where
+    requires exists<Counter>(addr)
+    aborts_if exists<Config>(account.address)
+    ensures exists<Config>(account.address)
+    modifies global<Counter>(addr)
+    modifies global<Config>(account.address)
+
 end VerexSL.Tests.Check.Storage.CalleeFrames

@@ -292,7 +292,7 @@ verex module 0x42::ordered_map where
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
     case ensures_1 =>
-      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_⟩
+      refine ⟨lower_bound_loop_result.val, by omega, by omega, ?_, ?_⟩
       all_goals verex_normalize_context
       all_goals verex_decide
     all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
@@ -403,30 +403,11 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega), if_neg (by omega)]
 
-  theorem map_insert {α β : Type} (f : α → β) (xs : Array α) (i : Nat) (e : α)
-      (h : i ≤ xs.size) :
-      (xs.insertIdx i e h).map f = (xs.map f).insertIdx i (f e) (by simpa using h) := by
-    apply Array.ext_getElem?
-    intro j
-    simp only [Array.getElem?_map, Array.getElem?_insertIdx]
-    split
-    · rfl
-    · split <;> simp_all
-
   verify add by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
-    all_goals try simp only [← Array.getElem?_map, map_insert]
     case ensures_2_1 | ensures_2_2 =>
-      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      all_goals try (intro i h0 hi)
-      all_goals simp only [Array.getElem?_insertIdx]
-      all_goals verex_normalize_context
-      all_goals first
-        | omega
-        | rfl
-        | (rw [show i.toNat - 1 = (i - 1).toNat by omega] <;> rfl)
+      apply insert_at Prod.fst (Prod.fst ∘ Prod.snd) <;> first | assumption | omega
     all_goals first
       | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
@@ -434,16 +415,15 @@ verex module 0x42::ordered_map where
           first | assumption | omega | infer_instance |
             (apply found_ne Prod.fst <;> assumption))
       | (apply present Prod.fst <;> first | assumption | omega)
-      | (apply sorted_insert (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst)
-          (lawful := @VerexIR.Proofs.Denote.instLawfulEqCmpCarrierOrderOrders given.operations 0 _) <;>
+      | (apply sorted_insert (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance |
             (intro a ha hb
              first
              | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
-                 (key := Prod.fst) (index := lower_bound_result.val) <;>
+                 (key := Prod.fst) (index := lower_bound_loop_result.val) <;>
                  first | assumption | omega | infer_instance)
              | (apply absent_at (order := VerexIR.Proofs.Denote.TypedOrder.order _ _)
-                 (key := Prod.fst) (index := lower_bound_result.val) <;>
+                 (key := Prod.fst) (index := lower_bound_loop_result.val) <;>
                  first | assumption | omega | infer_instance |
                    (apply found_ne Prod.fst <;> assumption))))
 
@@ -513,31 +493,12 @@ verex module 0x42::ordered_map where
       simp only [id] at step
       rw [step, if_neg (by omega)]
 
-  theorem map_erase {α β : Type} (f : α → β) (xs : Array α) (i : Nat)
-      (h : i < xs.size) :
-      (xs.eraseIdx i h).map f = (xs.map f).eraseIdx i (by simpa using h) := by
-    apply Array.ext_getElem?
-    intro j
-    simp only [Array.getElem?_map, Array.getElem?_eraseIdx]
-    split <;> rfl
-
   verify remove by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    all_goals try simp (config := { contextual := true }) (disch := omega) only [vir_denote_norm] at *
-    all_goals try simp only [← Array.getElem?_map, map_erase]
     case ensures_2 =>
       have found := ‹(_ : Array _)[_]? = some _›
-      erw [(Array.getElem_of_getElem? found).choose_spec]
-      refine ⟨lower_bound_result.val, by omega, by omega, ?_, ?_, ?_, ?_, ?_, ?_⟩
-      all_goals try (intro i h0 hi)
-      all_goals try simp only [Array.getElem?_eraseIdx]
-      all_goals verex_normalize_context
-      all_goals first
-        | omega
-        | rfl
-        | (rw [show i.toNat + 1 = (i + 1).toNat by omega] <;> rfl)
-        | verex_decide
+      apply erase_at Prod.fst (Prod.fst ∘ Prod.snd) _ _ _ _ _ _ found <;> first | assumption | omega
     all_goals first
       | (apply absent_past (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (key := Prod.fst) <;>
           first | assumption | omega | infer_instance)
@@ -566,9 +527,10 @@ verex module 0x42::ordered_map where
     let removed := remove::<u64, u64>(&mut map, &key)
     if contains::<u64, u64>(&map, &key) then 0 else removed
   -- Every insertion and removal is computed on the concrete map, its order
-  -- owed where each mutation ends.
+  -- owed where each mutation ends. The contract states no `modifies`, so the
+  -- scenario also owes that global memory ends as it began.
   spec remove_scenario where
-    pragma heartbeats = 300
+    ensures true
 
   fun duplicate_scenario() -> u64 := do
     let mut map := empty::<u64, u64>()
@@ -617,7 +579,7 @@ verex module 0x42::ordered_map where
     let middle := *borrow::<u64, u64>(&map, &middle_key)
     first + last + middle
   spec remove_edges_scenario where
-    pragma heartbeats = 300
+    ensures true
 
 -- Run the functions on concrete inputs in the interpreter and compare the
 -- outcomes at `u64` and `Bool` keys.

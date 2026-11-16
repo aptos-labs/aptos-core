@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexSL
+import VerexSL.Tests.LoanDeathSupport
 
 /-!
 # Source-level `validResult` call-result invariant controls
@@ -24,6 +25,16 @@ through the explicit `Satisfies` premise carried on the caller's exported theore
    - Both exported theorems (`verified` and `typedVerified`) carry the explicit `Satisfies`
      premise (`native_make_percent` / `native_opaque_percent`) in their binder telescopes,
      with zero new axioms and `nativeDependencies` recorded.
+3. **A result a contract equates with an opaque specification function's value**: the
+   clauses of a generated contract read the result at its native type's carrier
+   (`NTy.carrier`), the type every other value of a clause has, so the equation is a row's
+   and the result's fact is a fact of the specification value.
+   - Negatives: a result type without an invariant gives the specification value no bound
+     (`use_stated_raw`); the fact does not reach the value of another specification
+     function (`use_stated_other`); the invariant gives no stronger bound
+     (`use_stated_too_strong`).
+   - Positives: the clause binder of the result has that domain, and `use_stated`
+     verifies `ensures spec_percent().value <= 100`.
 -/
 
 namespace VerexSL.Tests.CallResultHolds
@@ -74,6 +85,44 @@ verex module 0x42::call_result_holds where
   spec use_opaque where
     aborts_if false
     ensures result.value <= 100
+
+  -- 3. A result equated with an opaque specification function's value.
+  struct Raw has Copy, Drop where
+    value : u64
+
+  opaque spec fun spec_percent() : Percent
+  opaque spec fun spec_other() : Percent
+  opaque spec fun spec_raw() : Raw
+
+  native fun stated_percent() -> Percent
+  spec stated_percent where
+    aborts_if false
+    ensures result == spec_percent()
+
+  native fun stated_raw() -> Raw
+  spec stated_raw where
+    aborts_if false
+    ensures result == spec_raw()
+
+  fun use_stated_raw() -> Raw := stated_raw()
+  spec use_stated_raw where
+    aborts_if false
+    ensures spec_raw().value <= 100
+
+  fun use_stated_other() -> Percent := stated_percent()
+  spec use_stated_other where
+    aborts_if false
+    ensures spec_other().value <= 100
+
+  fun use_stated_too_strong() -> Percent := stated_percent()
+  spec use_stated_too_strong where
+    aborts_if false
+    ensures spec_percent().value <= 99
+
+  fun use_stated() -> Percent := stated_percent()
+  spec use_stated where
+    aborts_if false
+    ensures spec_percent().value <= 100
 
 /-! ## 1. Negative Controls (First) -/
 
@@ -201,5 +250,43 @@ run_cmd liftTermElabM do
         else [``propext, ``Classical.choice, ``Quot.sound]
       unless axioms.all (allowed.contains ·) do
         throwError "unexpected axioms in {thm}: {axioms}"
+
+/-! ## 3. A result equated with an opaque specification function's value -/
+
+open LoanDeathControls in
+run_cmd do
+  expectUnestablished `«0x42».call_result_holds.use_stated_raw
+    ["ensures spec_raw().value <= 100"]
+    (← `(command| verify 0x42::call_result_holds::use_stated_raw))
+  expectUnestablished `«0x42».call_result_holds.use_stated_other
+    ["ensures spec_other().value <= 100"]
+    (← `(command| verify 0x42::call_result_holds::use_stated_other))
+  expectUnestablished `«0x42».call_result_holds.use_stated_too_strong
+    ["ensures spec_percent().value <= 99"]
+    (← `(command| verify 0x42::call_result_holds::use_stated_too_strong))
+
+verify 0x42::call_result_holds::use_stated
+
+-- The clauses of the callee's contract bind the result at its native type's carrier, and
+-- no clause states a value at a result shape's carrier.
+run_cmd liftTermElabM do
+  let env ← getEnv
+  let curNs ← getCurrNamespace
+  let local_ := curNs ++ `«0x42».call_result_holds.stated_percent.typedContract
+  let name := if env.contains local_ then local_
+    else `«0x42».call_result_holds.stated_percent.typedContract
+  let info ← getConstInfo name
+  lambdaTelescope info.value! fun _ contract => do
+    unless contract.isAppOf ``VerexIR.Proofs.Contract.mk do
+      throwError "{name} is not a constructed contract: {contract}"
+    for field in [6, 10] do
+      let clause := contract.getArg! field
+      lambdaTelescope clause fun binders body => do
+        let some result := binders[2]? | throwError "a clause over a result has four binders"
+        let domain ← inferType result
+        unless domain.isAppOfArity ``NTy.carrier 2 do
+          throwError "the result is bound at {domain}"
+        if (body.find? (·.isConstOf ``ResultShape.carrier)).isSome then
+          throwError "a clause states a value at a result shape's carrier: {body}"
 
 end VerexSL.Tests.CallResultHolds

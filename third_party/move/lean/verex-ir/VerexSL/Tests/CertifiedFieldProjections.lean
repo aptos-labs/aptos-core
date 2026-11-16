@@ -132,6 +132,9 @@ verex module 0x42::certified_nested_fields where
     ensures result <= 1
   verify count
 
+  -- A field read through two nested intrinsic-map borrows: the value's own
+  -- invariant is observed at the concrete family of each borrow, so the bound
+  -- on the payload's field follows within the module's budget.
   public fun nested(t : &Table<u64, Table<u64, Payload> >, a : u64, b : u64) -> u64 :=
     borrow(borrow(t, a), b).value
   spec nested where
@@ -139,6 +142,7 @@ verex module 0x42::certified_nested_fields where
     requires has(get(t, a), b)
     aborts_if false
     ensures result <= 10
+  verify nested
 
   -- Returning a mutable table unchanged owes its intrinsic invariant. The
   -- invariant's generic field selector must be observed at the field's
@@ -148,23 +152,3 @@ verex module 0x42::certified_nested_fields where
 
   public fun preserve_nominal(t : &mut Table<u64, Payload>) -> Unit := ()
   verify preserve_nominal
-
-/--
-error: the specification clause `aborts_if false` is not established
----
-error: (deterministic) timeout at `whnf`, maximum number of heartbeats (25000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
----
-error: verex verification failed: the automatic verification of `nested` exceeded its budget of 25000 maxHeartbeats after deciding 2 leaves (stage interrupted); provide a proof in the module:
-  verify nested by lean =>
-    verex_obligations
-    verex_on
-    | aborts_if_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
--/
-#guard_msgs in
-verify 0x42::certified_nested_fields::nested

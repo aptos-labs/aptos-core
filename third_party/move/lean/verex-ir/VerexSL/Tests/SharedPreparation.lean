@@ -619,3 +619,289 @@ example (x s o q w : Int) (x0 : 0 ≤ x) (s0 : 0 ≤ s) (o0 : 0 ≤ o)
     (monotone : (o * (x * s).tdiv 10).tdiv (x + (x * s).tdiv 10) ≤ q)
     (named : w = o * (x * s / 10) / (x + x * s / 10)) : w ≤ q := by
   verex_block_decide
+
+-- A local an equation of the context eliminates is substituted, not taken
+-- apart. One function selects the local an equation eliminates
+-- (`eliminatedSide?`): the split leaves whole exactly the locals the
+-- context's elimination plan holds (`eliminationPlan`), and the substitution
+-- carries that plan out.
+
+/-- Fail unless no product-carried local is left in the context. -/
+elab "assert_no_product_local" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  goal.withContext do
+    for decl in ← Lean.getLCtx do
+      if decl.isImplementationDetail then continue
+      if (← Lean.Meta.whnfD decl.type).isAppOfArity ``Prod 2 then
+        throwError "a product local survived the preparation: {decl.userName}"
+
+/-- Fail unless the product-carried locals of the context are the named ones. -/
+elab "assert_product_locals " "[" names:ident,* "]" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  goal.withContext do
+    let mut found : Array Lean.Name := #[]
+    for decl in ← Lean.getLCtx do
+      if decl.isImplementationDetail then continue
+      if (← Lean.Meta.whnfD decl.type).isAppOfArity ``Prod 2 then found := found.push decl.userName
+    let expected := names.getElems.map (·.getId)
+    unless found.all expected.contains && expected.all found.contains do
+      throwError "the product locals are {found}, not {expected}"
+
+/-- Fail unless the context has a local of each name. -/
+elab "assert_locals " "[" names:ident,* "]" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  goal.withContext do
+    for name in names.getElems do
+      if ((← Lean.getLCtx).findFromUserName? name.getId).isNone then
+        throwError "the local {name.getId} was eliminated"
+
+/-- Fail if the context has a local of one of the names. -/
+elab "assert_no_locals " "[" names:ident,* "]" : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  goal.withContext do
+    for name in names.getElems do
+      if ((← Lean.getLCtx).findFromUserName? name.getId).isSome then
+        throwError "the local {name.getId} was not eliminated"
+
+/-- The named local stays, as a parameter of a derived summary does. -/
+elab "keep_as_summary_parameter " x:ident : tactic => Lean.Elab.Tactic.withMainContext do
+  let fvar ← Lean.Elab.Tactic.getFVarId x
+  (← targetState).summaryParameters.modify (·.insert fvar)
+
+-- A local the substitution cannot eliminate, because it occurs in the term
+-- its equation gives, is taken apart as before.
+example (g : Nat × PUnit → Nat × PUnit) (x : Nat × PUnit) (_defined : x = g x)
+    (p : Nat → PUnit → Prop) (fact : ∀ a u, p a u) : p x.1 x.2 := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact _ _
+
+-- Two equations that define two locals by one another eliminate one of
+-- them: the other is taken apart. The target is not an equation, so no
+-- reflexivity closes it over a local that survived.
+example (x y : Nat × PUnit) (_forth : x = y) (_back : y = x)
+    (p : Nat × PUnit → Prop) (fact : p x) : p x := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- The same where each local occurs inside the term the other's equation
+-- gives: the second equation would eliminate its local in terms of itself.
+example (g h : Nat × PUnit → Nat × PUnit) (x y : Nat × PUnit)
+    (_first : x = g y) (_second : y = h x)
+    (p : Nat × PUnit → Prop) (fact : p y) : p y := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- A local a term reading its dependents defines is taken apart too: the
+-- substitution reverts the locals whose types reach the eliminated one and
+-- re-introduces them around the equation, which it cannot do for a local the
+-- replacing term reads. Here the term `g y` reads `g` and `y`, whose types
+-- are stated at `x`.
+example (x : Nat × PUnit) (y : Fin (x.1 + 1)) (g : Fin (x.1 + 1) → Nat × PUnit)
+    (_defined : x = g y) (p : Nat × PUnit → Prop) (fact : p x) : p x := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- The same equation whose term reads no dependent of the local eliminates
+-- it: the fact about the local and the goal about the term are one
+-- proposition.
+example (x : Nat × PUnit) (y : Fin 3) (g : Fin 3 → Nat × PUnit)
+    (_defined : x = g y) (p : Nat × PUnit → Prop) (fact : p x) : p (g y) := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- The replacing term may reach the eliminated local only through a
+-- metavariable in the type of a local it reads. The plan follows an assigned
+-- metavariable to the locals it stands for and declines where an unassigned
+-- one stands for a term that could read any of them (`dependsOnDefined`).
+open Lean Meta Elab Command VerexIR.Proofs.Denote in
+run_cmd liftTermElabM do
+  let pair ← mkAppM ``Prod #[mkConst ``Nat, mkConst ``Unit]
+  let mut wrong : Array MessageData := #[]
+  for (description, assignment?) in #[("an unassigned index", (none : Option Bool)),
+      ("an index assigned a term reading the local", some true),
+      ("an index assigned a term reading no local", some false)] do
+    let selected ← withLocalDeclD `x pair fun x => do
+      let index ← mkFreshExprMVar (mkConst ``Nat)
+      let bound := mkApp (mkConst ``Fin) index
+      let reader ← mkArrow bound pair
+      withLocalDeclD `y bound fun y =>
+        withLocalDeclD `g reader fun g => do
+          if let some reading := assignment? then
+            let first ← mkAppM ``Prod.fst #[x]
+            index.mvarId!.assign
+              (if reading then mkApp (mkConst ``Nat.succ) first else mkNatLit 3)
+          withLocalDeclD `defined (← mkEq x (mkApp g y)) fun _ => do
+            let goal ← mkFreshExprMVar (mkConst ``True)
+            return (← eliminationPlan goal.mvarId!).any (·.eliminated == x.fvarId!)
+    unless selected == (assignment? == some false) do
+      wrong := wrong.push m!"{if selected then "selected a local the replacing term reads through"
+        else "declined a local the replacing term does not read through"} {description}"
+  unless wrong.isEmpty do
+    throwError "the elimination plan {MessageData.joinSep wrong.toList ", "}"
+
+-- A `let`-bound local is never the eliminated side: the substitution replaces
+-- a local by a term and has no place for one that already stands for one.
+example (a : Nat) (p : Nat → Prop) :
+    let z : Nat := a; ∀ (w : Nat), w = z → p w → p a := by
+  intro z w _eqn fact
+  verex_subst_vars
+  exact fact
+
+-- A term reading a local the equation's own local stands in the value of is
+-- a dependent too, so its local is taken apart.
+example (x : Nat × PUnit) (p : Nat × PUnit → Prop) (fact : p x) : p x := by
+  let z : Nat × PUnit := (x.1, PUnit.unit)
+  have _defined : x = z := by
+    show x = (x.1, PUnit.unit)
+    exact Prod.ext rfl (PUnit.ext _ _)
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- Where a path's preparation keeps the locals its goal reads, an equation
+-- eliminates its other local, whichever side the kept one is on: `x` goes
+-- and `y` stays.
+set_option verex.keepTargetLocals true in
+example (p : Nat → Prop) (x y : Nat) (_defined : x = y) (fact : p x) : p y := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [y]
+  all_goals assert_no_locals [x]
+  all_goals exact fact
+
+set_option verex.keepTargetLocals true in
+example (p : Nat → Prop) (x y : Nat) (_defined : y = x) (fact : p x) : p y := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [y]
+  all_goals assert_no_locals [x]
+  all_goals exact fact
+
+-- An equation between two kept locals eliminates neither.
+set_option verex.keepTargetLocals true in
+example (p : Nat → Nat → Prop) (x y : Nat) (_defined : x = y) (fact : p y y) : p x y := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [x, y]
+  all_goals exact _defined ▸ fact
+
+-- The same between product locals: the kept one is taken apart, the other
+-- stays whole and is replaced.
+set_option verex.keepTargetLocals true in
+example (p : Nat × PUnit → Prop) (x y : Nat × PUnit) (_defined : x = y) (fact : p x) :
+    p y := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [x]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+set_option verex.keepTargetLocals true in
+example (p : Nat × PUnit → Prop) (x y : Nat × PUnit) (_defined : y = x) (fact : p x) :
+    p y := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [x]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- A parameter of a derived summary stays on either side of an equation.
+example (p : Nat → Prop) (x y : Nat) (_defined : x = y) (fact : p x) : p y := by
+  keep_as_summary_parameter y
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [y]
+  all_goals assert_no_locals [x]
+  all_goals exact fact
+
+example (p : Nat → Prop) (x y : Nat) (_defined : y = x) (fact : p x) : p y := by
+  keep_as_summary_parameter y
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [y]
+  all_goals assert_no_locals [x]
+  all_goals exact fact
+
+example (p : Nat → Prop) (x y : Nat) (_defined : x = y) (fact : p x) : p y := by
+  keep_as_summary_parameter x
+  keep_as_summary_parameter y
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [x, y]
+  all_goals exact _defined ▸ fact
+
+-- Between two locals neither of which stays, the right one goes.
+example (p : Nat → Prop) (x y : Nat) (_defined : x = y) (fact : p x) : p y := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_locals [x]
+  all_goals assert_no_locals [y]
+  all_goals exact fact
+
+-- Between two product locals the split leaves whole the one the
+-- substitution eliminates, the right one, and takes the other apart.
+example (x y : Nat × PUnit) (_defined : x = y) (p : Nat → Prop) (fact : p y.1) :
+    p x.1 := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [y]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+example (x y : Nat × PUnit) (_defined : y = x) (p : Nat → Prop) (fact : p y.1) :
+    p x.1 := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [x]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- An equation stated twice eliminates its local once.
+example (x y : Nat × PUnit) (_first : x = y) (_second : x = y) (p : Nat → Prop)
+    (fact : p y.1) : p x.1 := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [y]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- A local a constructor term defines is replaced by it, and the projections
+-- of the term reduce.
+example (a : Nat) (x : Nat × PUnit) (_defined : x = (a, PUnit.unit))
+    (p : Nat → Prop) (fact : p a) : p x.1 := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- A local an opaque term defines stays one value, so a fact about the local
+-- and a goal about the term are the same proposition. Taken apart, the
+-- equation would state a row at its components and neither side would reach
+-- the other.
+example (f : Unit → Nat × PUnit) (x : Nat × PUnit) (_defined : x = f ())
+    (p : Nat × PUnit → Prop) (fact : p x) : p (f ()) := by
+  verex_split_hypotheses
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
+
+-- So does a local equated to one an opaque term defines: both are replaced
+-- by the term.
+example (f : Unit → Nat × PUnit) (x y : Nat × PUnit) (_alias : x = y) (_defined : y = f ())
+    (p : Nat × PUnit → Prop) (fact : p x) : p (f ()) := by
+  verex_split_hypotheses
+  all_goals assert_product_locals [x, y]
+  all_goals verex_subst_vars
+  all_goals assert_no_product_local
+  all_goals exact fact
