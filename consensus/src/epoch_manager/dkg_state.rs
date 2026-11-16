@@ -79,7 +79,9 @@ pub(super) fn recover_dkg_state<T: OnChainConfig + Default>(
 mod tests {
     use super::*;
     use aptos_crypto::HashValue;
-    use aptos_storage_interface::{errors::AptosDbError, Result as StorageResult};
+    use aptos_storage_interface::{
+        errors::AptosDbError, CheckpointStateReader, Result as StorageResult,
+    };
     use aptos_types::{
         aggregate_signature::AggregateSignature,
         block_info::BlockInfo,
@@ -150,8 +152,10 @@ mod tests {
             assert_eq!((start, end), (EPOCH - 1, EPOCH));
             Ok(self.proof.clone())
         }
+    }
 
-        fn get_state_value_by_version(
+    impl CheckpointStateReader for EpochStartDb {
+        fn get_state_value_at_checkpoint(
             &self,
             key: &StateKey,
             version: Version,
@@ -322,8 +326,9 @@ mod tests {
 
     #[test]
     fn current_stale_and_missing_sessions_do_not_read_history() {
-        // Any attempted historical read fails the test through DbReader's defaults.
+        // Any attempted historical read fails the test through the trait defaults.
         struct NoReads;
+        impl CheckpointStateReader for NoReads {}
         impl DbReader for NoReads {}
         for original in [
             randomness_state(EPOCH - 1),

@@ -27,7 +27,7 @@ use aptos_network::{
 use aptos_peer_monitoring_service_types::{
     response::NetworkInformationResponse, PeerMonitoringMetadata,
 };
-use aptos_storage_interface::{DbReader, StateKind};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, StateKind};
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
 use aptos_storage_service_types::{
@@ -387,6 +387,7 @@ pub fn create_mock_db_reader() -> Arc<dyn DbReader> {
 /// A simple mock database reader that only implements
 /// the functions required by the tests.
 pub struct MockDatabaseReader {}
+impl CheckpointStateReader for MockDatabaseReader {}
 impl DbReader for MockDatabaseReader {
     fn get_block_timestamp(&self, version: Version) -> aptos_storage_interface::Result<u64> {
         Ok(version * 100_000)
