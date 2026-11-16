@@ -1,14 +1,14 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/apply_carrier_unread_memory.move:706:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:704:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:694:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:692:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
   verify rec_wrap_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:718:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:716:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:706:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:704:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
   verify rec_read_across_write by lean =>
     verex_obligations
     verex_on
@@ -79,47 +79,39 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:181:5: error:
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:188:36: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:188:5: error: verex verification failed: the automatic verification of `determined_native_twice` failed; provide a proof in the module:
-  verify determined_native_twice by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:237:37: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:237:5: error: verex verification failed: the automatic verification of `pure_native_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:230:37: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:230:5: error: verex verification failed: the automatic verification of `pure_native_across_write` failed; provide a proof in the module:
   verify pure_native_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:247:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:246:5: error: verex verification failed: the automatic verification of `native_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:240:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:239:5: error: verex verification failed: the automatic verification of `native_across_write` failed; provide a proof in the module:
   verify native_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:271:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:269:5: error: verex verification failed: the automatic verification of `native_memory_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:264:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:262:5: error: verex verification failed: the automatic verification of `native_memory_across_write` failed; provide a proof in the module:
   verify native_memory_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:281:32: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:281:5: error: verex verification failed: the automatic verification of `signer_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:274:32: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:274:5: error: verex verification failed: the automatic verification of `signer_across_write` failed; provide a proof in the module:
   verify signer_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:337:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:330:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -141,13 +133,13 @@ permitted :
               (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:337:5: error: verex verification failed: the automatic verification of `reads_frame_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:330:5: error: verex verification failed: the automatic verification of `reads_frame_across_write` failed; provide a proof in the module:
   verify reads_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:349:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:342:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -169,13 +161,13 @@ permitted :
               (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:349:5: error: verex verification failed: the automatic verification of `reads_frame_unsat_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:342:5: error: verex verification failed: the automatic verification of `reads_frame_unsat_across_write` failed; provide a proof in the module:
   verify reads_frame_unsat_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:361:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:354:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -197,13 +189,13 @@ permitted :
               (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:361:5: error: verex verification failed: the automatic verification of `transparent_reads_frame_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:354:5: error: verex verification failed: the automatic verification of `transparent_reads_frame_across_write` failed; provide a proof in the module:
   verify transparent_reads_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:373:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:366:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -225,13 +217,13 @@ permitted :
               (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
       0
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:373:5: error: verex verification failed: the automatic verification of `modifies_frame_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:366:5: error: verex verification failed: the automatic verification of `modifies_frame_across_write` failed; provide a proof in the module:
   verify modifies_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:382:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:375:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -241,13 +233,13 @@ args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:382:5: error: verex verification failed: the automatic verification of `reads_frame_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:375:5: error: verex verification failed: the automatic verification of `reads_frame_twice` failed; provide a proof in the module:
   verify reads_frame_twice by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:390:5: error: Tactic `assumption` failed
+tests/sources/functional/closures/apply_carrier_unread_memory.move:383:5: error: Tactic `assumption` failed
 
 case nativesTyped
 registry✝ : VerexIR.Validation.SemanticsRegistry
@@ -257,109 +249,109 @@ args✝ : VerexIR.Proofs.Denote.HList params
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
 ⊢ VerexIR.NativesTyped executable✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:390:5: error: verex verification failed: the automatic verification of `reads_any_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:383:5: error: verex verification failed: the automatic verification of `reads_any_twice` failed; provide a proof in the module:
   verify reads_any_twice by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:403:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:402:5: error: verex verification failed: the automatic verification of `reads_frame_named_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:396:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:395:5: error: verex verification failed: the automatic verification of `reads_frame_named_across_write` failed; provide a proof in the module:
   verify reads_frame_named_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:437:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:435:5: error: verex verification failed: the automatic verification of `intrinsic_memory_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:430:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:428:5: error: verex verification failed: the automatic verification of `intrinsic_memory_across_write` failed; provide a proof in the module:
   verify intrinsic_memory_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:449:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:447:5: error: verex verification failed: the automatic verification of `move_intrinsic_memory_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:442:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:440:5: error: verex verification failed: the automatic verification of `move_intrinsic_memory_across_write` failed; provide a proof in the module:
   verify move_intrinsic_memory_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:469:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:467:5: error: verex verification failed: the automatic verification of `bodied_intrinsic_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:462:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:460:5: error: verex verification failed: the automatic verification of `bodied_intrinsic_across_write` failed; provide a proof in the module:
   verify bodied_intrinsic_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:487:31: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:487:5: error: verex verification failed: the automatic verification of `table_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:480:31: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:480:5: error: verex verification failed: the automatic verification of `table_across_write` failed; provide a proof in the module:
   verify table_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:513:25: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:513:5: error: verex verification failed: the automatic verification of `vector_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:506:25: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:506:5: error: verex verification failed: the automatic verification of `vector_twice` failed; provide a proof in the module:
   verify vector_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:519:22: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:519:5: error: verex verification failed: the automatic verification of `bcs_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:512:22: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:512:5: error: verex verification failed: the automatic verification of `bcs_twice` failed; provide a proof in the module:
   verify bcs_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:525:25: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:525:5: error: verex verification failed: the automatic verification of `string_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:518:25: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:518:5: error: verex verification failed: the automatic verification of `string_twice` failed; provide a proof in the module:
   verify string_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:531:23: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:531:5: error: verex verification failed: the automatic verification of `hash_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:524:23: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:524:5: error: verex verification failed: the automatic verification of `hash_twice` failed; provide a proof in the module:
   verify hash_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:548:29: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:548:5: error: verex verification failed: the automatic verification of `mut_native_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:541:29: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:541:5: error: verex verification failed: the automatic verification of `mut_native_twice` failed; provide a proof in the module:
   verify mut_native_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:557:26: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:557:5: error: verex verification failed: the automatic verification of `context_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:550:26: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:550:5: error: verex verification failed: the automatic verification of `context_twice` failed; provide a proof in the module:
   verify context_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:568:31: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:568:5: error: verex verification failed: the automatic verification of `local_digest_twice` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:561:31: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:561:5: error: verex verification failed: the automatic verification of `local_digest_twice` failed; provide a proof in the module:
   verify local_digest_twice by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:574:5: error: verification failed with a residual obligation:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:567:5: error: verification failed with a residual obligation:
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 nativesTyped : VerexIR.NativesTyped executable✝
@@ -412,7 +404,7 @@ bounds : #[].size < 2 ^ 64
               (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
               initialState✝)
     (fun error =>
-      VerexIR.Proofs.Denote.AbortsAt 899810
+      VerexIR.Proofs.Denote.AbortsAt 883784
         (VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
             VerexIR.Proofs.Denote.NRow.nil)
@@ -420,24 +412,16 @@ bounds : #[].size < 2 ^ 64
           (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
           initialState✝))
     initialState✝
-tests/sources/functional/closures/apply_carrier_unread_memory.move:574:5: error: verex verification failed: the automatic verification of `apply_bytes` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:567:5: error: verex verification failed: the automatic verification of `apply_bytes` failed; provide a proof in the module:
   verify apply_bytes by lean =>
     verex_obligations
     verex_on
     | leaf => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:583:39: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:583:5: error: verex verification failed: the automatic verification of `prelude_native_through_hof` failed; provide a proof in the module:
-  verify prelude_native_through_hof by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:622:9: error: the precondition `requires exists<S>(@0x42)` of `r_odd_requires` does not hold at this call
-tests/sources/functional/closures/apply_carrier_unread_memory.move:638:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:635:5: error: verex verification failed: the automatic verification of `requires_failed_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:610:9: error: the precondition `requires exists<S>(@0x42)` of `r_odd_requires` does not hold at this call
+tests/sources/functional/closures/apply_carrier_unread_memory.move:626:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:623:5: error: verex verification failed: the automatic verification of `requires_failed_across_write` failed; provide a proof in the module:
   verify requires_failed_across_write by lean =>
     verex_obligations
     verex_on
@@ -445,16 +429,16 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:635:5: error:
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:660:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:658:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:648:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:646:5: error: verex verification failed: the automatic verification of `rec_wrap_across_write` failed; provide a proof in the module:
   verify rec_wrap_across_write by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:672:9: error: the specification clause `ensures result == spec.result[1]` is not established
-tests/sources/functional/closures/apply_carrier_unread_memory.move:670:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
+tests/sources/functional/closures/apply_carrier_unread_memory.move:660:9: error: the specification clause `ensures result == spec.result[1]` is not established
+tests/sources/functional/closures/apply_carrier_unread_memory.move:658:5: error: verex verification failed: the automatic verification of `rec_read_across_write` failed; provide a proof in the module:
   verify rec_read_across_write by lean =>
     verex_obligations
     verex_on
