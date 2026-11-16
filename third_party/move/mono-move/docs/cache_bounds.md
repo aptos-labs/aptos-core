@@ -1,19 +1,28 @@
 # Cache Bounds
 
-How MonoMove bounds the memory held by code-derived data, and the interning redesign that makes the bound simple.
+How MonoMove bounds the memory of its type and code caches, and the interning redesign that makes it possible.
 
-Value memory (stacks, heaps, frozen heaps, the per-block resource arena) is a separate budget, see `heap_and_gc.md`.
+Scope: types and code. Value memory (stacks, heaps, frozen heaps, the per-block resource arena) is a separate budget, see `heap_and_gc.md`. Block state (`MVHashMap`, `UnsyncMap`) is not redesigned here; §6 states what this design needs from it.
 
-## 1. Problem
+## 1. Problem and constraints
 
-`GlobalContext` holds one shared `Context` and one bump arena per worker. Identifiers, types, modules, lowered functions, layouts and descriptors all grow monotonically until `MaintenanceGuard::reset_arena_pool` drops everything. In production the context is owned by `AptosModuleCacheManager` (`aptos-move/block-executor`), handed to every block, and never reset.
+`GlobalContext` holds one shared `Context` and one bump arena per worker. Identifiers, types, modules, lowered functions, layouts and descriptors grow until `MaintenanceGuard::reset_arena_pool` drops everything. In production the context is owned by `AptosModuleCacheManager` (`aptos-move/block-executor`), handed to every block, and never reset.
 
-Two things make it hard to bound as it stands:
+Target:
 
-- **Everything is one lifetime.** Types live in arenas shared by all modules, so nothing can be freed without freeing everything.
-- **Everything is identity.** Pointer equality on interned types is used as type equality, and those pointers are baked into block state: `UnsyncMap` keys embed an `InternedType`, heap object headers carry a `DescriptorId`. So nothing can be made local to a transaction without breaking what other transactions see.
+```
+type and code memory  <=  W + N * E
+```
 
-Most interned types need neither property. Separating the ones that do from the ones that do not is the redesign.
+`W` is the size of the shared cache, `N` the number of executors, `E` the most one transaction can build.
+
+Constraints:
+
+- **Nothing is flushed while a block executes.** Block state holds pointers into the cache; it is never rebuilt or converted mid-block.
+- **No fallback to sequential execution.** The mechanism is the same for sequential and parallel execution and never stops workers.
+- **Determinism.** Cache state differs between validators. Nothing a transaction observes may depend on it.
+
+So when the cache is full, a transaction that needs something new has to keep it to itself and free it when it ends. The hard part is types: pointer equality on interned types is type equality everywhere, so a private type must never meet a shared copy of itself.
 
 ## 2. What types are used for
 
@@ -21,166 +30,172 @@ From the specializer, loader and runtime:
 
 | Where a type appears | Example | Needs identity across modules and transactions? |
 |---|---|---|
-| A module's pools: signatures, field types, instantiation signatures, IR operands (`PreparedModule::build`, destack) | `vector<T>`, `&Coin<T>`, `T` | No. Read as a template; compared only inside the module (e.g. type-keyed slot recycling). |
-| Substitution intermediates during lowering (`try_build_context`) | substituted home-slot list, callee parameter list | No. Used once to compute slot sizes. The current code interns whole lists just to pass them to `subst_type_list` (there is a `TODO(perf)` on it). |
-| Type arguments of a call, native call or closure (`CallByName`, `CallNative`, `FunctionRef`) | `[Coin<APT>]` | Yes. Key of the monomorphization cache. |
-| Resource, table-value and event types (`Exists`, `BorrowGlobal`, `MoveTo`, `InMemoryStorageKey`) | `CoinStore<APT>` | Yes. Key into block state. |
-| Types that have a layout or a GC descriptor (`Layouts::by_ty`, `Descriptors::*`) | `vector<Coin<APT>>` | Yes. The IDs end up in heap objects other transactions read. |
+| A module's pools: signatures, field types, instantiation signatures, IR operands (`PreparedModule::build`, destack) | `vector<T>`, `&Coin<T>`, `T` | No. Read as a template; compared only inside the module. |
+| Substitution intermediates during lowering (`try_build_context`) | substituted home-slot list, callee parameter list | No. Used once to compute slot sizes. |
+| Type arguments of a call, native call or closure | `[Coin<APT>]` | Yes. Key of the monomorphization cache. |
+| Resource, table-value and event types | `CoinStore<APT>` | Yes. Key into block state. |
+| Types that have a layout or a GC descriptor | `vector<Coin<APT>>` | Yes. The IDs end up in heap objects. |
 
-Everything in the "yes" rows is a closed type: no type parameters. Everything with a type parameter is in a "no" row.
+Everything in the "yes" rows is a closed type. Today all rows go through one interner, and `PreparedModule::build` interns a module's whole signature pool into the shared maps at load time.
 
-Today all of these go through the same interner. `PreparedModule::build` interns a module's entire signature pool, type parameters and references included, into the shared maps at load time.
+## 3. Types anchored on their defining module
 
-## 3. Three spaces
+### 3.1 Terms stay in the module
 
-```
-   code:   LoadedModule ── owns ──> module space (terms)
-           lowered Function
-              │
-              │ points to
-              ▼
-   key space:  names, ground types, type lists, function refs,
-               layouts, descriptors, module slots
-              ▲
-              │ points to
-   values: heap objects (descriptor ids, closure function refs),
-           block state keys
-```
+The types written in a module's bytecode, open or closed, are *terms*. They are interned in an arena the `LoadedModule` owns, with a plain single-threaded map: deduplicated within the module, meaningless outside it, freed with it. `PreparedModule::build` and `destack` are already generic over `Interner`, so this is a second implementation passed to `build`.
 
-**Module space.** The types written in a module's bytecode, open or closed, as *terms*. Interned in an arena the `LoadedModule` owns, with a plain single-threaded map: deduplicated within the module, meaningless outside it. Freed with the module.
+### 3.2 Identity is the definition
 
-**Key space.** Canonical *ground* (closed) types, plus the other things that are identity: identifiers and module IDs, type-argument lists, function refs, the layout and descriptor tables, module slots. Shared by all workers, as the interner is today. Small per entry.
-
-**Code.** Modules and lowered functions. The bulk of the memory.
-
-One rule about pointers: **code and values point into key space; key space points only to itself; nothing points into code except the transaction running it.** That rule is what the bounds below rest on.
-
-### 3.1 Interning
-
-`PreparedModule::build` and `destack` are already generic over `Interner`, so the split is mostly a second implementation:
-
-- A **module interner** (bump arena + `UnorderedMap`) is passed to `build`. Terms, type parameters, references and the partially substituted instantiation signatures all stay in the module. Names it delegates to key space. Loading a module no longer touches the shared type maps.
-- The **key-space interner** is the existing `DashMap`-based one, holding ground types only.
-- One bridge: `instantiate(term, ty_args: &[Ty]) -> Ty`. It reads a term from any module and interns the ground result in key space. This replaces `subst_type` at the points that produce keys.
-
-What lowering `f<τ>` puts into key space is then exactly what something is keyed by:
-
-- the type-argument list of each call, native call and closure it contains;
-- the resource types of its global-storage ops;
-- the vector and nominal types among its slots and fields, because their layouts are looked up by type.
-
-It does not intern references, parameter and return lists, or anything open. Those are computed into a scratch buffer for the duration of the lowering. `Function::param_tys` and `return_tys`, the one place substituted signatures are kept, become owned data on the function: a ground type plus a by-value / `&` / `&mut` marker.
-
-Terms and ground types get distinct Rust types (`Term`, `Ty`), with no `==` between them; `instantiate` and structural matching (as `SignatureTokenKey` does today) are the only ways across. A pointer comparison between spaces does not compile.
-
-### 3.2 What the split buys
-
-- **A module is self-contained.** Nothing outside a module points into its arena: after lowering, a function holds ground types, IDs and names only. So a `LoadedModule` can be owned by a single transaction and dropped at its end, or evicted from the cache on its own, without tracing anything. Other modules reach it only through its slot, which already handles being empty.
-- **Identity is small.** Key space holds no IR, no bytecode and no templates, so it can afford to be always shared.
-- **Local code does not fork identity.** A transaction running a module nobody else has cached still produces the same ground types, layout IDs and descriptor IDs as everyone else. Block state needs no second representation.
-
-## 4. Bounds
-
-Two budgets, because the two spaces fail differently: code is big but can be local; keys are small but cannot.
+A closed type that needs identity gets it from the module that defines it:
 
 ```
-code memory  <=  K_max  +  W_code  +  N * E
+LoadedModule
+ ├─ terms (arena)
+ ├─ TypeDef  per struct/enum
+ │    └─ instances:  type arguments  ->  TypeInst
+ └─ FuncDef  per function
+      └─ instances:  type arguments  ->  Function        (today's instantiated_functions)
+
+Ty = primitive | &TypeInst
 ```
 
-### 4.1 Weights and per-transaction limits
+- **A non-generic type is its definition.** `0x1::coin::Info` is the single `TypeInst` created with the module. Resolving a struct handle yields that pointer; there is no lookup and nothing to intern.
+- **A generic instance is an entry in its definition's table**, keyed by the pointers of its type arguments: `Coin<APT>` lives under `Coin`. This is the shape `instantiated_functions` already has.
+- **`vector<T>` and function types** are instances of built-in definitions on a pseudo-module that is always present.
+- **Argument lists are compared by content**, as slices of `Ty` pointers. They need no interning of their own.
+- **Names.** A module's identifiers stay in its own pool. A definition is found from its module's slot by name; cross-module lookups hash the string once, at lowering.
 
-Every first use of a module or of an instantiation `f<τ>` in a transaction is an event with two deterministic weights, computed from on-chain inputs only and stored on the built object next to its gas cost:
+`instantiate(term, ty_args) -> Ty` is the one bridge from terms to identity: it walks a term and looks up, or creates, the instances it names. Lowering `f<τ>` calls it for exactly the things that are keys: type arguments of calls, natives and closures; resource types; vector and nominal types among its slots and fields. References, parameter lists and anything open are computed into a scratch buffer and dropped. `Function::param_tys` and `return_tys` become owned data on the function.
 
-| | Code weight | Key weight |
+Terms and `Ty` are distinct Rust types with no `==` between them.
+
+### 3.3 Derived data hangs off identity
+
+| Derived from | Data | Recorded dependencies |
 |---|---|---|
-| Module | bytecode, IR, term arena, lowered non-generic functions | identifier pool, module IDs, slot |
-| Instantiation `f<τ>` | lowered code | ground types and lists it instantiates, layouts and descriptors in their closure |
-| User type arguments, failed lookups | none | type nodes and names |
+| `TypeInst` | layout, GC descriptors | the modules whose definitions its layout reads |
+| `FuncDef` + arguments | lowered `Function` | `mandatory_dependencies`, as today |
+| module ID | `LoadedModule` (bytecode, IR, terms) | — |
 
-A transaction is charged both, hit or miss, at the sites where load gas is charged, and aborts deterministically above `T_code` or `T_key`. Both live in the gas schedule. They generalize the legacy `max_num_dependencies` and `max_total_dependency_size`.
+A layout then belongs to a specific version of its definition and lists the other modules it read, the way a lowered function does. That closes the existing `TODO(correctness)` on `publish_enum_descriptor` about layout caches surviving an upgrade.
 
-Weights must upper-bound real bytes; tests check them against a counting allocator. On a miss the charge comes before the build, one module at a time (today a mandatory set is built, inserted, then charged as a sum).
+### 3.4 What anchoring buys
 
-### 4.2 Code: shared up to `W_code`, then local
+- **A module that is local to a transaction makes its types local with no extra machinery.** Its definitions are in the transaction's copy; nobody else can reach them.
+- **Nothing outside a module points into its terms.** After lowering, a function holds `Ty` pointers, IDs and names only.
+- **No global structural hashing.** The shared `types` map goes away; contention is per definition.
+- **Memory is attributable.** Every instance, layout and function belongs to one definition.
 
-A built module or function is published to the shared cache only if its weight fits: reserve against an atomic counter, publish on success. Otherwise the transaction keeps it and frees it when it ends:
+One thing anchoring does not give: an instance is not always *stored* where it is indexed. `Option<Aggregator<u64>>` is indexed under `Option` but points into `aggregator`. If `aggregator` is local to a transaction, the shared `Option` table cannot hold that entry. The rule: **an instance is stored with the shortest-lived thing it mentions.** With two lifetimes that is always well defined, and §4 is arranged so the choice is never a race.
 
-- the read-set entry for a module becomes shared-reference or owned;
-- a function lowered for a shared module but not publishable goes in a per-transaction table keyed by its function ref.
+## 4. Shared and local
 
-No transaction can build more than `E = T_code`, so code memory is at most `W_code + N * E`. The framework is preloaded and lowered at reset, counted in `W_code`, never evicted, and exempt from `T_code` as it is from load gas.
+Every table in §3.2 and §3.3 exists twice: in the shared cache, and in a per-transaction local set that is empty in the common case. Lookup is shared first, then local.
 
-A module can be local in one transaction and shared in the next; nothing depends on which. The read-set already pins one copy per transaction.
+### 4.1 The gate
 
-At block start, if the cache is near `W_code`, drop code and keep key space. Since modules are self-contained this is safe per module, so the framework and any modules worth keeping stay; no tier or tracing is needed.
-
-### 4.3 Keys: a deterministic limit per block
-
-Key space cannot be local and cannot be reclaimed while a block runs. So bound what a block can add, deterministically:
-
-- **`X_key`, a block limit like the gas limit.** At commit, in order, each transaction's first-use events are added to the block's set; an event counts once per block. When the summed key weight exceeds `X_key`, the block is cut and the rest is retried later, through the existing `BlockGasLimitProcessor`. Counting once per block is what makes the limit usable: transactions in a block share almost all of their instantiations, so honest blocks sit far below it, while a per-transaction sum would count every hit.
-- A stamp on the shared object (module slot, function ref) makes "first in this block" one compare-and-set at commit. Events with no such object, like user type arguments, are counted every time.
-
-Sequentially, every executed transaction is committed, so a block grows key space by at most `X_key + T_key`, whatever the cache held.
-
-In parallel, aborted incarnations and transactions past the cut also intern. That part is not deterministic, so it gets a node-local guard: an incarnation starts only while this block's growth is below `G`; past it, the attempt halts and the block falls back to the existing sequential path, which is bounded as above. A block therefore adds at most
+Publishing into the shared cache goes through one gate, a reader-writer lock around a flag:
 
 ```
-X_block = G + X_key + (N + 1) * T_key
+publish(entry, weight):
+    hold gate (shared)
+    if gate is closed            -> keep entry local
+    if used + weight > W         -> release, close the gate (exclusive), keep entry local
+    insert into shared table, used += weight
 ```
 
-At block start, in `AptosModuleCacheManager::try_lock`: if `K + X_block > K_max`, reset everything. That is the only time key space is reclaimed, and it is a point where nothing is running. There is no flush in the middle of a block, no private context and no bytes path for block state.
+- The gate starts open at block start and, once closed, stays closed for the rest of the block.
+- Closing takes the lock exclusively, so it waits for publishes in flight. After it returns, the shared cache does not change until the block ends.
+- A transaction creates a **local** entry only after it has seen the gate closed and then looked the entry up in shared once more.
 
-### 4.4 Cost of an attack
+While the gate is open, execution is as today: everything built is shared, and nothing local exists. After it closes, the shared cache is read-only and everything new is local.
 
-- Filling the code cache makes the attacker's own transactions run uncached. Everyone else's cached code keeps working.
-- Reaching `X_key` cuts the block, as reaching the gas limit does, so key weight has to be priced like block capacity. Each instantiation's key weight should carry gas accordingly.
-- Reaching `K_max` over many blocks forces a reset at a block boundary, after which the framework is preloaded and hot modules reload once.
+### 4.2 Why a type has exactly one identity in a transaction
+
+- A local entry for a key exists only if the key was absent from shared after the gate closed. Shared no longer changes, so the key stays absent: no transaction can see a shared copy and a local copy of the same type.
+- Nothing is published after any local entry exists, so the shared cache never points to local data.
+- Local entries point to shared entries or to the same transaction's local entries. Both outlive them.
+- A module is pinned once per transaction by the read-set, as today, so a transaction sees one copy of each module whether shared or local.
+
+The storage rule of §3.4 is then automatic: before the gate closes nothing is local, so every instance is shared; after, every new instance is local.
+
+### 4.3 The per-transaction limit
+
+Every first use of a module or an instantiation in a transaction has a deterministic weight, computed from on-chain inputs only and stored on the built object next to its gas cost. A transaction is charged it, hit or miss, where load gas is charged, and aborts deterministically above `T`. `T` lives in the gas schedule and generalizes the legacy `max_num_dependencies` and `max_total_dependency_size`.
+
+- Weights must upper-bound real bytes; tests check them against a counting allocator.
+- On a miss the charge comes before the build, one module at a time. Today a mandatory set is built, inserted, then charged as a sum.
+- The framework is preloaded and lowered at reset, counted in `W`, and exempt, as it is from load gas.
+
+So a transaction builds at most `E = T`, local or not.
+
+### 4.4 The bound
+
+- A publish reserves before it inserts, so the shared cache never exceeds `W`.
+- Each executor holds at most `E` of local entries and entries under construction.
+- Total `<= W + N * E`, in sequential and parallel execution alike, with no flush and no pause.
+
+### 4.5 Between blocks
+
+`AptosModuleCacheManager::try_lock` is where the legacy caches are size-checked per block. The check for MonoMove goes there, with nothing executing: if the gate closed in the previous block, or `used` is above a watermark, reclaim and reopen the gate.
+
+Stage 1 reclaims by resetting the shared cache and preloading the framework. Because a module's code and terms are self-contained, a later stage can evict cold modules individually instead and keep the rest; that needs the instances of an evicted module's types either kept as bare identity or dropped together with everything that depends on the module, via the recorded dependencies.
 
 ## 5. Safety rules
 
-The pointer rule of §3 has to be true of the code. Where it is not today:
+1. **Publishing is the only way into the shared cache**, and only through the gate. `OnceLock` function slots and the instantiation maps on a shared module are written by `publish`, not directly.
+2. **Closures memoize a function pointer into the heap object.** `CallClosure` flips an `Unresolved` closure to `Resolved` after its first call, and that value can outlive a local function. Memoize only pointers to shared functions; resolve the rest through a per-transaction cache.
+3. **Call-site patching.** `CallByPtr` is not emitted yet. When it is, shared code may be patched only to shared targets, under the gate.
+4. **Pay before growing.** User type arguments are interned before the prologue (`user_txn/execute.rs`), so a discarded transaction grows the cache for free. Intern them after.
+5. **The limit is always on.** The block executor runs MonoMove with `without_metering()` today. `T` must hold regardless.
 
-1. **Closures memoize a function pointer into the heap object.** `CallClosure` flips an `Unresolved` closure to `Resolved` after the first call. That value can be written to storage and read by a later transaction, after a local function is freed. Memoize only pointers to shared functions; resolve the rest through a per-transaction cache.
-2. **Call-site patching.** `CallByPtr` is not emitted yet. When it is, shared code may be patched only to shared targets, and cross-module patching makes per-module eviction unsafe. Keep cross-module calls by name with a per-transaction inline cache.
-3. **Publishing is the only way into the shared cache**, and what is published may reference only key space and its own arena. A module or function satisfies this by construction once terms are module-local.
-4. **Pay before growing key space.** User type arguments are interned before the prologue (`user_txn/execute.rs`), so a discarded transaction grows key space for free. Intern them after.
-5. **The limits are always on.** The block executor runs MonoMove with `without_metering()` today. `T_code` and `T_key` must hold regardless.
+## 6. What this needs from block state
 
-## 6. Configuration
+After the gate closes, a transaction can hold types nobody else has. Two things leave a transaction and carry type identity:
+
+- **Keys.** `InMemoryStorageKey` embeds a `Ty`. Two transactions with their own local copy of a type would not agree on the key.
+- **Values.** Heap object headers carry a `DescriptorId`, and closures carry a function ref. Another transaction reading the value by pointer could not interpret a local one.
+
+Block state is out of scope here, so the design is staged around it.
+
+**Stage 1: identity is exempt from the gate.** Definitions, instances, the layout and descriptor IDs assigned to them, and function refs are always published, even after the gate closes. They are small: a pointer, an argument slice and two IDs per instance. Everything bulky stays behind the gate: module code and terms, lowered functions, and the *data* behind a layout or descriptor ID, which a transaction looks up by ID in the shared table and then in its own. Keys and values are then exactly what they are today, and block state does not change.
+
+The price is that identity is not under `W + N * E`. It is limited per transaction by `T` and reclaimed between blocks, so within a block it can grow by the number of executions times what one transaction may create. That is a soft bound: the reset watermark has to leave that much headroom.
+
+**Stage 2: identity behind the gate too.** The bound becomes hard. It needs block state to key by `StateKey` when a type is local (`StateKey` is interned process-wide and means the same to every transaction), and to pass a value with a local layout as bytes rather than by pointer. Whether a type is local is the same for every transaction once the gate is closed, so both choices are consistent across the block.
+
+## 7. Configuration
 
 | Parameter | Where | Meaning |
 |---|---|---|
-| `T_code`, `T_key` | gas schedule | per-transaction limits |
-| `X_key` | on-chain block limits | distinct key weight per block |
-| weight constants | gas schedule | §4.1 |
-| `W_code`, `K_max`, `G` | `BlockExecutorModuleCacheLocalConfig` | node-local sizes |
+| `T` and the weight constants | gas schedule | per-transaction limit |
+| `W`, reclaim watermark | `BlockExecutorModuleCacheLocalConfig` | node-local |
 
 `N = concurrency_level`. Node-local values can differ between validators without affecting results.
 
-## 7. Implementation order
+## 8. Implementation order
 
-1. **Module interner.** `ModuleInterner`, `Term` / `Ty`, `instantiate`; `PreparedModule::build` on the module interner; lowering instantiates keys and uses scratch for the rest; owned `param_tys`. No behavior change, and module loads stop contending on the shared type maps.
-2. **Accounting.** Weights, counters for code and keys, metrics.
-3. **Reset at block start** in `try_lock`. Bounds growth across blocks.
-4. **Per-transaction limits**, charge-before-build, rule 4.
-5. **Local code** (§4.2), rules 1–3.
-6. **`X_key`** in `BlockGasLimitProcessor`; the guard `G` with parallel execution.
+1. **Module-local terms.** `ModuleInterner`, `Term` / `Ty`, `instantiate`; lowering instantiates keys and uses scratch for the rest. No behavior change.
+2. **Definitions and instances.** `TypeDef` / `TypeInst` on the module; layouts and descriptors hung off instances with their dependencies; the global `types` map removed.
+3. **Accounting and the per-transaction limit.** Weights, `used`, `T`, charge-before-build, rule 4.
+4. **Reclaim at block start** in `try_lock`.
+5. **The gate and local tables**, rules 1–3. This completes Stage 1.
+6. Later: per-module eviction (§4.5), Stage 2 (§6).
 
-## 8. Alternatives considered
+## 9. Alternatives considered
 
 | Alternative | Why not |
 |---|---|
-| Keys local to a transaction when the key space is full | Types, layout IDs and descriptor IDs are identity inside a block. Local ones need a freeze protocol so a type cannot be both local and shared, a split ID space, block-state keys by `StateKey`, and values exchanged as bytes whenever they contain a local descriptor. |
-| Private context per executor | Forks all identity, not only code; same block-state cost. |
-| Flush key space mid-block (between transactions, or at the committed prefix in parallel) | Works without a consensus rule, but needs block state rebuilt as bytes and, in parallel, resuming a block after a cut. It is the fallback if `X_key` is not wanted. |
-| Types owned by their defining module | `Option<Aggregator<u64>>` on `option` points into `aggregator`; `Table<a::K, b::V>` into two modules; `vector<T>` has none. Evicting a module would need the reverse closure. The split above gets the benefit differently: a module owns its terms, and ground types belong to no module. |
-| Deterministic block limit for code as well | Honest blocks touch a lot of distinct code, aborted incarnations can each load megabytes, and a cheap way to cut blocks is a worse failure than running uncached. |
-| Bound keys by gas alone | A per-transaction sum counts hits, so either the bound is useless or every transaction pays for instantiations that are already cached. |
+| Read-only shared cache during a block, with local results promoted between blocks | No lock on the miss path and no gate, but anything new is rebuilt by every transaction that needs it until the next block, and promotion needs conflict handling between transactions that built the same thing. |
+| Flush mid-block, or cut the block and resume | Rebuilds block state. Excluded by §1. |
+| Fall back to sequential when speculation overshoots | Excluded by §1. |
+| A deterministic per-block limit on new identity | Bounds only what commits; aborted incarnations also intern, and bounding those needs one of the two rows above. |
+| A private context per executor | Forks all identity, not only what is new. |
+| One global key space instead of per-definition tables | Works, but keeps global structural hashing, gives layouts no version, and local modules need their types tracked separately. |
 
-## 9. Open questions
+## 10. Open questions
 
-- **Names.** Identifiers are interned into key space when a module is built, so a module's identifier pool is part of its key weight even when its code stays local. If that dominates `T_key`, intern names lazily, when they first appear in a ground type or a by-name call, and key a module's own function table by string.
-- **Module upgrades.** Layouts in key space outlive the module version they were computed from. The coarse answer is to reset on publish at the next block start; a real one is part of the versioning design.
-- **Parallel guard.** `G` trades wasted parallel attempts against reserved headroom, and needs measuring once MonoMove runs in parallel.
-- **Zaptos.** A reset needs a point where no block is executing against the context.
+- **Stage 1 headroom.** How much identity a block can create in the worst case depends on how many incarnations Block-STM runs; it needs measuring.
+- **Reclaim policy.** A reset every time the gate closes lets an attacker force a cold start per block by filling `W`. Per-module eviction (§4.5) removes most of that cost.
+- **Module upgrades.** Recorded dependencies make a stale layout or function detectable; the versioning itself is the loader's open item.
+- **Zaptos.** Reclaim needs a point where no block is executing against the context.
