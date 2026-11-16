@@ -359,7 +359,11 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
     pruned: bool,
 ) {
     for (k, (old_version, v)) in kvs {
-        let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
+        let v_from_db = state_store
+            .state_kv_db
+            .get_state_value_row_by_version(k, version)
+            .unwrap()
+            .and_then(|(_, value)| value);
         assert_eq!(&v_from_db, if pruned { &None } else { v });
         if pruned {
             assert!(state_store
