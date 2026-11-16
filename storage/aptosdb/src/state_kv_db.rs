@@ -287,11 +287,12 @@ impl StateKvDb {
         self.inner.shard(shard_id).write_schemas(batch)
     }
 
-    pub(crate) fn get_state_value_with_version_by_version(
+    /// Returns the latest row of `state_key` at or before `version`, including tombstones.
+    pub(crate) fn get_state_value_row_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
+    ) -> Result<Option<(Version, Option<StateValue>)>> {
         let mut read_opts = ReadOptions::default();
 
         // We want `None` if the state_key changes in iteration.
@@ -303,7 +304,7 @@ impl StateKvDb {
         Ok(iter
             .next()
             .transpose()?
-            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+            .map(|((_, version), value_opt)| (version, value_opt)))
     }
 
     /// Returns the latest hot state entry for the given key hash at or before
