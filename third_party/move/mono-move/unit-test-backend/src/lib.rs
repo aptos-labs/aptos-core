@@ -207,6 +207,11 @@ impl MonoMoveBackend {
                         reason: err.to_string(),
                     }
                 },
+                Classification::Diverged => {
+                    return TestExecution::Diverged {
+                        reason: err.to_string(),
+                    }
+                },
                 Classification::BackendError => return backend_error(err.to_string()),
                 Classification::Ran => {
                     let (error, v1_exact_error) =
@@ -226,9 +231,12 @@ impl MonoMoveBackend {
                             Some(Classification::Unsupported) => TestExecution::Unsupported {
                                 reason: format!("{err:#}"),
                             },
-                            Some(Classification::BackendError | Classification::Ran) | None => {
-                                backend_error(format!("failed to collect effects: {err:#}"))
-                            },
+                            Some(
+                                Classification::BackendError
+                                | Classification::Ran
+                                | Classification::Diverged,
+                            )
+                            | None => backend_error(format!("failed to collect effects: {err:#}")),
                         }
                     },
                 }
@@ -283,9 +291,11 @@ impl MonoMoveBackend {
             if let Err(err) = placed {
                 return match classify(&err) {
                     Classification::Unsupported => Outcome::Error(err),
-                    Classification::BackendError | Classification::Ran => Outcome::BackendError(
-                        format!("failed to place the argument {arg:?}: {err}"),
-                    ),
+                    Classification::BackendError
+                    | Classification::Ran
+                    | Classification::Diverged => Outcome::BackendError(format!(
+                        "failed to place the argument {arg:?}: {err}"
+                    )),
                 };
             }
         }
@@ -351,6 +361,8 @@ enum Outcome {
 enum Classification {
     /// An explicitly unsupported MonoMove feature.
     Unsupported,
+    /// A failure where MonoMove differs from V1 by an agreed design choice.
+    Diverged,
     /// A MonoMove bug, or a failure V1 would not raise.
     BackendError,
     /// A failure of the test itself.
@@ -379,6 +391,13 @@ fn classify(err: &VMInternalError) -> Classification {
         Some(RuntimeError::Unsupported(_))
     ) {
         return Classification::Unsupported;
+    }
+    // V1 orders function values; MonoMove refuses to.
+    if matches!(
+        err.downcast_ref::<RuntimeError>(),
+        Some(RuntimeError::FunctionValuesNotOrdered)
+    ) {
+        return Classification::Diverged;
     }
     if matches!(describe(err), V1Equivalent::NoV1Failure) {
         return Classification::BackendError;
@@ -490,6 +509,7 @@ mod tests {
     fn classified(err: impl mono_move_core::IntoExecutionError) -> &'static str {
         match classify(&VMInternalError::new(err)) {
             Classification::Unsupported => "unsupported",
+            Classification::Diverged => "diverged",
             Classification::BackendError => "backend error",
             Classification::Ran => "ran",
         }
@@ -556,5 +576,13 @@ mod tests {
         assert_eq!(classified(MeteringError::OutOfGas), "ran");
         // V1 fails here too, with a status MonoMove cannot determine.
         assert_eq!(classified(RuntimeError::BCSEof), "ran");
+    }
+
+    #[test]
+    fn ordering_function_values_diverges() {
+        assert_eq!(
+            classified(RuntimeError::FunctionValuesNotOrdered),
+            "diverged"
+        );
     }
 }
