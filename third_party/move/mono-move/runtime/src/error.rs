@@ -473,14 +473,24 @@ pub enum RuntimeInvariantViolation {
     StoredClosureTargetNotPersistent { function: String },
 
     #[error(
-        "CallClosure: capture {capture_idx} was packed as ({packed_size}, {packed_align}) but \
-         resolved callee's param {param_idx} is ({param_size}, {param_align})"
+        "CallClosure: capture {capture_idx} was packed under layout {packed_id} but resolved \
+         callee's param {param_idx} has layout {param_id}"
     )]
     ClosureCapturedLayoutMismatch {
         capture_idx: usize,
-        packed_size: u32,
-        packed_align: u32,
+        packed_id: u32,
         param_idx: usize,
+        param_id: u32,
+    },
+
+    #[error(
+        "CallClosure: param {param_idx}'s layout is ({layout_size}, {layout_align}) but its slot \
+         is ({param_size}, {param_align})"
+    )]
+    ClosureParamLayoutMismatch {
+        param_idx: usize,
+        layout_size: u32,
+        layout_align: u32,
         param_size: u32,
         param_align: u32,
     },

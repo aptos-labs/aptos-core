@@ -589,6 +589,36 @@ pub trait LayoutProvider {
         intrinsic_slot_size_and_align(view_type(ty))
             .or_else(|| self.layout_by_ty(ty).map(|l| (l.size, l.align)))
     }
+
+    /// Heap-pointer byte offsets within a value of layout `id`, relative to the
+    /// value's start, or [`None`] if a reachable layout is not published or an
+    /// offset overflows. A reference, vector, function or (frozen) enum slot
+    /// holds a pointer at relative offset 0; a struct recurses through its
+    /// fields; scalars hold none.
+    //
+    // TODO(metering): rewrite without recursion or add a depth/visited bound.
+    fn pointer_offsets(&self, id: LayoutId) -> Option<Vec<u32>> {
+        Some(match &self.layout(id)?.kind {
+            LayoutKind::Bool
+            | LayoutKind::UnsignedInt
+            | LayoutKind::SignedInt
+            | LayoutKind::Address
+            | LayoutKind::Signer => vec![],
+            LayoutKind::Ref
+            | LayoutKind::Vector { .. }
+            | LayoutKind::FrozenEnum { .. }
+            | LayoutKind::Function => vec![0],
+            LayoutKind::Struct { fields } => {
+                let mut out = vec![];
+                for field in fields.iter() {
+                    for rel in self.pointer_offsets(field.id)? {
+                        out.push(field.offset.checked_add(rel)?);
+                    }
+                }
+                out
+            },
+        })
+    }
 }
 
 /// In-memory layout table used by unit tests as a lightweight

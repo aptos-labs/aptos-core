@@ -23,10 +23,11 @@
 use crate::{
     captured_values_size,
     native::NativeABI,
+    next_captured_value_offset,
     types::{view_type_list, InternedType},
     CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, LayoutProvider, MicroOp, ObjectDescriptorInner, PackClosureOp,
-    ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    Function, IntBinaryOp, LayoutKind, LayoutProvider, MicroOp, ObjectDescriptorInner,
+    PackClosureOp, ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -1049,6 +1050,146 @@ impl<P: DescriptorProvider + LayoutProvider + ?Sized> FunctionVerifier<'_, P> {
                     op.values_size, expected_values_size
                 ),
             );
+        }
+        self.verify_captured_layout(pc, op);
+    }
+
+    /// Checks that the captured-values layout describes the values region
+    /// `PackClosure` writes. Serialization and equality read the captures
+    /// through this layout, and the GC traces them through the captured-data
+    /// descriptor, so the two must agree with each other and with the packed
+    /// slots.
+    fn verify_captured_layout(&mut self, pc: usize, op: &PackClosureOp) {
+        // Presence is checked by the caller.
+        let Some(id) = op.captured_layout_id else {
+            return;
+        };
+        let Some(layout) = self.provider.layout(id) else {
+            self.err(
+                Some(pc),
+                format!("PackClosure: unknown captured_layout_id {:?}", id),
+            );
+            return;
+        };
+        let LayoutKind::Struct { fields } = &layout.kind else {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_layout_id {:?} is not a struct layout",
+                    id
+                ),
+            );
+            return;
+        };
+        if fields.len() != op.captured.len() {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured layout has {} fields for {} captures",
+                    fields.len(),
+                    op.captured.len()
+                ),
+            );
+            return;
+        }
+        if layout.size != op.values_size {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured layout size {} != values_size {}",
+                    layout.size, op.values_size
+                ),
+            );
+        }
+        let mut cursor = 0usize;
+        for (k, (field, slot)) in fields.iter().zip(&op.captured).enumerate() {
+            let (offset, next) =
+                next_captured_value_offset(cursor, slot.size as usize, slot.align as usize);
+            cursor = next;
+            if field.offset as usize != offset {
+                self.err(
+                    Some(pc),
+                    format!(
+                        "PackClosure: captured layout field {} at offset {} != packed offset {}",
+                        k, field.offset, offset
+                    ),
+                );
+            }
+            match self.provider.layout(field.id) {
+                Some(field_layout)
+                    if field_layout.size == slot.size && field_layout.align == slot.align => {},
+                Some(field_layout) => self.err(
+                    Some(pc),
+                    format!(
+                        "PackClosure: captured layout field {} is ({}, {}) but captured[{}] is ({}, {})",
+                        k, field_layout.size, field_layout.align, k, slot.size, slot.align
+                    ),
+                ),
+                None => self.err(
+                    Some(pc),
+                    format!(
+                        "PackClosure: captured layout field {} has unknown layout {:?}",
+                        k, field.id
+                    ),
+                ),
+            }
+        }
+
+        // The GC must trace exactly the pointers the layout holds: a pointer
+        // it misses dangles after a collection.
+        let Some(expected) = self.provider.pointer_offsets(id) else {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured layout {:?} has no pointer offsets",
+                    id
+                ),
+            );
+            return;
+        };
+        let traced = match op
+            .captured_data_descriptor_id
+            .and_then(|desc_id| self.provider.descriptor(desc_id))
+            .map(|desc| desc.inner())
+        {
+            Some(ObjectDescriptorInner::Trivial) => &[][..],
+            Some(ObjectDescriptorInner::CapturedData { pointer_offsets }) => &pointer_offsets[..],
+            // A missing or wrong-kind descriptor is reported by the caller.
+            _ => return,
+        };
+        if expected != traced {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured layout pointer offsets {:?} != descriptor offsets {:?}",
+                    expected, traced
+                ),
+            );
+        }
+
+        // A resolved target's captured parameters must have the captures'
+        // layouts.
+        if let ClosureFuncRef::Resolved(func_ptr) = &op.func_ref {
+            let callee = unsafe { func_ptr.as_ref_unchecked() };
+            let captured_params = callee
+                .param_tys
+                .iter()
+                .enumerate()
+                .filter(|&(i, _)| i < 64 && (op.mask >> i) & 1 != 0)
+                .map(|(_, &ty)| ty);
+            for (k, (field, ty)) in fields.iter().zip(captured_params).enumerate() {
+                if self.provider.layout_id(ty) != Some(field.id) {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: captured layout field {} is layout {:?} but the callee's parameter has {:?}",
+                            k,
+                            field.id,
+                            self.provider.layout_id(ty)
+                        ),
+                    );
+                }
+            }
         }
     }
 

@@ -268,6 +268,13 @@ pub(crate) unsafe fn saved_return_pc(fp: *mut u8) -> (usize, FrameFlag) {
 //
 // TODO(security): prove at compile time that the block's `GlobalContext` guard
 // is held.
+//
+// TODO(correctness): a closure in these effects may be in the `Resolved` state,
+// holding a pointer to a leaked `Function`. That keeps the function's memory
+// pinned for as long as the effects are readable, and binds the value to the
+// module version it was resolved against. A later transaction reading it after
+// that module is upgraded must re-resolve the closure, as V1 does with the
+// module hash it records on resolution.
 pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
@@ -3426,12 +3433,13 @@ impl InterpreterContext<'_> {
             let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
 
             // Callee-dependent validation runs once, on the first resolution of
-            // an `Unresolved` closure; we then memoize the resolved pointer into
-            // the closure object (flipping it to `Resolved`) so later calls of
-            // the same closure value skip both the loader and these checks. An
-            // already-`Resolved` closure was validated earlier — by the verifier
-            // at pack time, or by this block on a prior call — and its captured
-            // data is immutable, so re-validation is unnecessary.
+            // an `Unresolved` closure. Once it and the captures' checks pass,
+            // the resolved pointer is memoized into the closure object
+            // (flipping it to `Resolved`), so later calls of the same closure
+            // value skip both the loader and these checks. An already-`Resolved`
+            // closure was validated earlier — by the verifier at pack time, or
+            // by this block on a prior call — and its captured data is
+            // immutable, so re-validation is unnecessary.
             if resolved_now {
                 let num_params = callee.param_slots.len();
                 if num_params > 64 {
@@ -3458,17 +3466,6 @@ impl InterpreterContext<'_> {
                         ),
                     });
                 }
-                // Memoize: bake the resolved function pointer into the closure
-                // and flip the tag to `Resolved`. The func-ref payload is not
-                // GC-traced and `FunctionPtr` is a stable leaked address, so this
-                // survives heap relocation exactly like a closure packed as
-                // `Resolved`.
-                write_ptr(
-                    closure,
-                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
-                    callee as *const Function as *mut u8,
-                );
-                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_RESOLVED;
             }
 
             let captured_data = if mask == 0 {
@@ -3501,6 +3498,23 @@ impl InterpreterContext<'_> {
                     tag => invariant_violation!(InvalidCapturedDataTag { tag }),
                 }
             };
+
+            if resolved_now {
+                // Memoize, now that every check has passed: bake the resolved
+                // function pointer into the closure and flip the tag to
+                // `Resolved`. The func-ref payload is not GC-traced and
+                // `FunctionPtr` is a stable leaked address, so this survives
+                // heap relocation exactly like a closure packed as `Resolved`.
+                // Decoding the captures may have collected, so the closure is
+                // re-read from its frame slot.
+                let closure = read_ptr(fp, op.closure_src);
+                write_ptr(
+                    closure,
+                    CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                    callee as *const Function as *mut u8,
+                );
+                *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) = FUNC_REF_TAG_RESOLVED;
+            }
 
             // Walk the callee's parameters, interleaving captured values
             // (from the captured-data object, packed sequentially in
@@ -3591,9 +3605,9 @@ impl InterpreterContext<'_> {
     }
 
     /// Checks a packed closure's captures against the callee just resolved for
-    /// it: each capture's layout must have the size and alignment the callee's
-    /// corresponding parameter has today. Rejects cross-module signature skew
-    /// before the call's copy loop reads the values at the callee's offsets.
+    /// it: each capture must have been packed under the layout of the callee's
+    /// corresponding parameter. Rejects cross-module signature skew before the
+    /// call's copy loop reads the values at the callee's offsets.
     ///
     /// # Safety
     ///
@@ -3620,21 +3634,21 @@ impl InterpreterContext<'_> {
             });
         }
         let mut capture_idx = 0usize;
-        for (param_idx, pslot) in callee.param_slots.iter().enumerate() {
+        for (param_idx, &param_ty) in callee.param_tys.iter().enumerate() {
             if (mask >> param_idx) & 1 == 0 {
                 continue;
             }
-            let Some(layout) = guard.layout(packed[capture_idx].id) else {
+            let Some(param_id) = guard.layout_id(param_ty) else {
                 invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
             };
-            if layout.size != pslot.size || layout.align != pslot.align {
+            // Equal ids mean equal layouts, so equal sizes and alignments.
+            let packed_id = packed[capture_idx].id;
+            if packed_id != param_id {
                 invariant_violation!(ClosureCapturedLayoutMismatch {
                     capture_idx,
-                    packed_size: layout.size,
-                    packed_align: layout.align,
+                    packed_id: packed_id.as_u32(),
                     param_idx,
-                    param_size: pslot.size,
-                    param_align: pslot.align,
+                    param_id: param_id.as_u32(),
                 });
             }
             capture_idx += 1;
@@ -3687,11 +3701,10 @@ impl InterpreterContext<'_> {
                 invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
             };
             if layout.size != pslot.size || layout.align != pslot.align {
-                invariant_violation!(ClosureCapturedLayoutMismatch {
-                    capture_idx,
-                    packed_size: layout.size,
-                    packed_align: layout.align,
+                invariant_violation!(ClosureParamLayoutMismatch {
                     param_idx,
+                    layout_size: layout.size,
+                    layout_align: layout.align,
                     param_size: pslot.size,
                     param_align: pslot.align,
                 });
