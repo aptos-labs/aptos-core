@@ -8,6 +8,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Compiler now rejects selecting an enum field `e.f` when the variants that declare `f` declare it with different types. Previously this was accepted when the types coincided after instantiation.
 - Interactive runs now check every 3 days for a newer CLI release and print a notice on stderr when one is available. Set `APTOS_DISABLE_UPDATE_CHECK=1` to disable it.
 - Update the `zip` dependency used by `aptos update` to 9.x by moving from a fork of `self_update` to the published `self_update` 1.3.3.
+- `aptos governance propose-bundle` now works with delegation pools: pass the delegation pool's address as `--pool-address` and sign as a delegator, as with `aptos governance delegation-pool propose`.
 
 ## [9.6.0]
 - Add `aptos governance propose-bundle` and `aptos governance execute-bundle`, which submit and execute a governance bundle's proposal using the bundle's compiled scripts. `execute-bundle` resumes from the step the chain expects next.
