@@ -33,8 +33,8 @@ use mono_move_output::{
     v1_return_bcs,
 };
 use mono_move_runtime::{
-    serialize, InterpreterContext, ProductionContextFamily, ProductionNativeRegistry, RuntimeError,
-    RuntimeStatus, SessionEffects, WriteClass,
+    serialize, InterpreterContext, InterpreterOptions, ProductionContextFamily,
+    ProductionNativeRegistry, RuntimeError, RuntimeStatus, SessionEffects, WriteClass,
 };
 use move_binary_format::errors::VMError;
 use move_core_types::{
@@ -163,11 +163,18 @@ impl MonoMoveBackend {
         let resource_provider = LazyResourceProvider::new(guard, |address, tag| {
             Ok(self.genesis.get(&(address, tag)).cloned())
         });
-        let mut interpreter = InterpreterContext::new(
+        // Debug mode matches V1, whose debug natives the `testing` feature
+        // enables.
+        let options = InterpreterOptions {
+            enable_debugging: cfg!(feature = "testing"),
+            ..InterpreterOptions::default()
+        };
+        let mut interpreter = InterpreterContext::new_with_options(
             loader,
             GasMeter::new(self.gas_budget),
             &resource_provider,
             natives,
+            options,
         )
         .with_extensions(unit_test_extensions());
 
@@ -382,6 +389,7 @@ fn classify(err: &VMInternalError) -> Classification {
         | ExecutionErrorKind::InvalidOperation => Classification::Ran,
         ExecutionErrorKind::InvariantViolation
         | ExecutionErrorKind::LinkingError
+        | ExecutionErrorKind::Interrupted
         | ExecutionErrorKind::Placeholder => Classification::BackendError,
     }
 }
@@ -476,7 +484,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mono_move_core::GasExhaustedError;
+    use mono_move_core::MeteringError;
     use mono_move_runtime::ArithOp;
 
     fn classified(err: impl mono_move_core::IntoExecutionError) -> &'static str {
@@ -545,7 +553,7 @@ mod tests {
             "ran"
         );
         assert_eq!(classified(RuntimeError::StackOverflow), "ran");
-        assert_eq!(classified(GasExhaustedError), "ran");
+        assert_eq!(classified(MeteringError::OutOfGas), "ran");
         // V1 fails here too, with a status MonoMove cannot determine.
         assert_eq!(classified(RuntimeError::BCSEof), "ran");
     }

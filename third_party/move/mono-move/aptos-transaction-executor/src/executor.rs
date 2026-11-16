@@ -11,7 +11,7 @@ use aptos_types::{
     transaction::{AuxiliaryInfo, Transaction},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use mono_move_core::{storage::module_provider::ModuleProvider, FrameworkSymbols};
+use mono_move_core::{storage::module_provider::ModuleProvider, FrameworkSymbols, InterruptSource};
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::ProductionNativeRegistry;
 
@@ -29,6 +29,10 @@ pub struct AptosTransactionExecutor<'a> {
     pub(crate) natives: &'a ProductionNativeRegistry,
     pub(crate) module_provider: &'a dyn ModuleProvider,
     pub(crate) data_provider: &'a dyn AptosDataProvider,
+    /// Polled during a user transaction to stop it early. System transactions
+    /// never poll: Block-STM runs the block epilogue after it halts the block,
+    /// when every poll would ask to stop.
+    pub(crate) interrupts: &'a dyn InterruptSource,
     /// The on-chain configs (features, gas schedule) at the current state.
     //
     // TODO(cleanup): reusing the legacy VM's environment type is transitional;
@@ -50,6 +54,7 @@ impl<'a> AptosTransactionExecutor<'a> {
         natives: &'a ProductionNativeRegistry,
         module_provider: &'a dyn ModuleProvider,
         data_provider: &'a dyn AptosDataProvider,
+        interrupts: &'a dyn InterruptSource,
         env: &'a AptosEnvironment,
         usage: StateStorageUsage,
     ) -> Self {
@@ -59,6 +64,7 @@ impl<'a> AptosTransactionExecutor<'a> {
             natives,
             module_provider,
             data_provider,
+            interrupts,
             env,
             usage,
             unmetered: false,

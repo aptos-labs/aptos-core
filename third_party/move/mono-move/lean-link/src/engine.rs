@@ -291,9 +291,11 @@ fn run_error_outcome(error: &VMInternalError) -> Outcome {
             }
         },
         // Linking failures are invalid requests, invariant violations are VM
-        // bugs, and placeholders make no claim about program behavior.
+        // bugs, interrupts come from outside the program, and placeholders
+        // make no claim about program behavior.
         ExecutionErrorKind::LinkingError
         | ExecutionErrorKind::InvariantViolation
+        | ExecutionErrorKind::Interrupted
         | ExecutionErrorKind::Placeholder => Outcome::Error {
             stage: Stage::Run,
             message: format!("{error}"),
