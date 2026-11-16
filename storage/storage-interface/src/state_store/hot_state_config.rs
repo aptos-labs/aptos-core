@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::DbReader;
+use crate::CheckpointStateReader;
 use anyhow::Result;
 use aptos_config::config::HotStateConfig;
 use aptos_types::{
@@ -65,7 +65,7 @@ impl EffectiveHotStateConfig {
     /// must be a block end.
     pub fn read_at(
         local: HotStateConfig,
-        reader: &dyn DbReader,
+        reader: &dyn CheckpointStateReader,
         version: Option<Version>,
     ) -> Result<(Self, bool)> {
         let on_chain = match version {

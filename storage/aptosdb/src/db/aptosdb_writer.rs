@@ -36,7 +36,7 @@ use aptos_storage_interface::{
         orders::{decode_order_writes, OrderOverlay, ShardedOrderLayers},
         positions::{PositionOverlay, ShardedPositionLayers},
     },
-    AptosDbError, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
+    AptosDbError, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_types::transaction::TransactionAuxiliaryData;

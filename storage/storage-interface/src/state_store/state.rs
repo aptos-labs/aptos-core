@@ -17,7 +17,7 @@ use crate::{
         versioned_state_value::StateUpdateRef,
         HotEvictionOp, HotInsertionOp, HotStateShardUpdates, HotStateUpdates,
     },
-    DbReader,
+    CheckpointStateReader,
 };
 use anyhow::{bail, Result};
 use aptos_config::config::HotStateConfig;
@@ -549,14 +549,14 @@ impl LedgerState {
         Ok((LedgerState::new(last_checkpoint), all_hot_state_updates))
     }
 
-    /// Old values of the updated keys are read from the DbReader at the version of the
+    /// Old values of the updated keys are read from `reader` at the version of the
     /// `persisted_snapshot`.
     pub fn update_with_db_reader(
         &self,
         persisted_snapshot: &State,
         hot_state: Arc<dyn HotStateView>,
         updates: &StateUpdateRefs,
-        reader: Arc<dyn DbReader>,
+        reader: Arc<dyn CheckpointStateReader>,
     ) -> Result<(LedgerState, ShardedStateCache, HotStateUpdates)> {
         let state_view = CachedStateView::new_impl(
             StateViewId::Miscellaneous,
