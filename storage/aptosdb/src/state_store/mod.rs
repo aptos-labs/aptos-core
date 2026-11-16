@@ -239,28 +239,27 @@ impl DbReader for StateDb {
             .transpose()
     }
 
-    /// Get the latest state value of the given key up to the given version. Only used for testing for now
-    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
-    /// value without proof.
-    fn get_state_value_by_version(
+    // Only checkpoint reads: a single seek in state KV is only guaranteed to be exact at a block
+    // end. Reads at any version go through `AptosDB`.
+    fn get_state_value_at_checkpoint(
         &self,
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
         Ok(self
-            .get_state_value_with_version_by_version(state_key, version)?
+            .get_state_value_with_version_at_checkpoint(state_key, version)?
             .map(|(_, value)| value))
     }
 
-    /// Gets the latest state value and its corresponding version when it's of the given key up
-    /// to the given version.
-    fn get_state_value_with_version_by_version(
+    fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
-        self.state_kv_db
-            .get_state_value_with_version_by_version(state_key, version)
+        Ok(self
+            .state_kv_db
+            .get_state_value_row_by_version(state_key, version)?
+            .and_then(|(version, value)| value.map(|value| (version, value))))
     }
 
     /// Returns the proof of the given state key and version.
@@ -348,26 +347,22 @@ impl DbReader for StateStore {
         self.deref().get_state_snapshot_before(next_version)
     }
 
-    /// Get the latest state value of the given key up to the given version. Only used for testing for now
-    /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
-    /// value without proof.
-    fn get_state_value_by_version(
+    fn get_state_value_at_checkpoint(
         &self,
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        self.deref().get_state_value_by_version(state_key, version)
+        self.deref()
+            .get_state_value_at_checkpoint(state_key, version)
     }
 
-    /// Gets the latest state value and the its corresponding version when its of the given key up
-    /// to the given version.
-    fn get_state_value_with_version_by_version(
+    fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<(Version, StateValue)>> {
         self.deref()
-            .get_state_value_with_version_by_version(state_key, version)
+            .get_state_value_with_version_at_checkpoint(state_key, version)
     }
 
     /// Returns the proof of the given state key and version.
@@ -410,14 +405,16 @@ impl StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<StateValue> {
-        self.get_state_value_by_version(state_key, version)
-            .and_then(|opt| {
-                opt.ok_or_else(|| {
-                    AptosDbError::NotFound(format!(
-                        "State Value is missing for key {:?} by version {}",
-                        state_key, version
-                    ))
-                })
+        // `version` comes from a JMT leaf, so it's the key's last write in its block, which always
+        // has a row.
+        self.state_kv_db
+            .get_state_value_row_by_version(state_key, version)?
+            .and_then(|(_, value)| value)
+            .ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "State Value is missing for key {:?} by version {}",
+                    state_key, version
+                ))
             })
     }
 
@@ -1557,7 +1554,7 @@ impl StateStore {
             .map(|i| {
                 Self::hot_state_usage_delta(
                     self.get_hot_state_value_chunk_iter(version, i * CHUNK_SIZE, CHUNK_SIZE)?,
-                    |key| self.get_state_value_by_version(key, version),
+                    |key| self.get_state_value_at_checkpoint(key, version),
                 )
             })
             .try_reduce(|| (0, 0), |(i1, b1), (i2, b2)| Ok((i1 + i2, b1 + b2)))?;

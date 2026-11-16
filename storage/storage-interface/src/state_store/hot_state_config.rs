@@ -61,14 +61,15 @@ impl EffectiveHotStateConfig {
         }
     }
 
-    /// Reads the config in effect at `version`, and whether the on-chain config exists.
+    /// Reads the config in effect at `version`, and whether the on-chain config exists. `version`
+    /// must be a block end.
     pub fn read_at(
         local: HotStateConfig,
         reader: &dyn DbReader,
         version: Option<Version>,
     ) -> Result<(Self, bool)> {
         let on_chain = match version {
-            Some(version) => reader.get_state_value_by_version(&ON_CHAIN_CONFIG_KEY, version)?,
+            Some(version) => reader.get_state_value_at_checkpoint(&ON_CHAIN_CONFIG_KEY, version)?,
             None => None,
         };
         let config = Self::new(local, on_chain.as_ref().map(|value| value.bytes().as_ref()));

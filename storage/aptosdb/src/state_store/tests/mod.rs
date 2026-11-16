@@ -65,7 +65,7 @@ fn verify_value_index_in_store(
     expected_value: Option<&StateValue>,
     version: Version,
 ) {
-    let value = store.get_state_value_by_version(&key, version).unwrap();
+    let value = store.get_state_value_at_checkpoint(&key, version).unwrap();
     assert_eq!(value.as_ref(), expected_value);
 }
 
