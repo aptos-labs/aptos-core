@@ -23,6 +23,18 @@ pub enum LoaderError {
         name: String,
     },
 
+    /// A function was named with a different number of type arguments than it
+    /// declares. Only a closure decoded from storage names its own type
+    /// arguments, so only it can reach this.
+    #[error("Function {address}::{module}::{name} takes {expected} type arguments, got {got}")]
+    TypeArgumentCountMismatch {
+        address: AccountAddress,
+        module: String,
+        name: String,
+        expected: usize,
+        got: usize,
+    },
+
     /// TODO(completeness): temporary until natives are loadable as functions.
     #[error("Function {address}::{module}::{name} is a native and cannot be loaded as code")]
     NativeFunctionNotLoadable {
@@ -70,9 +82,10 @@ impl IntoExecutionError for LoaderError {
     fn kind(&self) -> ExecutionErrorKind {
         use LoaderError::*;
         match self {
-            ModuleNotFound { .. } | FunctionNotFound { .. } | NativeFunctionNotLoadable { .. } => {
-                ExecutionErrorKind::LinkingError
-            },
+            ModuleNotFound { .. }
+            | FunctionNotFound { .. }
+            | TypeArgumentCountMismatch { .. }
+            | NativeFunctionNotLoadable { .. } => ExecutionErrorKind::LinkingError,
 
             // TODO(cleanup): delegate once GlobalContext has its own error type.
             GlobalContext(_) | LoweringSkipped { .. } | ResourceLayoutNotDerivable => {

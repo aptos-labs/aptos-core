@@ -190,17 +190,17 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/entry_points/return_values.masm",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/entry_points/script_too_few_type_args.masm",
-        "no entry type-argument validation: a count mismatch is reported as unsupported",
+        "a type-argument count mismatch is located nowhere instead of in the script",
     ),
     MonoMoveDivergence::semantic(
         "tests/entry_points/script_too_few_type_args_inner.masm",
         "no entry type-argument validation: a struct instantiated with the wrong arity runs",
     ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/entry_points/script_too_many_type_args.masm",
-        "no entry type-argument validation: a count mismatch is reported as unsupported",
+        "a type-argument count mismatch is located nowhere instead of in the script",
     ),
     MonoMoveDivergence::semantic(
         "tests/entry_points/script_too_many_type_args_inner.masm",

@@ -378,6 +378,7 @@ fn classify(err: &VMInternalError) -> Classification {
             // Unit tests link against their whole package and load no scripts.
             LoaderError::ModuleNotFound { .. }
             | LoaderError::FunctionNotFound { .. }
+            | LoaderError::TypeArgumentCountMismatch { .. }
             | LoaderError::GlobalContext(_)
             | LoaderError::InvariantViolation(_)
             | LoaderError::NativeShadowsMoveFunction { .. }

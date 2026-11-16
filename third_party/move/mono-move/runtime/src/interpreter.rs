@@ -3459,7 +3459,7 @@ impl InterpreterContext<'_> {
                     let module_id = view_module_id(callee.module_id());
                     invariant_violation!(StoredClosureTargetNotPersistent {
                         function: format!(
-                            "{}::{}::{}",
+                            "0x{}::{}::{}",
                             module_id.address().short_str_lossless(),
                             view_name(module_id.name()),
                             callee.name()

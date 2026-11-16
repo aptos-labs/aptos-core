@@ -580,6 +580,25 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
+        let expected = module
+            .ir()
+            .module
+            .function_handle_at(func_ir.handle_idx)
+            .type_parameters
+            .len();
+        let got = view_type_list(ty_args).len();
+        if expected != got {
+            let id = self.guard.arena_ref_for_module_id(module.id());
+            return Err(VMInternalError::new(
+                LoaderError::TypeArgumentCountMismatch {
+                    address: *id.address(),
+                    module: id.name().to_string(),
+                    name: view_name(func_name).to_string(),
+                    expected,
+                    got,
+                },
+            ));
+        }
         // TODO(metering): the lowering work, including micro-op verification
         // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
