@@ -118,10 +118,6 @@ where
             InMemoryStorageKey::TableItem { .. } => Ok(StorageRead::DoesNotExist),
         }
     }
-
-    fn interrupt_requested(&self) -> bool {
-        false
-    }
 }
 
 /// Allocates a value of type `ty` on `heap` and decodes `blob`, its BCS

@@ -51,9 +51,9 @@ use mono_move_core::{
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
-    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, InterruptedError, MicroOp,
-    PackClosureOp, PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult,
-    VecPackOp, VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    PreparedModule, ResourceProvider, ShiftOperand, VMInternalError, VMResult, VecPackOp,
+    VecUnpackOp, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CAPTURED_DATA_VALUES_SIZE_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -104,6 +104,8 @@ struct LoaderAdapter<'a, 'guard> {
     /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
     /// at most one borrow is live at a time.
     read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
+    /// The transaction's gas meter, charged by loads. Held like `read_set`.
+    gas_meter: UnsafeCell<&'a mut GasMeter<'guard>>,
 }
 
 impl LoaderAccess for LoaderAdapter<'_, '_> {
@@ -116,14 +118,14 @@ impl LoaderAccess for LoaderAdapter<'_, '_> {
 
     fn resolve_function(
         &self,
-        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
-        // SAFETY: this is the only borrow of the read-set, and it does not
-        // outlive the call.
+        // SAFETY: these are the only borrows of the read-set and the gas meter,
+        // and they do not outlive the call.
         let read_set = unsafe { &mut **self.read_set.get() };
+        let gas_meter = unsafe { &mut **self.gas_meter.get() };
         self.loader
             .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
     }
@@ -761,10 +763,7 @@ pub struct InterpreterContext<'guard> {
     pub(crate) loader: Loader<'guard, 'guard>,
     /// Read-set of the modules loaded by this transaction.
     read_set: ModuleReadSet<'guard>,
-    pub(crate) gas_meter: GasMeter,
-    /// Whether this session raised an [`InterruptedError`], however the error
-    /// was handled afterwards.
-    interrupted: bool,
+    pub(crate) gas_meter: GasMeter<'guard>,
     /// A process-wide global native function table.
     natives: &'guard ProductionNativeRegistry,
     /// Per-transaction native extensions, shared across native calls.
@@ -823,7 +822,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// Creates a context with no call prepared, with default options.
     pub fn new(
         loader: Loader<'guard, 'guard>,
-        gas_meter: GasMeter,
+        gas_meter: GasMeter<'guard>,
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
     ) -> Self {
@@ -839,7 +838,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// Creates a context with no call prepared.
     pub fn new_with_options(
         loader: Loader<'guard, 'guard>,
-        gas_meter: GasMeter,
+        gas_meter: GasMeter<'guard>,
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
         options: InterpreterOptions,
@@ -877,7 +876,6 @@ impl<'guard> InterpreterContext<'guard> {
             loader,
             read_set: ModuleReadSet::new(),
             gas_meter,
-            interrupted: false,
             natives,
             extensions: NativeExtensions::new(),
             resource_provider,
@@ -1049,12 +1047,6 @@ impl<'guard> InterpreterContext<'guard> {
         self.gas_meter.balance()
     }
 
-    /// Whether this session was interrupted on request of the resource
-    /// provider. Its effects must not be published.
-    pub fn is_interrupted(&self) -> bool {
-        self.interrupted
-    }
-
     /// Consumes the context, returning the transaction's side effects for
     /// publication. The effects are copied out of the session heap into a
     /// buffer sized to what the session allocated, which is then frozen into
@@ -1070,7 +1062,6 @@ impl<'guard> InterpreterContext<'guard> {
             loader,
             read_set: _,
             gas_meter: _,
-            interrupted: _,
             natives: _,
             extensions,
             resource_provider: _,
@@ -1120,11 +1111,10 @@ impl<'guard> InterpreterContext<'guard> {
     /// effectively unbounded one and restored afterwards, so loads and
     /// execution inside `f` never touch the transaction's budget. Used for
     /// system code (prologue, epilogue) that runs unmetered by design. The
-    /// swapped-in meter keeps the chunk size, so a session that polls for
-    /// interrupts keeps polling inside `f`.
+    /// swapped-in meter keeps the interrupt listener, so a session that polls
+    /// for interrupts keeps polling inside `f`.
     pub fn unmetered<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
-        let unbounded =
-            GasMeter::with_max_budget().with_interrupt_polling(self.gas_meter.chunk_size());
+        let unbounded = self.gas_meter.unbounded();
         let saved = std::mem::replace(&mut self.gas_meter, unbounded);
         let result = f(self);
         self.gas_meter = saved;
@@ -1171,7 +1161,6 @@ impl<'guard> InterpreterContext<'guard> {
         self.read_write_set = ResourceReadWriteSet::new();
         self.root_pool = RootPool::new();
         self.gas_meter.reset(gas_budget);
-        self.interrupted = false;
         self.rng = StdRng::seed_from_u64(0);
     }
 
@@ -1764,21 +1753,6 @@ impl InterpreterContext<'_> {
     /// loop iteration and every recursion passes one of these.
     #[inline(always)]
     fn charge_gas(&mut self, amount: u64) -> VMResult<()> {
-        if self.gas_meter.try_charge_in_chunk(amount) {
-            return Ok(());
-        }
-        self.charge_gas_slow(amount)
-    }
-
-    /// Runs once per gas chunk: polls for an interrupt, then starts the next
-    /// chunk or runs out of gas.
-    #[cold]
-    #[inline(never)]
-    fn charge_gas_slow(&mut self, amount: u64) -> VMResult<()> {
-        if self.gas_meter.polls_interrupts() && self.resource_provider.interrupt_requested() {
-            self.interrupted = true;
-            return Err(InterruptedError.into());
-        }
         Ok(self.gas_meter.charge(amount)?)
     }
 
@@ -3757,12 +3731,12 @@ impl InterpreterContext<'_> {
             let loader = LoaderAdapter {
                 loader: &self.loader,
                 read_set: UnsafeCell::new(&mut self.read_set),
+                gas_meter: UnsafeCell::new(&mut self.gas_meter),
             };
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
                 view_type_list(ty_args),
-                &mut self.gas_meter,
                 guard,
                 self.resource_provider,
                 &loader,

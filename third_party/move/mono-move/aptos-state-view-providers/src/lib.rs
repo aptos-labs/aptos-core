@@ -277,10 +277,6 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         inner.values.insert(cache_key, read.clone());
         Ok(read)
     }
-
-    fn interrupt_requested(&self) -> bool {
-        false
-    }
 }
 
 impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {

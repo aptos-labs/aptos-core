@@ -35,7 +35,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
+    production_natives, AptosTransactionExecutor, DiscardReason, NoInterrupts, TxnOutcome,
 };
 use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, ReadPin},
@@ -468,6 +468,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             natives,
             &module_provider,
             &data_provider,
+            // A sequential run has no concurrent incarnations to abort.
+            &NoInterrupts,
             &self.environment,
             usage,
         )

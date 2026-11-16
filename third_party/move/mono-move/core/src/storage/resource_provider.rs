@@ -121,12 +121,17 @@ pub fn nominal_tag(ty: InternedType) -> anyhow::Result<StructTag> {
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
     InvariantViolation(String),
+    /// The read was stopped by an interrupt, e.g. while loading the code of
+    /// the value's type.
+    #[error("execution interrupted")]
+    Interrupted,
 }
 
 impl IntoExecutionError for ResourceProviderError {
     fn kind(&self) -> ExecutionErrorKind {
         match self {
             ResourceProviderError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProviderError::Interrupted => ExecutionErrorKind::Interrupted,
         }
     }
 }
@@ -180,14 +185,6 @@ pub trait ResourceProvider {
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError>;
-
-    /// Whether the block executor asks the running transaction to stop, e.g.
-    /// because Block-STM aborted its incarnation. Polled by the interpreter
-    /// once per gas chunk when the meter has interrupt polling on.
-    //
-    // TODO(cleanup): move this to a dedicated interrupt handle passed to the
-    // session, instead of the resource provider.
-    fn interrupt_requested(&self) -> bool;
 }
 
 /// Empty storage with no resources.
@@ -200,9 +197,5 @@ impl ResourceProvider for NoResourceProvider {
         _group: Option<InternedType>,
     ) -> Result<StorageRead, ResourceProviderError> {
         Ok(StorageRead::DoesNotExist)
-    }
-
-    fn interrupt_requested(&self) -> bool {
-        false
     }
 }

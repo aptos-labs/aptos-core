@@ -21,7 +21,7 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     secret_sharing::EvalProof,
-    state_store::{state_key::StateKey, StateView},
+    state_store::StateView,
     transaction::{
         encrypted_payload::{
             DecryptedPlaintext, DecryptionFailureReason, EncryptedInner, EncryptedPayload,
@@ -33,11 +33,7 @@ use aptos_types::{
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosDataProvider, AptosTransactionExecutor, GroupMembers, TxnOutcome,
-};
-use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey, types::InternedType, ResourceProvider,
-    ResourceProviderError, StorageRead,
+    production_natives, AptosTransactionExecutor, InterruptSource, NoInterrupts, TxnOutcome,
 };
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use move_core_types::{transaction_argument::TransactionArgument, vm_status::StatusCode};
@@ -114,6 +110,7 @@ fn execute_v2_in<S: StateView>(
         natives,
         &module_provider,
         &data_provider,
+        &NoInterrupts,
         &env,
         usage,
     );
@@ -2383,34 +2380,17 @@ fn gas_dependent_keys(
     ]
 }
 
-/// A data provider that requests an interrupt every time it is polled.
-struct Interrupting<'p, P>(&'p P);
+/// An interrupt source that asks to stop every time it is polled.
+struct AlwaysInterrupt;
 
-impl<P: ResourceProvider> ResourceProvider for Interrupting<'_, P> {
-    fn get_resource(
-        &self,
-        key: &InMemoryStorageKey,
-        group: Option<InternedType>,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        self.0.get_resource(key, group)
-    }
-
+impl InterruptSource for AlwaysInterrupt {
     fn interrupt_requested(&self) -> bool {
         true
     }
 }
 
-impl<P: AptosDataProvider> AptosDataProvider for Interrupting<'_, P> {
-    fn group_members(
-        &self,
-        group_key: &StateKey,
-    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
-        self.0.group_members(group_key)
-    }
-}
-
-/// Runs `txn` through the MonoMove executor against `state`, with a data
-/// provider that asks for an interrupt on every poll. Returns whether the
+/// Runs `txn` through the MonoMove executor against `state`, with an interrupt
+/// source that asks to stop on every poll. Returns whether the
 /// outcome is `Interrupted`, and the materialized output if there is one.
 fn execute_v2_interrupting<S: StateView>(
     state: &S,
@@ -2424,14 +2404,14 @@ fn execute_v2_interrupting<S: StateView>(
     let natives = production_natives();
     let module_provider = StateViewModuleProvider::new(state);
     let data_provider = StateViewResourceProvider::new(&guard, state);
-    let interrupting = Interrupting(&data_provider);
     let env = AptosEnvironment::new(state);
     let usage = state.get_usage().expect("usage is readable");
     let executor = AptosTransactionExecutor::new(
         &guard,
         natives,
         &module_provider,
-        &interrupting,
+        &data_provider,
+        &AlwaysInterrupt,
         &env,
         usage,
     );
@@ -2449,8 +2429,8 @@ fn execute_v2_interrupting<S: StateView>(
     (interrupted, output)
 }
 
-/// A transaction that runs past one gas chunk is interrupted when the provider
-/// asks, and nothing of it can be materialized.
+/// A transaction that runs past one interrupt interval is interrupted when the
+/// source asks, and nothing of it can be materialized.
 #[test]
 fn long_running_transaction_is_interrupted() {
     let (fx, alice, _bob) = setup();

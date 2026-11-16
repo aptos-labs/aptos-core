@@ -4,10 +4,8 @@
 //! Integration tests for gas metering through the full pipeline.
 
 use mono_move_core::{
-    storage::resource_provider::InMemoryStorageKey,
-    types::{InternedType, EMPTY_TYPE_LIST},
-    Function, GasExhaustedError, GasMeter, InterruptedError, ResourceProvider,
-    ResourceProviderError, StorageRead, VMInternalError, GAS_CHUNK_SIZE,
+    types::EMPTY_TYPE_LIST, Function, GasMeter, InterruptListener, InterruptSource, MeteringError,
+    VMInternalError, INTERRUPT_INTERVAL_GAS_UNITS,
 };
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
@@ -65,7 +63,10 @@ module 0x1::test {
         .map(CompletedCall::into_status)
         .unwrap_err()
         .into_error();
-    assert!(err.downcast_ref::<GasExhaustedError>().is_some(),);
+    assert_eq!(
+        err.downcast_ref::<MeteringError>(),
+        Some(&MeteringError::OutOfGas)
+    );
 }
 
 /// `load_function` errors when the gas budget is too small to cover the
@@ -108,18 +109,10 @@ fn test_out_of_gas_during_load() {
     );
 }
 
-/// Requests an interrupt every time it is polled.
+/// Asks to stop every time it is polled.
 struct AlwaysInterrupt;
 
-impl ResourceProvider for AlwaysInterrupt {
-    fn get_resource(
-        &self,
-        _key: &InMemoryStorageKey,
-        _group: Option<InternedType>,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        Ok(StorageRead::DoesNotExist)
-    }
-
+impl InterruptSource for AlwaysInterrupt {
     fn interrupt_requested(&self) -> bool {
         true
     }
@@ -178,8 +171,11 @@ module 0x1::test {
             .into_global_arena_ptr();
         let mut interpreter = InterpreterContext::new(
             loader,
-            GasMeter::with_max_budget().with_interrupt_polling(GAS_CHUNK_SIZE),
-            &AlwaysInterrupt,
+            GasMeter::with_max_budget().with_interrupt_listener(InterruptListener::new(
+                &AlwaysInterrupt,
+                INTERRUPT_INTERVAL_GAS_UNITS,
+            )),
+            &mono_move_core::NoResourceProvider,
             &natives,
         );
         let func = interpreter
@@ -190,10 +186,10 @@ module 0x1::test {
         } else {
             interpreter.unmetered(|interp| run_to_error(interp, func))
         };
-        assert!(
-            err.downcast_ref::<InterruptedError>().is_some(),
+        assert_eq!(
+            err.downcast_ref::<MeteringError>(),
+            Some(&MeteringError::Interrupted),
             "{name} (metered: {metered}): {err:?}"
         );
-        assert!(interpreter.is_interrupted());
     }
 }

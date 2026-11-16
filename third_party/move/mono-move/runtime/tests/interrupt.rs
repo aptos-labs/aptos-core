@@ -1,25 +1,22 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! A meter with interrupt polling lets the resource provider stop a run once
-//! per gas chunk. A meter without polling never asks.
+//! A meter with an interrupt listener lets its source stop a run once per
+//! interval. A meter without one never asks.
 
 mod common;
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    native::NativeExtensions,
-    storage::resource_provider::InMemoryStorageKey,
-    types::{InternedType, EMPTY_TYPE_LIST},
-    Code, CodeOffset, FrameLayoutInfo, Function, FunctionDefinitionIndex, GasExhaustedError,
-    GasMeter, InterruptedError, MicroOp, ResourceProvider, ResourceProviderError,
-    SortedSafePointEntries, StorageRead, VMInternalError, VMResult, FRAME_METADATA_SIZE,
+    native::NativeExtensions, types::EMPTY_TYPE_LIST, Code, CodeOffset, FrameLayoutInfo, Function,
+    FunctionDefinitionIndex, GasMeter, InterruptListener, InterruptSource, MeteringError, MicroOp,
+    NoResourceProvider, SortedSafePointEntries, VMInternalError, VMResult, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::InterpreterContext;
 use std::cell::Cell;
 
 const BUDGET: u64 = 1_000_000;
-const CHUNK_SIZE: u64 = 100;
+const INTERVAL_GAS_UNITS: u64 = 100;
 const JUMP_GAS: u64 = 2;
 
 /// Requests an interrupt from its `fire_at`-th poll on, counting from 1.
@@ -37,15 +34,7 @@ impl InterruptAt {
     }
 }
 
-impl ResourceProvider for InterruptAt {
-    fn get_resource(
-        &self,
-        _key: &InMemoryStorageKey,
-        _group: Option<InternedType>,
-    ) -> Result<StorageRead, ResourceProviderError> {
-        Ok(StorageRead::DoesNotExist)
-    }
-
+impl InterruptSource for InterruptAt {
     fn interrupt_requested(&self) -> bool {
         let polls = self.polls.get() + 1;
         self.polls.set(polls);
@@ -81,8 +70,9 @@ fn spin() -> Function {
     }])
 }
 
-fn polling_meter() -> GasMeter {
-    GasMeter::new(BUDGET).with_interrupt_polling(CHUNK_SIZE)
+fn listening_meter(source: &InterruptAt) -> GasMeter<'_> {
+    GasMeter::new(BUDGET)
+        .with_interrupt_listener(InterruptListener::new(source, INTERVAL_GAS_UNITS))
 }
 
 fn run<'guard>(ctx: &mut InterpreterContext<'guard>, entry: &'guard Function) -> VMResult<()> {
@@ -90,108 +80,112 @@ fn run<'guard>(ctx: &mut InterpreterContext<'guard>, entry: &'guard Function) ->
     Ok(())
 }
 
-/// Result of a run: its error, whether it was interrupted, and the balance.
+/// Result of a run: its error and the balance.
 struct Ran {
     err: Option<VMInternalError>,
-    interrupted: bool,
     balance: u64,
+}
+
+impl Ran {
+    fn metering_error(&self) -> Option<MeteringError> {
+        self.err
+            .as_ref()
+            .and_then(|err| err.downcast_ref::<MeteringError>())
+            .copied()
+    }
 }
 
 fn run_with(
     entry: &Function,
     gas_meter: GasMeter,
-    provider: &InterruptAt,
     f: impl for<'guard> FnOnce(&mut InterpreterContext<'guard>, &'guard Function) -> VMResult<()>,
 ) -> Ran {
     common::with_test_interpreter_using(
         entry,
         gas_meter,
-        provider,
+        &NoResourceProvider,
         NativeExtensions::new(),
         |ctx, entry| Ran {
             err: f(ctx, entry).err(),
-            interrupted: ctx.is_interrupted(),
             balance: ctx.gas_balance(),
         },
     )
 }
 
 fn assert_interrupted(ran: &Ran) {
-    let err = ran.err.as_ref().expect("the run should fail");
-    assert!(err.downcast_ref::<InterruptedError>().is_some(), "{err:?}");
-    assert!(ran.interrupted);
+    assert_eq!(
+        ran.metering_error(),
+        Some(MeteringError::Interrupted),
+        "{:?}",
+        ran.err
+    );
 }
 
 #[test]
 fn loop_is_interrupted_at_first_poll() {
-    let provider = InterruptAt::new(1);
-    let ran = run_with(&spin(), polling_meter(), &provider, run);
+    let source = InterruptAt::new(1);
+    let ran = run_with(&spin(), listening_meter(&source), run);
     assert_interrupted(&ran);
-    assert_eq!(provider.polls.get(), 1);
-    // The first chunk is spent; the interrupted charge changes nothing.
-    assert_eq!(ran.balance, BUDGET - CHUNK_SIZE);
+    assert_eq!(source.polls.get(), 1);
+    // The first interval is spent; the interrupted charge changes nothing.
+    assert_eq!(ran.balance, BUDGET - INTERVAL_GAS_UNITS);
 }
 
 #[test]
 fn loop_is_interrupted_after_several_polls() {
-    let provider = InterruptAt::new(3);
-    let ran = run_with(&spin(), polling_meter(), &provider, run);
+    let source = InterruptAt::new(3);
+    let ran = run_with(&spin(), listening_meter(&source), run);
     assert_interrupted(&ran);
-    assert_eq!(provider.polls.get(), 3);
-    // Three chunks, plus the two charges that started the second and third.
-    assert_eq!(ran.balance, BUDGET - 3 * CHUNK_SIZE - 2 * JUMP_GAS);
+    assert_eq!(source.polls.get(), 3);
+    // Three intervals, plus the two charges that started the second and third.
+    assert_eq!(ran.balance, BUDGET - 3 * INTERVAL_GAS_UNITS - 2 * JUMP_GAS);
 }
 
 #[test]
 fn unmetered_loop_is_interrupted() {
-    let provider = InterruptAt::new(2);
-    let ran = run_with(&spin(), polling_meter(), &provider, |ctx, entry| {
+    let source = InterruptAt::new(2);
+    let ran = run_with(&spin(), listening_meter(&source), |ctx, entry| {
         ctx.unmetered(|ctx| run(ctx, entry))
     });
     assert_interrupted(&ran);
-    assert_eq!(provider.polls.get(), 2);
+    assert_eq!(source.polls.get(), 2);
     assert_eq!(ran.balance, BUDGET);
 }
 
 #[test]
 fn nested_unmetered_loop_is_interrupted() {
-    let provider = InterruptAt::new(2);
-    let ran = run_with(&spin(), polling_meter(), &provider, |ctx, entry| {
+    let source = InterruptAt::new(2);
+    let ran = run_with(&spin(), listening_meter(&source), |ctx, entry| {
         ctx.unmetered(|ctx| ctx.unmetered(|ctx| run(ctx, entry)))
     });
     assert_interrupted(&ran);
-    assert_eq!(provider.polls.get(), 2);
+    assert_eq!(source.polls.get(), 2);
     assert_eq!(ran.balance, BUDGET);
 }
 
 #[test]
-fn meter_without_polling_runs_out_of_gas() {
-    let provider = InterruptAt::new(1);
+fn meter_without_listener_runs_out_of_gas() {
     let budget = 101;
-    let ran = run_with(&spin(), GasMeter::new(budget), &provider, run);
-    let err = ran.err.expect("the run should fail");
-    assert!(err.downcast_ref::<GasExhaustedError>().is_some(), "{err:?}");
-    assert!(!ran.interrupted);
-    assert_eq!(provider.polls.get(), 0);
+    let ran = run_with(&spin(), GasMeter::new(budget), run);
+    assert_eq!(ran.metering_error(), Some(MeteringError::OutOfGas));
     assert_eq!(ran.balance, budget % JUMP_GAS);
 }
 
 #[test]
-fn polling_run_out_of_gas_is_not_interrupted() {
-    let provider = InterruptAt::new(u64::MAX);
-    let budget = 3 * CHUNK_SIZE + 1;
-    let gas_meter = GasMeter::new(budget).with_interrupt_polling(CHUNK_SIZE);
-    let ran = run_with(&spin(), gas_meter, &provider, run);
-    let err = ran.err.expect("the run should fail");
-    assert!(err.downcast_ref::<GasExhaustedError>().is_some(), "{err:?}");
-    assert!(!ran.interrupted);
+fn listening_meter_runs_out_of_gas() {
+    let source = InterruptAt::new(u64::MAX);
+    let budget = 3 * INTERVAL_GAS_UNITS + 1;
+    let gas_meter = GasMeter::new(budget)
+        .with_interrupt_listener(InterruptListener::new(&source, INTERVAL_GAS_UNITS));
+    let ran = run_with(&spin(), gas_meter, run);
+    assert_eq!(ran.metering_error(), Some(MeteringError::OutOfGas));
     assert_eq!(ran.balance, budget % JUMP_GAS);
 }
 
 #[test]
-fn jump_spanning_several_chunks_polls_once() {
-    let provider = InterruptAt::new(u64::MAX);
-    let jump_gas = 3 * CHUNK_SIZE + 7;
+fn jump_spanning_several_intervals_polls_once() {
+    let source = InterruptAt::new(u64::MAX);
+    let jump_gas = 3 * INTERVAL_GAS_UNITS + 7;
     let entry = function(vec![
         MicroOp::Jump {
             target: CodeOffset(1),
@@ -199,19 +193,17 @@ fn jump_spanning_several_chunks_polls_once() {
         },
         MicroOp::Return,
     ]);
-    let ran = run_with(&entry, polling_meter(), &provider, run);
+    let ran = run_with(&entry, listening_meter(&source), run);
     assert!(ran.err.is_none(), "{:?}", ran.err);
-    assert!(!ran.interrupted);
-    assert_eq!(provider.polls.get(), 1);
+    assert_eq!(source.polls.get(), 1);
     assert_eq!(ran.balance, BUDGET - jump_gas);
 }
 
 #[test]
 fn completed_run_is_not_interrupted() {
-    let provider = InterruptAt::new(1);
+    let source = InterruptAt::new(1);
     let entry = function(vec![MicroOp::Return]);
-    let ran = run_with(&entry, polling_meter(), &provider, run);
+    let ran = run_with(&entry, listening_meter(&source), run);
     assert!(ran.err.is_none(), "{:?}", ran.err);
-    assert!(!ran.interrupted);
-    assert_eq!(provider.polls.get(), 0);
+    assert_eq!(source.polls.get(), 0);
 }

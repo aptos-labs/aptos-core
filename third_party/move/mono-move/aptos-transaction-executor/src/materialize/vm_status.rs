@@ -126,6 +126,9 @@ pub(crate) fn discard_to_vm_status(reason: DiscardReason) -> VMStatus {
             stage_failure_status(&stage, &format!("{failure:?}"))
         },
         DiscardReason::InvariantViolation(detail) => invariant_status(detail),
+        DiscardReason::Interrupted => {
+            invariant_status("an interrupted transaction is never discarded".to_string())
+        },
     }
 }
 

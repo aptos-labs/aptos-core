@@ -28,8 +28,8 @@ use aptos_types::{
     },
 };
 use mono_move_core::{
-    intern_type_tag, native::NativeExtensions, types::InternedTypeList, GasMeter, Interner,
-    GAS_CHUNK_SIZE,
+    intern_type_tag, native::NativeExtensions, storage::resource_provider::ResourceProviderError,
+    types::InternedTypeList, GasMeter, Interner, InterruptListener, INTERRUPT_INTERVAL_GAS_UNITS,
 };
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy};
 use mono_move_natives::TransactionContextExtension;
@@ -69,7 +69,10 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             loader,
             // TODO(metering): MonoMove gas units are uncalibrated; budgeting
             // 1:1 against the transaction's gas units is a placeholder.
-            GasMeter::new(txn_data.max_gas_amount).with_interrupt_polling(GAS_CHUNK_SIZE),
+            GasMeter::new(txn_data.max_gas_amount).with_interrupt_listener(InterruptListener::new(
+                self.interrupts,
+                INTERRUPT_INTERVAL_GAS_UNITS,
+            )),
             self.data_provider,
             self.natives,
         )
@@ -81,16 +84,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         // transaction against, so a discard that skipped it would drop the
         // transaction's dependencies. Finishing also parks the worker's stack
         // and heap for reuse.
-        let result = self.run_session(&mut interp, txn, &txn_data);
-        // An interrupt may have been turned into a payload failure or a
-        // discard on its way out, so the session's flag decides.
         //
-        // TODO(perf): an interrupted session still runs the rest of the
-        // transaction and evacuates its heap; it could be abandoned instead.
-        let interrupted = interp.is_interrupted();
+        // TODO(perf): an interrupted session still evacuates its heap; it
+        // could be abandoned instead.
+        let result = self.run_session(&mut interp, txn, &txn_data);
         match (result, interp.finish()) {
             (_, Err(e)) => TxnOutcome::Panic(e),
-            (_, Ok(_)) if interrupted => TxnOutcome::Interrupted,
+            (Err(DiscardReason::Interrupted), Ok(_)) => TxnOutcome::Interrupted,
             (Ok((status, fee_statement)), Ok(effects)) => TxnOutcome::Executed {
                 status,
                 fee_statement,
@@ -142,10 +142,13 @@ impl<'guard> AptosTransactionExecutor<'guard> {
                         self.symbols.approved_execution_hashes,
                     )
                 })
-                .map_err(|e| {
-                    DiscardReason::InvariantViolation(format!(
-                        "the approved script hashes are unreadable: {e}"
-                    ))
+                .map_err(|e| match e {
+                    ResourceProviderError::Interrupted => DiscardReason::Interrupted,
+                    ResourceProviderError::InvariantViolation(_) => {
+                        DiscardReason::InvariantViolation(format!(
+                            "the approved script hashes are unreadable: {e}"
+                        ))
+                    },
                 })?
         };
         PreExecutionChecker::new(
@@ -184,12 +187,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
 
         // ============================ Prologue ==============================
         // Validate the transaction (auth key, sequence number or nonce, fee coverage etc.)
-        run_prologue(interp, self.symbols, &signers, txn_data).map_err(|failure| {
-            DiscardReason::Failure {
-                stage: ExecutionStage::Prologue,
-                failure,
-            }
-        })?;
+        run_prologue(interp, self.symbols, &signers, txn_data)
+            .map_err(|failure| stage_failure(ExecutionStage::Prologue, failure))?;
 
         // ======================== Metered prologue ==========================
         // State setup that costs real gas (today: creating the sender's
@@ -213,10 +212,7 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         self.run_metered(interp, |interp| {
             run_metered_prologue(interp, self.symbols, &signers, txn_data)
         })
-        .map_err(|failure| DiscardReason::Failure {
-            stage: ExecutionStage::MeteredPrologue,
-            failure,
-        })?;
+        .map_err(|failure| stage_failure(ExecutionStage::MeteredPrologue, failure))?;
         // A failed payload rolls back to here, so the effects of both prologue
         // halves (e.g. nonce insertion, the created account) survive.
         checkpoint(interp)?;
@@ -237,6 +233,9 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         let payload_succeeded = payload_result.is_ok();
         let execution_status = match payload_result {
             Ok(()) => ExecutionStatus::Success,
+            // Nothing of an interrupted transaction is kept, so there is no
+            // point in rolling back or running the epilogue.
+            Err(failure) if failure.is_interrupted() => return Err(DiscardReason::Interrupted),
             Err(failure) => {
                 rollback(interp, 1)?;
                 ExecutionStatus::Failure {
@@ -264,13 +263,15 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         };
         let execution_status = match epilogue(interp) {
             Ok(()) => execution_status,
+            // A retry might finish before it polls again, so it must not run.
+            Err(failure) if failure.is_interrupted() => return Err(DiscardReason::Interrupted),
             // Payload failed + epilogue failed => no choice but to discard.
             // This should not happen unless there is a bug in the executor.
             Err(failure) if !payload_succeeded => {
-                return Err(DiscardReason::Failure {
-                    stage: ExecutionStage::EpilogueAfterRollback,
+                return Err(stage_failure(
+                    ExecutionStage::EpilogueAfterRollback,
                     failure,
-                })
+                ))
             },
             // Payload succeeded + epilogue failed => rollback payload effects and
             // retry. The transaction still commits, charging the fee; which
@@ -281,10 +282,8 @@ impl<'guard> AptosTransactionExecutor<'guard> {
             // discard here instead.
             Err(failure) => {
                 rollback(interp, 1)?;
-                epilogue(interp).map_err(|failure| DiscardReason::Failure {
-                    stage: ExecutionStage::EpilogueRetry,
-                    failure,
-                })?;
+                epilogue(interp)
+                    .map_err(|failure| stage_failure(ExecutionStage::EpilogueRetry, failure))?;
                 ExecutionStatus::Failure {
                     stage: ExecutionStage::Epilogue,
                     failure,
@@ -346,6 +345,17 @@ impl<'guard> AptosTransactionExecutor<'guard> {
         } else {
             f(interp)
         }
+    }
+}
+
+/// Discards the transaction after `stage` failed, or reports the interrupt that
+/// stopped it. Every stage that runs Move code reports its failure through
+/// this.
+fn stage_failure(stage: ExecutionStage, failure: MoveExecutionFailure) -> DiscardReason {
+    if failure.is_interrupted() {
+        DiscardReason::Interrupted
+    } else {
+        DiscardReason::Failure { stage, failure }
     }
 }
 

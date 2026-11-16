@@ -689,10 +689,6 @@ mod tests {
                 None => StorageRead::DoesNotExist,
             })
         }
-
-        fn interrupt_requested(&self) -> bool {
-            false
-        }
     }
 
     fn entry(read: StorageRead, write: StorageWrite) -> Entry {
