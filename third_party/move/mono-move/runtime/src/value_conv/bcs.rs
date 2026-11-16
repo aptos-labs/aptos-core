@@ -52,7 +52,7 @@ use move_core_types::{
     function::{ClosureMask, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    value::{check_layout_within_bounds, MoveTypeLayout, MoveValue},
+    value::{check_layout_within_bounds, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
 use serde::de::DeserializeSeed;
 use std::marker::PhantomData;
@@ -511,12 +511,9 @@ fn serialize_closure_header(func_ref: &FunctionRef, mask: u64, out: &mut Vec<u8>
     write_uleb128_len(out, ty_args.len() as u64);
     for &ty in ty_args {
         // Type parameters and references have no `TypeTag`. Neither can be a
-        // closure's type argument once it is fully substituted, but bailing
-        // beats emitting a header V1 could not have written.
+        // closure's type argument once it is fully substituted.
         let tag = type_tag_of(ty).ok_or_else(|| {
-            VMInternalError::new(RuntimeError::Unsupported(
-                "function value over a type with no type tag",
-            ))
+            bad_closure("function value over a type with no type tag".to_string())
         })?;
         bcs::serialize_into(out, &tag).map_err(|err| {
             bad_closure(format!(
@@ -542,12 +539,12 @@ fn serialize_captured_layout<T: LayoutProvider + ?Sized>(
     id: LayoutId,
     out: &mut Vec<u8>,
 ) -> VMResult<()> {
-    // V1 fails to serialize a layout past its node cap or the BCS depth limit.
-    // Falling back keeps MonoMove from writing bytes V1 would not.
-    let unsupported = || RuntimeError::Unsupported("captured layout V1 cannot serialize");
+    // V1 refuses to serialize a layout past its node cap or the BCS depth
+    // limit.
+    let refused = || RuntimeError::ValueNotSerializable("captured layout exceeds V1's bounds");
     let layout = to_v1_type_layout(layouts, id)?;
-    check_layout_within_bounds::<bcs::Error>(&layout).map_err(|_| unsupported())?;
-    bcs::serialize_into(out, &layout).map_err(|_| unsupported())?;
+    check_layout_within_bounds::<bcs::Error>(&layout).map_err(|_| refused())?;
+    bcs::serialize_into(out, &layout).map_err(|_| refused())?;
     Ok(())
 }
 
@@ -1126,10 +1123,11 @@ pub(crate) fn decode_captures(
 /// the natural alignment of `capture_layouts`, and the blob follows them, so a
 /// later serialization still reproduces the stored bytes.
 ///
-/// Each capture's stored layout must match the one the callee publishes today.
-/// A mismatch means the closure was written against a different version of the
-/// target's signature; the call is refused rather than decoded under layouts
-/// that disagree with the bytes.
+/// Each capture is decoded under the layout the callee publishes today. Its
+/// stored layout may be older: a compatible upgrade can append enum variants,
+/// and the stored bytes still decode under the current layout. Any other
+/// difference means the target's signature changed, which persistence rules
+/// out, so it is an invariant violation.
 ///
 /// # Allocating semantics
 ///
@@ -1189,7 +1187,7 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
 
     let mut cursor = 0usize;
     let mut value_cursor = 0usize;
-    for &id in capture_layouts {
+    for (capture_idx, &id) in capture_layouts.iter().enumerate() {
         let layout = layouts.layout(id).ok_or(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::ValueLayoutNotFound,
         ))?;
@@ -1202,11 +1200,9 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
         let expected = to_v1_type_layout(layouts, id).map_err(|e| {
             RuntimeError::InvariantViolation(RuntimeInvariantViolation::Unreachable(e.to_string()))
         })?;
-        // The converted layout can share a struct along many paths, so compare
-        // it structurally rather than serializing it.
-        if stored != expected {
-            return Err(RuntimeError::Unsupported(
-                "calling a function value captured under a different layout",
+        if !stored_layout_compatible(&stored, &expected) {
+            return Err(RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::ClosureCapturedLayoutIncompatible { capture_idx },
             )
             .into());
         }
@@ -1234,6 +1230,79 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
         .into());
     }
     Ok(obj)
+}
+
+/// Whether a capture stored under `stored` decodes as a value of `current`. A
+/// compatible upgrade can only append enum variants, so each enum in `stored`
+/// may list a prefix of the variants in `current`; everything else must match.
+///
+/// The walk follows `stored`, a tree decoded from the capture's bytes, so its
+/// cost is bounded by them even where `current` shares a struct along many
+/// paths.
+//
+// TODO(metering): recursion depth follows the stored layout, which BCS's
+// container depth limit bounds when it is decoded.
+fn stored_layout_compatible(stored: &MoveTypeLayout, current: &MoveTypeLayout) -> bool {
+    use MoveTypeLayout as L;
+    match stored {
+        L::Bool
+        | L::U8
+        | L::U16
+        | L::U32
+        | L::U64
+        | L::U128
+        | L::U256
+        | L::I8
+        | L::I16
+        | L::I32
+        | L::I64
+        | L::I128
+        | L::I256
+        | L::Address
+        | L::Signer
+        | L::Function => stored == current,
+        L::Vector(stored) => {
+            matches!(current, L::Vector(current) if stored_layout_compatible(stored, current))
+        },
+        L::Struct(stored) => {
+            let L::Struct(current) = current else {
+                return false;
+            };
+            match (stored.as_ref(), current.as_ref()) {
+                (MoveStructLayout::Runtime(stored), MoveStructLayout::Runtime(current)) => {
+                    stored_fields_compatible(stored, current)
+                },
+                (
+                    MoveStructLayout::RuntimeVariants(stored),
+                    MoveStructLayout::RuntimeVariants(current),
+                ) => {
+                    stored.len() <= current.len()
+                        && stored
+                            .iter()
+                            .zip(current)
+                            .all(|(stored, current)| stored_fields_compatible(stored, current))
+                },
+                (
+                    MoveStructLayout::Runtime(_)
+                    | MoveStructLayout::RuntimeVariants(_)
+                    | MoveStructLayout::WithFields(_)
+                    | MoveStructLayout::WithTypes { .. }
+                    | MoveStructLayout::WithVariants { .. },
+                    _,
+                ) => false,
+            }
+        },
+        // MonoMove never converts a layout to a native one.
+        L::Native(..) => false,
+    }
+}
+
+fn stored_fields_compatible(stored: &[MoveTypeLayout], current: &[MoveTypeLayout]) -> bool {
+    stored.len() == current.len()
+        && stored
+            .iter()
+            .zip(current)
+            .all(|(stored, current)| stored_layout_compatible(stored, current))
 }
 
 /// Interns a decoded closure header's `(module, name, type arguments)` into the
@@ -2875,8 +2944,8 @@ mod tests {
         assert_closure_walks(&out);
     }
 
-    /// Serializing a closure over one capture must fall back to V1.
-    fn assert_capture_unsupported(layouts: &ValueLayoutTable, layout_id: LayoutId, values: &[u8]) {
+    /// Serializing a closure over one capture must be refused, as V1 refuses it.
+    fn assert_capture_refused(layouts: &ValueLayoutTable, layout_id: LayoutId, values: &[u8]) {
         let func_ref = test_func_ref(EMPTY_TYPE_LIST);
         let mut heap = Heap::new(1 << 20);
         let closure = unsafe { build_closure(&mut heap, &func_ref, 0b1, Some(layout_id), values) };
@@ -2893,7 +2962,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             err.downcast_ref::<RuntimeError>(),
-            Some(RuntimeError::Unsupported(_))
+            Some(RuntimeError::ValueNotSerializable(_))
         ));
     }
 
@@ -2924,7 +2993,7 @@ mod tests {
     }
 
     #[test]
-    fn serialize_closure_capturing_layout_over_node_cap_falls_back() {
+    fn serialize_closure_capturing_layout_over_node_cap_is_refused() {
         // Each level holds two copies of the level below. The table stays
         // small, but the unfolded layout doubles per level and passes V1's
         // 4096-node cap at level 12.
@@ -2937,7 +3006,7 @@ mod tests {
             size *= 2;
         }
         let layout_id = push_captured_values_layout(&mut layouts, size, vec![(0, id)]);
-        assert_capture_unsupported(&layouts, layout_id, &vec![0u8; size as usize]);
+        assert_capture_refused(&layouts, layout_id, &vec![0u8; size as usize]);
     }
 
     #[test]
@@ -3296,7 +3365,45 @@ mod tests {
         };
         assert!(matches!(
             err,
-            AllocationError::RuntimeError(RuntimeError::Unsupported(_))
+            AllocationError::RuntimeError(RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::ClosureCapturedLayoutIncompatible { capture_idx: 0 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn stored_layout_may_list_a_prefix_of_enum_variants() {
+        use MoveTypeLayout as L;
+        let variants = |variants: Vec<Vec<L>>| {
+            L::Struct(Arc::new(MoveStructLayout::RuntimeVariants(variants)))
+        };
+        let record = |fields: Vec<L>| L::Struct(Arc::new(MoveStructLayout::Runtime(fields)));
+        let old = variants(vec![vec![], vec![L::U64]]);
+        let new = variants(vec![vec![], vec![L::U64], vec![L::Bool]]);
+
+        // An upgrade appended a variant, here nested inside a struct and a
+        // vector.
+        assert!(stored_layout_compatible(&old, &new));
+        assert!(stored_layout_compatible(
+            &record(vec![L::Vector(Box::new(old.clone()))]),
+            &record(vec![L::Vector(Box::new(new.clone()))]),
+        ));
+
+        // Nothing else may change: variants are never removed, and fields and
+        // primitives stay as they were.
+        assert!(!stored_layout_compatible(&new, &old));
+        assert!(!stored_layout_compatible(
+            &variants(vec![vec![], vec![L::U8]]),
+            &new
+        ));
+        assert!(!stored_layout_compatible(
+            &record(vec![L::U64]),
+            &record(vec![L::U64, L::U64])
+        ));
+        assert!(!stored_layout_compatible(&L::U64, &L::I64));
+        assert!(!stored_layout_compatible(
+            &record(vec![]),
+            &variants(vec![vec![]])
         ));
     }
 
@@ -3419,7 +3526,7 @@ mod tests {
                 compare_impl(&layouts, ptr(&slot), ptr(&slot), FUNCTION_LAYOUT_ID).unwrap_err();
             assert!(matches!(
                 err.downcast_ref::<RuntimeError>(),
-                Some(RuntimeError::Unsupported(_))
+                Some(RuntimeError::FunctionValuesNotOrdered)
             ));
         }
     }
@@ -3591,7 +3698,9 @@ mod tests {
             let err = eq_closures(&layouts, a, b).unwrap_err();
             assert!(matches!(
                 err.downcast_ref::<RuntimeError>(),
-                Some(RuntimeError::Unsupported(_))
+                Some(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ClosureCaptureKindMismatch
+                ))
             ));
         }
     }

@@ -412,9 +412,7 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
         },
         // Function values support equality but not ordering.
-        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::Unsupported(
-            "function values cannot be ordered",
-        ))),
+        LayoutKind::Function => Err(VMInternalError::new(RuntimeError::FunctionValuesNotOrdered)),
         LayoutKind::Ref => Err(VMInternalError::new(RuntimeError::InvariantViolation(
             RuntimeInvariantViolation::Unreachable(
                 "Comparison runs on pointee types only".to_string(),
@@ -538,6 +536,10 @@ unsafe fn capture_bytes<'a, T: LayoutProvider + ?Sized>(
             capture_blob(parts.captured_data)
         }));
     }
+    // TODO(correctness): a captured layout past V1's node cap cannot be
+    // emitted, so comparing such a closure against a wire-backed one fails,
+    // while V1 compares the values. It takes a capture whose layout crossed the
+    // cap after the other side was stored.
     let mut out = vec![];
     unsafe { emit_closure_captures(layouts, parts, Encoding::Compare, &mut out)? };
     Ok(CaptureBytes::Emitted(out))
@@ -568,16 +570,14 @@ fn compare_capture_lists(
 }
 
 /// Two captures sit at the same position under layouts of different kinds.
-///
-/// V1 reports `INTERNAL_TYPE_ERROR` for a value-kind mismatch and defines no
-/// cross-kind order. MonoMove has no equivalent error, so it falls back rather
-/// than inventing one.
+/// V1 reports `INTERNAL_TYPE_ERROR`, an invariant violation, and defines no
+/// cross-kind order.
 //
 // TODO(correctness): `drop_unchanged_writes` compares at session close, where
-// `Unsupported` aborts the block instead of falling back. See its own
-// `TODO(correctness)` on auditing the `equals` error paths.
+// an error aborts the block. See its own `TODO(correctness)` on auditing the
+// `equals` error paths.
 fn kind_mismatch() -> RuntimeError {
-    RuntimeError::Unsupported("captures compared under layouts of different kinds")
+    RuntimeError::InvariantViolation(RuntimeInvariantViolation::ClosureCaptureKindMismatch)
 }
 
 /// A decoded value does not have the shape of the layout it was decoded under.
@@ -802,9 +802,13 @@ fn func_ref_ty_args(func_ref: &FunctionRef) -> VMResult<Vec<TypeTag>> {
     view_type_list(func_ref.ty_args)
         .iter()
         .map(|&ty| {
+            // A closure's type arguments are fully substituted, so each has a
+            // tag.
             type_tag_of(ty).ok_or_else(|| {
-                VMInternalError::new(RuntimeError::Unsupported(
-                    "function value over a type with no type tag",
+                VMInternalError::new(RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::Unreachable(
+                        "function value over a type with no type tag".to_string(),
+                    ),
                 ))
             })
         })
@@ -980,7 +984,9 @@ mod tests {
         for (a, b) in [(vec![], vec![]), (vec![1u8], vec![1u64])] {
             assert!(matches!(
                 cmp_one(&u8s, &a, &u64s, &b).unwrap_err(),
-                RuntimeError::Unsupported(_)
+                RuntimeError::InvariantViolation(
+                    RuntimeInvariantViolation::ClosureCaptureKindMismatch
+                )
             ));
         }
     }
@@ -1017,7 +1023,7 @@ mod tests {
         ])));
         assert!(matches!(
             cmp_one(&s, &(7u64,), &MoveTypeLayout::U64, &7u64).unwrap_err(),
-            RuntimeError::Unsupported(_)
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ClosureCaptureKindMismatch)
         ));
     }
 
@@ -1025,11 +1031,11 @@ mod tests {
     fn compare_ints_of_different_widths_is_a_type_error() {
         assert!(matches!(
             cmp_one(&MoveTypeLayout::U8, &0u8, &MoveTypeLayout::U64, &0u64).unwrap_err(),
-            RuntimeError::Unsupported(_)
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ClosureCaptureKindMismatch)
         ));
         assert!(matches!(
             cmp_one(&MoveTypeLayout::U64, &0u64, &MoveTypeLayout::I64, &0i64).unwrap_err(),
-            RuntimeError::Unsupported(_)
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::ClosureCaptureKindMismatch)
         ));
     }
 

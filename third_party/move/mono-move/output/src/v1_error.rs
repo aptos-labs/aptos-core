@@ -488,6 +488,8 @@ pub fn describe_runtime_error(err: &RuntimeError) -> V1Equivalent {
 
         // A feature V1 has and MonoMove does not, so V1 runs the input.
         E::Unsupported(_) => return V1Equivalent::NoV1Failure,
+        // An agreed divergence: V1 orders function values, MonoMove refuses to.
+        E::FunctionValuesNotOrdered => return V1Equivalent::V1StatusUnknown,
 
         E::InvariantViolation(_) | E::ResourceProvider(_) => {
             V1ErrorInfo::with_mono_message(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err)

@@ -122,6 +122,11 @@ pub enum RuntimeError {
     #[error("BCS serialize: {0}")]
     ValueNotSerializable(&'static str),
 
+    /// Ordering reached a function value. V1 orders function values; MonoMove
+    /// refuses to, by design.
+    #[error("function values cannot be ordered")]
+    FunctionValuesNotOrdered,
+
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
 
@@ -221,6 +226,7 @@ impl RuntimeError {
             | AbortMessageTooLong { .. }
             | StateKeyTypeTooDeep
             | ValueNotSerializable(_)
+            | FunctionValuesNotOrdered
             | InvariantViolation(_)
             | ResourceProvider(_)
             | Unsupported(_) => false,
@@ -249,7 +255,8 @@ impl IntoExecutionError for RuntimeError {
             | ReentrancyUnderModuleLock { .. }
             | ResourceAccessDuringReentrancy { .. }
             | EnumVariantMismatch { .. }
-            | ValueNotSerializable(_) => ExecutionErrorKind::InvalidOperation,
+            | ValueNotSerializable(_)
+            | FunctionValuesNotOrdered => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -497,6 +504,12 @@ pub enum RuntimeInvariantViolation {
 
     #[error("CallClosure: {packed} captured values for a mask capturing {captured}")]
     ClosureCapturedCountMismatch { packed: usize, captured: usize },
+
+    #[error("CallClosure: capture {capture_idx} was stored under a layout the callee's parameter cannot read")]
+    ClosureCapturedLayoutIncompatible { capture_idx: usize },
+
+    #[error("closure equality: captures compared under layouts of different kinds")]
+    ClosureCaptureKindMismatch,
 
     #[error("CallClosure: no published struct layout {id} for the captured values")]
     ClosureCapturedValuesLayoutMissing { id: u32 },
