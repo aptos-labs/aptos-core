@@ -404,20 +404,12 @@ name = "aptos-api::aptos_api$tests::view_function::test_view_tuple"
 note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails. The test's package is never published."
 
 [[test]]
-name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_apply_features_after_init"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_default"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_orderless_transaction"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_benchmark_transaction"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_vm_and_native_parallel_uncoordinated"
@@ -428,44 +420,32 @@ name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_compare_v
 note = "Compares two runs with different settings; MonoMove charges no gas, so the FeeStatement events differ. TODO(metering)."
 
 [[test]]
-name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_external_lib_bench_larger"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_external_lib_bench_test"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_iterative"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_recursive"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_fibonacci_tail_recursive"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_direct_raw_loose_block_executor_benchmark"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_loose_block_executor_benchmark"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_value_cache_loose_block_executor_benchmark"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_native_vm_benchmark_transaction"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor-benchmark::aptos_executor_benchmark$tests::test_publish_transaction"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "aptos-executor::storage_integration_test$test_epilogue_hotness_survives_state_sync"
@@ -558,10 +538,6 @@ note = "Aggregators V1 are not supported by MonoMove."
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_aggregator_with_republish"
 note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
-
-[[test]]
-name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_cases::test_snapshot_concat"
-note = "MonoMove does not implement the `0x1::debug` natives (native_print, native_stack_trace)."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::aggregator_v2::test_too_many_aggregators_in_a_resource::usetype_useresourcegrouptype_expects"
@@ -1296,14 +1272,6 @@ name = "language-e2e-testsuite::language_e2e_testsuite$tests::verify_txn::verify
 note = "MonoMove checks the fee balance before duplicate secondary signers (INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE instead of SIGNERS_CONTAIN_DUPLICATES)."
 
 [[test]]
-name = "smoke-test::smoke_test$aptos_cli::validator::test_join_and_leave_validator"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$aptos_cli::validator::test_owner_create_and_delegate_flow"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "smoke-test::smoke_test$aptos_cli::validator::test_register_and_update_validator"
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. Validator set changes then abort with stake::ERECONFIGURATION_IN_PROGRESS."
 
@@ -1352,88 +1320,8 @@ name = "smoke-test::smoke_test$chunky_dkg::with_validator_down::chunky_dkg_with_
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
-name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_execution_retry"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_faulty_votes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_no_failures"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_ordered_only_cert"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::consensus_fault_tolerance::test_round_timeout_msg_rollout"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_same_db"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_batch_id_on_restart_wiped_db"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_onchain_config_quorum_store_enabled_and_disabled"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_remote_batch_reads"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus::quorum_store_fault_tolerance::test_swarm_with_bad_non_qs_node"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "smoke-test::smoke_test$consensus_key_rotation::consensus_key_rotation"
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fast_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_restart_wipe"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disable_quorum_store"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_disconnected"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_fullnode_sync_multiple_nodes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_public_fullnode_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$consensus_observer::test_consensus_observer_validator_restart_wipe"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$decryption::secret_share_rpc_path::secret_share_rpc_path"
@@ -1456,36 +1344,16 @@ name = "smoke-test::smoke_test$decryption::test_fee_payer_encrypted_transaction"
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
-name = "smoke-test::smoke_test$execution::block_epilogue_upgrade_test"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "smoke-test::smoke_test$execution::fallback_test"
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
-
-[[test]]
-name = "smoke-test::smoke_test$fullnode::test_internal_indexer_with_fast_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$genesis::test_validator_genesis_transaction_and_db_restore_flow"
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. The recovery genesis then aborts with stake::ERECONFIGURATION_IN_PROGRESS."
 
 [[test]]
-name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_execution_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_fast_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_output_sync"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_restart_across_v1_boundary"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. TRANSACTION_INFO_V1 is never enabled."
 
 [[test]]
 name = "smoke-test::smoke_test$hot_state::test_hot_state_fullnode_sync_across_v1_boundary"
@@ -1494,14 +1362,6 @@ note = "Waits for an epoch change with randomness on; MonoMove discards DKGResul
 [[test]]
 name = "smoke-test::smoke_test$hot_state::test_hot_state_on_chain_config"
 note = "MonoMove does not implement the `hot_state_config::validate_internal` native."
-
-[[test]]
-name = "smoke-test::smoke_test$hot_state::test_hot_state_validator_fast_sync_and_participate"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$hot_state::test_hot_state_validator_restart"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
 
 [[test]]
 name = "smoke-test::smoke_test$jwks::jwk_consensus_basic::jwk_consensus_basic"
@@ -1625,19 +1485,19 @@ note = "Waits for an epoch change with randomness on; MonoMove discards DKGResul
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_0::enable_feature_0"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_1::enable_feature_1"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::enable_feature_2::enable_feature_2"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::entry_func_attrs::randomness_attr_000"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "smoke-test::smoke_test$randomness::optimistic_verification::optimistic_verification"
@@ -1652,120 +1512,12 @@ name = "smoke-test::smoke_test$randomness::validator_restart_during_dkg::validat
 note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes."
 
 [[test]]
-name = "smoke-test::smoke_test$rosetta::test_account_balance"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_block"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_block_transactions"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_delegation_pool_operations"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_invalid_transaction_gas_charged"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_network"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$rosetta::test_transfer"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_execution_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_and_intelligent_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_fast_sync_no_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_intelligent_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_fullnode_output_sync_exponential_backoff"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_single_validator_reboot"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_execution_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_and_participate_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_fast_sync_exponential_backoff_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_intelligent_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_output_sync_exponential_backoff"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$state_sync::test_validator_sync_and_participate_epoch_changes"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$storage::test_db_restart"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$storage::test_db_restore"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
 name = "smoke-test::smoke_test$storage_native_position::test_db_restore_with_native_positions"
 note = "MonoMove does not support in-transaction code publishing (no `code::request_publish` native), so `0x1::code::publish_package` fails."
 
 [[test]]
 name = "smoke-test::smoke_test$storage_native_position::test_enable_native_positions_on_running_chain"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$transaction_filter::test_consensus_block_filter"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$transaction_filter::test_mempool_transaction_filter"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
-
-[[test]]
-name = "smoke-test::smoke_test$transaction_filter::test_quorum_store_batch_filter"
-note = "Chain halts at the first epoch change: MonoMove drops unchanged writes, so the reconfiguration output lacks ValidatorSet (\"ValidatorSet not touched on epoch change\")."
+note = "Waits for an epoch change with randomness on; MonoMove discards DKGResult validator transactions, so the DKG reconfiguration never finishes. The position features are never enabled."
 
 [[test]]
 name = "smoke-test::smoke_test$txn_emitter::test_txn_emmitter_low_funds"
