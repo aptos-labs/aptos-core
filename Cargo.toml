@@ -339,7 +339,6 @@ aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }
 aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
-aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
 aptos-collections = { path = "crates/aptos-collections" }
@@ -357,7 +356,6 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-indexer-schemas = { path = "storage/indexer_schemas" }
 aptos-db-tool = { path = "storage/db-tool" }
-aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
@@ -367,21 +365,16 @@ aptos-executor = { path = "execution/executor" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
-aptos-experimental-bulk-txn-submit = { path = "experimental/bulk-txn-submit" }
-aptos-experimental-hexy = { path = "experimental/storage/hexy" }
 aptos-experimental-layered-map = { path = "experimental/storage/layered-map" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
 aptos-fallible = { path = "crates/fallible" }
-aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
-aptos-faucet-service = { path = "crates/aptos-faucet/service" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
 aptos-framework-natives = { path = "aptos-move/framework/natives" }
 aptos-gas-algebra = { path = "aptos-move/aptos-gas-algebra" }
-aptos-gas-calibration = { path = "aptos-move/aptos-gas-calibration" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
 aptos-gas-profiling = { path = "aptos-move/aptos-gas-profiling" }
 aptos-gas-schedule = { path = "aptos-move/aptos-gas-schedule" }
@@ -391,23 +384,10 @@ aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-governance-bundle = { path = "aptos-move/aptos-governance-bundle" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
-aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
-aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
-aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
-aptos-indexer-grpc-data-service-v2 = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service-v2" }
-aptos-indexer-grpc-file-checker = { path = "ecosystem/indexer-grpc/indexer-grpc-file-checker" }
-aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
-aptos-indexer-grpc-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store-backfiller" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
-aptos-indexer-grpc-gateway = { path = "ecosystem/indexer-grpc/indexer-grpc-gateway" }
-aptos-indexer-grpc-in-memory-cache-benchmark = { path = "ecosystem/indexer-grpc/indexer-grpc-in-memory-cache-benchmark" }
-aptos-indexer-grpc-manager = { path = "ecosystem/indexer-grpc/indexer-grpc-manager" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
-aptos-indexer-grpc-v2-file-store-backfiller = { path = "ecosystem/indexer-grpc/indexer-grpc-v2-file-store-backfiller" }
-aptos-indexer-test-transactions = { path = "ecosystem/indexer-grpc/indexer-test-transactions" }
-aptos-indexer-transaction-generator = { path = "ecosystem/indexer-grpc/indexer-transaction-generator" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
@@ -415,9 +395,7 @@ aptos-jemalloc = { path = "crates/aptos-jemalloc" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
-aptos-keyless-common = { path = "keyless/common" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
-aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-keyless-validation = { path = "aptos-move/aptos-keyless-validation" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
@@ -431,10 +409,7 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
-aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-move-e2e-test-harness = { path = "aptos-move/e2e-move-test-harness" }
-aptos-move-examples = { path = "aptos-move/move-examples" }
-aptos-move-flow = { path = "aptos-move/flow" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -442,7 +417,6 @@ aptos-network = { path = "network/framework" }
 aptos-network-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
-aptos-nft-metadata-crawler = { path = "ecosystem/nft-metadata-crawler" }
 aptos-node = { path = "aptos-node" }
 aptos-node-identity = { path = "crates/aptos-node-identity" }
 aptos-node-resource-metrics = { path = "crates/node-resource-metrics" }
@@ -459,7 +433,6 @@ aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-release-builder = { path = "aptos-move/aptos-release-builder" }
 aptos-release-bundle = { path = "aptos-move/framework/release-bundle" }
-aptos-release-tool = { path = "aptos-move/aptos-release-tool" }
 aptos-reliable-broadcast = { path = "crates/reliable-broadcast" }
 aptos-replay-benchmark = { path = "aptos-move/replay-benchmark" }
 aptos-resource-viewer = { path = "aptos-move/aptos-resource-viewer" }
@@ -471,7 +444,6 @@ aptos-runtimes = { path = "crates/aptos-runtimes" }
 aptos-safety-rules = { path = "consensus/safety-rules" }
 aptos-schemadb = { path = "storage/schemadb" }
 aptos-scratchpad = { path = "storage/scratchpad" }
-aptos-script-composer = { path = "aptos-move/script-composer" }
 aptos-sdk = { path = "sdk" }
 aptos-sdk-builder = { path = "aptos-move/aptos-sdk-builder" }
 aptos-secure-net = { path = "secure/net" }
@@ -501,7 +473,6 @@ aptos-transaction-simulation = { path = "aptos-move/aptos-transaction-simulation
 aptos-transaction-simulation-session = { path = "aptos-move/aptos-transaction-simulation-session" }
 aptos-transaction-tracing = { path = "crates/aptos-transaction-tracing" }
 aptos-transaction-workloads-lib = { path = "crates/transaction-workloads-lib" }
-aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
 aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
@@ -514,7 +485,6 @@ aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-workspace-server = { path = "aptos-move/aptos-workspace-server" }
-fuzzer = { path = "testsuite/fuzzer" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -554,7 +524,6 @@ backtrace = "0.3.77"
 base64 = "0.23.1"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = { version = "0.2.1", features = ["derive"] }
-bigdecimal = { version = "0.4.0", features = ["serde"] }
 bitflags = "2.13.2"
 bitvec = "1.1.1"
 blake2 = "0.10.4"
@@ -624,7 +593,6 @@ diesel-async = { version = "0.7.4", features = [
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 difference = "2.0.0"
 digest = "0.9.0"
-dir-diff = "0.3.2"
 dirs = "7.0.0"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
@@ -642,7 +610,6 @@ fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 figment = { version = "0.10.19", features = ["yaml", "env"] }
-file_diff = "1.0.0"
 firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
 firestore = "0.43.0"
 fixed = "1.31.0"
@@ -716,10 +683,8 @@ jemallocator = { package = "tikv-jemallocator", version = "0.7.0", features = [
 ] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
-jwt = "0.16.0"
 lazy_static = "1.5.1"
 libc = "0.2.191"
-libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.8.2"
 log = "0.4.35"
@@ -787,7 +752,6 @@ prometheus-http-query = "0.5.2"
 proptest = "1.12.0"
 proptest-derive = "0.9.0"
 prost = { version = "0.13.4", features = ["no-recursion-limit"] }
-prost-types = "0.13.3"
 quick-junit = "0.8.0"
 quick_cache = "0.7.0"
 quote = "1.0.18"
@@ -915,7 +879,6 @@ walkdir = "2.5.0"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.106"
-wasm-bindgen-futures = "0.4.56"
 whoami = "2.1.0"
 # This allows for zeroize 1.6 to be used. Version 1.2.0 of x25519-dalek locks zeroize to 1.3.
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
@@ -933,10 +896,8 @@ mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/apto
 mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
-mono-move-lean-link = { path = "third_party/move/mono-move/lean-link" }
 mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-natives = { path = "third_party/move/mono-move/natives" }
-mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-output = { path = "third_party/move/mono-move/output" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }
