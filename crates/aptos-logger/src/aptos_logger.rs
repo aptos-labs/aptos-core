@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#![allow(unexpected_cfgs)]
-
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
@@ -225,13 +223,13 @@ impl LogEntry {
         let peer_id: Option<&str>;
         let chain_id: Option<u8>;
 
-        #[cfg(node_identity)]
+        #[cfg(feature = "node-identity")]
         {
             peer_id = aptos_node_identity::peer_id_as_str();
             chain_id = aptos_node_identity::chain_id().map(|chain_id| chain_id.id());
         }
 
-        #[cfg(not(node_identity))]
+        #[cfg(not(feature = "node-identity"))]
         {
             peer_id = None;
             chain_id = None;
