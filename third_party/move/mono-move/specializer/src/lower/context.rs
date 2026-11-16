@@ -238,7 +238,9 @@ pub enum CapturedDataLayout {
     NonCapturing,
     /// Concrete capturing closure with its resolved captured-data layout.
     Capturing(ClosureCapturedInfo),
-    /// A captured type isn't concrete / GC-walkable yet; lowering must `Skip`.
+    /// A captured type has no layout, which only an open type can lack. The
+    /// module-wide discovery pass walks generic functions and reaches it;
+    /// lowering an instantiated function never should.
     NotDerivable,
 }
 
@@ -713,10 +715,10 @@ pub fn try_build_context<'a>(
                         info.values_size,
                         Some(info.layout_id),
                     ),
+                    // Discovery ran under this function's type arguments, so
+                    // every capture type is closed and its layout derivable.
                     CapturedDataLayout::NotDerivable => {
-                        return Ok(BuildContextOutcome::Skipped(
-                            "captured-data layout not derivable",
-                        ));
+                        return Err(LoweringError::CapturedLayoutNotDerivable.into());
                     },
                 };
                 closure_pack_sites.push(ClosurePackInfo {
@@ -1358,47 +1360,49 @@ fn discover_captured_data_descriptor(
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
-    let mut cursor = 0usize;
+    let mut cursor = 0u32;
     let mut max_align = 1u32;
     let mut pointer_offsets = Vec::new();
     let mut fields = vec![];
     let mut field_ids = vec![];
     for (i, &ty) in view_type_list(captured_list).iter().enumerate() {
-        let Some((size, align)) = ctx.size_and_align(ty) else {
+        // The capture types are already substituted, so the walk needs no
+        // further type arguments. Everything below reads the layout it
+        // publishes.
+        let Some(id) =
+            discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?
+        else {
             return Ok(CapturedDataLayout::NotDerivable);
         };
-        if !gc_layout_supports(ctx, ty) {
-            return Ok(CapturedDataLayout::NotDerivable);
-        }
-        // The capture types are already substituted, so the walk needs no
-        // further type arguments. It publishes the layouts serialization
-        // reads; the loop above would otherwise leave them to chance.
-        field_ids.push(discover_type_metadata(
-            ctx,
-            interner,
-            ty,
-            EMPTY_TYPE_LIST,
-            visited,
-            descriptors,
-        )?);
-        let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
-        for rel in type_pointer_offsets(ctx, ty)? {
-            pointer_offsets.push(FrameOffset(offset as u32 + rel));
+        let layout = ctx.layout(id).ok_or(LoweringError::LayoutIdUnresolved)?;
+        let (size, align) = (layout.size, layout.align);
+        let (offset, next) =
+            next_captured_value_offset(cursor as usize, size as usize, align as usize);
+        let offset = u32::try_from(offset).map_err(|_| LoweringError::CapturedValuesOverflow)?;
+        for rel in ctx
+            .pointer_offsets(id)
+            .ok_or(LoweringError::LayoutIdUnresolved)?
+        {
+            let ptr_offset = offset
+                .checked_add(rel)
+                .ok_or(LoweringError::CapturedValuesOverflow)?;
+            pointer_offsets.push(FrameOffset(ptr_offset));
         }
         // Captures have no names, so they are named by position.
         //
         // TODO(metering): try to avoid building and interning identifiers here.
         let name = Identifier::new(format!("_{i}")).expect("`_<index>` is a valid identifier");
         fields.push(VariantFieldLayout {
-            offset: offset as u32,
+            offset,
             size,
             ty,
             name: interner.identifier_of(&name),
         });
+        field_ids.push(Some(id));
         max_align = max_align.max(align);
-        cursor = next;
+        cursor = u32::try_from(next).map_err(|_| LoweringError::CapturedValuesOverflow)?;
     }
-    let values_size = cursor as u32;
+    let values_size = cursor;
     let Some(layout) =
         try_build_inline_value_layout(&*ctx, None, &fields, &field_ids, values_size, max_align)?
     else {
