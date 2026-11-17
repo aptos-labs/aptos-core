@@ -6,6 +6,7 @@
 use crate::{
     common::{HOT_STATE_KV_DB_FOLDER_NAME, STATE_KV_DB_FOLDER_NAME},
     db_options::{gen_hot_state_kv_shard_cfds, gen_state_kv_shard_cfds},
+    ledger_db::LedgerDb,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -307,6 +308,80 @@ impl StateKvDb {
             .map(|((_, version), value_opt)| (version, value_opt)))
     }
 
+    /// Returns the version of the earliest row of `state_key` after `version`.
+    pub(crate) fn get_next_state_value_row_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<Version>> {
+        let Some(next_version) = version.checked_add(1) else {
+            return Ok(None);
+        };
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self
+            .db_shard(state_key.get_shard_id())
+            .rev_iter_with_opts::<StateValueByKeyHashSchema>(read_opts)?;
+        // Versions are encoded in descending order, so this lands on the smallest version at or
+        // after `next_version`.
+        iter.seek_for_prev(&(state_key.hash(), next_version))?;
+        Ok(iter.next().transpose()?.map(|((_, version), _)| version))
+    }
+
+    /// Returns the latest write to `state_key` at or before `version`, with `None` as the value
+    /// of a deletion. Seeks state KV first, then checks write sets in `ledger_db` if the key's
+    /// next row is in the same block. `error_if_ledger_pruned` runs before each ledger read.
+    pub(crate) fn get_latest_state_write(
+        &self,
+        ledger_db: &LedgerDb,
+        state_key: &StateKey,
+        version: Version,
+        error_if_ledger_pruned: impl Fn(&str, Version) -> Result<()>,
+    ) -> Result<Option<(Version, Option<StateValue>)>> {
+        let row = self.get_state_value_row_by_version(state_key, version)?;
+        let first_version_after_row = row.as_ref().map_or(0, |(row_version, _)| row_version + 1);
+        if first_version_after_row > version {
+            return Ok(row);
+        }
+
+        // A write in `[first_version_after_row, version]` can only lack a row if a later write
+        // in the same block replaced it, and that block's last write has a row. That row must be
+        // after `version`, so such a write can only be in `version`'s block, and only if the
+        // key's next row is in that block too.
+        let Some(next_row_version) = self.get_next_state_value_row_version(state_key, version)?
+        else {
+            return Ok(row);
+        };
+        // TODO: This is slow for mid-block reads, which API clients can trigger by picking the
+        // version. Block bounds come from linear scans over txn infos instead of the block index,
+        // nothing is reused across keys, and each scanned version decodes a full write set.
+        error_if_ledger_pruned("TransactionInfo", version)?;
+        if has_block_end_in(ledger_db, version, next_row_version)? {
+            return Ok(row);
+        }
+
+        for v in (first_version_after_row..=version).rev() {
+            error_if_ledger_pruned("WriteSet", v)?;
+            // `v` ends the previous block (`version` doesn't, as checked above).
+            if v < version
+                && ledger_db
+                    .transaction_info_db()
+                    .get_transaction_info(v)?
+                    .has_state_checkpoint_hash()
+            {
+                break;
+            }
+            if let Some(write_op) = ledger_db
+                .write_set_db()
+                .get_write_set(v)?
+                .get_write_op(state_key)
+            {
+                return Ok(Some((v, write_op.as_state_value_opt().cloned())));
+            }
+        }
+        Ok(row)
+    }
+
     /// Returns the latest hot state entry for the given key hash at or before
     /// the given version. Outer `None` means no entry found; inner `None` means
     /// the key was evicted at that version.
@@ -539,6 +614,19 @@ impl StateKvDb {
         loaded.validate_lru_chain();
         loaded
     }
+}
+
+/// Whether a block ends in `[begin, end)`.
+fn has_block_end_in(ledger_db: &LedgerDb, begin: Version, end: Version) -> Result<bool> {
+    for txn_info in ledger_db
+        .transaction_info_db()
+        .get_transaction_info_iter(begin, (end - begin) as usize)?
+    {
+        if txn_info?.has_state_checkpoint_hash() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Per-shard data recovered from the hot state KV DB.

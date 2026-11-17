@@ -688,15 +688,14 @@ impl DbReader for AptosDB {
 
     fn get_state_value_by_version(
         &self,
-        state_store_key: &StateKey,
+        state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(self
-                .state_kv_db
-                .get_state_value_row_by_version(state_store_key, version)?
+                .get_latest_state_write(state_key, version)?
                 .and_then(|(_, value)| value))
         })
     }
@@ -710,8 +709,7 @@ impl DbReader for AptosDB {
             self.error_if_state_kv_pruned("StateValue", version)?;
 
             Ok(self
-                .state_kv_db
-                .get_state_value_row_by_version(state_key, version)?
+                .get_latest_state_write(state_key, version)?
                 .and_then(|(version, value)| value.map(|value| (version, value))))
         })
     }
@@ -1349,5 +1347,19 @@ impl AptosDB {
                 .map_or(true, |txn_info| txn_info.has_state_checkpoint_hash()),
             "Version {version} is not a block end.",
         );
+    }
+
+    /// See [`StateKvDb::get_latest_state_write`](crate::state_kv_db::StateKvDb::get_latest_state_write).
+    fn get_latest_state_write(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, Option<StateValue>)>> {
+        self.state_kv_db.get_latest_state_write(
+            &self.ledger_db,
+            state_key,
+            version,
+            |data_type, version| self.error_if_ledger_pruned(data_type, version),
+        )
     }
 }
