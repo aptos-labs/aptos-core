@@ -211,9 +211,9 @@ impl ReleasePackage {
 
         emitln!(writer, "let code = vector::empty();");
 
-        for i in 0..self.code.len() {
+        for (i, code) in self.code.iter().enumerate() {
             emitln!(writer, "let chunk{} = ", i);
-            generate_blob_as_hex_string(&writer, &self.code[i]);
+            generate_blob_as_hex_string(&writer, code);
             emitln!(writer, ";");
             emitln!(writer, "vector::push_back(&mut code, chunk{});", i);
         }

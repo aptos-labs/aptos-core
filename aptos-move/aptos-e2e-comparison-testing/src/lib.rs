@@ -219,10 +219,7 @@ impl DataManager {
     }
 
     pub fn check_dir_availability(&self) -> bool {
-        if !(self.state_data_dir_path.exists() && self.write_set_dir_path.exists()) {
-            return false;
-        }
-        true
+        self.state_data_dir_path.exists() && self.write_set_dir_path.exists()
     }
 
     pub fn dump_state_data(&self, version: u64, state: &HashMap<StateKey, StateValue>) {

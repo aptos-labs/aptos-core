@@ -44,11 +44,13 @@ macro_rules! build_information {
 /// WARNING: This does not return the expected value for the `dev`, `test`,
 /// and `bench` profiles. See the SO link above for more details.
 fn get_build_profile_name() -> String {
-    // The profile name is always the 3rd last part of the path (with 1 based indexing).
-    // e.g. /code/core/target/debug/build/aptos-build-info-9f91ba6f99d7a061/out
+    // The profile name is the parent of the `build` dir. Depth differs across Cargo versions:
+    //   /code/core/target/debug/build/aptos-build-info-9f91ba6f99d7a061/out
+    //   /code/core/target/debug/build/aptos-build-info/9f91ba6f99d7a061/out (Rust 1.100+)
     std::env!("OUT_DIR")
-        .split(std::path::MAIN_SEPARATOR)
-        .nth_back(3)
+        .rsplit(std::path::MAIN_SEPARATOR)
+        .skip_while(|part| *part != "build")
+        .nth(1)
         .unwrap_or("unknown")
         .to_string()
 }
