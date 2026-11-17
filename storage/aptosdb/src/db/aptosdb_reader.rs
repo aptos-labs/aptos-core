@@ -964,16 +964,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.error_if_state_merkle_pruned("State merkle", next_version)?;
-        gauged_api("get_state_snapshot_before", || {
-            self.state_store.get_state_snapshot_before(next_version)
-        })
-    }
-
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
         gauged_api("get_accumulator_root_hash", || {
             self.error_if_ledger_pruned("Transaction accumulator", version)?;
@@ -1361,5 +1351,16 @@ impl AptosDB {
             version,
             |data_type, version| self.error_if_ledger_pruned(data_type, version),
         )
+    }
+
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    pub fn get_state_snapshot_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.error_if_state_merkle_pruned("State merkle", next_version)?;
+        gauged_api("get_state_snapshot_before", || {
+            self.state_store.get_state_snapshot_before(next_version)
+        })
     }
 }
