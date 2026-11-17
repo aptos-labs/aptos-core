@@ -5403,7 +5403,12 @@ impl SpecTranslator<'_> {
             let mut global_state = self
                 .env
                 .get_cloned_extension::<GlobalNumberOperationState>();
-            global_state.update_node_oper(args[0].node_id(), cast_oper, true);
+            // The argument may have been created after the number operation
+            // analysis (e.g. by instantiating a generic ghost initializer)
+            // and so lack an entry; it gets one, as any other argument would.
+            global_state
+                .exp_operation_map
+                .insert(args[0].node_id(), cast_oper);
             self.env.set_extension(global_state);
         }
         if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {

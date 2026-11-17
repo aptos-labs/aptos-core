@@ -1,0 +1,17 @@
+Move prover returns: exiting with verification errors
+tests/sources/regression/ghost_init_generic_cast.move:37:9: error: the specification clause `ensures result.size == 3` is not established
+tests/sources/regression/ghost_init_generic_cast.move:35:5: error: verex verification failed: the automatic verification of `make_two_wrong` failed; provide a proof in `tests/sources/regression/ghost_init_generic_cast.proof.lean`:
+  verify make_two_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/regression/ghost_init_generic_cast.move:46:9: error: the specification clause `ensures new Bag<u8> { items := v }.size == v.length + 1` is not established
+tests/sources/regression/ghost_init_generic_cast.move:44:5: error: verex verification failed: the automatic verification of `id_wrong` failed; provide a proof in `tests/sources/regression/ghost_init_generic_cast.proof.lean`:
+  verify id_wrong by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
