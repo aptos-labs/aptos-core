@@ -71,7 +71,7 @@ impl Cmd {
         let mut count = 0;
         while count < 10 {
             match db
-                .get_state_value_row_by_version(&key, start_version)?
+                .get_latest_state_write(&ledger_db, &key, start_version, |_, _| Ok(()))?
                 .and_then(|(version, value)| value.map(|value| (version, value)))
             {
                 None => {
