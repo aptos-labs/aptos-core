@@ -15,7 +15,6 @@ tests/sources/functional/generic_invariants.move:30:1: error: verex verification
     | module_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/generic_invariants.move:30:1: info: `0x2::S::publish_u64_y` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
         ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
 tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
@@ -32,7 +31,6 @@ tests/sources/functional/generic_invariants.move:30:1: error: verex verification
     | module_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/generic_invariants.move:30:1: info: `0x2::S::publish_x_bool` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
         ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
 tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)
@@ -49,7 +47,6 @@ tests/sources/functional/generic_invariants.move:30:1: error: verex verification
     | module_invariant => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/generic_invariants.move:30:1: info: `0x2::S::publish_x_y` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/generic_invariants.move:34:5: error: the module invariant `invariant exists<Storage<u64, Bool> >(@0x22)
         ==> global<Storage<u64, Bool> >(@0x22).x == 1` does not hold after a write of memory it reads
 tests/sources/functional/generic_invariants.move:39:5: error: the module invariant `invariant {Y} exists<Storage<u64, Y> >(@0x23)

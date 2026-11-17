@@ -835,6 +835,154 @@ theorem pos_push_valid_element_closes
   assert_scalar_clause_goals 1
   omega
 
+-- 2.5d. Tactic-level controls for a concatenation: its result holds exactly
+-- the elements of both of its vectors, so its fact is the facts of both. It is
+-- selected where the fact of one of them is in hand, and the other one is then
+-- asked for its fact whole; where neither is, the opener takes the elementwise
+-- reading of the result. The element type is a parameter, so an element's
+-- fact that is owed stays the goal it is.
+
+-- Negative (first): the fact of the second vector is missing. What stays owed
+-- is the fact of the elements of that vector alone.
+theorem neg_concatBounded_second_fact_missing_stays_owed
+    (l r : (NTy.vector (NTy.param 0)).carrier)
+    (hl : NTy.Holds (.vector (NTy.param 0)) l)
+    (bounded : (l.values ++ r.values).size < 2 ^ 64)
+    (owed : ∀ value ∈ r.values, NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (concatBounded l r bounded) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Negative: the fact of the first vector is missing.
+theorem neg_concatBounded_first_fact_missing_stays_owed
+    (l r : (NTy.vector (NTy.param 0)).carrier)
+    (hr : NTy.Holds (.vector (NTy.param 0)) r)
+    (bounded : (l.values ++ r.values).size < 2 ^ 64)
+    (owed : ∀ value ∈ l.values, NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (concatBounded l r bounded) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Negative: the fact of neither vector is in hand, although another vector's
+-- is. Nothing is selected, and the reading is elementwise over the result.
+theorem neg_concatBounded_without_facts_reads_elementwise
+    (l r w : (NTy.vector (NTy.param 0)).carrier)
+    (_hw : NTy.Holds (.vector (NTy.param 0)) w)
+    (bounded : (l.values ++ r.values).size < 2 ^ 64)
+    (owed : ∀ value ∈ (concatBounded l r bounded).values, NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (concatBounded l r bounded) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Negative: a literal of one element whose fact is missing. The vector's fact
+-- is taken, and the element's own fact is what stays owed.
+theorem neg_concatBounded_literal_element_fact_missing_stays_owed
+    (l : (NTy.vector (NTy.param 0)).carrier) (e : (NTy.param 0).carrier)
+    (hl : NTy.Holds (.vector (NTy.param 0)) l) (single : #[e].size < 2 ^ 64)
+    (bounded : (l.values ++ (⟨#[e], single⟩ : (NTy.vector (NTy.param 0)).carrier).values).size <
+      2 ^ 64)
+    (owed : ∀ value ∈ #[e], NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (concatBounded l ⟨#[e], single⟩ bounded) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Positive: both facts in hand.
+theorem pos_concatBounded_both_facts_closes
+    (l r : (NTy.vector (NTy.param 0)).carrier)
+    (hl : NTy.Holds (.vector (NTy.param 0)) l) (hr : NTy.Holds (.vector (NTy.param 0)) r)
+    (bounded : (l.values ++ r.values).size < 2 ^ 64) :
+    NTy.Holds (.vector (NTy.param 0)) (concatBounded l r bounded) := by
+  verex_holds
+
+-- Positive: the same at an element type that declares an invariant.
+theorem pos_concatBounded_declared_elements_closes
+    (l r : (NTy.vector PercentTy).carrier)
+    (hl : NTy.Holds (.vector PercentTy) l) (hr : NTy.Holds (.vector PercentTy) r)
+    (bounded : (l.values ++ r.values).size < 2 ^ 64) :
+    NTy.Holds (.vector PercentTy) (concatBounded l r bounded) := by
+  verex_holds
+
+-- Positive: a concatenation of the results of other operations, each reached
+-- through its own vector.
+theorem pos_concatBounded_of_operations_closes
+    (l r : (NTy.vector PercentTy).carrier)
+    (hl : NTy.Holds (.vector PercentTy) l) (hr : NTy.Holds (.vector PercentTy) r) (i j : Nat)
+    (inner : ((swapBounded l i j).values ++ (eraseBounded r i).values).size < 2 ^ 64)
+    (outer : ((concatBounded (swapBounded l i j) (eraseBounded r i) inner).values ++ l.values).size <
+      2 ^ 64) :
+    NTy.Holds (.vector PercentTy)
+      (concatBounded (concatBounded (swapBounded l i j) (eraseBounded r i) inner) l outer) := by
+  verex_holds
+
+-- 2.5e. Tactic-level controls for a slice and a reversed range: each keeps
+-- only elements of its vector, so its fact is that vector's where it is in
+-- hand. Where it is not, nothing is selected and the reading is elementwise
+-- over the result: the fact of the whole vector is not asked for.
+
+-- Negative (first): no fact of the sliced vector in hand, although another
+-- vector's is. The elements of the slice alone stay owed.
+theorem neg_extract_without_fact_reads_elementwise
+    (v w : (NTy.vector (NTy.param 0)).carrier) (lower upper : Nat)
+    (_hw : NTy.Holds (.vector (NTy.param 0)) w)
+    (owed : ∀ value ∈ (VerexIR.SpecVector.extract v lower upper).values, NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (VerexIR.SpecVector.extract v lower upper) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Negative: the same for a reversed range.
+theorem neg_reverseSliceBounded_without_fact_reads_elementwise
+    (v w : (NTy.vector (NTy.param 0)).carrier) (left right : Nat)
+    (_hw : NTy.Holds (.vector (NTy.param 0)) w)
+    (owed : ∀ value ∈ (reverseSliceBounded v left right).values, NTy.Holds (.param 0) value) :
+    NTy.Holds (.vector (NTy.param 0)) (reverseSliceBounded v left right) := by
+  fail_if_success (verex_holds; done)
+  verex_holds
+  assert_elementwise_reading
+  rename_i element member
+  exact owed element member
+
+-- Positive: the vector's fact in hand, at an opaque and at a declared
+-- element type, and through another operation.
+theorem pos_extract_preserves_closes
+    (v : (NTy.vector (NTy.param 0)).carrier)
+    (hv : NTy.Holds (.vector (NTy.param 0)) v) (lower upper : Nat) :
+    NTy.Holds (.vector (NTy.param 0)) (VerexIR.SpecVector.extract v lower upper) := by
+  verex_holds
+
+theorem pos_extract_declared_elements_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (lower upper : Nat) :
+    NTy.Holds (.vector PercentTy) (VerexIR.SpecVector.extract v lower upper) := by
+  verex_holds
+
+theorem pos_reverseSliceBounded_preserves_closes
+    (v : (NTy.vector (NTy.param 0)).carrier)
+    (hv : NTy.Holds (.vector (NTy.param 0)) v) (left right : Nat) :
+    NTy.Holds (.vector (NTy.param 0)) (reverseSliceBounded v left right) := by
+  verex_holds
+
+theorem pos_reverseSliceBounded_of_extract_declared_closes
+    (v : (NTy.vector PercentTy).carrier)
+    (hv : NTy.Holds (.vector PercentTy) v) (lower upper left right : Nat) :
+    NTy.Holds (.vector PercentTy)
+      (reverseSliceBounded (VerexIR.SpecVector.extract v lower upper) left right) := by
+  verex_holds
+
 -- 2.6. Tactic-level controls for a fact at a type parameter, whose family is
 -- not known: it is the fact of a value as any other, and the opener leaves the
 -- goal as it stands where no fact of it or of its container is in hand.
@@ -860,6 +1008,78 @@ theorem pos_param_read_element_closes
     (inBounds : idx < v.values.size) :
     NTy.Holds (.param 0) (v.values[idx]'inBounds) := by
   verex_holds
+
+-- 2.6b. Tactic-level controls for a check at the carriers a call's type
+-- arguments induce, as the body of a generic callee inlined on the generic
+-- route emits it. The normal form states the check at the outer carriers
+-- (`checkingAtOuterFamily`), of the same value, so the fact it owes is the
+-- one the caller's context holds. The opener itself reconciles nothing: it
+-- reads a fact at the carriers it is stated at.
+
+-- Negative (first): the opener does not take a fact at the outer carriers
+-- for the goal at the induced ones.
+theorem neg_opener_does_not_reconcile_families
+    (v : (NTy.vector (NTy.param 0)).carrier)
+    (_hv : NTy.Holds (.vector (NTy.param 0)) v)
+    (owed : @NTy.Holds (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+      (.vector (NTy.param 0)) v) :
+    @NTy.Holds (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+      (.vector (NTy.param 0)) v := by
+  fail_if_success (clear owed; verex_holds; done)
+  exact owed
+
+-- Negative: after the check is stated at the outer carriers, the fact of
+-- another vector gives nothing; the fact of this one stays owed.
+theorem neg_induced_family_check_of_other_value_stays_owed {State : Type} (state : State)
+    (v w : (NTy.vector (NTy.param 0)).carrier)
+    (_hw : NTy.Holds (.vector (NTy.param 0)) w)
+    (owed : ∀ value ∈ v.values, NTy.Holds (.param 0) value) :
+    VerexIR.Proofs.wp
+      (@checkingAt (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+        State 7 .exit (.vector (NTy.param 0)) v)
+      (fun _ _ => True) (fun _ => True) state := by
+  simp only [checkingAtOuterFamily]
+  apply wp_checkingAt_intro_holds
+  · fail_if_success (verex_holds; done)
+    verex_holds
+    assert_elementwise_reading
+    rename_i element member
+    exact owed element member
+  · intro _; trivial
+
+-- Positive: the fact at the induced carriers alone, of the goal as it is
+-- stated: the opener closes it whole.
+theorem pos_induced_family_fact_at_its_own_family_closes
+    (v : @NTy.carrier (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+      (.vector (NTy.param 0)))
+    (hv : @NTy.Holds (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+      (.vector (NTy.param 0)) v) :
+    @NTy.Holds (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+      (.vector (NTy.param 0)) v := by
+  verex_holds
+
+-- Positive: the check at the induced carriers is the check at the outer
+-- ones, of the same value.
+theorem pos_induced_family_check_is_the_outer_check {State : Type}
+    (v : (NTy.vector (NTy.param 0)).carrier) :
+    @checkingAt (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+        State 7 .exit (.vector (NTy.param 0)) v =
+      @checkingAt inferInstance State 7 .exit (.vector (NTy.param 0)) v := by
+  simp only [checkingAtOuterFamily]
+
+-- Positive: the check of a swap and a removal of a vector whose fact the
+-- context holds at the outer carriers, through the operations' own laws.
+theorem pos_induced_family_check_of_operations_closes {State : Type} (state : State)
+    (v : (NTy.vector (NTy.param 0)).carrier)
+    (hv : NTy.Holds (.vector (NTy.param 0)) v) (i j : Nat) :
+    VerexIR.Proofs.wp
+      (@checkingAt (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+        State 7 .exit (.vector (NTy.param 0)) (eraseBounded (swapBounded v i j) j))
+      (fun _ _ => True) (fun _ => True) state := by
+  simp only [checkingAtOuterFamily]
+  apply wp_checkingAt_intro_holds
+  · verex_holds
+  · intro _; trivial
 
 -- 2.7. Tactic-level controls for an element read out of an inserting
 -- expression: the read at the written position is the inserted element, so

@@ -1,8 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/bitwise_table.move:81:9: error: the specification clause `ensures spec_contains(result, 1) && spec_contains(result, 2)` is not established
-tests/sources/functional/bitwise_table.move:82:9: error: the specification clause `ensures spec_len(result) == 2` is not established
-tests/sources/functional/bitwise_table.move:83:9: error: the specification clause `ensures spec_get(result, 1) == 4` is not established
-tests/sources/functional/bitwise_table.move:84:9: error: the specification clause `ensures spec_get(result, 2) == 3` is not established
+tests/sources/functional/bitwise_table.move:81:9: error: the specification clause `ensures spec_contains::<u8, u64>(result, 1)
+        && spec_contains::<u8, u64>(result, 2)` is not established
+tests/sources/functional/bitwise_table.move:82:9: error: the specification clause `ensures spec_len::<u8, u64>(result) == 2` is not established
+tests/sources/functional/bitwise_table.move:83:9: error: the specification clause `ensures spec_get::<u8, u64>(result, 1) == 4` is not established
+tests/sources/functional/bitwise_table.move:84:9: error: the specification clause `ensures spec_get::<u8, u64>(result, 2) == 3` is not established
 tests/sources/functional/bitwise_table.move:79:5: error: verex verification failed: the automatic verification of `borrow_mut` failed; provide a proof in `tests/sources/functional/bitwise_table.proof.lean`:
   verify borrow_mut by lean =>
     verex_obligations
@@ -15,1166 +16,629 @@ tests/sources/functional/bitwise_table.move:79:5: error: verex verification fail
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/bitwise_table.proof.lean:23:5: error: the step's fact is not proved:
   executable✝ : Validation.ExecutableUnit unit
-  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
-  value :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).carrier
-  invariantHolds✝¹⁰ : True
-  new_result_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  new_result_0_1_eq : new_result_0_1 == 0
-  a✝⁸ :
-    ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value.val.fst
-  invariantHolds✝⁸ invariantHolds✝⁷ invariantHolds✝⁵ : True
-  old_value_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
+  new_result_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  new_result_1_eq : new_result_1 == 0
+  old_value_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁹ : True
+  value_1✝ : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁷ : True
+  value_0 : Proofs.Denote.NTy.address.carrier
+  value_1 : (Proofs.Denote.NTy.int 64 false).carrier
   final : Proofs.Denote.Memory unit
-  a✝⁷ :
+  a✝¹⁰ :
+    ∀ (history : Array String),
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value_0
+  a✝⁹ :
     ∀ (key : StorageKey),
       key != StorageKey.unit →
         final Proofs.Denote.TableMemory.allocationResource key ==
           initialState✝ Proofs.Denote.TableMemory.allocationResource key
-  a✝⁶ :
+  a✝⁸ :
     ∀ (resource : Proofs.Denote.ResourceType),
       resource != Proofs.Denote.TableMemory.allocationResource → final resource == initialState✝ resource
-  a✝⁵ :
+  a✝⁷ :
     ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some (history.push value.val.fst)
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Array.push (Proofs.Denote.TableMemory.encodeAllocated history) ⟨value_0, ⋯⟩)
+  invariantHolds✝⁴ : True
+  borrow_mut_result : (Proofs.Denote.NTy.int 64 false).carrier
   invariantHolds✝³ : True
-  borrow_mut_result value_0_1 :
-    Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  invariantHolds✝² : True
   verexInvariant✝⁶ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      value.val.snd.snd.fst
-  verexInvariant✝⁵ :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
       { entries := [], bounded := ⋯ }
-  verexInvariant✝⁴ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value) value.val.snd.snd.fst)
-  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence []
-  new_result_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, new_result_0_1, { entries := [], bounded := ⋯ }, ())
-  bounds✝² : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
-  bounds✝¹ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
-  bounds✝ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
-  bounds : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
-  new_result_0_1_lower : 0 ≤ new_result_0_1
-  new_result_0_1_upper : new_result_0_1 ≤ 2 ^ 64 - 1
-  old_value_0_1_lower : 0 ≤ old_value_0_1
-  old_value_0_1_upper : old_value_0_1 ≤ 2 ^ 64 - 1
+  verexInvariant✝⁵ : True
+  bounds✝⁴ : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
+  bounds✝³ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
+  bounds✝² : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
+  bounds✝¹ : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
+  new_result_1_lower : 0 ≤ new_result_1
+  new_result_1_upper : new_result_1 ≤ 2 ^ 64 - 1
+  old_value_1_lower : 0 ≤ old_value_1
+  old_value_1_upper : old_value_1 ≤ 2 ^ 64 - 1
+  value_1_lower : 0 ≤ value_1✝
+  value_1_upper : value_1✝ ≤ 2 ^ 64 - 1
+  left✝² : 0 ≤ value_1
+  right✝² : value_1 ≤ 2 ^ 64 - 1
   borrow_mut_result_lower : 0 ≤ borrow_mut_result
   borrow_mut_result_upper : borrow_mut_result ≤ 2 ^ 64 - 1
-  value_0_1_lower : 0 ≤ value_0_1
-  value_0_1_upper : value_0_1 ≤ 2 ^ 64 - 1
-  left✝ : 0 ≤ value.val.snd.fst
-  right✝ : value.val.snd.fst ≤ 2 ^ 64 - 1
-  value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝¹⁵ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁶ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value,
         PUnit.unit)
-  value_0_invariant✝¹⁴ value_0_invariant✝¹³ value_0_invariant✝¹² value_0_invariant✝¹¹ value_0_invariant✝¹⁰ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  invariantHolds✝² :
+    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
+      ((value_0, value_1,
+          SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value, ()),
+        ())
+  verexInvariant✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value)
+  value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value) ==
+      value
+  a✝⁵ : value_1 == spec_len(value)
+  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence value
+  value_size_bounds : 0 ≤ spec_len(value) ∧ spec_len(value) < 18446744073709551616
+  value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value
+  old_value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value,
         PUnit.unit)
   invariantHolds✝¹ :
-    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
-      ((value.val.fst, value_0_1,
-          (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              value_0),
-          ()),
-        ())
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value, ())
   verexInvariant✝² :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          value_0))
-  verexInvariant✝¹ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)))
-  value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            value_0)) ==
-      value_0
-  a✝⁴ : value_0_1 == spec_len(value_0)
-  value_0_size_bounds : 0 ≤ spec_len(value_0) ∧ spec_len(value_0) < 18446744073709551616
-  value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
-  value_map : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_map_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        value.val.snd.snd.fst ==
-      value_map
-  a✝³ :
-    value_map ==
-      spec_set([],
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
-        22)
-  a✝² : value.val.snd.fst == spec_len(value_map)
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value)
+  old_value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) old_value) ==
+      old_value
+  value_eq :
+    old_value == spec_set([], ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()), 22)
+  value_1_eq : old_value_1 == spec_len(old_value)
   add_returns :
-    !spec_contains(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
-  value_map_size_bounds : 0 ≤ spec_len(value_map) ∧ spec_len(value_map) < 18446744073709551616
-  value_map_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_map
-  old_value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝⁹ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
-  value_0_invariant✝⁸ value_0_invariant✝⁷ value_0_invariant✝⁶ value_0_invariant✝⁵ value_0_invariant✝⁴ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
+    !spec_contains(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
+  verexInvariant✝¹ : SpecMap.Valid SpecMap.Discipline.sequence old_value
+  old_value_size_bounds : 0 ≤ spec_len(old_value) ∧ spec_len(old_value) < 18446744073709551616
+  old_value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value
+  value' : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝³ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value',
         PUnit.unit)
   invariantHolds✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
           0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        ())
-  value_0_invariant✝³ value_0_invariant✝² value_0_invariant✝¹ value_0_invariant✝ value_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value', ())
   verexInvariant✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          old_value_0))
-  verexInvariant :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0)))
-  a✝¹ :
-    ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)).entries ==
-      spec_set(((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              old_value_0)).entries,
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value')
+  a✝² :
+    (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value).entries ==
+      spec_set((SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+            value').entries,
         ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
         Proofs.Denote.BitOp.and.run borrow_mut_result { val := 1, fits := ⋯ })
-  old_value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            old_value_0)) ==
-      old_value_0
-  value_0_1_eq : old_value_0_1 == spec_len(old_value_0)
+  value'_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value') ==
+      value'
+  a✝¹ : value_1✝ == spec_len(value')
   borrow_mut_returns :
-    spec_contains(old_value_0,
-      0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-        ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
+    spec_contains(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
   a✝ :
-    spec_get(old_value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
+    spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
       borrow_mut_result
-  value_0_eq :
-    old_value_0 ==
-      spec_set(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()),
-        23)
-  old_value_0_size_bounds : 0 ≤ spec_len(old_value_0) ∧ spec_len(old_value_0) < 18446744073709551616
-  old_value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value_0
-  ⊢ spec_get(value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }], bounded := ⋯ }, ())) ==
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence value'
+  value'_eq :
+    value' ==
+      spec_set(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()), 23)
+  value'_size_bounds : 0 ≤ spec_len(value') ∧ spec_len(value') < 18446744073709551616
+  value'_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value'
+  bounds✝ :
+    0 ≤
+        spec_get(value,
+          ({ values := #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }], bounded := ⋯ }, ())) ∧
+      spec_get(value,
+          ({ values := #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  bounds :
+    0 ≤ spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ∧
+      spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  read_bounds_0 :
+    0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ∧
+      (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ (63 + 1) - 1
+  ⊢ spec_get(value,
+        ({ values := #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }],
+            bounded := attempt_1._proof_1_23 },
+          ())) ==
       23
 tests/sources/functional/bitwise_table.proof.lean:20:5: error: the step's fact is not proved:
   executable✝ : Validation.ExecutableUnit unit
-  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
-  value :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).carrier
-  invariantHolds✝¹⁰ : True
-  new_result_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  new_result_0_1_eq : new_result_0_1 == 0
-  a✝⁸ :
-    ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value.val.fst
-  invariantHolds✝⁸ invariantHolds✝⁷ invariantHolds✝⁵ : True
-  old_value_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
+  new_result_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  new_result_1_eq : new_result_1 == 0
+  old_value_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁹ : True
+  value_1✝ : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁷ : True
+  value_0 : Proofs.Denote.NTy.address.carrier
+  value_1 : (Proofs.Denote.NTy.int 64 false).carrier
   final : Proofs.Denote.Memory unit
-  a✝⁷ :
+  a✝¹⁰ :
+    ∀ (history : Array String),
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value_0
+  a✝⁹ :
     ∀ (key : StorageKey),
       key != StorageKey.unit →
         final Proofs.Denote.TableMemory.allocationResource key ==
           initialState✝ Proofs.Denote.TableMemory.allocationResource key
-  a✝⁶ :
+  a✝⁸ :
     ∀ (resource : Proofs.Denote.ResourceType),
       resource != Proofs.Denote.TableMemory.allocationResource → final resource == initialState✝ resource
-  a✝⁵ :
+  a✝⁷ :
     ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some (history.push value.val.fst)
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Array.push (Proofs.Denote.TableMemory.encodeAllocated history) ⟨value_0, ⋯⟩)
+  invariantHolds✝⁴ : True
+  borrow_mut_result : (Proofs.Denote.NTy.int 64 false).carrier
   invariantHolds✝³ : True
-  borrow_mut_result value_0_1 :
-    Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  invariantHolds✝² : True
   verexInvariant✝⁶ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      value.val.snd.snd.fst
-  verexInvariant✝⁵ :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
       { entries := [], bounded := ⋯ }
-  verexInvariant✝⁴ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value) value.val.snd.snd.fst)
-  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence []
-  new_result_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, new_result_0_1, { entries := [], bounded := ⋯ }, ())
-  bounds✝² : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
-  bounds✝¹ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
-  bounds✝ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
-  bounds : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
-  new_result_0_1_lower : 0 ≤ new_result_0_1
-  new_result_0_1_upper : new_result_0_1 ≤ 2 ^ 64 - 1
-  old_value_0_1_lower : 0 ≤ old_value_0_1
-  old_value_0_1_upper : old_value_0_1 ≤ 2 ^ 64 - 1
+  verexInvariant✝⁵ : True
+  bounds✝⁴ : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
+  bounds✝³ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
+  bounds✝² : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
+  bounds✝¹ : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
+  new_result_1_lower : 0 ≤ new_result_1
+  new_result_1_upper : new_result_1 ≤ 2 ^ 64 - 1
+  old_value_1_lower : 0 ≤ old_value_1
+  old_value_1_upper : old_value_1 ≤ 2 ^ 64 - 1
+  value_1_lower : 0 ≤ value_1✝
+  value_1_upper : value_1✝ ≤ 2 ^ 64 - 1
+  left✝² : 0 ≤ value_1
+  right✝² : value_1 ≤ 2 ^ 64 - 1
   borrow_mut_result_lower : 0 ≤ borrow_mut_result
   borrow_mut_result_upper : borrow_mut_result ≤ 2 ^ 64 - 1
-  value_0_1_lower : 0 ≤ value_0_1
-  value_0_1_upper : value_0_1 ≤ 2 ^ 64 - 1
-  left✝ : 0 ≤ value.val.snd.fst
-  right✝ : value.val.snd.fst ≤ 2 ^ 64 - 1
-  value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝¹⁵ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁶ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value,
         PUnit.unit)
-  value_0_invariant✝¹⁴ value_0_invariant✝¹³ value_0_invariant✝¹² value_0_invariant✝¹¹ value_0_invariant✝¹⁰ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  invariantHolds✝² :
+    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
+      ((value_0, value_1,
+          SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value, ()),
+        ())
+  verexInvariant✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value)
+  value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value) ==
+      value
+  a✝⁵ : value_1 == spec_len(value)
+  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence value
+  value_size_bounds : 0 ≤ spec_len(value) ∧ spec_len(value) < 18446744073709551616
+  value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value
+  old_value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value,
         PUnit.unit)
   invariantHolds✝¹ :
-    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
-      ((value.val.fst, value_0_1,
-          (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              value_0),
-          ()),
-        ())
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value, ())
   verexInvariant✝² :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          value_0))
-  verexInvariant✝¹ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)))
-  value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            value_0)) ==
-      value_0
-  a✝⁴ : value_0_1 == spec_len(value_0)
-  value_0_size_bounds : 0 ≤ spec_len(value_0) ∧ spec_len(value_0) < 18446744073709551616
-  value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
-  value_map : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_map_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        value.val.snd.snd.fst ==
-      value_map
-  a✝³ :
-    value_map ==
-      spec_set([],
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
-        22)
-  a✝² : value.val.snd.fst == spec_len(value_map)
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value)
+  old_value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) old_value) ==
+      old_value
+  value_eq :
+    old_value == spec_set([], ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()), 22)
+  value_1_eq : old_value_1 == spec_len(old_value)
   add_returns :
-    !spec_contains(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
-  value_map_size_bounds : 0 ≤ spec_len(value_map) ∧ spec_len(value_map) < 18446744073709551616
-  value_map_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_map
-  old_value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝⁹ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
-  value_0_invariant✝⁸ value_0_invariant✝⁷ value_0_invariant✝⁶ value_0_invariant✝⁵ value_0_invariant✝⁴ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
+    !spec_contains(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
+  verexInvariant✝¹ : SpecMap.Valid SpecMap.Discipline.sequence old_value
+  old_value_size_bounds : 0 ≤ spec_len(old_value) ∧ spec_len(old_value) < 18446744073709551616
+  old_value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value
+  value' : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝³ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value',
         PUnit.unit)
   invariantHolds✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
           0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        ())
-  value_0_invariant✝³ value_0_invariant✝² value_0_invariant✝¹ value_0_invariant✝ value_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value', ())
   verexInvariant✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          old_value_0))
-  verexInvariant :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0)))
-  a✝¹ :
-    ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)).entries ==
-      spec_set(((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              old_value_0)).entries,
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value')
+  a✝² :
+    (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value).entries ==
+      spec_set((SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+            value').entries,
         ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
         Proofs.Denote.BitOp.and.run borrow_mut_result { val := 1, fits := ⋯ })
-  old_value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            old_value_0)) ==
-      old_value_0
-  value_0_1_eq : old_value_0_1 == spec_len(old_value_0)
+  value'_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value') ==
+      value'
+  a✝¹ : value_1✝ == spec_len(value')
   borrow_mut_returns :
-    spec_contains(old_value_0,
-      0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-        ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
+    spec_contains(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
   a✝ :
-    spec_get(old_value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
+    spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
       borrow_mut_result
-  value_0_eq :
-    old_value_0 ==
-      spec_set(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()),
-        23)
-  old_value_0_size_bounds : 0 ≤ spec_len(old_value_0) ∧ spec_len(old_value_0) < 18446744073709551616
-  old_value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value_0
-  ⊢ spec_get(value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }], bounded := ⋯ }, ())) ==
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence value'
+  value'_eq :
+    value' ==
+      spec_set(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()), 23)
+  value'_size_bounds : 0 ≤ spec_len(value') ∧ spec_len(value') < 18446744073709551616
+  value'_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value'
+  bounds✝ :
+    0 ≤
+        spec_get(value,
+          ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }], bounded := ⋯ }, ())) ∧
+      spec_get(value,
+          ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  bounds :
+    0 ≤ spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ∧
+      spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  read_bounds_0 :
+    0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ∧
+      (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ (63 + 1) - 1
+  ⊢ spec_get(value,
+        ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }],
+            bounded := attempt_1._proof_1_39 },
+          ())) ==
       0
 tests/sources/functional/bitwise_table.proof.lean:16:5: error: the step's fact is not proved:
   executable✝ : Validation.ExecutableUnit unit
-  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
-  value :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).carrier
-  invariantHolds✝¹⁰ : True
-  new_result_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  new_result_0_1_eq : new_result_0_1 == 0
-  a✝⁸ :
-    ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value.val.fst
-  invariantHolds✝⁸ invariantHolds✝⁷ invariantHolds✝⁵ : True
-  old_value_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
+  new_result_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  new_result_1_eq : new_result_1 == 0
+  old_value_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁹ : True
+  value_1✝ : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁷ : True
+  value_0 : Proofs.Denote.NTy.address.carrier
+  value_1 : (Proofs.Denote.NTy.int 64 false).carrier
   final : Proofs.Denote.Memory unit
-  a✝⁷ :
+  a✝¹⁰ :
+    ∀ (history : Array String),
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value_0
+  a✝⁹ :
     ∀ (key : StorageKey),
       key != StorageKey.unit →
         final Proofs.Denote.TableMemory.allocationResource key ==
           initialState✝ Proofs.Denote.TableMemory.allocationResource key
-  a✝⁶ :
+  a✝⁸ :
     ∀ (resource : Proofs.Denote.ResourceType),
       resource != Proofs.Denote.TableMemory.allocationResource → final resource == initialState✝ resource
-  a✝⁵ :
+  a✝⁷ :
     ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some (history.push value.val.fst)
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Array.push (Proofs.Denote.TableMemory.encodeAllocated history) ⟨value_0, ⋯⟩)
+  invariantHolds✝⁴ : True
+  borrow_mut_result : (Proofs.Denote.NTy.int 64 false).carrier
   invariantHolds✝³ : True
-  borrow_mut_result value_0_1 :
-    Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  invariantHolds✝² : True
   verexInvariant✝⁶ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      value.val.snd.snd.fst
-  verexInvariant✝⁵ :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
       { entries := [], bounded := ⋯ }
-  verexInvariant✝⁴ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value) value.val.snd.snd.fst)
-  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence []
-  new_result_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, new_result_0_1, { entries := [], bounded := ⋯ }, ())
-  bounds✝² : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
-  bounds✝¹ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
-  bounds✝ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
-  bounds : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
-  new_result_0_1_lower : 0 ≤ new_result_0_1
-  new_result_0_1_upper : new_result_0_1 ≤ 2 ^ 64 - 1
-  old_value_0_1_lower : 0 ≤ old_value_0_1
-  old_value_0_1_upper : old_value_0_1 ≤ 2 ^ 64 - 1
+  verexInvariant✝⁵ : True
+  bounds✝³ : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
+  bounds✝² : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
+  bounds✝¹ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
+  bounds✝ : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
+  new_result_1_lower : 0 ≤ new_result_1
+  new_result_1_upper : new_result_1 ≤ 2 ^ 64 - 1
+  old_value_1_lower : 0 ≤ old_value_1
+  old_value_1_upper : old_value_1 ≤ 2 ^ 64 - 1
+  value_1_lower : 0 ≤ value_1✝
+  value_1_upper : value_1✝ ≤ 2 ^ 64 - 1
+  left✝² : 0 ≤ value_1
+  right✝² : value_1 ≤ 2 ^ 64 - 1
   borrow_mut_result_lower : 0 ≤ borrow_mut_result
   borrow_mut_result_upper : borrow_mut_result ≤ 2 ^ 64 - 1
-  value_0_1_lower : 0 ≤ value_0_1
-  value_0_1_upper : value_0_1 ≤ 2 ^ 64 - 1
-  left✝ : 0 ≤ value.val.snd.fst
-  right✝ : value.val.snd.fst ≤ 2 ^ 64 - 1
-  value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝¹⁵ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁶ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value,
         PUnit.unit)
-  value_0_invariant✝¹⁴ value_0_invariant✝¹³ value_0_invariant✝¹² value_0_invariant✝¹¹ value_0_invariant✝¹⁰ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  invariantHolds✝² :
+    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
+      ((value_0, value_1,
+          SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value, ()),
+        ())
+  verexInvariant✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value)
+  value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value) ==
+      value
+  a✝⁵ : value_1 == spec_len(value)
+  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence value
+  value_size_bounds : 0 ≤ spec_len(value) ∧ spec_len(value) < 18446744073709551616
+  value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value
+  old_value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value,
         PUnit.unit)
   invariantHolds✝¹ :
-    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
-      ((value.val.fst, value_0_1,
-          (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              value_0),
-          ()),
-        ())
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value, ())
   verexInvariant✝² :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          value_0))
-  verexInvariant✝¹ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)))
-  value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            value_0)) ==
-      value_0
-  a✝⁴ : value_0_1 == spec_len(value_0)
-  value_0_size_bounds : 0 ≤ spec_len(value_0) ∧ spec_len(value_0) < 18446744073709551616
-  value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
-  value_map : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_map_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        value.val.snd.snd.fst ==
-      value_map
-  a✝³ :
-    value_map ==
-      spec_set([],
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
-        22)
-  a✝² : value.val.snd.fst == spec_len(value_map)
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value)
+  old_value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) old_value) ==
+      old_value
+  value_eq :
+    old_value == spec_set([], ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()), 22)
+  value_1_eq : old_value_1 == spec_len(old_value)
   add_returns :
-    !spec_contains(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
-  value_map_size_bounds : 0 ≤ spec_len(value_map) ∧ spec_len(value_map) < 18446744073709551616
-  value_map_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_map
-  old_value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝⁹ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
-  value_0_invariant✝⁸ value_0_invariant✝⁷ value_0_invariant✝⁶ value_0_invariant✝⁵ value_0_invariant✝⁴ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
+    !spec_contains(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
+  verexInvariant✝¹ : SpecMap.Valid SpecMap.Discipline.sequence old_value
+  old_value_size_bounds : 0 ≤ spec_len(old_value) ∧ spec_len(old_value) < 18446744073709551616
+  old_value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value
+  value' : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝³ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value',
         PUnit.unit)
   invariantHolds✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
           0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        ())
-  value_0_invariant✝³ value_0_invariant✝² value_0_invariant✝¹ value_0_invariant✝ value_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value', ())
   verexInvariant✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          old_value_0))
-  verexInvariant :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0)))
-  a✝¹ :
-    ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)).entries ==
-      spec_set(((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              old_value_0)).entries,
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value')
+  a✝² :
+    (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value).entries ==
+      spec_set((SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+            value').entries,
         ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
         Proofs.Denote.BitOp.and.run borrow_mut_result { val := 1, fits := ⋯ })
-  old_value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            old_value_0)) ==
-      old_value_0
-  value_0_1_eq : old_value_0_1 == spec_len(old_value_0)
+  value'_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value') ==
+      value'
+  a✝¹ : value_1✝ == spec_len(value')
   borrow_mut_returns :
-    spec_contains(old_value_0,
-      0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-        ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
+    spec_contains(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
   a✝ :
-    spec_get(old_value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
+    spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
       borrow_mut_result
-  value_0_eq :
-    old_value_0 ==
-      spec_set(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()),
-        23)
-  old_value_0_size_bounds : 0 ≤ spec_len(old_value_0) ∧ spec_len(old_value_0) < 18446744073709551616
-  old_value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value_0
-  ⊢ spec_contains(value_0,
-      0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-        ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }], bounded := ⋯ }, ()))
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence value'
+  value'_eq :
+    value' ==
+      spec_set(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()), 23)
+  value'_size_bounds : 0 ≤ spec_len(value') ∧ spec_len(value') < 18446744073709551616
+  value'_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value'
+  bounds :
+    0 ≤ spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ∧
+      spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  ⊢ spec_contains(value,
+      ({ values := #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }],
+          bounded := attempt_1._proof_1_55 },
+        ()))
 tests/sources/functional/bitwise_table.proof.lean:13:5: error: the step's fact is not proved:
   executable✝ : Validation.ExecutableUnit unit
-  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
-  value :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).carrier
-  invariantHolds✝¹⁰ : True
-  new_result_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  new_result_0_1_eq : new_result_0_1 == 0
-  a✝⁸ :
-    ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value.val.fst
-  invariantHolds✝⁸ invariantHolds✝⁷ invariantHolds✝⁵ : True
-  old_value_0_1 : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
+  new_result_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  new_result_1_eq : new_result_1 == 0
+  old_value_1 : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁹ : True
+  value_1✝ : (Proofs.Denote.NTy.int 64 false).carrier
+  invariantHolds✝⁷ : True
+  value_0 : Proofs.Denote.NTy.address.carrier
+  value_1 : (Proofs.Denote.NTy.int 64 false).carrier
   final : Proofs.Denote.Memory unit
-  a✝⁷ :
+  a✝¹⁰ :
+    ∀ (history : Array String),
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        ∀ (i : Int), 0 ≤ i → i < ↑history.size → history[i.toNat]? != some value_0
+  a✝⁹ :
     ∀ (key : StorageKey),
       key != StorageKey.unit →
         final Proofs.Denote.TableMemory.allocationResource key ==
           initialState✝ Proofs.Denote.TableMemory.allocationResource key
-  a✝⁶ :
+  a✝⁸ :
     ∀ (resource : Proofs.Denote.ResourceType),
       resource != Proofs.Denote.TableMemory.allocationResource → final resource == initialState✝ resource
-  a✝⁵ :
+  a✝⁷ :
     ∀ (history : Array String),
-      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some history →
-        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit == some (history.push value.val.fst)
+      initialState✝ Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Proofs.Denote.TableMemory.encodeAllocated history) →
+        final Proofs.Denote.TableMemory.allocationResource StorageKey.unit ==
+          some (Array.push (Proofs.Denote.TableMemory.encodeAllocated history) ⟨value_0, ⋯⟩)
+  invariantHolds✝⁴ : True
+  borrow_mut_result : (Proofs.Denote.NTy.int 64 false).carrier
   invariantHolds✝³ : True
-  borrow_mut_result value_0_1 :
-    Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  invariantHolds✝² : True
   verexInvariant✝⁶ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      value.val.snd.snd.fst
-  verexInvariant✝⁵ :
-    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
       { entries := [], bounded := ⋯ }
-  verexInvariant✝⁴ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value) value.val.snd.snd.fst)
-  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence []
-  new_result_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, new_result_0_1, { entries := [], bounded := ⋯ }, ())
-  bounds✝² : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
-  bounds✝¹ : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
-  bounds✝ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
-  bounds : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
-  new_result_0_1_lower : 0 ≤ new_result_0_1
-  new_result_0_1_upper : new_result_0_1 ≤ 2 ^ 64 - 1
-  old_value_0_1_lower : 0 ≤ old_value_0_1
-  old_value_0_1_upper : old_value_0_1 ≤ 2 ^ 64 - 1
+  verexInvariant✝⁵ : True
+  bounds✝³ : #[{ val := 1, fits := _proof_11 }, { val := 2, fits := _proof_13 }].size < 18446744073709551616
+  bounds✝² : #[{ val := 2, fits := _proof_13 }, { val := 3, fits := _proof_16 }].size < 18446744073709551616
+  bounds✝¹ : #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }].size < 2 ^ 64
+  bounds✝ : #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }].size < 2 ^ 64
+  new_result_1_lower : 0 ≤ new_result_1
+  new_result_1_upper : new_result_1 ≤ 2 ^ 64 - 1
+  old_value_1_lower : 0 ≤ old_value_1
+  old_value_1_upper : old_value_1 ≤ 2 ^ 64 - 1
+  value_1_lower : 0 ≤ value_1✝
+  value_1_upper : value_1✝ ≤ 2 ^ 64 - 1
+  left✝² : 0 ≤ value_1
+  right✝² : value_1 ≤ 2 ^ 64 - 1
   borrow_mut_result_lower : 0 ≤ borrow_mut_result
   borrow_mut_result_upper : borrow_mut_result ≤ 2 ^ 64 - 1
-  value_0_1_lower : 0 ≤ value_0_1
-  value_0_1_upper : value_0_1 ≤ 2 ^ 64 - 1
-  left✝ : 0 ≤ value.val.snd.fst
-  right✝ : value.val.snd.fst ≤ 2 ^ 64 - 1
-  value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝¹⁵ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁶ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value,
         PUnit.unit)
-  value_0_invariant✝¹⁴ value_0_invariant✝¹³ value_0_invariant✝¹² value_0_invariant✝¹¹ value_0_invariant✝¹⁰ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0),
+  invariantHolds✝² :
+    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
+      ((value_0, value_1,
+          SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value, ()),
+        ())
+  verexInvariant✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value)
+  value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value) ==
+      value
+  a✝⁵ : value_1 == spec_len(value)
+  verexInvariant✝³ : SpecMap.Valid SpecMap.Discipline.sequence value
+  value_size_bounds : 0 ≤ spec_len(value) ∧ spec_len(value) < 18446744073709551616
+  value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value
+  old_value : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝⁴ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value,
         PUnit.unit)
   invariantHolds✝¹ :
-    0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝¹⁻⁰.Holds
-      ((value.val.fst, value_0_1,
-          (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              value_0),
-          ()),
-        ())
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, old_value_1,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value, ())
   verexInvariant✝² :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          value_0))
-  verexInvariant✝¹ :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)))
-  value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            value_0)) ==
-      value_0
-  a✝⁴ : value_0_1 == spec_len(value_0)
-  value_0_size_bounds : 0 ≤ spec_len(value_0) ∧ spec_len(value_0) < 18446744073709551616
-  value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
-  value_map : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_map_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        value.val.snd.snd.fst ==
-      value_map
-  a✝³ :
-    value_map ==
-      spec_set([],
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
-        22)
-  a✝² : value.val.snd.fst == spec_len(value_map)
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) old_value)
+  old_value_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) old_value) ==
+      old_value
+  value_eq :
+    old_value == spec_set([], ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()), 22)
+  value_1_eq : old_value_1 == spec_len(old_value)
   add_returns :
-    !spec_contains(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
-  value_map_size_bounds : 0 ≤ spec_len(value_map) ∧ spec_len(value_map) < 18446744073709551616
-  value_map_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_map
-  old_value_0 : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readCarrier Int
-  value_0_invariant✝⁹ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).deepHolds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
-  value_0_invariant✝⁸ value_0_invariant✝⁷ value_0_invariant✝⁶ value_0_invariant✝⁵ value_0_invariant✝⁴ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
+    !spec_contains(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()))
+  verexInvariant✝¹ : SpecMap.Valid SpecMap.Discipline.sequence old_value
+  old_value_size_bounds : 0 ≤ spec_len(old_value) ∧ spec_len(old_value) < 18446744073709551616
+  old_value_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value
+  value' : SpecMap 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.carrier Int
+  a✝³ :
+    (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
+          0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value',
         PUnit.unit)
   invariantHolds✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.1.declaration✝⁻⁰
           0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        ())
-  value_0_invariant✝³ value_0_invariant✝² value_0_invariant✝¹ value_0_invariant✝ value_0_invariant :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 1 }, structId := 0 }
-          (Proofs.Denote.NRow.cons 0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))
-          (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-              (Proofs.Denote.NRow.cons
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false))
-                Proofs.Denote.NRow.nil)))).Holds
-      (value.val.fst, old_value_0_1,
-        (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0),
-        PUnit.unit)
+      (value_0, value_1✝,
+        SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value', ())
   verexInvariant✝ :
     (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).Holds
-      ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-        (SpecMap.writeBack
-          (fun entry =>
-            (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-              (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-          old_value_0))
-  verexInvariant :
-    SpecMap.Valid SpecMap.Discipline.sequence
-      (SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯)
-        (fun value => value)
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            old_value_0)))
-  a✝¹ :
-    ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-            value_0)).entries ==
-      spec_set(((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table
-                (Proofs.Denote.NTy.int 64 false)).forget
-            (SpecMap.writeBack
-              (fun entry =>
-                (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                  (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
-              old_value_0)).entries,
+      (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value')
+  a✝² :
+    (SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd)) value).entries ==
+      spec_set((SpecMap.writeBack (fun entry => (entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+            value').entries,
         ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()),
         Proofs.Denote.BitOp.and.run borrow_mut_result { val := 1, fits := ⋯ })
-  old_value_0_read :
-    SpecMap.ofEntries (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯) SpecInt.val
-        ((0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.table (Proofs.Denote.NTy.int 64 false)).forget
-          (SpecMap.writeBack
-            (fun entry =>
-              (0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.unread ⋯ entry.fst,
-                SpecInt.ofInt ((Proofs.Denote.NTy.int 64 false).inhabitant ⋯) entry.snd))
-            old_value_0)) ==
-      old_value_0
-  value_0_1_eq : old_value_0_1 == spec_len(old_value_0)
+  value'_read :
+    SpecMap.ofEntries (fun value => value) SpecInt.val
+        (SpecMap.writeBack (fun entry => (entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value') ==
+      value'
+  a✝¹ : value_1✝ == spec_len(value')
   borrow_mut_returns :
-    spec_contains(old_value_0,
-      0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-        ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
+    spec_contains(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ()))
   a✝ :
-    spec_get(old_value_0,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
+    spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ==
       borrow_mut_result
-  value_0_eq :
-    old_value_0 ==
-      spec_set(value_map,
-        0x42.VerifyBitwiseTable.unit.nominal.namespace.0.declaration✝⁻⁰.readPlain ⋯
-          ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()),
-        23)
-  old_value_0_size_bounds : 0 ≤ spec_len(old_value_0) ∧ spec_len(old_value_0) < 18446744073709551616
-  old_value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) old_value_0
-  ⊢ value_0_1 == 2
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence value'
+  value'_eq :
+    value' ==
+      spec_set(old_value, ({ values := #[{ val := 2, fits := ⋯ }, { val := 3, fits := ⋯ }], bounded := ⋯ }, ()), 23)
+  value'_size_bounds : 0 ≤ spec_len(value') ∧ spec_len(value') < 18446744073709551616
+  value'_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value'
+  bounds :
+    0 ≤ spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ∧
+      spec_get(value', ({ values := #[{ val := 1, fits := ⋯ }, { val := 2, fits := ⋯ }], bounded := ⋯ }, ())) ≤
+        2 ^ 64 - 1
+  ⊢ value_1 == 2
 tests/sources/functional/bitwise_table.proof.lean:11:8: error: verex verification failed: the proof of `add_R` does not establish its specification

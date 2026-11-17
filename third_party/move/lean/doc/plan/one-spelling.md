@@ -36,6 +36,10 @@ takes precedence over the order either of them suggests.
 
 - **One spelling.** A type, a value and an operation have one spelling in a
   leaf, by construction of what produces them. No rule reconciles two.
+- **Canonical by construction, bottom up.** A term is built from canonical
+  children by a constructor that makes its result canonical. The form is an
+  invariant of how terms are built, not the result of a pass: no step rewrites
+  a whole term tree to establish it ("Building the normal form").
 - **Small terms, short walks.** A term names what it uses. Nothing a
   reduction can reach is spelled inline: a definition a leaf can unfold is a
   cost paid at every mention and at every pass that walks the result.
@@ -98,6 +102,40 @@ or an opaque specification function.
 | A generic callee at arguments | the callee's meaning at the caller's row, a named constant per function and row |
 | A unit's family, a frame | a name; no literal |
 | A closure's behavior | the target function at its full argument row, whatever the site captured |
+
+## Building the normal form
+
+The normal form is kept by construction. What produces a term produces it
+canonical, given canonical parts.
+
+- **A constructor vocabulary per sort.** Vectors, maps, integers at a width,
+  declared values, reads and memory operations each have a fixed set of
+  constructing functions. A constructor may assume its arguments are canonical
+  and returns a canonical term: it evaluates what is evaluable at its head (a
+  push onto a literal vector is the literal) and chooses the one form where
+  two are equal (a concatenation with a singleton is a push).
+- **Every producer builds through it**: the clause translator, the denotation
+  rules, the walk's read and write rules, and the steps that substitute or
+  instantiate.
+- **The rule set holds constructor laws only.** A normalization rule fires at
+  a constructor whose arguments are canonical. A rule that turns one
+  producer's form into another's marks a producer to repair, and goes with the
+  repair.
+- **A conditional fact is a fact, not a form.** What holds under a hypothesis
+  (a read within its bound is the element) is stated for the deciders. It does
+  not change how the term is spelled, so a term has the same form under a
+  binder and in a leaf.
+
+Construction does not decide everything. What remains has an owner each:
+
+| What remains | Its treatment |
+|---|---|
+| Equalities that are semantic: arithmetic up to associativity and commutativity, a read after a write at an index of unknown equality, anything under a hypothesis | the deciders; the boundary between what a constructor normalizes and what a decider proves is stated per sort |
+| Instantiation and substitution done by Lean, which do not pass through the constructors | a rebuild along the path from the substituted positions to the root; everything off that path is canonical already, so the cost follows the change, not the term |
+| Terms the producers do not build: authored proofs, hand-written specifications, statements of library lemmas, the output of Lean's tactics and elaborator | one gate where such a term enters, which canonicalizes it once; laws the solver applies are stated in canonical form |
+| Proofs inside terms (a bounded read carries its bound) | a canonical form carries no proof; the proof is a separate fact, so equal values are equal terms |
+| One value at two frames (a generic callee's value at its induced family and at the caller's) | a transport, not a spelling: instantiation at the caller's row (D2) and type arguments as sorts of a declared type |
+| Sharing of equal subterms | not given by the form; the form gives the exact key under which a result is cached |
 
 ## Decisions
 

@@ -3577,8 +3577,8 @@ private def elementEquality (carriers τ : Lean.Expr) : MetaM (Lean.Expr × Lean
 
 /-- A built-in lemma's instance at its application: its theorem at the
 translated arguments, a map as its owner's typed map, a key or a value as the
-typed value the map holds it as, the map's discipline as its owner gives it,
-an integer, a vector or an element as the clause states it, and a vector's
+typed value the map holds it as, the map's discipline and the default of a
+read outside it as its owner gives them, an integer, a vector or an element as the clause states it, and a vector's
 fallback as a clause reads one. The instance's proof, its statement, and its
 premises as goals. -/
 def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lemmaTheorem : Name) :
@@ -3673,8 +3673,21 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
       else if name == `order then
         if discipline.isAppOfArity ``VerexIR.SpecMap.Discipline.ordered 2 then
           discard <| isDefEq hole (discipline.getArg! 1)
-  -- Instances by their types, the keys' equality as the map's owner
-  -- decides it; the premises are what the lemma owes.
+  -- The view a default's hole stands at, by the theorem's own binders: the
+  -- keys' where it is the default of its map's key type, the values' of its
+  -- value type.
+  let defaultView? (hole : Lean.Expr) : MetaM (Option NativeMaps.TypedView) := do
+    let some (table, _) := owner? | return none
+    let some (mapHole, _) := (holes.toList.zip names).find? (·.2 == `map) | return none
+    let some (keyType, valueType) := (← mapHole.mvarId!.getType).app2? ``VerexIR.SpecMap
+      | return none
+    let subject := (← hole.mvarId!.getType).appArg!
+    if subject == keyType then return some table.keys
+    if subject == valueType then return some table.values
+    return none
+  -- Instances by their types, the keys' equality and the default of a read
+  -- outside the map as the map's owner gives them (`TypedView.inhabited`,
+  -- what a clause reads by); the premises are what the lemma owes.
   let mut premises := #[]
   for hole in holes do
     if ← hole.mvarId!.isAssigned then continue
@@ -3684,6 +3697,11 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
         if type.isAppOfArity ``DecidableEq 1 then
           if ← isDefEq type (← inferType table.keys.decEq) then
             hole.mvarId!.assign table.keys.decEq
+            continue
+        if type.isAppOfArity ``Inhabited 1 then
+          if let some view ← defaultView? hole then
+            unless ← isDefEq hole view.inhabited do
+              throwErrorAt reference m!"the lemma's default `{type}` does not fit its map's"
             continue
       hole.mvarId!.assign (← synthInstance type)
     else if ← isProp type then

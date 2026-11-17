@@ -1,0 +1,32 @@
+VerexE2ETests/SourceVerify/condition_kinds.move:23:9: error: the module invariant `invariant exists<Config>(@0x42) ==> global<Config>(@0x42).interval >= 2` does not hold after a write of memory it reads
+VerexE2ETests/SourceVerify/condition_kinds.move:45:5: error: verex verification failed: the automatic verification of `drop_interval` failed; provide a proof in `VerexE2ETests/SourceVerify/condition_kinds.proof.lean`:
+  verify drop_interval by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/condition_kinds.move:18:19: error: the data invariant `invariant interval > 0` does not hold where a mutation ends
+VerexE2ETests/SourceVerify/condition_kinds.move:55:5: error: verex verification failed: the automatic verification of `clear_interval` failed; provide a proof in `VerexE2ETests/SourceVerify/condition_kinds.proof.lean`:
+  verify clear_interval by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/condition_kinds.move:20:20: error: the data invariant `invariant rate > 0` does not hold where a mutation ends
+VerexE2ETests/SourceVerify/condition_kinds.move:75:5: error: verex verification failed: the automatic verification of `clear_rate` failed; provide a proof in `VerexE2ETests/SourceVerify/condition_kinds.proof.lean`:
+  verify clear_rate by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/condition_kinds.move:22:9: error: the module invariant `invariant exists<Flag>(@0x42) ==> exists<Config>(@0x42)` does not hold after a write of memory it reads
+VerexE2ETests/SourceVerify/condition_kinds.move:84:5: error: verex verification failed: the automatic verification of `publish_flag` failed; provide a proof in `VerexE2ETests/SourceVerify/condition_kinds.proof.lean`:
+  verify publish_flag by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

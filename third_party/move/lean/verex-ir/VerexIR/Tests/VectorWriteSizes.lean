@@ -272,4 +272,39 @@ theorem read_over_bounded_insert (v : SpecVector Int) (x : Int) (pos : Nat)
   verex_prepared_applies
   verex_decide_written
 
+-- A read of the swap-and-remove idiom at a position the swap leaves alone:
+-- without `position < index` the swap may have moved that position
+-- (negative), and with it the read is of the vector before the swap, the
+-- removed last position being past it.
+set_option linter.unusedVariables false in
+example [Carriers] (v : (NTy.vector (.param 0)).carrier) (index position : Int) (last : Nat)
+    (lower : 0 ≤ position) (inside : index < v.values.size) (final : last = v.values.size - 1)
+    (fallback : (NTy.param 0).carrier) : True := by
+  fail_if_success
+    have : ((v.values.swapIfInBounds index.toNat last).eraseIdxIfInBounds last)[position.toNat]?.getD
+          fallback = v.values[position.toNat]?.getD fallback := by
+      verex_lookups_after_writes
+      done
+  trivial
+
+set_option linter.unusedVariables false in
+example [Carriers] (v : (NTy.vector (.param 0)).carrier) (index position : Int) (last : Nat)
+    (lower : 0 ≤ position) (below : position < index) (inside : index < v.values.size)
+    (final : last = v.values.size - 1) (fallback : (NTy.param 0).carrier) :
+    ((v.values.swapIfInBounds index.toNat last).eraseIdxIfInBounds last)[position.toNat]?.getD
+        fallback = v.values[position.toNat]?.getD fallback := by
+  verex_lookups_after_writes
+
+-- A position the swap moves is no instance of that read: the swap stays.
+set_option linter.unusedVariables false in
+example [Carriers] (v : (NTy.vector (.param 0)).carrier) (index : Int) (last : Nat)
+    (lower : 0 ≤ index) (inside : index < v.values.size) (final : last = v.values.size - 1)
+    (fallback : (NTy.param 0).carrier) : True := by
+  fail_if_success
+    have : (v.values.swapIfInBounds index.toNat last)[index.toNat]?.getD fallback =
+        v.values[index.toNat]?.getD fallback := by
+      verex_lookups_after_writes
+      done
+  trivial
+
 end VerexIR.Tests.VectorWriteSizes

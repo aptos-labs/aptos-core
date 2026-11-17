@@ -7,29 +7,19 @@ tests/sources/functional/enum.move:21:5: error: verex verification failed: the a
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/enum.move:17:9: error: the data invariant `invariant this.x > 20` does not hold where a mutation ends
 tests/sources/functional/enum.move:18:9: error: the data invariant `invariant this is Bar ==> this.z > 10` does not hold where a mutation ends
-tests/sources/functional/enum.move:31:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (250000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/enum.move:31:5: error: verex verification failed: the automatic verification of `test_data_invariant` exceeded its budget of 250000 maxHeartbeats after deciding 5 leaves (stage interrupted); provide a proof in `tests/sources/functional/enum.proof.lean`:
+tests/sources/functional/enum.move:31:5: error: verex verification failed: the automatic verification of `test_data_invariant` failed; provide a proof in `tests/sources/functional/enum.proof.lean`:
   verify test_data_invariant by lean =>
     verex_obligations
     verex_on
-    | data_invariant_1 => verex_prepare; sorry
     | data_invariant_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/enum.move:76:13: error: the assertion `_common_vector_1.x != _common_vector_2.x` does not hold
-tests/sources/functional/enum.move:77:13: error: the assertion `_common_vector_2.y[0]
-        == new CommonFields::Bar { x := 30, y := 40, z := 50 }` does not hold
 tests/sources/functional/enum.move:62:5: error: verex verification failed: the automatic verification of `test_enum_vector` failed; provide a proof in `tests/sources/functional/enum.proof.lean`:
   verify test_enum_vector by lean =>
     verex_obligations
     verex_on
     | assert_1 => verex_prepare; sorry
-    | assert_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

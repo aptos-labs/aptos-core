@@ -1,7 +1,6 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/type_dependent_code.move:1:1: info: `test1` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
-case continues.none.continues.continues.none.continues
+case continues.none.continues.continues.continues.none.continues.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -14,6 +13,7 @@ account : VerexIR.Proofs.Denote.NTy.signer.carrier
 x : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
+x_valid : (VerexIR.Proofs.Denote.NTy.param 0).Holds x
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
@@ -48,9 +48,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                   (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       state
-invariantHolds✝³ :
-  (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds
-    ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ())
+invariantHolds✝⁵ : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds (x, ())
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 9 (some account, some x, ()) initialState✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -111,8 +109,9 @@ heq✝ :
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
       (VerexIR.StorageKey.address account) initialState✝ =
     none
-invariantHolds✝² : True
-invariantHolds✝¹ :
+invariantHolds✝⁴ : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds (x, ())
+invariantHolds✝³ : True
+invariantHolds✝² :
   (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)).Holds
     ({ val := 0, fits := ⋯ }, ())
 verexAnchor :
@@ -120,7 +119,7 @@ verexAnchor :
     (VerexIR.Proofs.Denote.Skolems.writePlain
       (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-      (VerexIR.StorageKey.address account) (some ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ())) initialState✝)
+      (VerexIR.StorageKey.address account) (some (x, ())) initialState✝)
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
@@ -170,8 +169,11 @@ heq :
       (VerexIR.Proofs.Denote.Skolems.writePlain
         (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-        (VerexIR.StorageKey.address account) (some ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ())) initialState✝) =
+        (VerexIR.StorageKey.address account) (some (x, ())) initialState✝) =
     none
+invariantHolds✝¹ :
+  (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)).Holds
+    ({ val := 0, fits := ⋯ }, ())
 invariantHolds✝ : True
 ⊢ VerexIR.Proofs.Denote.Skolems.plainAt
       (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false))
@@ -188,9 +190,8 @@ tests/sources/functional/type_dependent_code.move:10:5: error: verex verificatio
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:1:1: info: `test2` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
-case continues.none.continues.continues.none.continues
+case continues.none.continues.continues.continues.none.continues.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
@@ -204,6 +205,8 @@ t1 : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 t2 : (VerexIR.Proofs.Denote.NTy.param 1).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
+t1_valid : (VerexIR.Proofs.Denote.NTy.param 0).Holds t1
+t2_valid : (VerexIR.Proofs.Denote.NTy.param 1).Holds t2
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
@@ -237,9 +240,7 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
                   (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       state
-invariantHolds✝³ :
-  (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds
-    ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ())
+invariantHolds✝⁵ : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds (t1, ())
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 209 (some account, some t1, some t2, ()) initialState✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -300,16 +301,15 @@ heq✝ :
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
       (VerexIR.StorageKey.address account) initialState✝ =
     none
-invariantHolds✝² : True
-invariantHolds✝¹ :
-  (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)).Holds
-    ((VerexIR.Proofs.Denote.Carriers.lent 1).of t2, ())
+invariantHolds✝⁴ : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).Holds (t1, ())
+invariantHolds✝³ : True
+invariantHolds✝² : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)).Holds (t2, ())
 verexAnchor :
   VerexIR.Proofs.Denote.AnchorSaved 299 (some account, some t1, some t2, ())
     (VerexIR.Proofs.Denote.Skolems.writePlain
       (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-      (VerexIR.StorageKey.address account) (some ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ())) initialState✝)
+      (VerexIR.StorageKey.address account) (some (t1, ())) initialState✝)
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
@@ -359,8 +359,9 @@ heq :
       (VerexIR.Proofs.Denote.Skolems.writePlain
         (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
         (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
-        (VerexIR.StorageKey.address account) (some ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ())) initialState✝) =
+        (VerexIR.StorageKey.address account) (some (t1, ())) initialState✝) =
     none
+invariantHolds✝¹ : (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)).Holds (t2, ())
 invariantHolds✝ : True
 ⊢ VerexIR.Proofs.Denote.Skolems.plainAt
       (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1))
@@ -377,7 +378,6 @@ tests/sources/functional/type_dependent_code.move:26:5: error: verex verificatio
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:39:1: info: `test1` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:50:9: error: the specification clause `ensures global<S<u8> >(account.address).x == 0` is not established
 tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof in the module:
   verify test1 by lean =>
@@ -386,7 +386,6 @@ tests/sources/functional/type_dependent_code.move:49:5: error: verex verificatio
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:39:1: info: `test2` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
 tests/sources/functional/type_dependent_code.move:65:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in the module:
   verify test2 by lean =>

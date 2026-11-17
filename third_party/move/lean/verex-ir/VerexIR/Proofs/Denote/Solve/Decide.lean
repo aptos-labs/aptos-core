@@ -530,6 +530,7 @@ elab "verex_lookups_after_writes" : tactic => focusGoal do
       VerexIR.Proofs.Denote.getElem_swapIfInBounds_right,
       VerexIR.Proofs.Denote.getElem?_swapIfInBounds_left,
       VerexIR.Proofs.Denote.getElem?_swapIfInBounds_right,
+      VerexIR.Proofs.Denote.getElem?_swapIfInBounds_ne,
       Array.getElem?_setIfInBounds_ne, Array.getElem?_setIfInBounds_self_of_lt,
       Array.getElem_setIfInBounds_ne, Array.getElem_setIfInBounds_self,
       VerexIR.Proofs.Denote.eraseIdxIfInBounds_of_lt,
@@ -898,12 +899,15 @@ private def mapPositionFacts (goal : MVarId) (known : Array Lean.Expr := #[]) :
           if let some rank ← observing? (mkAppM ``VerexIR.SpecMap.rank #[map, key]) then
             unless positions.contains rank do positions := positions.push rank
       if positions.size ≥ 2 && positions.size ≤ 6 then
+        -- At the default the leaf reads the map's keys by.
+        let some inhabited ← instanceOf inhabiteds map ``Inhabited | continue
         for first in positions do
           for second in positions do
             if first == second then continue
             facts ← push facts (mkAppOptM ``VerexIR.SpecMap.keyAt_lt_of_lt
-              #[none, none, valid, first, second])
-            facts ← push facts (mkAppM ``VerexIR.SpecMap.keyAt_congr #[map, first, second])
+              #[none, inhabited, none, valid, first, second])
+            facts ← push facts (mkAppOptM ``VerexIR.SpecMap.keyAt_congr
+              #[none, inhabited, map, first, second])
       for decl in ← getLCtx do
         if decl.isImplementationDetail then continue
         let ty ← instantiateMVars decl.type
@@ -3033,7 +3037,7 @@ elab "verex_lookup_read" : tactic => focusGoal do
         evalTactic (← `(tactic| verex_bounds; omega))
         setGoals [same.mvarId!]
         evalTactic (← `(tactic| first
-          | assumption
+          | verex_assumption
           | (apply VerexIR.SpecInt.ext; (try simp only [VerexIR.Proofs.Obligation_eq] at *); omega)))
         goal.assign (← mkAppM ``getElem?_eq_some_of_read
           #[values, position, fallback, expected, bound, same])
@@ -4225,6 +4229,45 @@ syntax "verex_instantiate_positions" : tactic
 invocation returned (`rewriteResultOf`). -/
 syntax "verex_rewrite_results" : tactic
 
+/-- A goal stated on a named result, viewed as the read the name stands for,
+for one candidate: the goal `w = v` on a local `w`, a hypothesis
+`naming : ∀ default, ResultOf … default = w`, and a candidate whose
+conclusion reads a result (`ResultOf … d = _`) give the goal
+`ResultOf … d = v`, with the proof of `w = v` from it. The naming equation
+is the one a call's rule proved of this result: it states the equation at
+every default and under no premise, which is why it may be read at the
+candidate's default `d`; an equation at one default, or one under a
+condition, is no naming here. Whether the candidate's read is this
+invocation, of this function at these arguments in this state, is decided
+where the candidate is applied to the view, which also finds the position
+the candidate is instantiated at. The view does not state the naming
+equation, which would read its goal back to the name. `none` where the goal,
+the hypothesis or the candidate is not of this form. Assigns nothing of the
+goal. -/
+private def namedResultView (goal : MVarId) (naming : Lean.LocalDecl) (candidate : Lean.Expr) :
+    MetaM (Option (MVarId × Lean.Expr)) := goal.withContext do
+  let target ← instantiateMVars (← goal.getType)
+  let some (_, named, stated) := target.eq? | return none
+  unless named.isFVar do return none
+  let .forallE _ domain body _ ← instantiateMVars naming.type | return none
+  let some (_, read, name) := body.eq? | return none
+  unless name == named && read.isAppOfArity ``VerexIR.Proofs.ResultOf 11 &&
+      read.appArg! == .bvar 0 && !read.appFn!.hasLooseBVars do return none
+  let default? ← withNewMCtxDepth do
+    let (_, _, conclusion) ← forallMetaTelescope (← instantiateMVars (← inferType candidate))
+    let some (_, candidateRead, _) := conclusion.eq? | return none
+    unless candidateRead.isAppOfArity ``VerexIR.Proofs.ResultOf 11 do return none
+    let default ← instantiateMVars candidateRead.appArg!
+    if default.hasExprMVar then return none
+    unless ← isDefEq (← inferType default) domain do return none
+    return some default
+  let some default := default? | return none
+  let view ← mkFreshExprSyntheticOpaqueMVar (← mkEq (read.instantiate1 default) stated)
+    (← goal.getTag)
+  let proof ← mkEqTrans (← mkEqSymm (mkApp naming.toExpr default)) view
+  let some viewed ← observing? (view.mvarId!.clear naming.fvarId) | return none
+  return some (viewed, proof)
+
 /-- A goal at a position one past the range of a quantified hypothesis,
 the step that extends a range invariant by one iteration: the hypothesis
 states the goal for the positions its range premises admit, and one
@@ -4275,9 +4318,13 @@ private def rangeInstanceCore (normalize : Bool) (splitConditions := false) : Ta
       try simp (disch := verex_assumption) only [if_pos, if_neg, dif_pos, dif_neg] at *
       all_goals $closeByContext:tactic))
     else pure closeByContext
-  for candidate in candidates.reverse do
-    let saved ← saveState
-    try
+  -- One candidate against one goal: whether the goal is closed as the
+  -- candidate's instance within its range and by the context at its bound.
+  -- A goal every premise of the instance holds for is left to the instance
+  -- decider, which reads a goal as stated; with `whole` it is closed here,
+  -- for a view that decider does not have.
+  let instanceAt (goal : MVarId) (candidate : Lean.Expr) (whole := false) : TacticM Bool := do
+      let trial ← saveState
       let premises ← withReducible (goal.apply candidate)
       let mut failing : Array MVarId := #[]
       for premise in premises do
@@ -4285,10 +4332,11 @@ private def rangeInstanceCore (normalize : Bool) (splitConditions := false) : Ta
         setGoals [premise]
         try evalTactic (← `(tactic| first | verex_assumption | omega))
         catch _ => failing := failing.push premise
+      if whole && failing.isEmpty then return true
       let #[openPremise] := failing | throwError "not one open premise"
       let premise ← instantiateMVars (← openPremise.getType)
       if premise.hasExprMVar then throwError "the open premise is not determined"
-      saved.restore
+      trial.restore
       let equations ← goal.withContext (boundEquations premise)
       if equations.isEmpty then throwError "the open premise is not a comparison"
       let (holds, fails) ← goal.byCases premise
@@ -4323,11 +4371,39 @@ private def rangeInstanceCore (normalize : Bool) (splitConditions := false) : Ta
             break
         catch _ => pure ()
         attempt.restore
-      if closed then
+      return closed
+  -- The hypotheses that name a result the goal may be stated on.
+  let namings ← goal.withContext do
+    let target ← instantiateMVars (← goal.getType)
+    let some (_, named, _) := target.eq? | pure #[]
+    unless named.isFVar do return #[]
+    (← getLCtx).foldlM (init := #[]) fun found decl => do
+      if decl.isImplementationDetail then return found
+      let type ← instantiateMVars decl.type
+      return if type.isForall && (type.find? (· == named)).isSome &&
+          (type.find? (·.isAppOfArity ``VerexIR.Proofs.ResultOf 11)).isSome then found.push decl
+        else found
+  for candidate in candidates.reverse do
+    let saved ← saveState
+    try
+      if ← instanceAt goal candidate then
         setGoals []
         return
     catch _ => pure ()
     saved.restore
+    -- The goal stated on a named result, read as the candidate reads a
+    -- result (`namedResultView`).
+    for naming in namings do
+      if naming.toExpr == candidate then continue
+      let saved ← saveState
+      try
+        if let some (view, proof) ← namedResultView goal naming candidate then
+          if ← instanceAt view candidate (whole := true) then
+            goal.assign proof
+            setGoals []
+            return
+      catch _ => pure ()
+      saved.restore
   initial.restore
   throwError "no quantified hypothesis has the goal as an instance at or one past its range"
 
@@ -5311,8 +5387,9 @@ macro "verex_keys_differ" : tactic => `(tactic| verex_focus ( (
   first
   | done
   | assumption
-  -- A discharger runs at reducible transparency, which does not unfold `¬`.
-  | with_unfolding_all (intro equal; exact absurd equal.symm ‹_›)
+  -- A discharger runs at reducible transparency, which does not unfold `¬`:
+  -- the goal's own head is unfolded, the stated disequality is looked up.
+  | with_unfolding_all (intro equal; exact absurd equal.symm (by verex_assumption))
   | omega)))
 
 /-- A discharger answering a condition it was asked before, as each hypothesis
@@ -6410,7 +6487,7 @@ macro_rules
       (first
         | done
         | (verex_observed_row_fields; all_goals
-            (subst_vars; first | assumption | rfl | simp_all only [vir_denote_norm]))
+            (subst_vars; first | verex_assumption | rfl | simp_all only [vir_denote_norm]))
         | (constructor <;>
             (intro verexGiven
              try obtain ⟨_, _⟩ := verexGiven
@@ -6869,6 +6946,27 @@ private def writtenBackReads (e : Lean.Expr) : Array Lean.Expr :=
     | _ => pure ()
   ((walk e).run ({}, #[])).2.2
 
+/-- Two reads of written-back maps read the same map at the same types: the
+readers and the write-back's unread may be spelled differently, the map read
+and the four types it is read at may not. The producer of a carrier's bridge
+(`writeBackCarrier`) spells the unread as the family states it, where a leaf
+that has normalized the read spells it reduced. Candidates that pass are
+compared as complete reads, not reader by reader. -/
+private def sameWrittenBackRead (left right : Lean.Expr) : Bool :=
+  left.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 &&
+    right.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 &&
+    (let leftArguments := left.getAppArgs
+     let rightArguments := right.getAppArgs
+     let sameTypes := leftArguments[0]! == rightArguments[0]! &&
+       leftArguments[1]! == rightArguments[1]! &&
+       leftArguments[2]! == rightArguments[2]! &&
+       leftArguments[3]! == rightArguments[3]!
+     let leftTable := leftArguments[6]!
+     let rightTable := rightArguments[6]!
+     sameTypes && leftTable.isAppOfArity ``VerexIR.SpecMap.writeBack 6 &&
+       rightTable.isAppOfArity ``VerexIR.SpecMap.writeBack 6 &&
+       leftTable.getAppArgs[5]! == rightTable.getAppArgs[5]!)
+
 /-- Use a named map's defining read only for the entry roundtrip obligation.
 The rest of the leaf keeps the named map and its stated observations. -/
 private def entriesSatisfyRead (goal : MVarId) : MetaM (List MVarId) := goal.withContext do
@@ -6884,6 +6982,87 @@ private def entriesSatisfyRead (goal : MVarId) : MetaM (List MVarId) := goal.wit
     return [← goal.replaceTargetEq (mkApp target.appFn! source) same]
   throwError "the named map has no defining read"
 
+/-- The entry rule a map's own spelling names: an update, a removal, a read
+of written entries, or the empty map. A named map is read by its definition
+(`entriesSatisfyRead`) instead. -/
+private def entriesSatisfyRule? (map : Lean.Expr) : Option Name :=
+  if map.isAppOfArity ``VerexIR.SpecMap.update 7 then
+    some ``VerexIR.SpecMap.entriesSatisfy_update
+  else if map.isAppOfArity ``VerexIR.SpecMap.remove 6 then
+    some ``VerexIR.SpecMap.entriesSatisfy_remove
+  else if map.isAppOfArity ``VerexIR.SpecMap.ofEntries 7 then
+    some ``VerexIR.SpecMap.entriesSatisfy_ofEntries
+  else if map.isAppOfArity ``List.nil 1 then
+    some ``VerexIR.SpecMap.entriesSatisfy_nil
+  else none
+
+/-- Every entry of a map a specification builds reads back, entry by entry:
+the rule the map's spelling names, applied with the arguments the obligation
+states, so that the map, its discipline and its key dictionary are the ones
+the obligation holds and none is invented. What is left are the written
+entries. A target that states no `EntriesSatisfy`, a map whose spelling
+names no rule, and an application that would leave a value undetermined are
+returned unchanged; `apply` cannot be used in their place, since it
+synthesizes the key's dictionary afresh and declines to assign it over the
+one the obligation states. -/
+private partial def entriesSatisfyWalk (goal : MVarId) : MetaM (List MVarId) := do
+  let target ← goal.withContext (instantiateMVars (← goal.getType))
+  unless target.isAppOfArity ``VerexIR.SpecMap.EntriesSatisfy 4 do return [goal]
+  let map := target.appArg!
+  if map.isFVar then
+    let read? ← try some <$> entriesSatisfyRead goal catch _ => pure none
+    let some read := read? | return [goal]
+    let mut goals := []
+    for next in read do goals := goals ++ (← entriesSatisfyWalk next)
+    return goals
+  let some ruleName := entriesSatisfyRule? map | return [goal]
+  let applied? ← commitWhenSome? do
+    let rule ← mkConstWithFreshMVarLevels ruleName
+    let (arguments, _, conclusion) ← forallMetaTelescope (← inferType rule)
+    unless ← isDefEq conclusion target do return none
+    let mut premises := #[]
+    for argument in arguments do
+      let undetermined := argument.mvarId!
+      if ← undetermined.isAssigned then continue
+      -- A value the rule does not state is one the obligation did not
+      -- determine: the entries of some other map.
+      unless ← isProp (← instantiateMVars (← undetermined.getType)) do return none
+      premises := premises.push undetermined
+    goal.assign (← instantiateMVars (mkAppN rule arguments))
+    return some premises
+  let some premises := applied? | return [goal]
+  let mut goals := []
+  for premise in premises do goals := goals ++ (← entriesSatisfyWalk premise)
+  return goals
+
+@[inherit_doc entriesSatisfyWalk]
+elab "verex_entries_satisfy" : tactic => liftMetaTactic entriesSatisfyWalk
+
+/-- A component of a written entry reads back: an identity read is the
+component itself, an integer read is the value it cuts where that value fits
+(`SpecInt.ofInt_val` for a stored certified integer, `SpecInt.val_ofInt`
+with the value's own fit), and a reader the context states a round trip for
+is closed by the leaf's own closer. Each alternative closes the component or
+is rolled back, so a reader's law that only rewrites part of it leaves the
+closer the component as it was. -/
+macro "verex_written_component" : tactic => `(tactic| (
+  solve
+    | rfl
+    | exact VerexIR.SpecInt.ofInt_val _ _
+    | (simp (disch := first | assumption | omega | decide) only
+          [VerexIR.SpecInt.ofInt_val, VerexIR.SpecInt.val_ofInt]
+       all_goals verex_leaf_cheap)
+    | verex_leaf_cheap))
+
+/-- A written entry reads back componentwise (`Prod.mk.injEq`), each
+component by its reader's law (`verex_written_component`). An identity read
+holds by reflexivity, so an opaque key is never inspected. -/
+macro "verex_written_entry" : tactic => `(tactic| (
+  try dsimp only
+  try simp only [Prod.mk.injEq, VerexIR.SpecInt.ofInt_val]
+  all_goals (try refine ⟨?_, ?_⟩)
+  all_goals verex_written_component))
+
 elab "verex_typed_written_back" : tactic => focusGoal do
     let goal ← getMainGoal
     let reads ← goal.withContext do
@@ -6897,19 +7076,14 @@ elab "verex_typed_written_back" : tactic => focusGoal do
     -- Each entry reads back: the entries of the maps it is built from, and
     -- each entry an update writes.
     let roundtrip ← `(tactic| (
-      repeat (first
-        | with_reducible apply VerexIR.SpecMap.entriesSatisfy_update
-        | with_reducible apply VerexIR.SpecMap.entriesSatisfy_remove
-        | with_reducible apply VerexIR.SpecMap.entriesSatisfy_nil
-        | with_reducible apply VerexIR.SpecMap.entriesSatisfy_ofEntries
-        | run_tac liftMetaTactic entriesSatisfyRead)
-      all_goals (intros; verex_leaf_cheap)))
+      verex_entries_satisfy
+      all_goals (intros; verex_written_entry)))
     -- The length: through the maps it is built from, an update at a key the
     -- context has, an update or a removal within the length.
     let bounded ← `(tactic| (
       repeat (first
         | with_reducible apply VerexIR.SpecMap.size_ofEntries_lt
-        | (rw [VerexIR.SpecMap.size_update_sequence, if_pos (by assumption)])
+        | (rw [VerexIR.SpecMap.size_update_sequence, if_pos (by verex_assumption)])
         | with_reducible refine VerexIR.SpecMap.size_update_present_lt (by assumption) (by assumption) ?_
         | with_reducible refine VerexIR.SpecMap.size_update_lt (by assumption) ?_
         | with_reducible apply VerexIR.SpecMap.size_remove_lt)
@@ -6923,11 +7097,24 @@ elab "verex_typed_written_back" : tactic => focusGoal do
       let stated ← goal.withContext do (← getLCtx).findDeclM? fun decl => do
           if decl.isAuxDecl then return none
           let some (_, lhs, _) := (← instantiateMVars decl.type).eq? | return none
-          return if lhs == read then some decl else none
+          if lhs == read then return some decl
+          -- A bridge of the same map at the same types states this read with
+          -- the unread spelled as its producer wrote it: the two reads are
+          -- compared as whole terms, inside an assignment boundary, so that
+          -- nothing outside them is assigned by the comparison.
+          unless sameWrittenBackRead lhs read do return none
+          if ← withoutModifyingState (withNewMCtxDepth (isDefEq lhs read)) then
+            return some decl
+          else return none
       if let some decl := stated then
         if decl.isImplementationDetail then
+          -- The bridge holds of the read the leaf states by the same proof.
+          let some (_, _, stated) := (← goal.withContext do
+            instantiateMVars (← inferType decl.toExpr)).eq? | continue
+          let requested ← goal.withContext (mkEq read stated)
+          let proof ← goal.withContext (mkExpectedTypeHint decl.toExpr requested)
           let (equation, next) ← (← goal.withContext do
-            goal.assert `writtenBack decl.type decl.toExpr).intro1P
+            goal.assert `writtenBack requested proof).intro1P
           goal := next
           equations := equations.push equation
         continue

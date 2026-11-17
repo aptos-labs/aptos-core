@@ -13,9 +13,7 @@ f :
       (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
         VerexIR.Proofs.Denote.NRow.nil)
       { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
-x_final : 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-x_value :
-  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+x_value : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed :
   VerexIR.Proofs.KeepsMemoryAt executable✝
@@ -23,20 +21,24 @@ assumed :
       VerexIR.Proofs.Denote.NRow.nil)
     { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f
 permitted : True
+x_final : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 x_value_lower : 0 ≤ x_value.val
 x_value_upper : x_value.val ≤ 18446744073709551615
+x_final_lower : 0 ≤ x_final.val
+x_final_upper : x_final.val ≤ 18446744073709551615
 ⊢ VerexIR.Proofs.wp
     (VerexIR.Proofs.Denote.closureMeaning executable✝
       (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
         VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f (((x_value, ()), x_final), ()))
+      { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f
+      (((x_value, ()), x_final, ()), ()))
     (fun value state =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Flow.bind
               (VerexIR.Proofs.Denote.Flow.bind VerexIR.Proofs.Spec.bottom fun v env =>
-                (VerexIR.Proofs.Denote.certifyingAt 14 VerexIR.Proofs.Denote.CertifyKind.handOver
+                (VerexIR.Proofs.Denote.checkingAt 14 VerexIR.Proofs.Denote.CertifyKind.handOver
                       0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ v.fst).bind
                   fun x => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value v env))
               fun value env =>
@@ -64,28 +66,20 @@ x_value_upper : x_value.val ≤ 18446744073709551615
             | VerexIR.Proofs.Denote.Flow.value value env =>
               match env.snd.fst with
               | some reference =>
-                (VerexIR.Proofs.Denote.certifyingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
+                (VerexIR.Proofs.Denote.checkingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
                       0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ reference.fst).bind
                   fun x =>
-                  (VerexIR.Proofs.Spec.assume
-                        (reference.fst =
-                          0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.forget
-                            reference.snd)).bind
-                    fun x =>
+                  (VerexIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
                     VerexIR.Proofs.Denote.Mutables.resolve exitSite VerexIR.Proofs.Denote.Mutables.nil env
                       (VerexIR.Proofs.Spec.pure ())
               | none => VerexIR.Proofs.Spec.pure ()
             | VerexIR.Proofs.Denote.Flow.return_ result env =>
               match env.snd.fst with
               | some reference =>
-                (VerexIR.Proofs.Denote.certifyingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
+                (VerexIR.Proofs.Denote.checkingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
                       0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ reference.fst).bind
                   fun x =>
-                  (VerexIR.Proofs.Spec.assume
-                        (reference.fst =
-                          0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.forget
-                            reference.snd)).bind
-                    fun x =>
+                  (VerexIR.Proofs.Spec.assume (reference.fst = reference.snd)).bind fun x =>
                     VerexIR.Proofs.Denote.Mutables.resolve exitSite VerexIR.Proofs.Denote.Mutables.nil env
                       (VerexIR.Proofs.Spec.pure result)
               | none => VerexIR.Proofs.Spec.pure result

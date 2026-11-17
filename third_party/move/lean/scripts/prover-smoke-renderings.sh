@@ -47,6 +47,17 @@ TMP=$(mktemp -d "${TMPDIR:-/tmp}/verex-prover-smoke-renderings.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 : >"$TMP/started"
 
+# A snapshot is only what the generator makes of a rendering, so the
+# generator's own controls are part of this gate: they run first and their
+# failure is a failure of the gate.
+if python3 -I -B "$LEAN_ROOT/scripts/test_prover_smoke_rendering.py" >"$TMP/controls.log" 2>&1; then
+  echo "prover-smoke-renderings: the generator's controls, $(grep -m1 '^Ran ' "$TMP/controls.log")"
+else
+  cat "$TMP/controls.log" >&2
+  echo "prover-smoke-renderings: the generator's controls failed" >&2
+  exit 1
+fi
+
 move=() rust=()
 for name in "${names[@]}"; do
   if [ -f "$FIXTURES/$name.move" ]; then move+=("$name")

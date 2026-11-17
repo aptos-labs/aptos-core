@@ -5,34 +5,31 @@ addr1 addr2 : VerexIR.Proofs.Denote.NTy.address.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 2 (some addr1, none, ()) initialState✝
-fst✝¹ :
-  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+fst✝¹ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 heq✝ :
   VerexIR.Proofs.Denote.Skolems.plainAt 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil
       (VerexIR.StorageKey.address addr1) initialState✝ =
     some (fst✝¹, ())
-value✝ : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-a✝³ a✝² : 2 = value✝.val.fst.val
 verexAnchor :
   VerexIR.Proofs.Denote.AnchorSaved 2 (some addr2, none, ())
     (VerexIR.Proofs.Denote.Skolems.writePlain 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰
-      VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1) (some value✝.val) initialState✝)
-fst✝ : VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+      VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, ()))
+      initialState✝)
+fst✝ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 heq :
-  (if addr2 = addr1 then some value✝.val
+  (if addr2 = addr1 then some ({ val := 2, fits := ⋯ }, ())
     else
       VerexIR.Proofs.Denote.Skolems.plainAt 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil
         (VerexIR.StorageKey.address addr2) initialState✝) =
     some (fst✝, ())
-value : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-a✝¹ a✝ : 2 = value.val.fst.val
 key : VerexIR.StorageKey
 x✝ : ¬key = VerexIR.StorageKey.address addr1
 h✝ : key = VerexIR.StorageKey.address addr2
 ⊢ VerexIR.Proofs.Denote.Skolems.writePlain 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰ VerexIR.Proofs.Denote.NRow.nil
-      (VerexIR.StorageKey.address addr2) (some value.val)
+      (VerexIR.StorageKey.address addr2) (some ({ val := 2, fits := ⋯ }, ()))
       (VerexIR.Proofs.Denote.Skolems.writePlain 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰
-        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1) (some value✝.val) initialState✝)
+        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1) (some ({ val := 2, fits := ⋯ }, ()))
+        initialState✝)
       { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }
       (VerexIR.StorageKey.address addr2) =
     initialState✝ { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }

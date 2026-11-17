@@ -407,6 +407,66 @@ private def splitReadingAction? (goal : MVarId) (target reading : Lean.Expr) :
     pure [taken, reduced.getD missed]
   return cases
 
+/-- Whether an array is a literal's: the array of a literal vector, an array
+literal, or the list literal its lookups are normalized to. -/
+private partial def isLiteralContainer (container : Lean.Expr) : Bool :=
+  let container := container.consumeMData
+  if container.isAppOfArity ``VerexIR.SpecVector.values 2 then
+    let vector := container.appArg!.consumeMData
+    vector.isAppOfArity ``VerexIR.SpecVector.mk 3 && isLiteralContainer (vector.getArg! 1)
+  else container.arrayLit?.isSome || container.listLit?.isSome
+
+/-- A goal with the element a program's read of a literal vector yields
+spelled as a specification's read of that position
+(`values[index]?.getD (NTy.plainFallback τ _)`, at the read's own family and
+element type): the leaf's normal form does not keep that element's name (a
+literal's lookup is its list's, whose equation is read to its element), and
+a clause reads the position in this form. What the read's equation states
+beyond that, the position within the vector, stays as a fact. The family and
+the type are
+the read's: those of the step that reads (`typed`), else the ones the
+lookup's element type spells (`NTy.carrier`); a lookup whose element type
+spells none is left. The goal as it is, too, for a vector that is no
+literal, for a case that reads no element, and at an element type whose
+values are not decided to exist. -/
+def literalReadElement (goal : MVarId) (equation : Lean.Expr)
+    (typed : Option (Lean.Expr × Lean.Expr) := none) : MetaM MVarId := goal.withContext do
+  let some (_, lookup, read) := (← instantiateMVars (← inferType equation)).consumeMData.eq?
+    | return goal
+  let read := read.consumeMData
+  unless read.isAppOfArity ``Option.some 2 do return goal
+  let .fvar element := read.getArg! 1 | return goal
+  let reading := lookup.consumeMData
+  unless reading.isAppOfArity ``GetElem?.getElem? 7 && isLiteralContainer (reading.getArg! 5) do
+    return goal
+  let some (carriers, τ) := typed <|>
+      (let carrier := (reading.getArg! 2).consumeMData
+       if carrier.isAppOfArity ``NTy.carrier 2 then some (carrier.getArg! 0, carrier.getArg! 1)
+       else none)
+    | return goal
+  let inhabitable := mkApp (mkConst ``NTy.inhabitable) τ
+  unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do return goal
+  let decided ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
+    (← mkEq inhabitable (mkConst ``Bool.true))
+  let fallback := mkApp3 (mkConst ``NTy.plainFallback) carriers τ decided
+  let total ← mkAppM ``Option.getD #[lookup, fallback]
+  let statement ← mkEq total (.fvar element)
+  let taken ← withLocalDeclD `read (← inferType lookup) fun optional => do
+    mkLambdaFVars #[optional] (← mkAppM ``Option.getD #[optional, fallback])
+  let proof ← mkExpectedTypeHint (← mkCongrArg taken equation) statement
+  -- The position within the container, which the equation states and which
+  -- stays once the element is spelled by the read.
+  let listed := (← whnfR (← inferType (reading.getArg! 5))).isAppOfArity ``List 1
+  let within ← mkAppM (if listed then ``lt_length_of_getElem?_eq_some
+    else ``lt_size_of_getElem?_eq_some) #[equation]
+  unless ← isTypeCorrect proof <&&> isTypeCorrect within do return goal
+  let (_, goal) ← (← goal.assert `verexWithin (← inferType within) within).intro1P
+  let (spelled, goal) ← (← goal.assert `verexRead statement proof).intro1P
+  let (substitution, goal) ← substCore goal spelled (symm := true) (clearH := true)
+  -- The equation now states the read of itself.
+  let .fvar stated := substitution.apply equation | return goal
+  goal.tryClear stated
+
 /-- The cases of a weakest precondition over a match on one discriminant,
 by cases on that discriminant at the goal's own instance: each case states
 the pattern it took (`d = some x`) and runs its alternative. A discriminant
@@ -416,7 +476,8 @@ and equation; a read of storage by default.
 `none` where the match has several discriminants or a dependent motive. -/
 def splitMatchAction? (goal : MVarId)
     (readFact : MVarId → Lean.Expr → MetaM MVarId :=
-      fun goal equation => return (← statedReadFact goal equation).1) :
+      fun goal equation => do
+        literalReadElement (← statedReadFact goal equation).1 equation) :
     MetaM (Option (List MVarId)) := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
   unless target.isAppOfArity ``VerexIR.Proofs.wp 7 do return none
@@ -485,10 +546,12 @@ def splitVectorRead? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.with
   let next ← goal.replaceTargetEq
     (mkAppN target.getAppFn (target.getAppArgs.set! 3 matched)) (← mkCongrArg motive unfolded)
   splitMatchAction? next fun case equation => do
-    if let some held := held? then
-      return ← statedElementFact case carriers τ values index held equation
-    if owes then return ← owedElementFact case carriers τ values index equation
-    return case
+    let case ← do
+      if let some held := held? then
+        statedElementFact case carriers τ values index held equation
+      else if owes then owedElementFact case carriers τ values index equation
+      else pure case
+    literalReadElement case equation (some (carriers, τ))
 
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
@@ -2539,8 +2602,8 @@ def behaviorStep (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.E
     let mut stated := Lean.Expr.fvar hypothesis
     let mut held := true
     while type.isArrow do
-      let some premise ← findLocalDeclWithType? type.bindingDomain! | held := false; break
-      stated := mkApp stated (.fvar premise)
+      let some premise ← statedProof? type.bindingDomain! | held := false; break
+      stated := mkApp stated premise
       type := type.bindingBody!
     unless held do continue
     -- A clause's marker is its statement.
@@ -2573,7 +2636,7 @@ def behaviorStep (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.E
     for argument in theoremArguments do
       if let .mvar id ← instantiateMVars argument then
         unless ← id.isAssigned do
-          try id.assumption catch _ =>
+          try closeByStated id catch _ =>
             if (← instantiateMVars (← id.getType)).isAppOf ``FrameOf then
               unless ← closesBy id (← `(tactic| exact FrameOf.frame rfl)) do assumed := false
             else assumed := false
@@ -2619,13 +2682,13 @@ def behaviorStep (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.E
           ((try simp only [$lemmas,*, VerexIR.Proofs.Contract.ofSkolem,
               Weave.subst, Weave.compose, HList.Holds, vir_transport, vir_denote_norm]) <;>
             verex_split_hypotheses <;> (repeat apply And.intro) <;> first
-              | assumption
+              | verex_assumption
               | (verex_method_contract_at_caller
                  simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
-                 assumption)
+                 verex_assumption)
               | (apply VerexIR.Proofs.ReceiverScopedMethod.of_instantiate _
                  simp only [ResultShape.functionOfSkolem, NTy.ofSkolem_toSkolem, vir_denote_norm]
-                 assumption)
+                 verex_assumption)
               | verex_leaf)))
       unless discharged do
         established := false
@@ -3022,8 +3085,27 @@ def receiverScopedClosure? (goal : MVarId) : TacticM (Option (List MVarId)) := g
       | throwError "unexpected scoped receiver obligations"
     unless ← closesBy receipt (← `(tactic| decide +kernel)) do
       throwError "the callback has no checked receiver receipt"
-    unless ← closesBy shape (← `(tactic| first | assumption | decide +kernel)) do
-      throwError "the callback has no checked closure shape"
+    let shapeClosed ← do
+      if ← closesBy shape (← `(tactic| verex_assumption)) then pure true
+      else
+        -- The context states the shape at the closure's own function and
+        -- mask; the rule takes their values, which they are by definition.
+        let shapeType ← instantiateMVars (← shape.getType)
+        let stated? ← shape.withContext do
+          match shapeType.eq? with
+          | some (_, left, right) =>
+              let arguments := left.getAppArgs
+              if arguments.size == 5 then
+                statedProof? (← mkEq (mkAppN left.getAppFn
+                  ((arguments.set! 1 (raw.getArg! 0)).set! 2 (raw.getArg! 1))) right)
+              else pure none
+          | none => pure none
+        match stated? with
+        | some fact =>
+            shape.assign (← shape.withContext (mkExpectedTypeHint fact shapeType))
+            pure true
+        | none => closesBy shape (← `(tactic| decide +kernel))
+    unless shapeClosed do throwError "the callback has no checked closure shape"
     requirements.refl
     setGoals [captured]
     evalTactic (← `(tactic| try simp only [List.mem_reverse, List.mem_cons, List.not_mem_nil, forall_eq_or_imp,
@@ -3423,7 +3505,7 @@ partial def literalClosureKeepsMemory? (goal : MVarId)
     -- The natives the target's theorem assumes, the caller assumes too.
     for argument in theoremArguments do
       if let .mvar id ← instantiateMVars argument then
-        unless ← id.isAssigned do id.assumption
+        unless ← id.isAssigned do closeByStated id
     let constants ← contractConstants (← inferType theoremProof)
     let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
       `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
@@ -3550,7 +3632,7 @@ def closureValidResults? (goal : MVarId)
           ← instantiateMVars (mkAppN theoremProof theoremArguments)]
       for argument in theoremArguments do
         if let .mvar id ← instantiateMVars argument then
-          unless ← id.isAssigned do id.assumption
+          unless ← id.isAssigned do closeByStated id
       let constants ← contractConstants (← inferType theoremProof)
       let lemmas : Array (TSyntax ``Lean.Parser.Tactic.simpLemma) ← constants.mapM fun name =>
         `(Lean.Parser.Tactic.simpLemma| $(mkIdent (rootNamespace ++ name)):ident)
@@ -3914,7 +3996,8 @@ the hypotheses state of the value (`FramedAtOf`, `KeepsMemoryAtOf`): of a
 value keeping memory, the run's final memory is substituted by its initial
 one; of another, its frame at the run's arguments is a hypothesis. -/
 private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial : Lean.Expr)
-    (result final run validArgs : Lean.Expr) (facts : Array Lean.Expr) : TacticM MVarId := do
+    (result final run validArgs carriers : Lean.Expr) (facts : Array Lean.Expr) :
+    TacticM MVarId := do
   let mut goal := goal
   for fact in facts do
     let factType ← goal.withContext do frameFactType (← inferType fact)
@@ -3936,8 +4019,12 @@ private def keptMemoryOf (goal : MVarId) (invocation : ModelInvocation) (initial
       let some shapeFree ← decidedTrue? (mkApp (mkConst ``NRow.invariantFree)
           (mkApp (mkConst ``ResultShape.row) shape))
         | return none
-      let validResult ← mkAppM ``VerexIR.Proofs.Denote.ResultShape.holds_of_invariantFree
-        #[shape, shapeFree, result]
+      -- The carriers are the invocation's own, as the step states the
+      -- arguments' validity over them: they are a term of the leaf, which
+      -- instance synthesis does not find.
+      let validResult := mkAppN
+        (mkConst ``VerexIR.Proofs.Denote.ResultShape.holds_of_invariantFree)
+        #[carriers, shape, shapeFree, result]
       let kept := mkAppN (← frameFactProof fact)
         #[invocation.arguments, result, initial, final, validArgs, validResult,
           ← instantiateMVars typed, run]
@@ -4038,7 +4125,7 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
     stage.set "frames"
     let (introduced, returns) ← returns.introN 3 [`verexResult, `verexFinal, `verexEnsures]
     let returns ← keptMemoryOf returns invocation initial
-      (.fvar introduced[0]!) (.fvar introduced[1]!) (.fvar introduced[2]!) validArgs facts
+      (.fvar introduced[0]!) (.fvar introduced[1]!) (.fvar introduced[2]!) validArgs carriers facts
     -- The abort: the failure, the meaning's abort on it, and the invocation's
     -- abort in both readings, at the arguments and at their entry values
     -- (`AbortsOf`, `AbortsOfEntries`).
@@ -4061,8 +4148,8 @@ def unseenModelInvocation? (goal : MVarId) : TacticM (Option (List MVarId)) := d
       | none => pure false
     let validSyntax ← requiresGoal.withContext (Lean.Elab.Term.exprToSyntax validArgs)
     let decided ← if decided then pure true else closesBy requiresGoal (← `(tactic| first
-      | assumption
-      | exact VerexIR.Proofs.requiresOf_of_entries $validSyntax (by assumption)
+      | verex_assumption
+      | exact VerexIR.Proofs.requiresOf_of_entries $validSyntax (by verex_assumption)
       | (verex_behavior; done)))
     if debug then
       IO.println s!"model unseen invocation applied; precondition decided: {decided}"
@@ -4331,7 +4418,7 @@ private def modelDenotedRun (goal : MVarId) (callees : Array (Lean.Expr × Strin
       fact := mkApp fact (← instantiateMVars premise)
     for argument in theoremArguments do
       if let .mvar id ← instantiateMVars argument then
-        unless ← id.isAssigned do id.assumption
+        unless ← id.isAssigned do closeByStated id
     let (_, next) ← (← goal.assert `verexBehavior (← inferType fact) fact).intro1P
     let state ← saveState
     try
@@ -4595,8 +4682,8 @@ def denotedRun? (goal : MVarId) (callees : Array (Lean.Expr × String × Lean.Ex
       let mut stated := Lean.Expr.fvar hypothesis
       let mut held := true
       while type.isArrow do
-        let some premise ← findLocalDeclWithType? type.bindingDomain! | held := false; break
-        stated := mkApp stated (.fvar premise)
+        let some premise ← statedProof? type.bindingDomain! | held := false; break
+        stated := mkApp stated premise
         type := type.bindingBody!
       unless held do continue
       if type.isAppOfArity ``VerexIR.Proofs.Obligation 4 then

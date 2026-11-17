@@ -343,4 +343,263 @@ run_cmd do
 verify 0x4e::unverified_target::fifty
 verify 0x4e::unverified_target::through_fifty
 
+-- ============================================================================
+-- 6. The frame of a function value that takes a reference
+-- ============================================================================
+
+/-! A `modifies_of` clause binds its formals to an invocation's arguments, and
+a formal of reference type is read as a parameter of that type is: a mutable
+reference at the value it holds where the invocation starts, a shared
+reference at what it refers to. The contract of a function under `pragma
+verify = false` is built where a caller uses it, so each frame below is
+stated by its caller's verification.
+
+The executable frame (`FramedAt`) is stated of a parameter row and a result
+row that hold no reference and is vacuous otherwise. At a row with a mutable
+reference a caller's check of the function value it passes therefore says
+nothing of that value's frame, and a proof through an unverified opaque
+callee assumes that callee's whole contract. So the cells of `apply` and
+`apply_at` pin only that the frame is stated and the call goes through the
+contract: the positive verifies and the negative fails on its own clause
+alone. A row with a shared reference states a frame a caller must establish:
+a function that writes outside it is refused at the call.
+
+In a module verified through its model the frame of a row with a mutable
+reference is stated over the model's invocations (`FramedAtOf`) and is
+established where the value is passed or stored. The last module pins, for a
+function-typed parameter and for a function-valued field, that a target is
+read at the value the reference holds where the invocation starts. -/
+
+verex module 0x4e::reference_frames where
+  pragma verify = false
+
+  struct Counter has Key where
+    total : u64
+
+  struct Config has Key where
+    total : u64
+
+  -- A formal of mutable reference type that no target reads.
+  fun apply(f : Fn(&mut u64) -> Unit has Drop, x : &mut u64) -> Unit := invoke(f, x)
+  spec apply where
+    pragma opaque = true
+    pragma verify = false
+    aborts_if aborts_of<f>(x)
+    ensures ensures_of<f>(old(x), x)
+    modifies *
+    modifies_of<f>(v : &mut u64) global<Counter>(@0x42)
+
+  fun debit(v : &mut u64) -> Unit := do
+    let total := &mut Counter[@0x42].total
+    *total := *total - *v
+    *v := 0
+  spec debit where
+    aborts_if !exists<Counter>(@0x42)
+    aborts_if global<Counter>(@0x42).total < v
+    ensures v == 0
+    ensures global<Counter>(@0x42).total == old(global<Counter>(@0x42).total) - old(v)
+    modifies global<Counter>(@0x42)
+
+  fun settle(x : &mut u64) -> Unit :=
+    apply(function[Fn(&mut u64) -> Unit has Drop](debit), x)
+  spec settle where
+    aborts_if !exists<Counter>(@0x42)
+    aborts_if global<Counter>(@0x42).total < x
+    ensures x == 0
+    ensures global<Counter>(@0x42).total == old(global<Counter>(@0x42).total) - old(x)
+    modifies *
+
+  fun settle_bad(x : &mut u64) -> Unit :=
+    apply(function[Fn(&mut u64) -> Unit has Drop](debit), x)
+  spec settle_bad where
+    aborts_if !exists<Counter>(@0x42)
+    aborts_if global<Counter>(@0x42).total < x
+    ensures x == 1
+    modifies *
+
+  -- A formal of mutable reference type that a target reads.
+  fun apply_at(f : Fn(&mut Address) -> u64 has Drop, a : &mut Address) -> u64 := invoke(f, a)
+  spec apply_at where
+    pragma opaque = true
+    pragma verify = false
+    pragma aborts_if_is_partial
+    modifies *
+    modifies_of<f>(owner : &mut Address) global<Counter>(*owner)
+
+  fun reset_at(owner : &mut Address) -> u64 := do
+    let total := &mut Counter[*owner].total
+    *total := 0
+    0
+  spec reset_at where
+    pragma aborts_if_is_partial
+    modifies global<Counter>(owner)
+
+  fun reset(a : &mut Address) -> u64 :=
+    apply_at(function[Fn(&mut Address) -> u64 has Drop](reset_at), a)
+  spec reset where
+    pragma aborts_if_is_partial
+    modifies *
+
+  -- A formal of shared reference type that a target reads.
+  fun apply_shared(f : Fn(&Address) -> u64 has Drop, a : &Address) -> u64 := invoke(f, a)
+  spec apply_shared where
+    pragma opaque = true
+    pragma verify = false
+    pragma aborts_if_is_partial
+    modifies *
+    modifies_of<f>(owner : &Address) global<Counter>(*owner)
+
+  fun clear_counter(owner : &Address) -> u64 := do
+    let total := &mut Counter[*owner].total
+    *total := 0
+    0
+  spec clear_counter where
+    pragma aborts_if_is_partial
+    modifies global<Counter>(owner)
+
+  fun clear_config(owner : &Address) -> u64 := do
+    let total := &mut Config[*owner].total
+    *total := 0
+    0
+  spec clear_config where
+    pragma aborts_if_is_partial
+    modifies global<Config>(owner)
+
+  fun clears_counter(a : &Address) -> u64 :=
+    apply_shared(function[Fn(&Address) -> u64 has Drop](clear_counter), a)
+  spec clears_counter where
+    pragma aborts_if_is_partial
+    modifies *
+
+  fun clears_config(a : &Address) -> u64 :=
+    apply_shared(function[Fn(&Address) -> u64 has Drop](clear_config), a)
+  spec clears_config where
+    pragma aborts_if_is_partial
+    modifies *
+
+open LoanDeathControls in
+run_cmd do
+  let refused (base : Name) (command : TSyntax `command) : CommandElabM (List String) := do
+    return (← rejectedDiagnostics base command).filter
+      (!·.startsWith "verex verification failed: ")
+  let claimed ← refused `«0x4e».reference_frames.settle_bad
+    (← `(command| verify 0x4e::reference_frames::settle_bad))
+  unless claimed == ["the specification clause `ensures x == 1` is not established"] do
+    throwError "a false clause after a call that takes a mutable reference: found {claimed}"
+  let outside ← refused `«0x4e».reference_frames.clears_config
+    (← `(command| verify 0x4e::reference_frames::clears_config))
+  unless outside == ["the precondition of `apply_shared` at call 1 is not established"] do
+    throwError "a function value that writes outside its frame: found {outside}"
+
+verify 0x4e::reference_frames::settle
+verify 0x4e::reference_frames::reset
+verify 0x4e::reference_frames::clears_counter
+
+verex module 0x4e::model_reference_frames where
+  pragma verify = false
+
+  struct «Ghost$calls» has Copy, Drop, Store, Key where
+    v : u64
+
+  spec «Ghost$calls» where
+    pragma ghost_memory
+
+  struct Counter has Key where
+    total : u64
+
+  struct Config has Key where
+    total : u64
+
+  fun apply_at(f : Fn(&mut Address) -> u64 has Drop, a : &mut Address) -> u64 := invoke(f, a)
+  spec apply_at where
+    pragma opaque = true
+    pragma verify = false
+    pragma aborts_if_is_partial
+    modifies *
+    modifies_of<f>(owner : &mut Address) global<Counter>(*owner)
+
+  -- The same frame of a function-valued field.
+  struct Stored has Copy, Drop, Store where
+    action : Fn(&mut Address) -> u64 has Copy, Drop, Store
+  spec Stored where
+    modifies_of<action>(owner : &mut Address) global<Counter>(*owner)
+
+  public fun reset_at(owner : &mut Address) -> u64 := do
+    let total := &mut Counter[*owner].total
+    *total := 0
+    0
+  spec reset_at where
+    pragma aborts_if_is_partial
+    modifies global<Counter>(owner)
+
+  public fun reset_config(owner : &mut Address) -> u64 := do
+    let total := &mut Config[*owner].total
+    *total := 0
+    0
+  spec reset_config where
+    pragma aborts_if_is_partial
+    modifies global<Config>(owner)
+
+  -- Writes the counter at the address the reference holds after the write.
+  public fun reset_moved(owner : &mut Address) -> u64 := do
+    *owner := @0x43
+    let total := &mut Counter[*owner].total
+    *total := 0
+    0
+  spec reset_moved where
+    pragma aborts_if_is_partial
+    modifies global<Counter>(@0x43)
+
+  fun reset(a : &mut Address) -> u64 :=
+    apply_at(function[Fn(&mut Address) -> u64 has Drop](reset_at), a)
+  spec reset where
+    pragma aborts_if_is_partial
+    modifies *
+
+  fun reset_elsewhere(a : &mut Address) -> u64 :=
+    apply_at(function[Fn(&mut Address) -> u64 has Drop](reset_moved), a)
+  spec reset_elsewhere where
+    pragma aborts_if_is_partial
+    modifies *
+
+  fun store() -> Stored := new Stored {
+    action := function[Fn(&mut Address) -> u64 has Copy, Drop, Store](reset_at) }
+  spec store where
+    aborts_if false
+
+  fun store_moved() -> Stored := new Stored {
+    action := function[Fn(&mut Address) -> u64 has Copy, Drop, Store](reset_moved) }
+  spec store_moved where
+    aborts_if false
+
+  fun store_config() -> Stored := new Stored {
+    action := function[Fn(&mut Address) -> u64 has Copy, Drop, Store](reset_config) }
+  spec store_config where
+    aborts_if false
+
+open LoanDeathControls in
+run_cmd do
+  let refused (base : Name) (command : TSyntax `command) : CommandElabM (List String) := do
+    return (← rejectedDiagnostics base command).filter
+      (!·.startsWith "verex verification failed: ")
+  let moved ← refused `«0x4e».model_reference_frames.reset_elsewhere
+    (← `(command| verify 0x4e::model_reference_frames::reset_elsewhere))
+  unless moved == ["the precondition of `apply_at` at call 1 is not established"] do
+    throwError "a write at the address a mutable reference holds after a write: found {moved}"
+  -- A field's frame is the field's own fact, owed where the value is made.
+  let field := "the data invariant `action : Fn(&mut Address) -> u64 has Copy, Drop, Store` \
+    does not hold where a value is constructed"
+  let storedMoved ← refused `«0x4e».model_reference_frames.store_moved
+    (← `(command| verify 0x4e::model_reference_frames::store_moved))
+  unless storedMoved == [field] do
+    throwError "a stored function writing at the address its reference holds after a write: \
+      found {storedMoved}"
+  let storedOutside ← refused `«0x4e».model_reference_frames.store_config
+    (← `(command| verify 0x4e::model_reference_frames::store_config))
+  unless storedOutside == [field] do
+    throwError "a stored function writing outside its field's frame: found {storedOutside}"
+
+verify 0x4e::model_reference_frames::reset
+verify 0x4e::model_reference_frames::store
+
 end VerexSL.Tests.UnverifiedMethodEvidence

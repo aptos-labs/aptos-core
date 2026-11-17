@@ -272,6 +272,23 @@ At the prepared leaf, for what its consumers are presented with:
   Where they do not, the leaf keeps the read of the operation's result and
   the normalization does not expand it into the cases; a proof applies the
   law and splits its conditions where it needs to.
+- A vector grown by one element is `SpecVector.push` of that element, in a
+  clause as in a program: a clause's concatenation with a one-element
+  literal is that push, and other concatenations stay `SpecVector.append`. A
+  push onto a literal vector is the literal, where the grown length is within
+  the bound; a symbolic vector's push stays. The values of a nest of appends
+  and pushes are one concatenation under the single bound on its total size;
+  without that bound the nest is left as it is, and a lone push is read by
+  its own law.
+- The element of a successful read of a typed literal lookup, an array's or a
+  list's at an explicit carrier, is the clause's total read of that position,
+  and the position's bound is a fact beside it. A symbolic container's
+  successful read is a named element with its lookup equation. The total
+  read's fallback is the type's, never chosen from the carrier alone, and two
+  fallbacks are not identified off the domain.
+- An owner's validity clause reads a fixed-width map value through the
+  integer view its other clauses read; a value of another kind keeps its
+  native reader.
 
 Forms that differ because their roles do are not two forms of one thing, and
 each has its stage and its conversion: the runtime encoding and the native

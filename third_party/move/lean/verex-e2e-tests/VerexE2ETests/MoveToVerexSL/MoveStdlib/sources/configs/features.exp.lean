@@ -1194,7 +1194,8 @@ verex module std::features where
     aborts_if [abstract] false
     ensures [abstract] ∀ (i in disable), !spec_contains(features, i)
     ensures [abstract] ∀ (i in enable),
-        !std::vector::spec_contains(disable, i) ==> spec_contains(features, i)
+        !std::vector::spec_contains::<u64>(disable, i)
+          ==> spec_contains(features, i)
 
   fun ensure_framework_signer(account : &Signer) -> Unit := do
     let addr := account.address

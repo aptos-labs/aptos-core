@@ -259,9 +259,10 @@ private def declareGivenFunctionCore (unit : ValidatedUnit) (handle : FunctionHa
             (some frame) (carried := own.carriers)
           let mut loopPairs : Array Term := #[]
           for (site, condition, _) in conditions do
-            let pair ← mkAppM ``Prod.mk #[toExpr handle, condition]
+            let owned ← mkAppM ``Prod.mk #[toExpr handle, condition]
+            let kinded ← mkAppM ``Prod.mk #[toExpr SiteCondition.Kind.loopInvariant, owned]
             loopPairs := loopPairs.push (← Term.exprToSyntax
-              (← mkAppM ``Prod.mk #[toExpr site, pair]))
+              (← mkAppM ``Prod.mk #[toExpr site, kinded]))
           let mut calleePairs : Array Term := #[]
           for meaning in meanings, proof in proofs, label in labels do
             let pair ← mkAppM ``PProd.mk #[toExpr label, proof]

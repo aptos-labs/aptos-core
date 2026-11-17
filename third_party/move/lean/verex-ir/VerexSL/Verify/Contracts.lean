@@ -3903,6 +3903,24 @@ def markedInvariant (own : Contract.DataOwn) (view : CompileNamespace) (τ : NTy
   τ.carriesInvariant fun source =>
     declaresInvariant view source && !own.carriers.contains source
 
+/-- The sites a function owes a mutation end at, of the pairs of a site and
+the mutating local observed by `mutationConditions`.  A site reached as a
+loan's death and again as a write is one mutation of one local, observed
+twice: one condition.  Two locals at one site would be two conditions of
+this kind there, of which the marker's step reads one: refused, naming
+both. -/
+def mutationSitesOwed (observed : Array (Nat × Nat)) : Except String (Array (Nat × Nat)) :=
+  Id.run do
+    let mut seen : Array (Nat × Nat) := #[]
+    for (site, slot) in observed do
+      if let some (_, first) := seen.find? (·.1 == site) then
+        unless first == slot do
+          return .error s!"internal: the mutation ending at the site {site} is owed of two \
+            locals, {first} and {slot}: its marker checks one condition"
+        continue
+      seen := seen.push (site, slot)
+    return .ok seen
+
 /-- The data invariant owed where a mutation whose type carries one ends:
 where a loan of a local dies, keyed by the loan, where a loan of global
 memory dies, keyed by the loan and owed of the borrowing reference, and
@@ -3945,6 +3963,9 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
         if let some owner := view.ownedRoot? view.placeFuel place then
           if carries owner then sites := sites.push (view.site id.index, owner.index)
   if sites.isEmpty then return #[]
+  let owed ← match mutationSitesOwed sites with
+    | .ok owed => pure owed
+    | .error message => throwError message
   let envType ← mkAppM ``HEnv #[rowType]
   let argumentsType ← mkAppM ``HList #[← quoteRow params]
   let stateType ← memoryAt outer
@@ -3952,10 +3973,7 @@ def mutationConditions (unit : ValidatedUnit) (outer : Lean.Expr) (handle : Func
   let readsUnit := Contract.storedInvariantReadsUnit unit
   let block : VerexIR.SpecBlock := { loc := ⟨0⟩ }
   let mut conditions := #[]
-  let mut seen : Array Nat := #[]
-  for (site, slot) in sites do
-    if seen.contains site then continue
-    seen := seen.push site
+  for (site, slot) in owed do
     let condition ← overExecutable outer readsUnit fun executable =>
       withLocalDeclD `start argumentsType fun start =>
       withLocalDeclD `startState stateType fun startState =>

@@ -2621,6 +2621,22 @@ private partial def typeContainsParameter (unit : ValidatedUnit) (typeId : TypeI
       typeContainsParameter unit reference.referent parameter (fuel - 1)
   | _ => false
 
+/-- Whether the projection of a specification value changes this type, as
+`Lower.projectSpecTypeId` projects it: a fixed-width integer becomes the
+mathematical integer, a slice becomes a vector, a reference exposes its
+referent, and a tuple is projected elementwise. Vectors, nominal data and
+function values are representation-bearing and keep their element types. -/
+private partial def specificationProjectionChanges (unit : ValidatedUnit) (typeId : TypeId)
+    (fuel : Nat) : Bool :=
+  if fuel == 0 then true else
+  match unit.tables.types[typeId.index]? with
+  | some (.integer width signed) => !(width == .unbounded && signed)
+  | some (.slice _) | some (.reference _) => true
+  | some (.tuple elements) =>
+      elements.any (specificationProjectionChanges unit · (fuel - 1))
+  | some _ => false
+  | none => true
+
 private def signatureTypeArgumentsInferable (unit : ValidatedUnit)
     (signature : Signature) (instantiations : Array GenericArgument) : Bool :=
   signature.generics.size == instantiations.size &&
@@ -2687,13 +2703,32 @@ private def callTypeArgumentsInferable (context : Context) (reference : Qualifie
         functionName.name instantiations arguments
     | none => false
 
+/-- Whether re-elaborating a printed specification call can reproduce the
+instantiation this unit holds. A specification call's type arguments are
+inferred from its arguments' specification types, where the projection has
+already widened a fixed-width integer, dropped a reference and turned a slice
+into a vector. An instantiation the projection changes is therefore not guaranteed
+recoverable from the printed call and is spelled; the type arguments the
+projection leaves alone keep the ordinary omission policy. An occurrence of
+the binder in a representation-bearing parameter position is no exception: it
+is a candidate source of type information, not evidence that inference
+selects the recorded instantiation, since an explicit type argument need not
+equal the type a represented argument carries. -/
+private def specificationInstantiationsReproducible (context : Context)
+    (instantiations : Array GenericArgument) : Bool :=
+  let fuel := context.unit.tables.types.size + 1
+  instantiations.all fun
+    | .typeArg value => !specificationProjectionChanges context.unit value.typeId fuel
+    | _ => true
+
 private def specificationCallTypeArgumentsInferable (context : Context)
     (reference : QualifiedRef) (surfaceName : String)
     (instantiations : Array GenericArgument) (arguments : Array ExprId) : Bool :=
   let fromDeclaration := (specificationSignatureFor? context.unit reference).map
     fun signature => signatureTypeArgumentsInferable context.unit signature instantiations
-  fromDeclaration.getD false ||
-    standardCallTypeArgumentsInferable context reference surfaceName instantiations arguments
+  specificationInstantiationsReproducible context instantiations &&
+    (fromDeclaration.getD false ||
+      standardCallTypeArgumentsInferable context reference surfaceName instantiations arguments)
 
 private partial def inferPrintedTypeArgumentsFuel (unit : ValidatedUnit)
     (inferred : Array (Option TypeId)) (pattern actual : TypeId) (fuel : Nat) :

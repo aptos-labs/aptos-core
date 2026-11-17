@@ -1298,6 +1298,105 @@ private def functionShape (results : VerexIR.Proofs.Denote.NRow) :
   | .cons τ .nil => pure (.one τ)
   | _ => throwError "a function value returning several results is not carried"
 
+/-- The current value and the prophecy of a native reference to `referent`,
+both at `NTy.carrier` over the single carrier layer. -/
+private def heldReferenceParts (carriers referent value : Lean.Expr) :
+    MetaM (Lean.Expr × Lean.Expr) := do
+  let carrier := carrierType carriers referent
+  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier value,
+    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier carrier value)
+
+/-- The current value and the prophecy of a native reference to `referent`. -/
+private def referencePartsAt (carriers referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) :=
+  heldReferenceParts carriers referent value
+
+/-- The current value and the prophecy of a native reference of type `type`: a
+mutable slice's two readings (`sliceReferenceContents`), or a reference's. -/
+private def referenceParts (carriers type value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
+    return (← sliceReferenceContents value, ← sliceReferenceContents value true)
+  referencePartsAt carriers type.appArg! value
+
+/-- A native value holding references as a clause reads it at entry, or with
+`prophecies` at exit (`NTy.viewed`). -/
+private def viewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
+    MetaM Lean.Expr := do
+  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) carriers
+    (toExpr prophecies) ty value
+
+/-- Clause locals see through a chain of references. Keep the native carrier
+separately for invariants; projecting a nested holder does not settle its loan. -/
+private def clauseReferent (carriers : Lean.Expr) :
+    VerexIR.Proofs.Denote.NTy → Lean.Expr → MetaM Lean.Expr
+  | .sliceRef _, value => sliceReferenceContents value
+  | .ref referent, value => do
+      let (current, _) ← referencePartsAt carriers (← quoteNTy referent) value
+      clauseReferent carriers referent current
+  | _, value => pure value
+
+/-- The clause binders of the parameters, read off the native arguments.  A
+mutable reference's entry is its current value and its exit its prophecy. -/
+private def parameterBinders (carriers : Lean.Expr) (slots : Array Slot) (types : Array Lean.Expr)
+    (arguments : Lean.Expr) : MetaM (Array SlotBinders) := do
+  let values ← rowComponentsAt carriers arguments types
+  unless slots.size == types.size do
+    throwError "internal: a parameter row differs from its declaration"
+  (slots.zip (types.zip values)).mapM fun (slot, ty, value) => do
+    let domain := domainOf slot.physical
+    match slot.kind with
+    | .mutableRef =>
+        let (current, prophecy) ← referenceParts carriers ty value
+        -- A referent holding references is read at each end of this loan: what
+        -- it holds keeps its own loans.
+        let (current, prophecy) ← if slot.nty.refFree then pure (current, prophecy) else do
+          let quoted ← quoteNTy slot.nty
+          pure (← viewedNative carriers false quoted current,
+            ← viewedNative carriers false quoted prophecy)
+        return {
+          entry := ← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty current)
+          entryNative := current
+          exit := some (← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty prophecy))
+          exitNative := some prophecy }
+    | .value =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A value holding references is read through them, compositionally.
+        let entry ← viewedNative carriers false ty value
+        let exit ← viewedNative carriers true ty value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry
+                 exit := some (← domain.binderOfNative exit), exitNative := some exit }
+    | .sharedRef =>
+        if slot.nty.refFree then
+          return { entry := ← domain.binderOfNative value, entryNative := value }
+        -- A shared view holds no loan: a clause reads what it holds as current.
+        let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
+          carriers (← quoteNTy slot.nty) value
+        return { entry := ← domain.binderOfNative entry, entryNative := entry }
+
+/-- The type a clause reads a local at: a reference local's referent. -/
+private def clauseLocalType (unit : ValidatedUnit) (ty : IrTy) : MetaM IrTy :=
+  match ty with
+  | .reference reference =>
+      match unit.tables.types[reference.referent.index]? with
+      | some referent => pure referent
+      | none => throwError "a reference local has an unknown referent type"
+  | _ => pure ty
+
+/-- The clause binders of a frame's formals, read off an invocation's
+arguments as a function's parameters are read off its own: a formal of
+mutable reference type denotes the value its argument holds where the
+invocation starts, which is the state a frame's targets are read in. -/
+private def formalBinders (context : Context) (carriers : Lean.Expr)
+    (locals : Array VerexIR.LocalDecl) (formals : Array VerexIR.LocalId)
+    (row invocation : Lean.Expr) : MetaM (Array (VerexIR.LocalId × Lean.Expr)) := do
+  let slots ← formals.mapM fun formal => do
+    let some declared := locals[formal.index]?
+      | throwError "a frame's formal is not a local"
+    slotOf context (Name.mkSimple declared.name) (context.ns.typeId declared.type.typeId)
+      (allowReference := true)
+  let binders ← parameterBinders carriers slots (rowElementTypes row) invocation
+  return formals.zip (binders.map (·.entry))
+
 /-- What a function-valued field's runs keep and return, of the field's
 function value `value` of native type `fieldType` in the whole native value
 `whole` of type `τ`: the frame its `modifies_of` clause names or, with none,
@@ -1359,18 +1458,18 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
     withLocalDeclD `pre memoryType fun pre =>
     withLocalDeclD `post memoryType fun post => do
-      let componentTypes := rowElementTypes row
-      let components ← rowProjections skolems invocation componentTypes
       let mut active : Context := { context with
         namespaceId := owner, ns, locals, localTypes, oldLocals := locals
         results := #[], resultTypes := #[], state := some pre, oldState := some pre
         typeArgumentTypes }
-      for (formal, component) in frame.formals.zip components do
+      for (formal, binder) in ← formalBinders active (← frameCarriers skolems)
+          declaration.locals frame.formals row invocation do
         let some physical := localTypes[formal.index]?
           | throwError "a field frame's formal has no local type"
-        let binder ← (domainOf physical).binderOfNative component
         active := { active with
           locals := active.locals.set! formal.index (some binder)
+          localTypes := active.localTypes.set! formal.index
+            (← clauseLocalType context.unit physical)
           oldLocals := active.oldLocals.set! formal.index (some binder) }
       let slots ← frame.modifies.mapM (modifiedSlotTerm active)
       mkLambdaFVars #[invocation, pre, post] (← slotFrame pre post slots false)
@@ -1388,14 +1487,6 @@ private def variantFieldType? (τ : VerexIR.Proofs.Denote.NTy) (variant : String
   let .enum _ _ names rows _ := τ | none
   let row ← VerexIR.Proofs.Denote.NRows.variant? names rows variant
   row.toList[index]?
-
-/-- The current value and the prophecy of a native reference to `referent`,
-both at `NTy.carrier` over the single carrier layer. -/
-private def heldReferenceParts (carriers referent value : Lean.Expr) :
-    MetaM (Lean.Expr × Lean.Expr) := do
-  let carrier := carrierType carriers referent
-  return (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier carrier value,
-    mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier carrier value)
 
 /-- Mark a clause with its source range only when a non-empty range is given.
 Folded `NTy.Holds` obligations carry no outer range because opening
@@ -2609,78 +2700,11 @@ private def isReferenceType (ty : Lean.Expr) : Bool :=
   ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.ref 1 ||
     ty.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1
 
-/-- The current value and the prophecy of a native reference to `referent`. -/
-private def referencePartsAt (carriers referent value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) :=
-  heldReferenceParts carriers referent value
-
-/-- The current value and the prophecy of a native reference of type `type`: a
-mutable slice's two readings (`sliceReferenceContents`), or a reference's. -/
-private def referenceParts (carriers type value : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
-  if type.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1 then
-    return (← sliceReferenceContents value, ← sliceReferenceContents value true)
-  referencePartsAt carriers type.appArg! value
-
 /-- The equation a returned mutable reference's value view rests on: its
 prophecy is its current value, as the reference's death leaves it
 (`ResultShape.Settled`). -/
 private def settledReference (current prophecy : Lean.Expr) : MetaM Lean.Expr :=
   mkEq current prophecy
-
-/-- A native value holding references as a clause reads it at entry, or with
-`prophecies` at exit (`NTy.viewed`). -/
-private def viewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
-    MetaM Lean.Expr := do
-  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) carriers
-    (toExpr prophecies) ty value
-
-/-- Clause locals see through a chain of references. Keep the native carrier
-separately for invariants; projecting a nested holder does not settle its loan. -/
-private def clauseReferent (carriers : Lean.Expr) :
-    VerexIR.Proofs.Denote.NTy → Lean.Expr → MetaM Lean.Expr
-  | .sliceRef _, value => sliceReferenceContents value
-  | .ref referent, value => do
-      let (current, _) ← referencePartsAt carriers (← quoteNTy referent) value
-      clauseReferent carriers referent current
-  | _, value => pure value
-
-/-- The clause binders of the parameters, read off the native arguments.  A
-mutable reference's entry is its current value and its exit its prophecy. -/
-private def parameterBinders (carriers : Lean.Expr) (slots : Array Slot) (types : Array Lean.Expr)
-    (arguments : Lean.Expr) : MetaM (Array SlotBinders) := do
-  let values ← rowComponentsAt carriers arguments types
-  unless slots.size == types.size do
-    throwError "internal: a parameter row differs from its declaration"
-  (slots.zip (types.zip values)).mapM fun (slot, ty, value) => do
-    let domain := domainOf slot.physical
-    match slot.kind with
-    | .mutableRef =>
-        let (current, prophecy) ← referenceParts carriers ty value
-        -- A referent holding references is read at each end of this loan: what
-        -- it holds keeps its own loans.
-        let (current, prophecy) ← if slot.nty.refFree then pure (current, prophecy) else do
-          let quoted ← quoteNTy slot.nty
-          pure (← viewedNative carriers false quoted current,
-            ← viewedNative carriers false quoted prophecy)
-        return {
-          entry := ← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty current)
-          entryNative := current
-          exit := some (← slot.clauseDomain.binderOfNative (← clauseReferent carriers slot.nty prophecy))
-          exitNative := some prophecy }
-    | .value =>
-        if slot.nty.refFree then
-          return { entry := ← domain.binderOfNative value, entryNative := value }
-        -- A value holding references is read through them, compositionally.
-        let entry ← viewedNative carriers false ty value
-        let exit ← viewedNative carriers true ty value
-        return { entry := ← domain.binderOfNative entry, entryNative := entry
-                 exit := some (← domain.binderOfNative exit), exitNative := some exit }
-    | .sharedRef =>
-        if slot.nty.refFree then
-          return { entry := ← domain.binderOfNative value, entryNative := value }
-        -- A shared view holds no loan: a clause reads what it holds as current.
-        let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
-          carriers (← quoteNTy slot.nty) value
-        return { entry := ← domain.binderOfNative entry, entryNative := entry }
 
 /-- Whether the expression tree at `root` reads a returned reference's final
 value. -/
@@ -3997,12 +4021,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   let functionLocalTypes ← declaration.locals.mapM fun localDecl => do
     let some ty := ns.typeOf localDecl.type.typeId
       | throwError "function local has an unknown type"
-    match ty with
-    | .reference reference =>
-        let some referent := unit.tables.types[reference.referent.index]?
-          | throwError "function reference local has an unknown referent type"
-        pure referent
-    | _ => pure ty
+    clauseLocalType unit ty
   let padLocals (values : Array (Option Lean.Expr)) : Array (Option Lean.Expr) :=
     values ++ Array.replicate (declaration.locals.size - values.size) none
   let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (signature.frame.carriers)
@@ -4317,13 +4336,9 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
                 let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
                   withLocalDeclD `pre runtimeState fun pre =>
                     withLocalDeclD `post runtimeState fun post => do
-                      let componentTypes := rowElementTypes row
-                      let components ← rowComponentsAt signature.frame.carriers invocation componentTypes
                       let mut context := contextOf pre bound
-                      for (formal, component) in frame.formals.zip components do
-                        let some physical := functionLocalTypes[formal.index]?
-                          | throwError "a frame's formal has no local type"
-                        let binder ← (domainOf physical).binderOfNative component
+                      for (formal, binder) in ← formalBinders context signature.frame.carriers
+                          declaration.locals frame.formals row invocation do
                         context := { context with
                           locals := context.locals.set! formal.index (some binder)
                           oldLocals := context.oldLocals.set! formal.index (some binder) }

@@ -38,6 +38,29 @@ def get [Inhabited V] : List (K × V) → K → V
   | [], _ => default
   | entry :: rest, key => if entry.1 = key then entry.2 else get rest key
 
+/-- The value of a key's first entry, when present: the same lookup as
+`get`, spelled without the default. -/
+def get? : List (K × V) → K → Option V
+  | [], _ => none
+  | entry :: rest, key => if entry.1 = key then some entry.2 else get? rest key
+
+@[simp] theorem get?_nil (key : K) : get? ([] : SpecMap K V) key = none := rfl
+
+@[simp] theorem get?_cons (entry : K × V) (rest : SpecMap K V) (key : K) :
+    get? (entry :: rest) key = if entry.1 = key then some entry.2 else get? rest key := rfl
+
+theorem mem_of_get? {map : SpecMap K V} {key : K} {value : V}
+    (found : get? map key = some value) : (key, value) ∈ map := by
+  induction map with
+  | nil => cases found
+  | cons entry rest ih =>
+      simp only [get?] at found
+      split at found
+      · rename_i same
+        cases Option.some.inj found
+        exact same ▸ List.mem_cons_self ..
+      · exact List.mem_cons_of_mem _ (ih found)
+
 /-- The position of a key's first entry; the length without one. -/
 def indexOf : List (K × V) → K → Nat
   | [], _ => 0
@@ -614,6 +637,40 @@ def valueAt [Inhabited V] (map : SpecMap K V) (key : K) : V := get map key
 def keyAt [Inhabited K] (map : SpecMap K V) (index : Int) : K :=
   if index < 0 then default else (map[index.toNat]?.map Prod.fst).getD default
 
+/-- The key at a position inside the map, and `none` at one outside it: the
+same read as `keyAt`, spelled without the default. -/
+def keyAt? (map : SpecMap K V) (index : Int) : Option K :=
+  if index < 0 then none else map[index.toNat]?.map Prod.fst
+
+omit [DecidableEq K] in
+/-- A position whose read succeeds reads that key, whatever the default:
+`keyAt` takes its default exactly where `keyAt?` is `none`. -/
+theorem keyAt_of_keyAt? [Inhabited K] {map : SpecMap K V} {index : Int} {key : K}
+    (inside : keyAt? map index = some key) : keyAt map index = key := by
+  unfold keyAt? at inside
+  unfold keyAt
+  split at inside
+  · exact absurd inside (by simp)
+  · rename_i low
+    rw [if_neg low, inside, Option.getD_some]
+
+/-- A key whose read succeeds reads that value, whatever the default:
+`valueAt` takes its default exactly where `get?` is `none`. -/
+theorem valueAt_of_get? [Inhabited V] {map : SpecMap K V} {key : K} {value : V}
+    (found : get? map key = some value) : valueAt map key = value := by
+  induction map with
+  | nil => exact absurd found (by simp)
+  | cons entry rest ih =>
+      simp only [get?_cons] at found
+      unfold valueAt get
+      split at found
+      · rename_i same
+        rw [if_pos same]
+        exact Option.some.inj found
+      · rename_i differs
+        rw [if_neg differs]
+        exact ih found
+
 def rank (map : SpecMap K V) (key : K) : Int := indexOf map key
 
 def update (discipline : Discipline K) (map : SpecMap K V) (key : K) (value : V) : SpecMap K V :=
@@ -859,22 +916,24 @@ theorem size_remove (discipline : Discipline K) (map : SpecMap K V) (key : K) :
   all_goals split <;> rename_i h <;> first | rfl | (have := positive h; omega)
 
 omit [DecidableEq K] in
-theorem keyAt_lt {map : SpecMap Int V} (valid : Valid (.ordered intOrder) map)
+theorem keyAt_lt [Inhabited Int] {map : SpecMap Int V} (valid : Valid (.ordered intOrder) map)
     {first second : Int} (low : 0 ≤ first) (before : first < second) (high : second < size map) :
     keyAt map first < keyAt map second :=
   Int.compare_eq_lt.mp (order_keyAt_lt valid low before high)
 
 omit [DecidableEq K] in
 /-- `keyAt_lt` as a fact of two positions, its conditions premises: what the
-solver states of the positions a leaf reads. -/
-theorem keyAt_lt_of_lt {map : SpecMap Int V} (valid : Valid (.ordered intOrder) map)
+solver states of the positions a leaf reads, at the default the leaf reads
+them by. -/
+theorem keyAt_lt_of_lt [Inhabited Int] {map : SpecMap Int V}
+    (valid : Valid (.ordered intOrder) map)
     (first second : Int) :
     0 ≤ first → first < second → second < size map → keyAt map first < keyAt map second :=
   fun low before high => keyAt_lt valid low before high
 
 omit [DecidableEq K] in
 /-- Equal positions hold equal keys, as a fact over the positions' bounds. -/
-theorem keyAt_congr (map : SpecMap Int V) (first second : Int) :
+theorem keyAt_congr [Inhabited Int] (map : SpecMap Int V) (first second : Int) :
     first ≤ second → second ≤ first → keyAt map first ≤ keyAt map second := by
   intro below above
   rw [show first = second by omega]
@@ -1217,7 +1276,7 @@ theorem keyAt_of_keys [Inhabited K] {map : SpecMap K V} {keys : List K}
 
 omit [DecidableEq K] in
 /-- Integer-key enumeration establishes validity without exposing its list representation. -/
-theorem valid_of_keyAt_lt {map : SpecMap Int V}
+theorem valid_of_keyAt_lt [Inhabited Int] {map : SpecMap Int V}
     (ordered : ∀ i j : Int, 0 ≤ i → i < j → j < size map → keyAt map i < keyAt map j) :
     Valid (.ordered intOrder) map := by
   apply List.pairwise_iff_getElem.mpr
@@ -1230,7 +1289,8 @@ theorem valid_of_keyAt_lt {map : SpecMap Int V}
 omit [DecidableEq K] in
 /-- A slice is ordered when its keys enumerate a bounded interval of an ordered map.
 The slice and parent may have different value types. -/
-theorem valid_slice {W : Type} {map : SpecMap Int V} {slice : SpecMap Int W} {offset : Int}
+theorem valid_slice [Inhabited Int] {W : Type} {map : SpecMap Int V} {slice : SpecMap Int W}
+    {offset : Int}
     (valid : Valid (.ordered intOrder) map) (low : 0 ≤ offset)
     (high : offset + size slice ≤ size map)
     (same : ∀ i : Int, 0 ≤ i → i < size slice → keyAt slice i = keyAt map (offset + i)) :

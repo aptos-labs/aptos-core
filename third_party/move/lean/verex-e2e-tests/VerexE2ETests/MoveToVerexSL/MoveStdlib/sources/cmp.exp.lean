@@ -69,18 +69,18 @@ verex module std::cmp where
 
   -- here for typing, for the second line
   fun test_verify_compare_preliminary_types() -> Unit := spec do
-    assert compare(1, 5).is_ne()
-    assert !compare(1, 5).is_eq()
-    assert compare(1, 5).is_lt()
-    assert compare(1, 5).is_le()
-    assert compare(5, 5).is_eq()
-    assert !compare(5, 5).is_ne()
-    assert !compare(5, 5).is_lt()
-    assert compare(5, 5).is_le()
-    assert !compare(7, 5).is_eq()
-    assert compare(7, 5).is_ne()
-    assert !compare(7, 5).is_lt()
-    assert !compare(7, 5).is_le()
+    assert compare::<u256>(1, 5).is_ne()
+    assert !compare::<u256>(1, 5).is_eq()
+    assert compare::<u256>(1, 5).is_lt()
+    assert compare::<u256>(1, 5).is_le()
+    assert compare::<u256>(5, 5).is_eq()
+    assert !compare::<u256>(5, 5).is_ne()
+    assert !compare::<u256>(5, 5).is_lt()
+    assert compare::<u256>(5, 5).is_le()
+    assert !compare::<u256>(7, 5).is_eq()
+    assert compare::<u256>(7, 5).is_ne()
+    assert !compare::<u256>(7, 5).is_lt()
+    assert !compare::<u256>(7, 5).is_le()
     assert compare(false, true).is_ne()
     assert compare(false, true).is_lt()
     assert compare(true, false).is_ge()
@@ -162,7 +162,7 @@ verex module std::cmp where
     let v_a := vector<u64>[a]
     let v_b := vector<u64>[b]
     spec do
-      assert compare(a, b) == new Ordering::Less {}
+      assert compare::<u64>(a, b) == new Ordering::Less {}
       assert compare(se_a, se_b) == new Ordering::Less {}
       assert compare(v_a, v_b) == new Ordering::Less {}
 

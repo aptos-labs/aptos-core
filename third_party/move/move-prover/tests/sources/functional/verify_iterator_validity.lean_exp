@@ -16,29 +16,8 @@ tests/sources/functional/verify_iterator_validity.move:180:5: error: verex verif
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/verify_iterator_validity.move:314:9: error: the specification clause `ensures result == 3` is not established
-tests/sources/functional/verify_iterator_validity.move:313:5: error: (deterministic) timeout at `whnf`, maximum number of heartbeats (250000) has been reached
-
-Note: Use `set_option maxHeartbeats <num>` to set the limit.
-
-Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
-tests/sources/functional/verify_iterator_validity.move:313:5: error: verex verification failed: the automatic verification of `refind_after_invalidate` exceeded its budget of 250000 maxHeartbeats after deciding 1 leaves (stage interrupted); provide a proof in the module:
+tests/sources/functional/verify_iterator_validity.move:313:5: error: verex verification failed: the automatic verification of `refind_after_invalidate` failed; provide a proof in the module:
   verify refind_after_invalidate by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:452:9: error: the specification clause `ensures result == 2` is not established
-tests/sources/functional/verify_iterator_validity.move:451:5: error: verex verification failed: the automatic verification of `vector_same_element` failed; provide a proof in the module:
-  verify vector_same_element by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/verify_iterator_validity.move:501:9: error: the specification clause `ensures result == 2` is not established
-tests/sources/functional/verify_iterator_validity.move:500:5: error: verex verification failed: the automatic verification of `preserved_wrapper_ok` failed; provide a proof in the module:
-  verify preserved_wrapper_ok by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry

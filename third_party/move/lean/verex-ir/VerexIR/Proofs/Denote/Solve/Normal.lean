@@ -3803,6 +3803,73 @@ simproc ↓ [vir_denote, vir_denote_norm] ntyHoldsOuterFamily
     | return .continue
   return .visit { expr := rhs, proof? := some equation }
 
+/-- A check at the carriers a call's type arguments induce is the check at
+the outer carriers, of the type substituted and of the same value: the fact
+it owes and the fact what follows it sees are one proposition
+(`NTy.holds_instantiate_heq`). -/
+theorem checkingAt_instantiate_heq {State : Type} {outer : Carriers} (site : Nat)
+    (kind : CertifyKind) (θ : TypeArgs) (τ : NTy)
+    (value : @NTy.carrier (Carriers.instantiate θ outer) τ)
+    (value' : @NTy.carrier outer (τ.subst θ.1)) (h : HEq value value') :
+    @checkingAt (Carriers.instantiate θ outer) State site kind τ value =
+      @checkingAt outer State site kind (τ.subst θ.1) value' := by
+  have same := NTy.holds_instantiate_heq θ τ value value' h
+  unfold checkingAt checking Interpretation.checking
+  dsimp only
+  rw [same]
+
+/-- The check a term is, at the carriers a call's type arguments induce, as
+the check at the outer carriers of the type substituted and of the same value
+(`checkingAt_instantiate_heq`): the check there and the equation of the two.
+None where the term is no such check, the substitution is not evaluated, or
+the value's carrier is not the substituted type's.
+
+The attempt is a transaction: the carrier comparison and the construction of
+the equation run on a saved state, which is restored wherever the attempt
+yields none, also where a step of it throws, so a declined attempt leaves no
+assignment. An interruption or an exhausted budget is no decline: it is
+thrown on as it is. -/
+private def checkAtOuterFamily? (e : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let e := e.consumeMData
+  unless e.isAppOfArity ``VerexIR.Proofs.Denote.checkingAt 6 do return none
+  if e.hasLooseBVars then return none
+  let arguments := e.getAppArgs
+  let (family, state, site, kind, τ, value) :=
+    (arguments[0]!, arguments[1]!, arguments[2]!, arguments[3]!, arguments[4]!, arguments[5]!)
+  let some (θ, outer) := inducedCarriers? family.consumeMData | return none
+  let some row := substitutionRow? θ | return none
+  let some substituted := substituteNTy row τ (some (← getEnv)) | return none
+  let saved ← saveState
+  try
+    let found ← withTransparency .default do
+      let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) outer substituted
+      unless ← isDefEq (← inferType value) expectedCarrier do return none
+      let rhs := mkAppN (mkConst ``VerexIR.Proofs.Denote.checkingAt)
+        #[outer, state, site, kind, substituted, value]
+      let heq ← mkHEqRefl value
+      let proof ← mkAppOptM ``VerexIR.Proofs.Denote.checkingAt_instantiate_heq
+        #[some state, some outer, some site, some kind, some θ, some τ, some value, some value,
+          some heq]
+      pure (some (rhs, ← mkExpectedTypeHint proof (← mkEq e rhs)))
+    if found.isNone then saved.restore
+    return found
+  catch failure =>
+    saved.restore
+    if failure.isRuntime || failure.isInterrupt then throw failure
+    return none
+
+/-- A check of a generic callee's body that the walk inlines on the generic
+route (`closedGeneric`: a callee whose conditions are not carried at a row)
+is emitted at the carriers the call's type arguments induce. It is stated
+here at the outer carriers, where the body's steps are exposed, so the step
+that cuts at it makes the fact it owes and the fact its continuation takes
+at the one spelling the caller's context states its facts in
+(`checkAtOuterFamily?`). -/
+simproc ↓ [vir_denote, vir_denote_norm] checkingAtOuterFamily
+    (@VerexIR.Proofs.Denote.checkingAt ?family _ _ _ _ _) := fun e => do
+  let some (rhs, equation) ← checkAtOuterFamily? e | return .continue
+  return .visit { expr := rhs, proof? := some equation }
+
 -- The type arguments of an opaque specification function, at an
 -- instantiated family the caller's, at the public family themselves.
 -- Before `resolve_instantiate`, which a parameter's type also matches.
@@ -4353,59 +4420,95 @@ simproc [vir_denote_norm] literalToNat (Int.toNat _) := fun e => do
   let some value := e.appArg!.int? | return .continue
   return .done { expr := toExpr value.toNat }
 
-/-- The lengths of a nest of concatenations from `start`, as integers, in the order
-of its leaves: `start + len(b) + len(c) + …`. -/
-def SpecVector.lengthsFrom {α : Type} (start : Int) (rest : List (VerexIR.SpecVector α)) : Int :=
-  rest.foldl (fun sum vector => sum + (vector.values.size : Int)) start
+/-- A step of a nest: a vector concatenated to what precedes it, or an element
+appended to it. -/
+inductive SpecVector.Step (α : Type) where
+  | vector (appended : VerexIR.SpecVector α)
+  | element (appended : α)
 
-private theorem SpecVector.le_lengthsFrom {α : Type} (rest : List (VerexIR.SpecVector α)) (start : Int) :
+/-- The elements a step adds. -/
+def SpecVector.Step.values {α : Type} : SpecVector.Step α → Array α
+  | .vector appended => appended.values
+  | .element appended => #[appended]
+
+/-- A vector grown by a step. -/
+def SpecVector.Step.grow {α : Type} (base : VerexIR.SpecVector α) :
+    SpecVector.Step α → VerexIR.SpecVector α
+  | .vector appended => base.append appended
+  | .element appended => base.push appended
+
+/-- The lengths of a nest from `start`, as integers, in the order of its steps:
+`start + len(b) + 1 + …`. -/
+def SpecVector.lengthsFrom {α : Type} (start : Int) (rest : List (SpecVector.Step α)) : Int :=
+  rest.foldl (fun sum step => sum + (step.values.size : Int)) start
+
+private theorem SpecVector.le_lengthsFrom {α : Type} (rest : List (SpecVector.Step α)) (start : Int) :
     start ≤ SpecVector.lengthsFrom start rest := by
   induction rest generalizing start with
   | nil => exact Int.le_refl _
-  | cons vector rest induction =>
-      have := induction (start + (vector.values.size : Int))
+  | cons step rest induction =>
+      have := induction (start + (step.values.size : Int))
       simp only [SpecVector.lengthsFrom, List.foldl_cons] at this ⊢
       omega
 
-/-- A nest of concatenations is one concatenation under one premise on its
-leaves' lengths: the depth-one lemma, leaf by leaf. -/
-theorem SpecVector.values_nest {α : Type} (rest : List (VerexIR.SpecVector α))
+/-- A nest of concatenations and appends is one concatenation under one premise
+on its steps' lengths: the depth-one lemmas, step by step. -/
+theorem SpecVector.values_nest {α : Type} (rest : List (SpecVector.Step α))
     (first : VerexIR.SpecVector α)
     (bounded : SpecVector.lengthsFrom (first.values.size : Int) rest ≤ 18446744073709551615) :
-    (rest.foldl VerexIR.SpecVector.append first).values =
-      rest.foldl (fun values vector => values ++ vector.values) first.values := by
+    (rest.foldl SpecVector.Step.grow first).values =
+      rest.foldl (fun values step => values ++ step.values) first.values := by
   induction rest generalizing first with
   | nil => rfl
-  | cons vector rest induction =>
-      have below : (first.values.size : Int) + (vector.values.size : Int) ≤
-          SpecVector.lengthsFrom (first.values.size : Int) (vector :: rest) :=
+  | cons step rest induction =>
+      have below : (first.values.size : Int) + (step.values.size : Int) ≤
+          SpecVector.lengthsFrom (first.values.size : Int) (step :: rest) :=
         SpecVector.le_lengthsFrom rest _
-      have joined : (first.append vector).values = first.values ++ vector.values :=
-        VerexIR.SpecVector.values_append (by omega)
-      have size : (((first.append vector).values.size : Nat) : Int) =
-          (first.values.size : Int) + (vector.values.size : Int) := by
+      have joined : (SpecVector.Step.grow first step).values = first.values ++ step.values := by
+        cases step with
+        | vector appended =>
+            exact VerexIR.SpecVector.values_append (by
+              simp only [SpecVector.Step.values] at below
+              omega)
+        | element appended =>
+            have one : (SpecVector.Step.values (.element appended)).size = 1 := rfl
+            simp only [SpecVector.Step.grow, SpecVector.Step.values]
+            rw [VerexIR.SpecVector.values_push appended (by omega), Array.append_singleton]
+      have size : (((SpecVector.Step.grow first step).values.size : Nat) : Int) =
+          (first.values.size : Int) + (step.values.size : Int) := by
         rw [joined, Array.size_append]
         omega
-      have step := induction (first.append vector) (by
+      have grown := induction (SpecVector.Step.grow first step) (by
         rw [size]
         exact bounded)
       simp only [List.foldl_cons]
-      rw [step, joined]
+      rw [grown, joined]
 
 open Lean Meta Simp in
-/-- A nest of concatenations is one concatenation: the values of a left nest of
-`SpecVector.append` are the concatenation of its leaves' under one premise, the
-sum of the leaves' lengths as integers (a literal vector's as a literal), in their
-order, at most `MAX_U64`. A proof states it (`len(a) + len(b) + … <= MAX_U64`), matched by spelling in the normal
-form; `omega` proves it at a leaf. -/
-simproc [vir_denote_norm] valuesOfNest
-    (VerexIR.SpecVector.values (VerexIR.SpecVector.append _ _)) := fun e => do
+/-- The values of a left nest of `SpecVector.append` and `SpecVector.push` are the
+concatenation of its steps' under one premise, the sum of the steps' lengths as
+integers (a literal vector's as a literal, an appended element's as one), in
+their order, at most `MAX_U64`. A proof states it
+(`len(a) + 1 + len(b) + … <= MAX_U64`), matched by spelling in the normal form;
+`omega` proves it at a leaf. The nest is read whole or not at all: where the
+premise is not discharged the term stays, as this rule cannot flatten the whole
+nest without the total bound; other rules may still apply where their own
+premises hold. A single append of an element is no nest and is left to its own rule
+(`SpecVector.values_push`), whose premise is that append's room alone. -/
+private def valuesOfNestSteps (e : Lean.Expr) : SimpM Simp.Step := do
   let_expr VerexIR.SpecVector.values α nest := e | return .continue
   let mut first := nest
-  let mut rest : List Lean.Expr := []
-  while first.isAppOfArity ``VerexIR.SpecVector.append 3 do
-    rest := first.appArg! :: rest
-    first := first.getArg! 1
+  -- The steps in their order, each a vector (`true`) or an element.
+  let mut rest : List (Bool × Lean.Expr) := []
+  repeat
+    if first.isAppOfArity ``VerexIR.SpecVector.append 3 then
+      rest := (true, first.appArg!) :: rest
+      first := first.getArg! 1
+    else if first.isAppOfArity ``VerexIR.SpecVector.push 3 then
+      rest := (false, first.appArg!) :: rest
+      first := first.getArg! 1
+    else break
+  if rest.all (!·.1) && rest.length < 2 then return .continue
   let int := mkConst ``Int
   -- A literal vector's length is its literal, which `omega` reads.
   let length (vector : Lean.Expr) : MetaM Lean.Expr := do
@@ -4416,16 +4519,25 @@ simproc [vir_denote_norm] valuesOfNest
         if let some (_, elements) := values.appArg!.listLit? then
           return toExpr (Int.ofNat elements.length)
     mkAppOptM ``Nat.cast #[int, none, ← mkAppM ``Array.size #[← mkAppM ``VerexIR.SpecVector.values #[vector]]]
-  let sum ← rest.foldlM (init := ← length first) fun sum vector => do
-    mkAppM ``HAdd.hAdd #[sum, ← length vector]
-  let leaves ← mkListLit (mkApp (mkConst ``VerexIR.SpecVector) α) rest
-  let values ← rest.foldlM (init := ← mkAppM ``VerexIR.SpecVector.values #[first]) fun values vector => do
-    mkAppM ``HAppend.hAppend #[values, ← mkAppM ``VerexIR.SpecVector.values #[vector]]
+  let sum ← rest.foldlM (init := ← length first) fun sum (isVector, added) => do
+    mkAppM ``HAdd.hAdd #[sum, ← if isVector then length added else pure (toExpr (1 : Int))]
+  let steps ← mkListLit (mkApp (mkConst ``SpecVector.Step) α) (rest.map fun (isVector, added) =>
+    mkApp2 (mkConst (if isVector then ``SpecVector.Step.vector else ``SpecVector.Step.element)) α added)
+  let values ← rest.foldlM (init := ← mkAppM ``VerexIR.SpecVector.values #[first])
+    fun values (isVector, added) => do
+      mkAppM ``HAppend.hAppend #[values, ← if isVector then mkAppM ``VerexIR.SpecVector.values #[added]
+        else mkArrayLit α [added]]
   let premise ← mkAppM ``LE.le #[sum, toExpr (18446744073709551615 : Int)]
   let some bounded ← (← getMethods).discharge? premise | return .continue
-  let proof := mkApp4 (mkConst ``SpecVector.values_nest) α leaves first bounded
+  let proof := mkApp4 (mkConst ``SpecVector.values_nest) α steps first bounded
   let statement ← mkEq e values
   return .visit { expr := values, proof? := some (← mkExpectedTypeHint proof statement) }
+
+simproc [vir_denote_norm] valuesOfNest
+    (VerexIR.SpecVector.values (VerexIR.SpecVector.append _ _)) := valuesOfNestSteps
+
+simproc [vir_denote_norm] valuesOfPushNest
+    (VerexIR.SpecVector.values (VerexIR.SpecVector.push _ _)) := valuesOfNestSteps
 
 -- A resolved prophecy brings an operation's result into a leaf.
 attribute [vir_denote_norm] VerexIR.Proofs.Denote.wrapInt_unsigned
@@ -4702,6 +4814,39 @@ attribute [vir_denote_norm, vir_denote_eval] reduceBitwiseAnd reduceBitwiseOr re
 -- Concatenated vector literals, as a specification builds a key with
 -- `concat(vec(1), vec(2))`, are the literal of the concatenation.
 attribute [vir_denote_norm] List.append_toArray List.cons_append List.nil_append
+
+/-- An element appended to a vector built from an array is the vector of the
+grown array, where the grown array is within a vector's length. -/
+theorem SpecVector.push_mk {α : Type} (values : Array α) (bounded : values.size < 2 ^ 64)
+    (element : α) (grown : Array α) (same : values.push element = grown)
+    (within : grown.size < 2 ^ 64) :
+    (VerexIR.SpecVector.mk values bounded).push element = ⟨grown, within⟩ := by
+  subst same
+  have room : values.size + 1 < 2 ^ 64 := by simpa only [Array.size_push] using within
+  apply VerexIR.SpecVector.ext
+  rw [VerexIR.SpecVector.values_push element room]
+
+open Lean Meta Simp in
+/-- An element appended to a literal vector is the literal with that element
+last, as a clause's concatenation of two literals is the literal of their
+elements. The vector is one built from a list literal, of whatever elements.
+The grown length is decided on the literal before anything is built: a
+literal with no room for the element stays, as the append leaves such a
+vector as it is. -/
+simproc [vir_denote_norm] pushOfLiteral
+    (VerexIR.SpecVector.push (VerexIR.SpecVector.mk _ _) _) := fun e => do
+  let_expr VerexIR.SpecVector.push α vector element := e | return .continue
+  let_expr VerexIR.SpecVector.mk _ values bounded := vector | return .continue
+  let some (_, elements) := values.arrayLit? | return .continue
+  unless elements.length + 1 < 2 ^ 64 do return .continue
+  let grown ← mkArrayLit α (elements ++ [element])
+  let within ← VerexIR.Proofs.Denote.decidedLemma (← mkAppM ``LT.lt
+    #[← mkAppM ``Array.size #[grown], mkNatLit (2 ^ 64)])
+  let same ← mkExpectedTypeHint (← mkEqRefl grown)
+    (← mkEq (← mkAppM ``Array.push #[values, element]) grown)
+  let proof := mkAppN (mkConst ``SpecVector.push_mk)
+    #[α, values, bounded, element, grown, same, within]
+  return .visit { expr := mkApp3 (mkConst ``VerexIR.SpecVector.mk) α grown within, proof? := some proof }
 
 /-- The order of two integer literals, as the structural order of literal
 values compares their components. -/

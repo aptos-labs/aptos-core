@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/public_struct_cross_module_inv.move:12:9: error: the specification clause `invariant this.x > 0` is not established
+tests/sources/functional/public_struct_cross_module_inv.move:12:9: error: the data invariant `invariant this.x > 0` does not hold where a mutable parameter's loan ends, at the function's exit
 tests/sources/functional/public_struct_cross_module_inv.move:31:5: error: verex verification failed: the automatic verification of `violate` failed; provide a proof in the module:
   verify violate by lean =>
     verex_obligations

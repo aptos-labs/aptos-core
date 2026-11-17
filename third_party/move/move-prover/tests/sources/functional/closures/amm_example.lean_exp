@@ -20,13 +20,11 @@ tests/sources/functional/closures/amm_example.move:129:5: error: verex verificat
 tests/sources/functional/closures/amm_example.move:176:9: error: the specification clause `aborts_if !exists<Fee>(client)` is not established
 tests/sources/functional/closures/amm_example.move:178:9: error: the specification clause `aborts_if global<Fee>(client).bps > 10000` is not established
 tests/sources/functional/closures/amm_example.move:182:9: error: the specification clause `aborts_if reserve_in + effective_in == 0` is not established
-tests/sources/functional/closures/amm_example.move:187:9: error: the specification clause `ensures result <= reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:173:5: error: verex verification failed: the automatic verification of `constant_product_with_fee_non_compliant` failed; provide a proof in `tests/sources/functional/closures/amm_example.proof.lean`:
   verify constant_product_with_fee_non_compliant by lean =>
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
-    | ensures_2 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/amm_example.move:220:9: error: the specification clause `aborts_if amount_in == 0` is not established

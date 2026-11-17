@@ -98,3 +98,23 @@ verex module 0x99::stored_write_frames where
     requires other != stored.owner
     modifies global<Counter>(stored.owner)
     ensures global<Counter>(other) == old(global<Counter>(other))
+
+  -- A frame whose formal is a mutable reference that its target reads: the
+  -- formal denotes the address the reference holds where an invocation starts.
+  struct Resetter has Copy, Drop, Store where
+    action : Fn(&mut Address) -> u64 has Copy, Drop, Store
+  spec Resetter where
+    modifies_of<action>(owner : &mut Address) global<Counter>(*owner)
+
+  public fun reset_at(owner : &mut Address) -> u64 := do
+    let target := &mut Counter[*owner].value
+    *target := 0
+    0
+  spec reset_at where
+    pragma aborts_if_is_partial
+    modifies global<Counter>(owner)
+
+  fun make_resetter() -> Resetter := new Resetter {
+    action := function[Fn(&mut Address) -> u64 has Copy, Drop, Store](reset_at) }
+  spec make_resetter where
+    aborts_if false

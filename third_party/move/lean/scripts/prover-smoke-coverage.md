@@ -72,6 +72,22 @@ of the fixture that fails when the class regresses.
 | R14 a write through a returned element reference, read back (Rust) | | `rendered library_slice_get_mut_errors`: `increment` (and its negative `preserved`) |
 | R15 a table's own invariant at an instance row | the rows | `shapes TableRows`: `row_instance_ok`, `row_nested_ok`, `row_tagged_ok` |
 | | under a budget | the pin of `row_nested_ok`; `boundary CertifiedFieldProjections` |
+| R16 behavioural invariants of a function-typed field, quantified over every state | the pack that proves them, and a caller that uses the no-abort and the result rule with no user-written precondition | `rendered mini_amm`: `make_capped`, `quote` |
+| | what the pack must reject: a function that can abort, one whose result exceeds the bound | `rendered mini_amm`: `make_aborting`, `make_whole` |
+| | a caller claiming more than the rules give | `rendered mini_amm`: `quote_strict` |
+| | two named cases of the states the behavioural binder ranges over | `rendered mini_amm`: `make_fee_guarded` (positive: a state with `bps > 10000` is excluded) and `make_fee_unguarded` (negative: a function requiring a `Fee` is rejected, the empty state being admitted). The wider reading — the unit's installed ordinary data invariants and not its behavioural ones — rests on an inspection of the generator; this pair is its regression test |
+| | the result rule written with `result_of` instead of `ensures_of` | open: `rendered mini_amm`: `make_bounded` proves it, `quote_bounded` cannot use it |
+| | a pool holding a strategy, published, and the strategy invoked off a reference parameter | `rendered mini_amm`: `create`, and `quote_pool` (`&Pool`) and `quote_pool_mut` (`&mut Pool`, the Move Prover AMM's own shape) |
+| | a **specification** global read of a resource that holds a function value | open: `rendered mini_amm`: `quote_stored` is never scheduled — `nativeSlot` builds a fallback for the whole resource carrier and needs it inhabitable |
+| | the preservation of stored invariants after a call under `modifies_of *` | open: `rendered mini_amm`: `quote_stored_unbounded` reaches storage and the invocation, holds the strategy's two facts, and leaves the `stored_invariant` obligation |
+| R17 a built-in map lemma's fact against the assertion that owes it: both read outside the map by the owner's typed view | a key read at a symbolic and at a ground position, at an owner whose values are of another width than its keys, and at one whose keys are a type parameter | `rendered map_key_default`: `key_at_rank`, `key_at_ground`, `key_at_rank_narrow`, `key_at_rank_generic` |
+| | what the key lemma does not give: a fact of another key, a read outside the map (unspecified, not zero), and an integer-keyed law at keys that are no integers (refused, not synthesized) | `rendered map_key_default`: `key_at_other`, `key_at_outside`, `key_at_lt_generic` |
+| | a value read of an updated and of a removed map, whose default is the values' and not the keys', and the value of a key without an entry | `rendered map_value_default`: `value_at_set`, `value_at_erase`, `value_at_missing` |
+| R18 a law of the library applied by name in an authored proof: the size of a sequence map after an update of a key it holds and of one it does not, over the owner's own `add` | the two laws beside their parent `SpecMap.size_update_sequence`, and the cell of a key that may be held, which neither states | `rendered map_size_update`: `size_after_insert`, `size_after_override`, `size_after_unknown` |
+| R19 the conditions of several kinds one site owes (not a plain-values regression: the kind-blind lookup predates it) | a mutable borrow whose write of memory owes the module's invariants and whose mutation end owes the resource's data invariant | `rendered condition_kinds`: `set_rate` (both hold), with `clear_rate` (the data invariant where the mutation ends) and `drop_interval` (the module invariant after the write of a mutable borrow) |
+| | a declaration whose invariant is carried, where the mutation end owes nothing and the certifying cut owns it | `rendered condition_kinds`: `set_interval`, with `clear_interval` |
+| | the module's invariants where a publication's write ends | `rendered condition_kinds`: `publish_flag` |
+| | one site's two conditions read by their own markers, and a condition that is no predicate | `VerexIR/Tests/GivenWalker`: `markers_of_two_kinds`, `malformed_mutation_end` (`lake test` runs it; the internal malformed-obligation error is fail-closed) |
 
 Negative companions: where a class is represented by a positive rendering
 (`static_step`, `static_fnonce`, `fnonce_forward`), the `_errors` fixtures
@@ -95,6 +111,15 @@ component.
 | the generated bridge of an own invariant | `VerexSL/Tests/OwnBridgeGenerated`, `VerexSL/Tests/OwnBridgeLeaves` |
 | the domain a call binds its result at | `VerexSL/Tests/CallResultDomains`, `VerexSL/Tests/CallResultHolds` |
 | woven behaviors under a captured row's fact | `VerexSL/Tests/GuardedWovenReadings` |
+| the theorems a rendered fixture advertises, beside its diagnostics | `VerexSL/Tests/MiniAmmPositives`, `VerexSL/Tests/MapDefaultPositives`, `VerexSL/Tests/ConditionKindPositives` |
+| a literal map read whose default names a local family: a position inside it and a key with an entry evaluate, one outside and one without do not | `VerexSL/Tests/LiteralMaps` |
+| a clause's concatenation with a singleton vector rewrites to append; the values of a nest read push steps as well as append steps | `VerexSL/Tests/ClauseSingletonConcat` |
+| an element appended to a literal vector evaluates to the literal extended by that element | `VerexSL/Tests/LiteralVectorPush` |
+| an owner's validity reads a fixed-width map value as its integer; a value of another type stays in its native representation | `VerexSL/Tests/CanonicalMapValidity` |
+| the entries of a table written back, at each reader pair a key and a value can have | `VerexSL/Tests/WrittenBackRoundTrip`; the readers themselves in `VerexIR/Tests/TypedWriteback`, which `lake test` runs because its negatives are not silent |
+| the element a successful read of a typed literal lookup yields, and the fallback it does not value | `VerexSL/Tests/LiteralVectorReads` |
+| a range goal stated on a named result of a call | `VerexSL/Tests/RangeNamedResults` |
+| a read of a written vector at a position the write leaves alone | `VerexIR/Tests/VectorWriteSizes` |
 
 ## Rendered fixtures
 
@@ -113,6 +138,11 @@ last.
 | `library_option_map` | `Option::map` with a closure | the same |
 | `table_stored_resource` | a Move table as the Move frontend declares it: role bodies under `pragma intrinsic`, ghost memory, an open `modifies` | the hand-written cell `TableRows.publish_new_ok` has the mechanism; this has the declaration shape the frontend produces |
 | `generic_function_literals_model` | `aborts_of` of a function literal in a specification, under the model | the model route is taken by the Move frontend's lowering of the literal |
+| `map_key_default` | a built-in map lemma applied in a proof file, whose fact must be the fact the assertion owes: the keys' default for a key of its map, at owners whose keys and values read differently | the snapshot holds the proof file's items as items of the module (`PROOF_CONSUMERS` of `scripts/prover-smoke-rendering.py`, whose controls are `scripts/test_prover_smoke_rendering.py`), the one route by which an authored proof is elaborated by the libraries alone |
+| `map_value_default` | the same for a value of the map, through the update and the removal lemma: the owner binds the two executable roles their facts are of | the same route; the roles are what a lemma of an updated or a removed map needs |
+| `map_size_update` | a law of the library applied by name in an authored `lean` block: `SpecMap.size_update_sequence_{present,absent}` against the size an assertion owes after the owner's own `add` | the same route; the fact is of the map the executable role leaves, which only a frontend's rendering of that call produces |
+| `condition_kinds` | the conditions of more than one kind that one expression owes: a mutable borrow of a resource owes the module's invariants where its write of memory ends and the resource's data invariant where its mutation ends, with a carried and an uncarried declaration and a publication, and a negative for each kind | the sites are the Move frontend's, which keys the write and the mutation of one borrow alike; a hand-written unit cannot state that collision |
+| `mini_amm` | an automated market maker's rules as behavioural invariants of a function-typed field, quantified over every state: the pack, a caller that uses them, the pack's negatives, two named cases of the states the binder ranges over in a unit that also carries an ordinary data invariant, and the three storage observations (a reference parameter, a specification global read, the stored-invariant obligation after the call) | the wrapper is a Move tuple struct whose field is a function type and whose `spec` carries `modifies_of<self.0> *`; the positional field and the state binder are what the Move frontend writes, and `shapes KnownClosures` has no behavioural invariant |
 
 ## Costs
 
@@ -129,6 +159,13 @@ proves.
 | `Shapes/TableRows` | `row_instance_ok`, `row_nested_ok` | a table clause spelled so that each row costs again |
 | `Shapes/Enums` | `enum_replaced_ok`, `vector_replaced_ok` | the call-contract stages of two map calls |
 | `Cost/MapScaling` | `three`, `six` and their quotient | a cost that grows faster from three insertions to six than it does now; two sizes detect that and state no law of growth |
+| `Rendered/mini_amm` | `quote` | the cost of using a function-typed field's behavioural invariants at a call: the no-abort rule and the result rule instantiated at the invocation's state |
+
+The rendered fixtures' diagnostics are pinned by `#guard_rendering` and their
+costs by the pins above; neither says that a positive cell still proves
+anything. `boundary VerexSL/Tests/MiniAmmPositives` names the artifacts of
+`rendered mini_amm` instead: each positive cell's `typedVerified` theorem is
+present and each negative and open cell has none.
 
 ## Deferred
 
@@ -142,5 +179,13 @@ its reason and what stands for it meanwhile. Nothing is deferred.
   a package (the gate runs `scripts/verify-compiled-namespaces.sh` for those).
 - The rows marked "not covered" above.
 - The open cells of the shape matrix.
+- The three cells of `rendered mini_amm` marked open: the result rule
+  written with `result_of` is proved at the pack and not read at a call; a
+  specification global read of a resource holding a function value leaves its
+  target unscheduled; and the same read removed, the call leaves the
+  stored-invariant preservation obligation. All three are pinned by the
+  fixture's baseline and by `boundary VerexSL/Tests/MiniAmmPositives`, so a
+  tree that gains any of the capabilities fails the fixture. The third pins a
+  residual-obligation dump, which is the most churn-prone text in the tier.
 - Diagnostics are pinned where a negative names its clauses or a fixture has
   an `.exp`; their wording elsewhere is not.

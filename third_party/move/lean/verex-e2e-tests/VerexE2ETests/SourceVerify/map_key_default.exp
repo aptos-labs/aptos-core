@@ -1,0 +1,66 @@
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:38:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  m_handle : Proofs.Denote.NTy.address.carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  m : SpecMap Int Int
+  m_valid :
+    (0x1.map_key_default.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (m_handle,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        PUnit.unit)
+  m_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) m) ==
+      m
+  permitted_1 : spec_contains(m, 7)
+  permitted_2 : spec_rank(m, 7) == 1
+  verexInvariant : SpecMap.Valid (SpecMap.Discipline.ordered SpecMap.intOrder) m
+  m_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  fact_0_0 : spec_key_at(m, 1) == 7
+  m_size_bounds_1 : 0 ≤ spec_len(m)
+  m_size_bounds_2 : spec_len(m) < 18446744073709551616
+  left✝ right✝ : True
+  ⊢ False
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:37:8: error: verex verification failed: the proof of `key_at_other` does not establish its specification
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:44:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  m_handle : Proofs.Denote.NTy.address.carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  m : SpecMap Int Int
+  m_valid :
+    (0x1.map_key_default.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (m_handle,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        PUnit.unit)
+  m_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) m) ==
+      m
+  verexInvariant : SpecMap.Valid (SpecMap.Discipline.ordered SpecMap.intOrder) m
+  m_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_size_bounds_1 : 0 ≤ spec_len(m)
+  m_size_bounds_2 : spec_len(m) < 18446744073709551616
+  left✝ : 0 ≤ spec_key_at(m, spec_len(m))
+  right✝ : spec_key_at(m, spec_len(m)) ≤ 18446744073709551615
+  ⊢ spec_key_at(m, spec_len(m)) == 0
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:43:8: error: verex verification failed: the proof of `key_at_outside` does not establish its specification
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:48:11: error: the lemma's `map` does not fit its theorem: SpecMap (Proofs.Denote.NTy.param 0).readCarrier Int against SpecMap Int ?V
+VerexE2ETests/SourceVerify/map_key_default.proof.lean:46:8: error: verex verification failed: the proof of `key_at_lt_generic` does not establish its specification

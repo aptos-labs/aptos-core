@@ -76,7 +76,7 @@ def runInvocationStep (statement : Lean.Expr) (spent preparationSpent : Nat) :
     -- (`leafKey`).
     (← targetState).invariantKeys.set #[(inherited, "data_invariant_1")]
     let ctx : SolveContext := {
-      invariants := #[]
+      conditions := #[]
       callees := #[]
       equations := #[]
       handOver := false
@@ -255,7 +255,7 @@ elab "#guard_owned_leaf_step " mode:(&"fails" <|> &"commits") " in " statement:t
     let started ← IO.getNumHeartbeats
     (← targetState).invariantKeys.set #[(inherited, "data_invariant_1")]
     let ctx : SolveContext := {
-      invariants := #[]
+      conditions := #[]
       callees := #[]
       equations := #[]
       handOver := false

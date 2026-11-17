@@ -1,0 +1,164 @@
+VerexE2ETests/SourceVerify/mini_amm.move:15:1: error: the native type 0x42.mini_amm.unit.nominal.namespace.0.declaration✝¹⁻⁰ has no values
+VerexE2ETests/SourceVerify/mini_amm.move:115:5: error: verification failed with a residual obligation:
+case returns.left
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+nativesTyped : VerexIR.NativesTyped executable✝
+nativesShift : VerexIR.NativesShift executable✝
+runsAgree : VerexIR.Proofs.RunsAgree executable✝
+ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
+verexAgree : VerexIR.Proofs.TypesAgree unit
+verexResources : VerexIR.Proofs.ResourcesTyped unit
+owner client : VerexIR.Proofs.Denote.NTy.address.carrier
+amount : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+permitted : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+fst✝¹ : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
+fst✝ :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+      { parameters := [false, false, false], results := [false] }
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)).carrier
+heq :
+  VerexIR.Proofs.Denote.Skolems.plainAt 0x42.mini_amm.unit.nominal.namespace.0.declaration✝¹⁻⁰
+      VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address owner) initialState✝ =
+    some (fst✝¹, (fst✝, ()), ())
+stored_1 :
+  ∀ (S : VerexIR.Proofs.Denote.Memory unit) (client : String) (reserve : Int)
+    (fits : 0 ≤ reserve ∧ reserve ≤ 18446744073709551615) (amount : Int)
+    (fits_1 : 0 ≤ amount ∧ amount ≤ 18446744073709551615),
+    ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+        (client, { val := reserve, fits := ⋯ }, { val := amount, fits := ⋯ }, ()) S
+stored_2 :
+  ∀ (memory S : VerexIR.Proofs.Denote.Memory unit) (client : String) (reserve : Int)
+    (fits : 0 ≤ reserve ∧ reserve ≤ 18446744073709551615) (amount : Int)
+    (fits_1 : 0 ≤ amount ∧ amount ≤ 18446744073709551615) (out : Int) (fits_2 : 0 ≤ out ∧ out ≤ 18446744073709551615),
+    VerexIR.Proofs.EnsuresOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+        (client, { val := reserve, fits := ⋯ }, { val := amount, fits := ⋯ }, ()) () { val := out, fits := ⋯ } S
+        memory →
+      out ≤ reserve
+verexResult : (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).carrier
+verexFinal : VerexIR.Proofs.Denote.Memory unit
+verexEnsures :
+  VerexIR.Proofs.EnsuresOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+    (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+    { parameters := [false, false, false], results := [false] }
+    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝ (client, fst✝¹, amount, ())
+    verexResult initialState✝ verexFinal
+verexUnaborted :
+  ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+      { parameters := [false, false, false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+      (VerexIR.Proofs.Denote.HList.settle
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        (client, fst✝¹, amount, ()))
+      initialState✝
+verexResultOf :
+  ∀ (default : (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)).carrier),
+    VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        { parameters := [false, false, false], results := [false] }
+        (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+        (client, fst✝¹, amount, ()) initialState✝ default =
+      verexResult
+verexStateOf :
+  VerexIR.Proofs.StateOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+      { parameters := [false, false, false], results := [false] }
+      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 64 false)) fst✝
+      (VerexIR.Proofs.Denote.HList.settle
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.address
+          (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false)
+            (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)))
+        (client, fst✝¹, amount, ()))
+      initialState✝ =
+    verexFinal
+verexResultHolds : True
+a✝ :
+  (VerexIR.Proofs.Denote.Skolems.plainAt 0x42.mini_amm.unit.nominal.namespace.0.declaration✝¹⁻⁰
+        VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address owner) initialState✝).isSome =
+    true
+⊢ VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) verexFinal
+VerexE2ETests/SourceVerify/mini_amm.move:115:5: error: verex verification failed: the automatic verification of `quote_stored_unbounded` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify quote_stored_unbounded by lean =>
+    verex_obligations
+    verex_on
+    | stored_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/mini_amm.move:183:9: error: the specification clause `ensures result < reserve` is not established
+VerexE2ETests/SourceVerify/mini_amm.move:180:5: error: verex verification failed: the automatic verification of `quote_strict` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify quote_strict by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/mini_amm.move:267:9: error: the specification clause `ensures result <= amount` is not established
+VerexE2ETests/SourceVerify/mini_amm.move:264:5: error: verex verification failed: the automatic verification of `quote_bounded` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify quote_bounded by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/mini_amm.move:22:9: error: the data invariant `invariant ∀ (S : StateDomain;
+      client : Address;
+      reserve : u64;
+      amount : u64),
+        !(S.. |~ aborts_of<this.0>(client, reserve, amount))` does not hold where a value is constructed
+VerexE2ETests/SourceVerify/mini_amm.move:155:5: error: verex verification failed: the automatic verification of `make_aborting` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify make_aborting by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/mini_amm.move:26:9: error: the data invariant `invariant ∀ (S : StateDomain;
+      client : Address;
+      reserve : u64;
+      amount : u64;
+      out : u64),
+        (S.. |~ ensures_of<this.0>(client, reserve, amount, out))
+          ==> out <= reserve` does not hold where a value is constructed
+VerexE2ETests/SourceVerify/mini_amm.move:171:5: error: verex verification failed: the automatic verification of `make_whole` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify make_whole by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+VerexE2ETests/SourceVerify/mini_amm.move:22:9: error: the data invariant `invariant ∀ (S : StateDomain;
+      client : Address;
+      reserve : u64;
+      amount : u64),
+        !(S.. |~ aborts_of<this.0>(client, reserve, amount))` does not hold where a value is constructed
+VerexE2ETests/SourceVerify/mini_amm.move:229:5: error: verex verification failed: the automatic verification of `make_fee_unguarded` failed; provide a proof in `VerexE2ETests/SourceVerify/mini_amm.proof.lean`:
+  verify make_fee_unguarded by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -188,6 +188,10 @@ end VerexIR.SpecMap
 
 namespace VerexIR.Proofs.Denote.NativeMaps
 
+/-- The reads of literal maps the evaluator admits, each with the lookup
+that makes it one (`evaluateLiteralObservation`). -/
+initialize Lean.registerTraceClass `verex.literalRead
+
 /-! ## Typed reads
 
 The keys and values of a table, as a typed map holds them: integers by
@@ -594,6 +598,18 @@ attribute [vir_denote_norm] Prod.mk.injEq SpecVector.mk.injEq SpecInt.mk.injEq A
   simp only [SpecMap.size, SpecMap.update, SpecMap.Discipline.set, SpecMap.length_seqSet,
     SpecMap.hasKey]
   split <;> simp
+
+/-- The size of a sequence map after updating a key it holds. -/
+theorem _root_.VerexIR.SpecMap.size_update_sequence_present {K V : Type} [DecidableEq K]
+    {map : SpecMap K V} {key : K} {value : V} (present : SpecMap.hasKey map key = true) :
+    SpecMap.size (SpecMap.update .sequence map key value) = SpecMap.size map := by
+  rw [SpecMap.size_update_sequence, present, if_pos rfl]
+
+/-- The size of a sequence map after updating a key it does not hold. -/
+theorem _root_.VerexIR.SpecMap.size_update_sequence_absent {K V : Type} [DecidableEq K]
+    {map : SpecMap K V} {key : K} {value : V} (missing : SpecMap.hasKey map key = false) :
+    SpecMap.size (SpecMap.update .sequence map key value) = SpecMap.size map + 1 := by
+  rw [SpecMap.size_update_sequence, missing, if_neg (by simp)]
 
 -- Tests of variant names and other Boolean equalities evaluate.
 attribute [vir_denote_norm] beq_self_eq_true beq_iff_eq beq_eq_false_iff_ne
@@ -1011,13 +1027,54 @@ private def rewriteByAny (e : Lean.Expr) (lemmas : List Name) : SimpM Simp.Step 
   return .continue
 
 open Lean Meta in
+/-- Whether an observation's own read succeeds: `lookup` is the closed
+optional read its value comes from, spelled without the default
+(`SpecMap.keyAt?`, `SpecMap.get?`), and `some` says the value is an entry's.
+Probed without modifying the state, so a failed or undecidable read leaves
+the observation as it stands. -/
+private def literalReadSucceeds (lookup : Lean.Expr) : MetaM Bool :=
+  withoutModifyingState do
+    if lookup.hasFVar || lookup.hasMVar || lookup.hasLooseBVars then return false
+    return (← withDefault (whnf lookup)).isAppOfArity ``Option.some 2
+
+/-- Whether the local names of an observation are confined to the argument
+at `defaultArgument`: its default. -/
+private def localDefaultOnly (e : Lean.Expr) (defaultArgument : Nat) : Bool := Id.run do
+  let arguments := e.getAppArgs
+  if e.getAppFn.hasFVar || defaultArgument ≥ arguments.size then return false
+  for index in [0:arguments.size] do
+    if index != defaultArgument && arguments[index]!.hasFVar then return false
+  return true
+
+open Lean Meta in
 /-- A closed observation of a typed map built from literals evaluates: its
 value, under typed maps. The lemmas need the map valid, which a chain of
 literal constructions discharges only within simp's depth; evaluation needs
-nothing. -/
-private def evaluateLiteralObservation (e : Lean.Expr) (operands : Array Lean.Expr) :
-    SimpM Simp.DStep := do
-  if e.hasFVar || e.hasMVar || e.hasLooseBVars then return .continue
+nothing.
+
+`read?` admits the one observation that is not closed: a `keyAt` or
+`valueAt` whose DEFAULT, and nothing else, names a local family, as the
+owner's typed view spells an integer's by the opaque plain fallback of the
+unit's carriers. It names that argument and the observation's own optional
+read, closed and spelled without the default, which is admitted only where
+it succeeds: the value is then an entry's and the default is not consumed
+(`SpecMap.keyAt_of_keyAt?`, `SpecMap.valueAt_of_get?`). The value is the
+reduction of the ORIGINAL expression, default and all, so nothing is
+synthesized in its place, no captured instance is evaluated, and the opaque
+fallback is never unfolded; a read that fails or does not decide declines.
+`trace.verex.literalRead` shows the boundary of each admitted observation.
+
+The three tests are in the order of their cost: where the local names are,
+then the fragment the map and the query are spelled in, and only of an
+observation inside the fragment the optional read, which evaluates them. -/
+private def evaluateLiteralObservation (e : Lean.Expr) (operands : Array Lean.Expr)
+    (read? : Option (Nat × Lean.Expr) := none) : SimpM Simp.DStep := do
+  if e.hasMVar || e.hasLooseBVars then return .continue
+  let mut boundary? := none
+  if e.hasFVar then
+    let some (defaultArgument, lookup) := read? | return .continue
+    unless localDefaultOnly e defaultArgument do return .continue
+    boundary? := some (defaultArgument, lookup)
   let literal (sub : Lean.Expr) : Bool :=
     sub.isConstOf ``List.nil || sub.isConstOf ``List.cons ||
     sub.isConstOf ``SpecMap.update || sub.isConstOf ``SpecMap.remove ||
@@ -1031,6 +1088,14 @@ private def evaluateLiteralObservation (e : Lean.Expr) (operands : Array Lean.Ex
     for name in operand.getUsedConstants do
       unless literal (mkConst name) || name.getPrefix == ``VerexIR.SpecMap || (← isInstance name) do
         return .continue
+  -- The map and the query are within the fragment; a local default is
+  -- admitted where the observation's own read of them succeeds.
+  if let some (defaultArgument, lookup) := boundary? then
+    unless ← literalReadSucceeds lookup do
+      trace[verex.literalRead] "declined: {lookup} is no entry's read"
+      return .continue
+    trace[verex.literalRead] "{lookup} is an entry's read, so {e.getAppArgs[defaultArgument]!} \
+      is not consumed"
   -- Evaluated lazily, to the constructor: a full reduction would also
   -- normalize the instances and proofs inside.
   let value ← withDefault (whnf e)
@@ -1050,8 +1115,10 @@ dsimproc [vir_denote, vir_denote_norm] literalHasKey (SpecMap.hasKey _ _) := fun
   evaluateLiteralObservation e #[map, key]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalValueAt (SpecMap.valueAt _ _) := fun e => do
-  let_expr SpecMap.valueAt _ _ _ _ map key := e | return .continue
+  let_expr SpecMap.valueAt keyType valueType decidable _ map key := e | return .continue
+  -- The read is the expression's own, its keys compared as it compares them.
   evaluateLiteralObservation e #[map, key]
+    (read? := some (3, mkAppN (mkConst ``SpecMap.get?) #[keyType, valueType, decidable, map, key]))
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalSize (SpecMap.size _) := fun e => do
   let_expr SpecMap.size _ _ map := e | return .continue
@@ -1060,8 +1127,10 @@ dsimproc [vir_denote, vir_denote_norm] literalSize (SpecMap.size _) := fun e => 
   evaluateLiteralObservation e #[map]
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalKeyAt (SpecMap.keyAt _ _) := fun e => do
-  let_expr SpecMap.keyAt _ _ _ map index := e | return .continue
+  let_expr SpecMap.keyAt keyType valueType _ map index := e | return .continue
+  -- The read is the expression's own: nonnegative, and inside the map.
   evaluateLiteralObservation e #[map, index]
+    (read? := some (2, mkAppN (mkConst ``SpecMap.keyAt?) #[keyType, valueType, map, index]))
 open Lean Meta in
 dsimproc [vir_denote, vir_denote_norm] literalRank (SpecMap.rank _ _) := fun e => do
   let_expr SpecMap.rank _ _ _ map key := e | return .continue
@@ -1082,30 +1151,6 @@ end VerexIR.Proofs.Denote.NativeMaps
 namespace VerexIR.SpecMap
 
 open VerexIR.Proofs.Denote
-
-/-- The value of a key's first entry, when present. -/
-def get? {K V : Type} [DecidableEq K] : SpecMap K V → K → Option V
-  | [], _ => none
-  | entry :: rest, key => if entry.1 = key then some entry.2 else get? rest key
-
-@[simp] theorem get?_nil {K V : Type} [DecidableEq K] (key : K) :
-    get? ([] : SpecMap K V) key = none := rfl
-
-@[simp] theorem get?_cons {K V : Type} [DecidableEq K] (entry : K × V)
-    (rest : SpecMap K V) (key : K) :
-    get? (entry :: rest) key = if entry.1 = key then some entry.2 else get? rest key := rfl
-
-theorem mem_of_get? {K V : Type} [DecidableEq K] {map : SpecMap K V} {key : K} {value : V}
-    (found : get? map key = some value) : (key, value) ∈ map := by
-  induction map with
-  | nil => cases found
-  | cons entry rest ih =>
-      simp only [get?] at found
-      split at found
-      · rename_i same
-        cases Option.some.inj found
-        exact same ▸ List.mem_cons_self ..
-      · exact List.mem_cons_of_mem _ (ih found)
 
 /-- Every entry of a typed map holds the key and value invariants once unread
 back to the table's carrier types. -/

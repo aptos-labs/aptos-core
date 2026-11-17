@@ -3034,10 +3034,24 @@ target's own and its inlined callees'. -/
 private abbrev Owners (unit : ValidatedUnit) := Array (FunctionHandle × ValidatedNamespace ×
   VerexIR.FunctionDecl VerexIR.Validation.FunctionBody × Function unit)
 
+/-- What reads a condition the proof meets: the step of its kind at its
+site, or the entry of an inlined callee, which owes the callee's
+precondition. -/
+private inductive ConditionReader where
+  | step (kind : SiteCondition.Kind)
+  | calleeEntry
+  deriving DecidableEq
+
+/-- A reader's name in the artifacts of a target's conditions. -/
+private def ConditionReader.name : ConditionReader → String
+  | .step kind => kind.name
+  | .calleeEntry => "precondition"
+
 /-- The conditions the proof meets, each as an abbreviation applied at the
 unit and frame its marker names: the loop invariants, assertions, data and
-memory invariants of `owners`, paired by site and function, and the
-preconditions of the inlined callees, paired by function.
+memory invariants of `owners`, each with its site, the kind of the step
+that reads it there, and its function, and the preconditions of the inlined
+callees, paired by function.
 
 A callee whose body the proof inlines compiled at a row (`rowOwners`) is an
 owner too: its conditions are built at the row, which the clauses' types are
@@ -3110,22 +3124,22 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
           preconditionCondition unit executable owner.namespaceId ownerNs ownerDeclaration
             ownerCompiled.params types
       let conditions := invariants.map (fun (site, invariant, readsUnit) =>
-        (site, invariant, readsUnit, "loopInvariant")) ++
+        (site, invariant, readsUnit, ConditionReader.step .loopInvariant)) ++
         assertions.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "assertion")) ++
+          (site, condition, readsUnit, ConditionReader.step .assertion)) ++
         mutations.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "mutationEnd")) ++
+          (site, condition, readsUnit, ConditionReader.step .mutationEnd)) ++
         constructions.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "construction")) ++
+          (site, condition, readsUnit, ConditionReader.step .construction)) ++
         writes.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "memoryWritten")) ++
+          (site, condition, readsUnit, ConditionReader.step .memoryWritten)) ++
         calls.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "afterCall")) ++
+          (site, condition, readsUnit, ConditionReader.step .afterCall)) ++
         (precondition.map fun (condition, readsUnit) =>
-          (0, condition, readsUnit, "precondition")).toArray
-      conditions.mapM fun (site, invariant, readsUnit, kind) =>
+          (0, condition, readsUnit, ConditionReader.calleeEntry)).toArray
+      conditions.mapM fun (site, invariant, readsUnit, reader) =>
         return (site, owner, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
-          readsUnit, kind, (none : Option String))
+          readsUnit, reader, (none : Option String))
     let atRows ← rowOwners.flatMapM fun owner => do
       let types ← Contract.frameTypes skolems
       let row := owner.compiled.frame
@@ -3152,42 +3166,52 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
       let precondition ← preconditionCondition unit executable owner.handle.namespaceId owner.ns
         owner.declaration owner.compiled.params types (atArguments := atArguments)
       let conditions := invariants.map (fun (site, invariant, readsUnit) =>
-        (site, invariant, readsUnit, "loopInvariant")) ++
+        (site, invariant, readsUnit, ConditionReader.step .loopInvariant)) ++
         assertions.map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "assertion")) ++
+          (site, condition, readsUnit, ConditionReader.step .assertion)) ++
         (mutations.getD #[]).map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "mutationEnd")) ++
+          (site, condition, readsUnit, ConditionReader.step .mutationEnd)) ++
         (constructions.getD #[]).map (fun (site, condition, readsUnit) =>
-          (site, condition, readsUnit, "construction")) ++
+          (site, condition, readsUnit, ConditionReader.step .construction)) ++
         (precondition.map fun (condition, readsUnit) =>
-          (0, condition, readsUnit, "precondition")).toArray
-      conditions.mapM fun (site, invariant, readsUnit, kind) =>
+          (0, condition, readsUnit, ConditionReader.calleeEntry)).toArray
+      conditions.mapM fun (site, invariant, readsUnit, reader) =>
         return (site, owner.handle, ← mkLambdaFVars (← executableBinders executable skolems) invariant,
-          readsUnit, kind, some owner.key)
+          readsUnit, reader, some owner.key)
     return generic ++ atRows
   -- A site of an owner at a row stands for one program point of one
   -- reading: were it another owner's, a condition would be read at the
   -- wrong frame or an assertion checked against another's condition. The
   -- site space makes them disjoint by construction (`siteSpaceOf`); this
   -- refuses the target rather than look one up wrongly.
-  for (site, _, _, _, kind, row?) in invariants do
-    if row?.isNone || kind == "precondition" then continue
-    for (other, _, _, _, otherKind, otherRow?) in invariants do
-      if otherKind == "precondition" || otherRow? == row? then continue
+  for (site, _, _, _, reader, row?) in invariants do
+    if row?.isNone || reader == .calleeEntry then continue
+    for (other, _, _, _, otherReader, otherRow?) in invariants do
+      if otherReader == .calleeEntry || otherRow? == row? then continue
       if other == site then
         throwErrorAt m.reference m!"a condition of `{m.function}` at a row shares the site \
           {site} with another owner's: the site spaces of its readings are not disjoint"
+  -- A step reads the one condition of its kind at its site. Two of a kind
+  -- there would be one owner's twice or two owners', and the step would read
+  -- the first for both: refused, as the solver refuses the pair
+  -- (`elabObligationArguments`).
+  for ((site, _, _, _, reader, _), index) in invariants.zipIdx do
+    let .step kind := reader | continue
+    for ((other, _, _, _, otherReader, _), otherIndex) in invariants.zipIdx do
+      if otherIndex > index && other == site && otherReader == reader then
+        throwErrorAt m.reference m!"`{m.function}` is given two conditions of the kind \
+          `{kind.name}` at the site {site}: a step reads one"
   let mut loopPairs : Array Term := #[]
   let mut preconditionPairs : Array Term := #[]
   for (condition, index) in invariants.zipIdx do
-    let (site, owner, invariant, _, kind, row?) := condition
-    let name := match row?, kind == "precondition" with
+    let (site, owner, invariant, _, reader, row?) := condition
+    let name := match row?, reader with
       -- An instance's conditions are named after the compilation at the
       -- row and their order, not after a site: a site of a row is a wide
       -- number, which no name should carry.
-      | some key, _ => artifacts ++ Name.mkSimple s!"{kind}_{index}_{key}"
-      | none, true => artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
-      | none, false => artifacts ++ Name.mkSimple s!"{kind}_{site}"
+      | some key, _ => artifacts ++ Name.mkSimple s!"{reader.name}_{index}_{key}"
+      | none, .calleeEntry => artifacts ++ Name.mkSimple s!"precondition_{functionKey unit owner}"
+      | none, .step kind => artifacts ++ Name.mkSimple s!"{kind.name}_{site}"
     -- Declared when the target is prepared; the proof finds it.
     unless (← getEnv).contains name do liftTermElabM (addAbbrev name invariant)
     -- An inlined concrete callee's precondition is read at the frame
@@ -3195,28 +3219,33 @@ private def memberConditions (m : Member) (owners : Owners m.unit)
     let applied ← `(term| fun (_ : VerexIR.Validation.ValidatedUnit)
         (Θ : VerexIR.Proofs.Denote.Skolems $unitTerm) =>
           @$(rootIdent name) $unitTerm _ $(← unitReaderTerm unit) Θ)
-    if kind == "precondition" then
+    match reader with
+    | .calleeEntry =>
       -- An instance is named by its compilation, the one name of the callee
       -- at that row; a callee inlined generically by its handle.
       let key : Term ← match row? with
         | some key => `(term| $(rootIdent (compiledName segments key)))
         | none => handleSyntax owner
       preconditionPairs := preconditionPairs.push (← `(term| ($key, $applied)))
-    else
+    | .step kind =>
       -- Retain the producer's concrete frame explicitly for state-only
       -- markers. The walker selects a different frame only for a marker
       -- carrying that exact concrete inlined interpretation.
       let condition ← `(term| VerexIR.Proofs.Denote.concreteCondition
         ($ambientFrame : VerexIR.Proofs.Denote.Skolems $unitTerm)
         (fun Θ => @$(rootIdent name) $unitTerm _ $(← unitReaderTerm unit) Θ))
+      -- The entry carries the kind to the solver's table, where the step of
+      -- that kind reads it (`SolveContext.conditionOf?`).
+      let kindTerm := rootIdent (toExpr kind).constName!
       loopPairs := loopPairs.push
-        (← `(term| ($(Syntax.mkNumLit (toString site)), $(← handleSyntax owner), $condition)))
+        (← `(term| ($(Syntax.mkNumLit (toString site)), $kindTerm, $(← handleSyntax owner),
+          $condition)))
   -- Every instance the proof inlines has an entry, so that one the walk
   -- meets without one is a defect of this producer and not a body walked
   -- without its condition (`enterCallee`).
   for owner in rowOwners do
-    unless invariants.any (fun (_, _, _, _, kind, row?) =>
-        kind == "precondition" && row? == some owner.key) do
+    unless invariants.any (fun (_, _, _, _, reader, row?) =>
+        reader == .calleeEntry && row? == some owner.key) do
       preconditionPairs := preconditionPairs.push (← `(term|
         ($(rootIdent (compiledName segments owner.key)),
           VerexIR.Proofs.Denote.noPrecondition)))

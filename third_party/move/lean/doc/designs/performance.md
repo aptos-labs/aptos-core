@@ -555,6 +555,17 @@ instead of scripts over presented leaves remove that where one fact
 suffices; unmeasured on the corpus, and to be measured before investing in
 per-leaf preparation sharing.
 
+### Literal vectors grown by pushes
+
+A push onto a literal vector is evaluated to the literal one push at a time:
+each step restates the literal and its bound. Normalizing a chain of k
+pushes alone was measured at 37k, 56k, 103k, 223k, 568k, 1.68M and 5.58M
+heartbeats for k = 1, 2, 4, 8, 16, 32 and 64, so the cost per push grows with
+the literal, while a whole function of k pushes cost less than with the
+chain left in place at every k measured (k = 32: 18.0M to 10.2M). Nothing is
+known past k = 64. The lever is one evaluation of a recognized chain, with
+one bound for the grown literal.
+
 ## Levers measured and rejected
 
 Each lever below was measured and did not pay; do not retry one without a

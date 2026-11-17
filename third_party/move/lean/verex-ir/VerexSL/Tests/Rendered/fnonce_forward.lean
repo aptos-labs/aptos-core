@@ -16,11 +16,6 @@ Neither is edited here: `scripts/prover-smoke-renderings.sh --write` writes
 this file again, and without `--write` tells whether it is what the frontend
 renders. The crate's own namespace, which the diagnostics are of, is the last
 command; the namespaces before it are what it uses, and report nothing.
-
-`fnonce_forward.exp` records 9 further messages of the Given route (`uses
-concrete verification`). The option that takes that route, `verex.givenRoute`,
-is unset and nothing sets it, so no configuration produces them and they are
-no part of the diagnostics below.
 -/
 
 #guard_rendering in

@@ -1,1 +1,0 @@
-tests/sources/functional/unused_global_invariant.move:1:1: info: `publish_r3` uses concrete verification: Given interpretation does not yet support storage interpretation

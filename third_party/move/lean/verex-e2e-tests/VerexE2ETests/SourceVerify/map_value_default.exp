@@ -1,0 +1,35 @@
+VerexE2ETests/SourceVerify/map_value_default.proof.lean:26:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  k : (Proofs.Denote.NTy.int 8 false).carrier
+  m_handle : Proofs.Denote.NTy.address.carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  k_lower : 0 ≤ k
+  k_upper : k ≤ 2 ^ 8 - 1
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  m : SpecMap Int Int
+  m_valid :
+    (0x1.map_value_default.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 8 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (m_handle,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 8 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        PUnit.unit)
+  m_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) m) ==
+      m
+  permitted : !spec_contains(m, k)
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence m
+  m_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 8) false) m
+  m_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_size_bounds_1 : 0 ≤ map_spec_len(m)
+  m_size_bounds_2 : map_spec_len(m) < 18446744073709551616
+  left✝ : 0 ≤ spec_get(m, k)
+  right✝ : spec_get(m, k) ≤ 18446744073709551615
+  ⊢ spec_get(m, k) == 0
+VerexE2ETests/SourceVerify/map_value_default.proof.lean:25:8: error: verex verification failed: the proof of `value_at_missing` does not establish its specification

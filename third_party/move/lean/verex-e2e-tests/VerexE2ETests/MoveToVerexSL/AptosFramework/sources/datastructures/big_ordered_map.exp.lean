@@ -2286,7 +2286,7 @@ verex module aptos_framework::big_ordered_map where
     iter.iter_modify(
       self, function[Fn(&mut u64) -> Bool](__lambda__1__test_verify_modify)
     )
-    spec assert spec_get(map, 1) == 11
+    spec assert spec_get::<u64, u64>(map, 1) == 11
     let iter := map.internal_find(&1)
     let r :=
       iter.iter_modify(
@@ -2294,7 +2294,7 @@ verex module aptos_framework::big_ordered_map where
         function[Fn(&mut u64) -> Bool](__lambda__2__test_verify_modify)
       )
     spec do
-      assert spec_get(map, 1) == 12
+      assert spec_get::<u64, u64>(map, 1) == 12
       assert r
     map.remove(&1)
     map.destroy_empty()
@@ -2323,9 +2323,9 @@ verex module aptos_framework::big_ordered_map where
     let (_key, _value) := map.borrow_front()
     spec do
       assert keys[0] == 1
-      assert spec_contains(keys, 1)
-      assert spec_contains_key(map, _key)
-      assert spec_get(map, _key) == _value
+      assert spec_contains::<u64>(keys, 1)
+      assert spec_contains_key::<u64, u64>(map, _key)
+      assert spec_get::<u64, u64>(map, _key) == _value
       assert _key == 1
     map.remove(&1)
     map.remove(&2)
@@ -2342,9 +2342,9 @@ verex module aptos_framework::big_ordered_map where
     let (key, value) := map.borrow_back()
     spec do
       assert keys[2] == 3
-      assert spec_contains(keys, 3)
-      assert spec_contains_key(map, key)
-      assert spec_get(map, key) == value
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_contains_key::<u64, u64>(map, key)
+      assert spec_get::<u64, u64>(map, key) == value
       assert key == 3
     map.remove(&1)
     map.remove(&2)
@@ -2361,31 +2361,31 @@ verex module aptos_framework::big_ordered_map where
     let (_key, _value) := map.borrow_back()
     let result_1 := map.upsert(4, 5)
     spec do
-      assert spec_contains_key(map, 4)
-      assert spec_get(map, 4) == 5
-      assert is_none(result_1)
+      assert spec_contains_key::<u64, u64>(map, 4)
+      assert spec_get::<u64, u64>(map, 4) == 5
+      assert is_none::<u64>(result_1)
     let result_2 := map.upsert(4, 6)
     spec do
-      assert spec_contains_key(map, 4)
-      assert spec_get(map, 4) == 6
-      assert is_some(result_2)
-      assert std::option::borrow(result_2) == 5
-      assert !spec_contains_key(map, 10)
+      assert spec_contains_key::<u64, u64>(map, 4)
+      assert spec_get::<u64, u64>(map, 4) == 6
+      assert is_some::<u64>(result_2)
+      assert std::option::borrow::<u64>(result_2) == 5
+      assert !spec_contains_key::<u64, u64>(map, 10)
     spec do
       assert keys[0] == 1
-      assert spec_contains_key(map, 1)
-      assert spec_get(map, 1) == 4
+      assert spec_contains_key::<u64, u64>(map, 1)
+      assert spec_get::<u64, u64>(map, 1) == 4
     let v := map.remove(&1)
     spec assert v == 4
     map.remove(&2)
     map.remove(&3)
     map.remove(&4)
     spec do
-      assert !spec_contains_key(map, 1)
-      assert !spec_contains_key(map, 2)
-      assert !spec_contains_key(map, 3)
-      assert !spec_contains_key(map, 4)
-      assert spec_len(map) == 0
+      assert !spec_contains_key::<u64, u64>(map, 1)
+      assert !spec_contains_key::<u64, u64>(map, 2)
+      assert !spec_contains_key::<u64, u64>(map, 3)
+      assert !spec_contains_key::<u64, u64>(map, 4)
+      assert spec_len::<u64, u64>(map) == 0
     map.destroy_empty()
 
   spec test_verify_upsert where
@@ -2396,8 +2396,8 @@ verex module aptos_framework::big_ordered_map where
     let iter := map.internal_find(&1)
     let old_value := map.upsert(2, 21)
     spec do
-      assert is_some(old_value)
-      assert spec_iter_valid(iter, map)
+      assert is_some::<u64>(old_value)
+      assert spec_iter_valid::<u64, u64>(iter, map)
     let v := *iter.iter_borrow(&map)
     spec assert v == 10
     map.remove(&1)
@@ -2414,15 +2414,15 @@ verex module aptos_framework::big_ordered_map where
     let values := vector<u64>[4, 5, 6]
     let mut map := new_from(keys, values)
     let result_1 := map.next_key(&3)
-    spec assert is_none(result_1)
+    spec assert is_none::<u64>(result_1)
     let result_2 := map.next_key(&1)
     spec do
       assert keys[0] == 1
-      assert spec_contains_key(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 1)
       assert keys[1] == 2
-      assert spec_contains_key(map, 2)
-      assert is_some(result_2)
-      assert std::option::borrow(result_2) == 2
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert is_some::<u64>(result_2)
+      assert std::option::borrow::<u64>(result_2) == 2
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2436,14 +2436,14 @@ verex module aptos_framework::big_ordered_map where
     let values := vector<u64>[4, 5, 6]
     let mut map := new_from(keys, values)
     let result_1 := map.prev_key(&1)
-    spec assert is_none(result_1)
+    spec assert is_none::<u64>(result_1)
     let result_2 := map.prev_key(&3)
     spec do
       assert keys[0] == 1
-      assert spec_contains_key(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 1)
       assert keys[1] == 2
-      assert spec_contains_key(map, 2)
-      assert is_some(result_2)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert is_some::<u64>(result_2)
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2458,17 +2458,17 @@ verex module aptos_framework::big_ordered_map where
     let mut map := new_from(keys, values)
     spec do
       assert keys[1] == 2
-      assert spec_contains(keys, 2)
-      assert spec_contains_key(map, 2)
-      assert spec_get(map, 2) == 5
-      assert spec_len(map) == 3
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_get::<u64, u64>(map, 2) == 5
+      assert spec_len::<u64, u64>(map) == 3
     let v := map.remove(&1)
     spec do
       assert v == 4
-      assert spec_contains_key(map, 2)
-      assert spec_get(map, 2) == 5
-      assert spec_len(map) == 2
-      assert !spec_contains_key(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_get::<u64, u64>(map, 2) == 5
+      assert spec_len::<u64, u64>(map) == 2
+      assert !spec_contains_key::<u64, u64>(map, 1)
     map.remove(&2)
     map.remove(&3)
     map.destroy_empty()
@@ -2507,7 +2507,7 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_aborts_if_remove where
     pragma verify
-    aborts_if !spec_contains_key(map, 1)
+    aborts_if !spec_contains_key::<u64, u64>(map, 1)
 
   fun test_verify_iter_next() -> Unit := do
     let keys := vector<u64>[1, 2, 3]
@@ -2523,22 +2523,22 @@ verex module aptos_framework::big_ordered_map where
       assert keys[0] == 1
       assert keys[1] == 2
       assert keys[2] == 3
-      assert spec_contains(keys, 1)
-      assert spec_contains(keys, 2)
-      assert spec_contains(keys, 3)
-      assert spec_contains_key(map, 1)
-      assert spec_contains_key(map, 2)
-      assert spec_contains_key(map, 3)
-      assert spec_len(map) == 3
+      assert spec_contains::<u64>(keys, 1)
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_contains_key::<u64, u64>(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_contains_key::<u64, u64>(map, 3)
+      assert spec_len::<u64, u64>(map) == 3
     ground_enum_123(&map)
     spec do
       assert k1 == 1
       assert k2 == 2
       assert k3 == 3
-      assert it_end.iter_is_end(map)
-      assert spec_rank(map, k1) == 0
-      assert spec_rank(map, k2) == 1
-      assert spec_rank(map, k3) == 2
+      assert it_end.iter_is_end::<u64, u64>(map)
+      assert spec_rank::<u64, u64>(map, k1) == 0
+      assert spec_rank::<u64, u64>(map, k2) == 1
+      assert spec_rank::<u64, u64>(map, k3) == 2
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2560,12 +2560,12 @@ verex module aptos_framework::big_ordered_map where
     spec do
       assert k3 == 3
       assert keys[1] == 2
-      assert spec_contains(keys, 2)
-      assert spec_contains_key(map, 2)
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains_key::<u64, u64>(map, 2)
       assert k2 == 2
-      assert spec_len(map) == 3
-      assert spec_rank(map, k3) == 2
-      assert spec_rank(map, k2) == 1
+      assert spec_len::<u64, u64>(map) == 3
+      assert spec_rank::<u64, u64>(map, k3) == 2
+      assert spec_rank::<u64, u64>(map, k2) == 1
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2589,14 +2589,14 @@ verex module aptos_framework::big_ordered_map where
       )
     spec do
       assert old_v == 5
-      assert spec_get(map, 2) == 50
-      assert spec_len(map) == 3
+      assert spec_get::<u64, u64>(map, 2) == 50
+      assert spec_len::<u64, u64>(map) == 3
       assert keys[0] == 1
-      assert spec_contains(keys, 1)
+      assert spec_contains::<u64>(keys, 1)
       assert keys[2] == 3
-      assert spec_contains(keys, 3)
-      assert spec_get(map, 1) == 4
-      assert spec_get(map, 3) == 6
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_get::<u64, u64>(map, 1) == 4
+      assert spec_get::<u64, u64>(map, 3) == 6
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2620,9 +2620,9 @@ verex module aptos_framework::big_ordered_map where
       assert ks.length == 3
       assert ks[0] < ks[1]
       assert ks[1] < ks[2]
-      assert spec_contains_key(map, ks[0])
-      assert spec_contains_key(map, ks[1])
-      assert spec_contains_key(map, ks[2])
+      assert spec_contains_key::<u64, u64>(map, ks[0])
+      assert spec_contains_key::<u64, u64>(map, ks[1])
+      assert spec_contains_key::<u64, u64>(map, ks[2])
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2642,8 +2642,8 @@ verex module aptos_framework::big_ordered_map where
     let child := ordered_map::borrow(entries, &k0)
     let v0 := *child.internal_leaf_borrow_value()
     spec do
-      assert spec_contains_key(map, k0)
-      assert v0 == spec_get(map, k0)
+      assert spec_contains_key::<u64, u64>(map, k0)
+      assert v0 == spec_get::<u64, u64>(map, k0)
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2663,31 +2663,36 @@ verex module aptos_framework::big_ordered_map where
   fun ground_enum_123(map : &BigOrderedMap<u64, u64>) -> Unit := do
     let _fk := map.front_key()
     spec do
-      assert spec_rank(map, 1) >= 0 && spec_rank(map, 1) < 3
-        && spec_key_at(map, spec_rank(map, 1)) == 1
-      assert spec_rank(map, 2) >= 0 && spec_rank(map, 2) < 3
-        && spec_key_at(map, spec_rank(map, 2)) == 2
-      assert spec_rank(map, 3) >= 0 && spec_rank(map, 3) < 3
-        && spec_key_at(map, spec_rank(map, 3)) == 3
-      assert spec_rank(map, 1) < spec_rank(map, 2)
-      assert spec_rank(map, 2) < spec_rank(map, 3)
-      assert spec_rank(map, 1) == 0
-      assert spec_rank(map, 2) == 1
-      assert spec_rank(map, 3) == 2
-      assert spec_key_at(map, 0) == 1
-      assert spec_key_at(map, 1) == 2
-      assert spec_key_at(map, 2) == 3
+      assert spec_rank::<u64, u64>(map, 1) >= 0
+        && spec_rank::<u64, u64>(map, 1) < 3
+        && spec_key_at::<u64, u64>(map, spec_rank::<u64, u64>(map, 1)) == 1
+      assert spec_rank::<u64, u64>(map, 2) >= 0
+        && spec_rank::<u64, u64>(map, 2) < 3
+        && spec_key_at::<u64, u64>(map, spec_rank::<u64, u64>(map, 2)) == 2
+      assert spec_rank::<u64, u64>(map, 3) >= 0
+        && spec_rank::<u64, u64>(map, 3) < 3
+        && spec_key_at::<u64, u64>(map, spec_rank::<u64, u64>(map, 3)) == 3
+      assert spec_rank::<u64, u64>(map, 1) < spec_rank::<u64, u64>(map, 2)
+      assert spec_rank::<u64, u64>(map, 2) < spec_rank::<u64, u64>(map, 3)
+      assert spec_rank::<u64, u64>(map, 1) == 0
+      assert spec_rank::<u64, u64>(map, 2) == 1
+      assert spec_rank::<u64, u64>(map, 3) == 2
+      assert spec_key_at::<u64, u64>(map, 0) == 1
+      assert spec_key_at::<u64, u64>(map, 1) == 2
+      assert spec_key_at::<u64, u64>(map, 2) == 3
 
   spec ground_enum_123 where
     pragma verify
-    requires spec_len(map) == 3
-    requires spec_contains_key(map, 1)
-    requires spec_contains_key(map, 2)
-    requires spec_contains_key(map, 3)
-    ensures spec_rank(map, 1) == 0 && spec_rank(map, 2) == 1
-        && spec_rank(map, 3) == 2
-    ensures spec_key_at(map, 0) == 1 && spec_key_at(map, 1) == 2
-        && spec_key_at(map, 2) == 3
+    requires spec_len::<u64, u64>(map) == 3
+    requires spec_contains_key::<u64, u64>(map, 1)
+    requires spec_contains_key::<u64, u64>(map, 2)
+    requires spec_contains_key::<u64, u64>(map, 3)
+    ensures spec_rank::<u64, u64>(map, 1) == 0
+        && spec_rank::<u64, u64>(map, 2) == 1
+        && spec_rank::<u64, u64>(map, 3) == 2
+    ensures spec_key_at::<u64, u64>(map, 0) == 1
+        && spec_key_at::<u64, u64>(map, 1) == 2
+        && spec_key_at::<u64, u64>(map, 2) == 3
 
   -- Also pulls in the key's cmp instantiation (gates the ascending axiom).
   -- Each contained key has an in-range rank that key_at inverts.
@@ -2703,18 +2708,18 @@ verex module aptos_framework::big_ordered_map where
       assert keys[0] == 1
       assert keys[1] == 2
       assert keys[2] == 3
-      assert spec_contains(keys, 1)
-      assert spec_contains(keys, 2)
-      assert spec_contains(keys, 3)
-      assert spec_contains_key(map, 1)
-      assert spec_contains_key(map, 2)
-      assert spec_contains_key(map, 3)
-      assert spec_len(map) == 3
+      assert spec_contains::<u64>(keys, 1)
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_contains_key::<u64, u64>(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_contains_key::<u64, u64>(map, 3)
+      assert spec_len::<u64, u64>(map) == 3
     ground_enum_123(&map)
     spec do
       assert fk == 1
-      assert fk == spec_key_at(map, 0)
-      assert spec_get(map, spec_key_at(map, 0)) == 4
+      assert fk == spec_key_at::<u64, u64>(map, 0)
+      assert spec_get::<u64, u64>(map, spec_key_at::<u64, u64>(map, 0)) == 4
     map.remove(&1)
     map.remove(&2)
     map.remove(&3)
@@ -2733,12 +2738,13 @@ verex module aptos_framework::big_ordered_map where
       count := count + 1
       it := it.iter_next(&map)
     where
-      invariant spec_iter_valid(it, map)
+      invariant spec_iter_valid::<u64, u64>(it, map)
       invariant !(it is End)
-        ==> spec_contains_key(map, it.key) && count == spec_rank(map, it.key)
-      invariant it is End ==> count == spec_len(map)
+        ==> spec_contains_key::<u64, u64>(map, it.key)
+          && count == spec_rank::<u64, u64>(map, it.key)
+      invariant it is End ==> count == spec_len::<u64, u64>(map)
     spec do
-      assert count == spec_len(map)
+      assert count == spec_len::<u64, u64>(map)
       assert count == 3
     map.remove(&1)
     map.remove(&2)
@@ -2757,30 +2763,30 @@ verex module aptos_framework::big_ordered_map where
       assert keys[0] == 1
       assert keys[1] == 2
       assert keys[2] == 3
-      assert spec_contains(keys, 1)
-      assert spec_contains(keys, 2)
-      assert spec_contains(keys, 3)
-      assert spec_contains_key(map, 1)
-      assert spec_contains_key(map, 2)
-      assert spec_contains_key(map, 3)
-      assert spec_len(map) == 3
+      assert spec_contains::<u64>(keys, 1)
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_contains_key::<u64, u64>(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_contains_key::<u64, u64>(map, 3)
+      assert spec_len::<u64, u64>(map) == 3
     ground_enum_123(&map)
     let (k, v) := map.pop_front()
     spec do
       assert k == 1
       assert v == 10
-      assert spec_len(map) == 2
-      assert spec_rank(map, 2) == 0
-      assert spec_rank(map, 3) == 1
-      assert spec_key_at(map, 0) == 2
-      assert spec_key_at(map, 1) == 3
+      assert spec_len::<u64, u64>(map) == 2
+      assert spec_rank::<u64, u64>(map, 2) == 0
+      assert spec_rank::<u64, u64>(map, 3) == 1
+      assert spec_key_at::<u64, u64>(map, 0) == 2
+      assert spec_key_at::<u64, u64>(map, 1) == 3
     let (k2, v2) := map.pop_back()
     spec do
       assert k2 == 3
       assert v2 == 30
-      assert spec_len(map) == 1
-      assert spec_key_at(map, 0) == 2
-      assert spec_rank(map, 2) == 0
+      assert spec_len::<u64, u64>(map) == 1
+      assert spec_key_at::<u64, u64>(map, 0) == 2
+      assert spec_rank::<u64, u64>(map, 2) == 0
     let (k3, _v3) := map.pop_front()
     spec assert k3 == 2
     map.destroy_empty()
@@ -2799,28 +2805,32 @@ verex module aptos_framework::big_ordered_map where
       assert keys[0] == 1
       assert keys[1] == 2
       assert keys[2] == 3
-      assert spec_contains(keys, 1)
-      assert spec_contains(keys, 2)
-      assert spec_contains(keys, 3)
-      assert spec_contains_key(map, 1)
-      assert spec_contains_key(map, 2)
-      assert spec_contains_key(map, 3)
-      assert spec_len(map) == 3
-      assert spec_get(map, 1) == 10
-      assert spec_get(map, 2) == 20
-      assert spec_get(map, 3) == 30
+      assert spec_contains::<u64>(keys, 1)
+      assert spec_contains::<u64>(keys, 2)
+      assert spec_contains::<u64>(keys, 3)
+      assert spec_contains_key::<u64, u64>(map, 1)
+      assert spec_contains_key::<u64, u64>(map, 2)
+      assert spec_contains_key::<u64, u64>(map, 3)
+      assert spec_len::<u64, u64>(map) == 3
+      assert spec_get::<u64, u64>(map, 1) == 10
+      assert spec_get::<u64, u64>(map, 2) == 20
+      assert spec_get::<u64, u64>(map, 3) == 30
     ground_enum_123(&map)
     let sum := 0
     while !map.is_empty() do
       let (_k, v) := map.pop_front()
       sum := sum + v
     where
-      invariant spec_len(map) <= 3
-      invariant ∀ (i in 0 .. spec_len(map)),
-        spec_key_at(map, i) == i + 4 - spec_len(map)
-      invariant ∀ (i in 0 .. spec_len(map)),
-        spec_get(map, spec_key_at(map, i)) == 10 * spec_key_at(map, i)
-      invariant sum == 10 * (3 - spec_len(map)) * (4 - spec_len(map)) / 2
+      invariant spec_len::<u64, u64>(map) <= 3
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(map)),
+        spec_key_at::<u64, u64>(map, i) == i + 4 - spec_len::<u64, u64>(map)
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(map)),
+        spec_get::<u64, u64>(map, spec_key_at::<u64, u64>(map, i))
+          == 10 * spec_key_at::<u64, u64>(map, i)
+      invariant sum
+        == 10 * (3 - spec_len::<u64, u64>(map))
+          * (4 - spec_len::<u64, u64>(map))
+          / 2
     spec assert sum == 60
     map.destroy_empty()
     sum
@@ -2837,7 +2847,9 @@ verex module aptos_framework::big_ordered_map where
   -/
   spec fun spec_test_sum_upto(m : BigOrderedMap<u64, u64>, n : Int) : Int :=
     if n <= 0 then 0
-    else spec_test_sum_upto(m, n - 1) + spec_get(m, spec_key_at(m, n - 1))
+    else
+      spec_test_sum_upto(m, n - 1)
+        + spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, n - 1))
 
   fun test_verify_iter_sum_symbolic(m : &BigOrderedMap<u64, u64>) -> u64 := do
     let sum := 0
@@ -2847,16 +2859,17 @@ verex module aptos_framework::big_ordered_map where
       sum := sum + _t
       it := it.iter_next(m)
     where
-      invariant spec_iter_valid(it, m)
+      invariant spec_iter_valid::<u64, u64>(it, m)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key)
-          && sum == spec_test_sum_upto(m, spec_rank(m, it.key))
-      invariant it is End ==> sum == spec_test_sum_upto(m, spec_len(m))
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && sum == spec_test_sum_upto(m, spec_rank::<u64, u64>(m, it.key))
+      invariant it is End
+        ==> sum == spec_test_sum_upto(m, spec_len::<u64, u64>(m))
     sum
 
   spec test_verify_iter_sum_symbolic where
     pragma verify
-    ensures result == spec_test_sum_upto(m, spec_len(m))
+    ensures result == spec_test_sum_upto(m, spec_len::<u64, u64>(m))
 
   -- Symbolic map + iterator walk: exercises the general axiom chain,
   -- not a concrete model.
@@ -2867,18 +2880,20 @@ verex module aptos_framework::big_ordered_map where
       let (_k, _v) := m.pop_front()
       count := count + 1
     where
-      invariant count + spec_len(m) == spec_len(old(m))
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i + count)
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
+      invariant count + spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i)
+          == spec_key_at::<u64, u64>(old(m), i + count)
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i))
+          == spec_get::<u64, u64>(old(m), spec_key_at::<u64, u64>(m, i))
     count
 
   spec test_verify_drain_symbolic where
     pragma verify
     aborts_if false
-    ensures result == spec_len(old(m))
-    ensures spec_len(m) == 0
+    ensures result == spec_len::<u64, u64>(old(m))
+    ensures spec_len::<u64, u64>(m) == 0
 
   -- Symbolic drain: the current map stays the suffix of old(m) past
   -- the popped prefix.
@@ -2890,15 +2905,19 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_remove_shift_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures spec_len(m) == spec_len(old(m)) - 1
-    ensures !spec_contains_key(m, k)
-    ensures ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i)
-          == spec_key_at(old(m), if i < spec_rank(old(m), k) then i else i + 1)
-    ensures ∀ (i in 0 .. spec_len(m)),
-        spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m)) - 1
+    ensures !spec_contains_key::<u64, u64>(m, k)
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i)
+          == spec_key_at::<u64, u64>(
+            old(m), if i < spec_rank::<u64, u64>(old(m), k) then i
+            else i + 1
+          )
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i))
+          == spec_get::<u64, u64>(old(m), spec_key_at::<u64, u64>(m, i))
 
   -- Removal at an ARBITRARY rank, not just a border: the surviving
   -- enumeration is the old one with that one position spliced out.
@@ -2910,18 +2929,19 @@ verex module aptos_framework::big_ordered_map where
       let (_k, _v) := m.pop_back()
       count := count + 1
     where
-      invariant count + spec_len(m) == spec_len(old(m))
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
+      invariant count + spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i))
+          == spec_get::<u64, u64>(old(m), spec_key_at::<u64, u64>(m, i))
     count
 
   spec test_verify_pop_back_drain_symbolic where
     pragma verify
     aborts_if false
-    ensures result == spec_len(old(m))
-    ensures spec_len(m) == 0
+    ensures result == spec_len::<u64, u64>(old(m))
+    ensures spec_len::<u64, u64>(m) == 0
 
   -- Back-border mirror of the drain above: popping from the back keeps
   -- the map a PREFIX of the entry map.
@@ -2934,19 +2954,22 @@ verex module aptos_framework::big_ordered_map where
       out := core.prim.pushVector(out, *it.iter_borrow_key())
       it := it.iter_next(m)
     where
-      invariant spec_iter_valid(it, m)
-      invariant out.length <= spec_len(m)
-      invariant ∀ (i in 0 .. out.length), out[i] == spec_key_at(m, i)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant out.length <= spec_len::<u64, u64>(m)
+      invariant ∀ (i in 0 .. out.length),
+        out[i] == spec_key_at::<u64, u64>(m, i)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key) && out.length == spec_rank(m, it.key)
-      invariant it is End ==> out.length == spec_len(m)
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && out.length == spec_rank::<u64, u64>(m, it.key)
+      invariant it is End ==> out.length == spec_len::<u64, u64>(m)
     out
 
   spec test_verify_iter_collect_symbolic where
     pragma verify
     aborts_if false
-    ensures result.length == spec_len(m)
-    ensures ∀ (i in 0 .. spec_len(m)), result[i] == spec_key_at(m, i)
+    ensures result.length == spec_len::<u64, u64>(m)
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        result[i] == spec_key_at::<u64, u64>(m, i)
 
   -- A full traversal that COLLECTS: the result is the whole key set in
   -- ascending order, position by position.
@@ -2956,16 +2979,16 @@ verex module aptos_framework::big_ordered_map where
     m.add(k, v)
     let it := m.internal_new_begin_iter()
     spec do
-      assert spec_iter_valid(it, m)
+      assert spec_iter_valid::<u64, u64>(it, m)
       assert !(it is End)
-      assert spec_contains_key(m, it.key)
+      assert spec_contains_key::<u64, u64>(m, it.key)
 
   spec test_verify_iter_valid_after_insert_symbolic where
     pragma verify
-    requires !spec_contains_key(m, k)
+    requires !spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures spec_contains_key(m, k)
-    ensures spec_len(m) == spec_len(old(m)) + 1
+    ensures spec_contains_key::<u64, u64>(m, k)
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m)) + 1
 
   -- A structural change invalidates outstanding iterators, but an
   -- iterator taken afterwards is valid and lands on a real entry.
@@ -2974,11 +2997,11 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_back_key_rank_symbolic where
     pragma verify
-    requires spec_len(m) > 0
+    requires spec_len::<u64, u64>(m) > 0
     aborts_if false
-    ensures spec_contains_key(m, result)
-    ensures spec_rank(m, result) == spec_len(m) - 1
-    ensures spec_key_at(m, spec_len(m) - 1) == result
+    ensures spec_contains_key::<u64, u64>(m, result)
+    ensures spec_rank::<u64, u64>(m, result) == spec_len::<u64, u64>(m) - 1
+    ensures spec_key_at::<u64, u64>(m, spec_len::<u64, u64>(m) - 1) == result
 
   fun test_verify_iter_borrow_mut_symbolic(
     m : &mut BigOrderedMap<u64, u64>, k : u64, nv : u64
@@ -2989,20 +3012,22 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_iter_borrow_mut_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures spec_get(m, k) == nv
-    ensures spec_len(m) == spec_len(old(m))
-    ensures spec_contains_key(m, k)
+    ensures spec_get::<u64, u64>(m, k) == nv
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+    ensures spec_contains_key::<u64, u64>(m, k)
     ensures ∀ (other : u64),
         other != k
-          ==> spec_contains_key(m, other) == spec_contains_key(old(m), other)
+          ==> spec_contains_key::<u64, u64>(m, other)
+            == spec_contains_key::<u64, u64>(old(m), other)
     ensures ∀ (other : u64),
-        other != k && spec_contains_key(old(m), other)
-          ==> spec_get(m, other) == spec_get(old(m), other)
-    ensures ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-    ensures spec_rank(m, k) == spec_rank(old(m), k)
+        other != k && spec_contains_key::<u64, u64>(old(m), other)
+          ==> spec_get::<u64, u64>(m, other)
+            == spec_get::<u64, u64>(old(m), other)
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+    ensures spec_rank::<u64, u64>(m, k) == spec_rank::<u64, u64>(old(m), k)
 
   -- Write through the iterator's `&mut V`: the edge carried by the
   -- reference lands the update on the abstract map at `self.key`.
@@ -3016,17 +3041,19 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_iter_remove_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures result == spec_get(old(m), k)
-    ensures spec_len(m) == spec_len(old(m)) - 1
-    ensures !spec_contains_key(m, k)
+    ensures result == spec_get::<u64, u64>(old(m), k)
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m)) - 1
+    ensures !spec_contains_key::<u64, u64>(m, k)
     ensures ∀ (other : u64),
         other != k
-          ==> spec_contains_key(m, other) == spec_contains_key(old(m), other)
+          ==> spec_contains_key::<u64, u64>(m, other)
+            == spec_contains_key::<u64, u64>(old(m), other)
     ensures ∀ (other : u64),
-        other != k && spec_contains_key(old(m), other)
-          ==> spec_get(m, other) == spec_get(old(m), other)
+        other != k && spec_contains_key::<u64, u64>(old(m), other)
+          ==> spec_get::<u64, u64>(m, other)
+            == spec_get::<u64, u64>(old(m), other)
 
   -- Frame: every other entry survives with its value.
   fun test_verify_iter_prev_loop_symbolic(
@@ -3038,18 +3065,18 @@ verex module aptos_framework::big_ordered_map where
       it := it.iter_prev(m)
       count := count + 1
     where
-      invariant spec_iter_valid(it, m)
-      invariant count <= spec_len(m)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant count <= spec_len::<u64, u64>(m)
       invariant it is End ==> count == 0
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key)
-          && spec_rank(m, it.key) == spec_len(m) - count
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && spec_rank::<u64, u64>(m, it.key) == spec_len::<u64, u64>(m) - count
     count
 
   spec test_verify_iter_prev_loop_symbolic where
     pragma verify
     aborts_if false
-    ensures result == spec_len(m)
+    ensures result == spec_len::<u64, u64>(m)
 
   -- Backward traversal over a symbolic map: from End each step decrements
   -- the rank, so the step count measures the distance from the end, and
@@ -3063,18 +3090,20 @@ verex module aptos_framework::big_ordered_map where
       m.remove(&k)
       count := count + 1
     where
-      invariant count + spec_len(m) == spec_len(old(m))
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i + count)
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_get(m, spec_key_at(m, i)) == spec_get(old(m), spec_key_at(m, i))
+      invariant count + spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i)
+          == spec_key_at::<u64, u64>(old(m), i + count)
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i))
+          == spec_get::<u64, u64>(old(m), spec_key_at::<u64, u64>(m, i))
     count
 
   spec test_verify_front_remove_drain_symbolic where
     pragma verify
     aborts_if false
-    ensures result == spec_len(old(m))
-    ensures spec_len(m) == 0
+    ensures result == spec_len::<u64, u64>(old(m))
+    ensures spec_len::<u64, u64>(m) == 0
 
   -- Peek-then-remove, the shape callers write when they need the key
   -- before deciding: front_key's border rank fact plus the removal splice
@@ -3091,23 +3120,26 @@ verex module aptos_framework::big_ordered_map where
       it := it.iter_next(m)
       count := count + 1
     where
-      invariant spec_iter_valid(it, m)
-      invariant spec_len(m) == spec_len(old(m))
-      invariant count <= spec_len(m)
-      invariant ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+      invariant count <= spec_len::<u64, u64>(m)
+      invariant ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key) && spec_rank(m, it.key) == count
-      invariant it is End ==> count == spec_len(m)
-      invariant ∀ (i in 0 .. count), spec_get(m, spec_key_at(m, i)) == c
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && spec_rank::<u64, u64>(m, it.key) == count
+      invariant it is End ==> count == spec_len::<u64, u64>(m)
+      invariant ∀ (i in 0 .. count),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i)) == c
 
   spec test_verify_iter_write_loop_symbolic where
     pragma verify
     aborts_if false
-    ensures spec_len(m) == spec_len(old(m))
-    ensures ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-    ensures ∀ (i in 0 .. spec_len(m)), spec_get(m, spec_key_at(m, i)) == c
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i)) == c
 
   -- Writing values while traversing: the walk stays valid because a value
   -- write is not a structural mutation, and positions survive it, so the
@@ -3121,19 +3153,21 @@ verex module aptos_framework::big_ordered_map where
       it := it.iter_next(m)
       count := count + 1
     where
-      invariant spec_iter_valid(it, m)
-      invariant count + spec_rank(m, k) <= spec_len(m)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant count + spec_rank::<u64, u64>(m, k) <= spec_len::<u64, u64>(m)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key)
-          && spec_rank(m, it.key) == spec_rank(m, k) + count
-      invariant it is End ==> count + spec_rank(m, k) == spec_len(m)
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && spec_rank::<u64, u64>(m, it.key)
+            == spec_rank::<u64, u64>(m, k) + count
+      invariant it is End
+        ==> count + spec_rank::<u64, u64>(m, k) == spec_len::<u64, u64>(m)
     count
 
   spec test_verify_find_started_walk_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures result == spec_len(m) - spec_rank(m, k)
+    ensures result == spec_len::<u64, u64>(m) - spec_rank::<u64, u64>(m, k)
 
   -- Entering the walk at a found key rather than at begin: `internal_find`
   -- pins the iterator to that key, so the step count measures distance
@@ -3152,21 +3186,23 @@ verex module aptos_framework::big_ordered_map where
         it := it.iter_next(m)
         seen := seen + 1
     where
-      invariant spec_iter_valid(it, m)
-      invariant seen <= spec_len(m)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant seen <= spec_len::<u64, u64>(m)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key) && spec_rank(m, it.key) == seen
-      invariant it is End ==> seen == spec_len(m)
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && spec_rank::<u64, u64>(m, it.key) == seen
+      invariant it is End ==> seen == spec_len::<u64, u64>(m)
       invariant !found
-        ==> (∀ (i in 0 .. seen), spec_get(m, spec_key_at(m, i)) != target)
+        ==> (∀ (i in 0 .. seen),
+          spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i)) != target)
     found
 
   spec test_verify_early_exit_walk_symbolic where
     pragma verify
     aborts_if false
     ensures !result
-        ==> (∀ (i in 0 .. spec_len(m)),
-          spec_get(m, spec_key_at(m, i)) != target)
+        ==> (∀ (i in 0 .. spec_len::<u64, u64>(m)),
+          spec_get::<u64, u64>(m, spec_key_at::<u64, u64>(m, i)) != target)
 
   -- Early exit on the first entry whose value meets a condition. What the
   -- prefix invariant buys: on a negative result every position was
@@ -3182,20 +3218,24 @@ verex module aptos_framework::big_ordered_map where
       out := core.prim.pushVector(out, *it.iter_borrow_key())
       it := it.iter_next(m)
     where
-      invariant spec_iter_valid(it, m)
-      invariant out.length <= limit && out.length <= spec_len(m)
-      invariant ∀ (i in 0 .. out.length), out[i] == spec_key_at(m, i)
+      invariant spec_iter_valid::<u64, u64>(it, m)
+      invariant out.length <= limit && out.length <= spec_len::<u64, u64>(m)
+      invariant ∀ (i in 0 .. out.length),
+        out[i] == spec_key_at::<u64, u64>(m, i)
       invariant !(it is End)
-        ==> spec_contains_key(m, it.key) && spec_rank(m, it.key) == out.length
-      invariant it is End ==> out.length == spec_len(m)
+        ==> spec_contains_key::<u64, u64>(m, it.key)
+          && spec_rank::<u64, u64>(m, it.key) == out.length
+      invariant it is End ==> out.length == spec_len::<u64, u64>(m)
     out
 
   spec test_verify_bounded_walk_symbolic where
     pragma verify
     aborts_if false
     ensures result.length
-        == (if limit < spec_len(m) then limit else spec_len(m))
-    ensures ∀ (i in 0 .. result.length), result[i] == spec_key_at(m, i)
+        == (if limit < spec_len::<u64, u64>(m) then limit
+        else spec_len::<u64, u64>(m))
+    ensures ∀ (i in 0 .. result.length),
+        result[i] == spec_key_at::<u64, u64>(m, i)
 
   -- Collect at most `limit` keys — the take-ready shape. The result is the
   -- bounded prefix of the enumeration, not just some subset of the keys.
@@ -3211,14 +3251,14 @@ verex module aptos_framework::big_ordered_map where
       sum := sum + _t
       i := i + 1
     where
-      invariant n == spec_len(m)
-      invariant i <= spec_len(m)
+      invariant n == spec_len::<u64, u64>(m)
+      invariant i <= spec_len::<u64, u64>(m)
       invariant sum == spec_test_sum_upto(m, i)
     sum
 
   spec test_verify_keys_for_loop_symbolic where
     pragma verify
-    ensures result == spec_test_sum_upto(m, spec_len(m))
+    ensures result == spec_test_sum_upto(m, spec_len::<u64, u64>(m))
 
   -- Walking `keys()` with a `for` loop and summing the values it points
   -- at. The loop variable is a vector index, so this only closes if the
@@ -3235,20 +3275,20 @@ verex module aptos_framework::big_ordered_map where
       nxt := m.next_key(&k)
       count := count + 1
     where
-      invariant spec_contains_key(m, k)
-      invariant spec_rank(m, k) == count - 1
-      invariant count <= spec_len(m)
-      invariant spec_is_some(nxt)
-        ==> spec_contains_key(m, spec_borrow(nxt))
-          && spec_rank(m, spec_borrow(nxt)) == count
-      invariant spec_is_none(nxt) ==> count == spec_len(m)
+      invariant spec_contains_key::<u64, u64>(m, k)
+      invariant spec_rank::<u64, u64>(m, k) == count - 1
+      invariant count <= spec_len::<u64, u64>(m)
+      invariant spec_is_some::<u64>(nxt)
+        ==> spec_contains_key::<u64, u64>(m, spec_borrow::<u64>(nxt))
+          && spec_rank::<u64, u64>(m, spec_borrow::<u64>(nxt)) == count
+      invariant spec_is_none::<u64>(nxt) ==> count == spec_len::<u64, u64>(m)
     count
 
   spec test_verify_next_key_scan_symbolic where
     pragma verify
-    requires spec_len(m) > 0
+    requires spec_len::<u64, u64>(m) > 0
     aborts_if false
-    ensures result == spec_len(m)
+    ensures result == spec_len::<u64, u64>(m)
 
   -- Key stepping rather than iterators: start at the front and follow
   -- `next_key` to the end, the shape of a full scan that holds no
@@ -3261,14 +3301,14 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_insert_shift_symbolic where
     pragma verify
-    requires !spec_contains_key(m, k)
-    ensures spec_contains_key(m, k)
-    ensures spec_len(m) == spec_len(old(m)) + 1
-    ensures spec_get(m, k) == v
-    ensures ∀ (i in 0 .. spec_rank(m, k)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-    ensures ∀ (i in spec_rank(m, k) + 1 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i - 1)
+    requires !spec_contains_key::<u64, u64>(m, k)
+    ensures spec_contains_key::<u64, u64>(m, k)
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m)) + 1
+    ensures spec_get::<u64, u64>(m, k) == v
+    ensures ∀ (i in 0 .. spec_rank::<u64, u64>(m, k)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+    ensures ∀ (i in spec_rank::<u64, u64>(m, k) + 1 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i - 1)
 
   -- An insertion splices a position in: everything before the new key
   -- keeps its position, everything after moves up by one. Enumeration
@@ -3281,11 +3321,12 @@ verex module aptos_framework::big_ordered_map where
   spec test_verify_lower_bound_scan_start_symbolic where
     pragma verify
     aborts_if false
-    ensures !result.iter_is_end(m)
-        ==> (∀ (i in 0 .. spec_rank(m, result.key)),
-          compare(spec_key_at(m, i), k) == new Ordering::Less {})
-    ensures spec_contains_key(m, k)
-        ==> !result.iter_is_end(m) && result.key == k
+    ensures !result.iter_is_end::<u64, u64>(m)
+        ==> (∀ (i in 0 .. spec_rank::<u64, u64>(m, result.key)),
+          compare::<u64>(spec_key_at::<u64, u64>(m, i), k)
+            == new Ordering::Less {})
+    ensures spec_contains_key::<u64, u64>(m, k)
+        ==> !result.iter_is_end::<u64, u64>(m) && result.key == k
 
   -- Where a range scan begins. The search is characterized by comparison,
   -- so these are the facts that carry it into the enumeration; no clause of
@@ -3305,14 +3346,14 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_iter_modify_ranks_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
     ensures result == 7
-    ensures spec_get(m, k) == 7
-    ensures spec_len(m) == spec_len(old(m))
-    ensures ∀ (i in 0 .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-    ensures spec_rank(m, k) == spec_rank(old(m), k)
+    ensures spec_get::<u64, u64>(m, k) == 7
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m))
+    ensures ∀ (i in 0 .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+    ensures spec_rank::<u64, u64>(m, k) == spec_rank::<u64, u64>(old(m), k)
 
   -- Writing a value through an iterator leaves the key set alone, so every
   -- position is untouched — what a traversal needs in order to keep a
@@ -3331,15 +3372,16 @@ verex module aptos_framework::big_ordered_map where
 
   spec test_verify_iter_remove_shift_symbolic where
     pragma verify
-    requires spec_contains_key(m, k)
+    requires spec_contains_key::<u64, u64>(m, k)
     aborts_if false
-    ensures result == spec_get(old(m), k)
-    ensures !spec_contains_key(m, k)
-    ensures spec_len(m) == spec_len(old(m)) - 1
-    ensures ∀ (i in 0 .. spec_rank(old(m), k)),
-        spec_key_at(m, i) == spec_key_at(old(m), i)
-    ensures ∀ (i in spec_rank(old(m), k) .. spec_len(m)),
-        spec_key_at(m, i) == spec_key_at(old(m), i + 1)
+    ensures result == spec_get::<u64, u64>(old(m), k)
+    ensures !spec_contains_key::<u64, u64>(m, k)
+    ensures spec_len::<u64, u64>(m) == spec_len::<u64, u64>(old(m)) - 1
+    ensures ∀ (i in 0 .. spec_rank::<u64, u64>(old(m), k)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i)
+    ensures ∀ (i in spec_rank::<u64, u64>(old(m), k)
+        .. spec_len::<u64, u64>(m)),
+        spec_key_at::<u64, u64>(m, i) == spec_key_at::<u64, u64>(old(m), i + 1)
 
   -- The mirror of the insert splice: removing through an iterator closes
   -- the position up, so keys before the removed one stay put and keys
@@ -3360,29 +3402,34 @@ verex module aptos_framework::big_ordered_map where
         oit := ordered_map::iter_next(oit, entries)
       where
         invariant !(oit is End)
-          ==> oit.index < aptos_framework::ordered_map::spec_len(entries)
+          ==> oit.index
+            < aptos_framework::ordered_map::spec_len::<u64, Child<u64> >(
+              entries
+            )
         invariant sum
           == spec_test_sum_upto(
             m,
-            spec_leaf_offset(it, m)
-              + (if oit is End then aptos_framework::ordered_map::spec_len(
-                entries
-              )
+            spec_leaf_offset::<u64, u64>(it, m)
+              + (if oit is End then
+                aptos_framework::ordered_map::spec_len::<u64, Child<u64> >(
+                  entries
+                )
               else oit.index)
           )
       it := next_it
     where
-      invariant spec_leaf_iter_valid(it, m)
-      invariant 0 <= spec_leaf_offset(it, m)
-        && spec_leaf_offset(it, m) <= spec_len(m)
+      invariant spec_leaf_iter_valid::<u64, u64>(it, m)
+      invariant 0 <= spec_leaf_offset::<u64, u64>(it, m)
+        && spec_leaf_offset::<u64, u64>(it, m) <= spec_len::<u64, u64>(m)
       invariant it.internal_leaf_iter_is_end()
-        ==> spec_leaf_offset(it, m) == spec_len(m)
-      invariant sum == spec_test_sum_upto(m, spec_leaf_offset(it, m))
+        ==> spec_leaf_offset::<u64, u64>(it, m) == spec_len::<u64, u64>(m)
+      invariant sum
+        == spec_test_sum_upto(m, spec_leaf_offset::<u64, u64>(it, m))
     sum
 
   spec test_verify_leaf_walk_sum_symbolic where
     pragma verify
-    ensures result == spec_test_sum_upto(m, spec_len(m))
+    ensures result == spec_test_sum_upto(m, spec_len::<u64, u64>(m))
 
   -- The shape `for_each_ref` expands into: an outer walk over leaves and
   -- an inner walk over each leaf's entries. The leaf offset carries the

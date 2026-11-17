@@ -76,7 +76,14 @@ pin   VerexSL/Tests/Shapes/TableRows.lean ::row_nested_ok 20476270
 pin   VerexSL/Tests/Shapes/Enums.lean ::enum_replaced_ok 22224320
 pin   VerexSL/Tests/Shapes/Enums.lean ::vector_replaced_ok 33613040
 
+# Using a function-typed field's behavioural invariants at a call: the
+# no-abort rule and the result rule instantiated at the invocation's state.
+# Fourteen and a half million, under the tens of millions this file's header
+# pins without a measurement of their own: so it is pinned with one, two
+# elaborations of one build giving 14505257 and 14502446, 0.019% apart.
+pin   VerexSL/Tests/Rendered/mini_amm.lean «0x42».mini_amm::quote 14505257
+
 # A size pair: three and six insertions of distinct keys into a fresh map.
-pin   VerexSL/Tests/Cost/MapScaling.lean ::three 45853819
-pin   VerexSL/Tests/Cost/MapScaling.lean ::six 93729935
-ratio VerexSL/Tests/Cost/MapScaling.lean ::six ::three 2.044
+pin   VerexSL/Tests/Cost/MapScaling.lean ::three 43671546
+pin   VerexSL/Tests/Cost/MapScaling.lean ::six 85240863
+ratio VerexSL/Tests/Cost/MapScaling.lean ::six ::three 1.952

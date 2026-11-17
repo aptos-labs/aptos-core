@@ -5720,6 +5720,12 @@ theorem lt_size_of_getElem?_eq_some {α : Type} {xs : Array α} {i : Nat} {value
     (read : xs[i]? = some value) : i < xs.size :=
   (Array.getElem?_eq_some_iff.mp read).1
 
+/-- A position a list reads a value at lies within it. -/
+theorem lt_length_of_getElem?_eq_some {α : Type} {xs : List α} {i : Nat} {value : α}
+    (read : xs[i]? = some value) : i < xs.length :=
+  let ⟨bound, _⟩ := List.getElem?_eq_some_iff.mp read
+  bound
+
 instance : Inhabited (Memory unit) := ⟨fun _ _ => none⟩
 
 /-- A `Spec` over global memory with VIR failures. -/

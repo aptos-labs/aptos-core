@@ -313,9 +313,122 @@ theorem NTy.Holds.vector_push [Carriers] {τ : NTy} {vector : (NTy.vector τ).ca
     rw [same]
     exact held
 
+/-- Concatenating two vectors can exceed the representable length, so the
+result carries the certificate the construction decided. -/
+def concatBounded {α : Type} (left right : SpecVector α)
+    (bounded : (left.values ++ right.values).size < 2 ^ 64) : SpecVector α :=
+  ⟨left.values ++ right.values, bounded⟩
+
+-- A concatenation keeps both of its vectors until its result is asked for
+-- its fact. The representability of the result stays a branch of its own:
+-- past the representable length the program has no result.
+@[vir_denote ↓ high] theorem denote_concat_direct [C : Carriers] {State : Type} {ρ : ResultShape}
+    {Γ : NRow} {τ : NTy} (left right : Term unit ρ Γ (.vector τ))
+    (meanings : InterpreterOps unit C State) (env : HEnv Γ) :
+    (Term.concat left right).denoteIn meanings env =
+      Flow.bind (β := NTy.carrier (.vector τ)) (left.denoteIn meanings env) fun l env =>
+        Flow.bind (β := NTy.carrier (.vector τ)) (right.denoteIn meanings env) fun r env =>
+          if bounded : (l.values ++ r.values).size < 2 ^ 64 then
+            Spec.pure (@Flow.value C ρ Γ (NTy.carrier (.vector τ)) (concatBounded l r bounded) env)
+          else Spec.bottom := by
+  rw [Term.denoteIn]
+  congr 1
+  funext l env
+  congr 1
+  funext r env
+  by_cases bounded : (l.values ++ r.values).size < 2 ^ 64
+  · simp only [SpecVector.ofArray?, dif_pos bounded]
+    rfl
+  · simp only [SpecVector.ofArray?, dif_neg bounded]
+
+@[vir_denote_norm] theorem concatBounded_values {α : Type} (left right : SpecVector α)
+    (bounded : (left.values ++ right.values).size < 2 ^ 64) :
+    (concatBounded left right bounded).values = left.values ++ right.values := rfl
+
+/-- A concatenation holds where both of its vectors do. -/
+theorem NTy.Holds.concatBounded [Carriers] {τ : NTy} {left right : (NTy.vector τ).carrier}
+    (leftHeld : NTy.Holds (.vector τ) left) (rightHeld : NTy.Holds (.vector τ) right)
+    (bounded : (left.values ++ right.values).size < 2 ^ 64) :
+    NTy.Holds (.vector τ) (Denote.concatBounded left right bounded) :=
+  NTy.Holds.of_concat leftHeld rightHeld (by
+    simp only [SpecVector.ofArray?, dif_pos bounded]
+    rfl)
+
+-- A slice within its range never exceeds the representable length: its result
+-- is the vector a specification states of the range (`SpecVector.extract`),
+-- which keeps the vector it is of. A range outside the vector aborts as before.
+@[vir_denote ↓ high] theorem denote_slice_direct [C : Carriers] {State : Type} {ρ : ResultShape}
+    {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+    (vector : Term unit ρ Γ (.vector τ)) (start stop : Term unit ρ Γ (.int width signed))
+    (meanings : InterpreterOps unit C State) (env : HEnv Γ) :
+    (Term.slice site vector start stop).denoteIn meanings env =
+      Flow.bind (vector.denoteIn meanings env) fun values env =>
+        Flow.bind (start.denoteIn meanings env) fun a env =>
+          Flow.bind (stop.denoteIn meanings env) fun b env =>
+            if a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat then
+              abortAt site (Failure.ofInts .abort #[a.val, b.val])
+            else Spec.pure (.value (SpecVector.extract values a.val.toNat b.val.toNat) env) := by
+  rw [Term.denoteIn]
+  congr 1
+  funext values env
+  congr 1
+  funext a env
+  congr 1
+  funext b env
+  by_cases outside : a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat
+  · simp only [if_pos outside]
+  · have bounded := (SpecVector.extract values a.val.toNat b.val.toNat).bounded
+    rw [SpecVector.values_extract] at bounded
+    simp only [if_neg outside, SpecVector.ofArray?, dif_pos bounded]
+    rfl
+
+/-- Reversing a range preserves the representable length without a fresh
+runtime check. -/
+def reverseSliceBounded {α : Type} (v : SpecVector α) (left right : Nat) : SpecVector α :=
+  ⟨reverseSlice v.values left right, by simpa only [size_reverseSlice] using v.bounded⟩
+
+-- A range outside the vector aborts as before.
+@[vir_denote ↓ high] theorem denote_reverseSlice_direct [C : Carriers] {State : Type}
+    {ρ : ResultShape} {Γ : NRow} {τ : NTy} {width : Nat} {signed : Bool} (site : Nat)
+    (vector : Term unit ρ Γ (.vector τ)) (start stop : Term unit ρ Γ (.int width signed))
+    (meanings : InterpreterOps unit C State) (env : HEnv Γ) :
+    (Term.reverseSlice site vector start stop).denoteIn meanings env =
+      Flow.bind (vector.denoteIn meanings env) fun values env =>
+        Flow.bind (start.denoteIn meanings env) fun a env =>
+          Flow.bind (stop.denoteIn meanings env) fun b env =>
+            if a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat then
+              abortAt site (Failure.ofInts .abort #[a.val, b.val])
+            else Spec.pure (.value (reverseSliceBounded values a.val.toNat b.val.toNat) env) := by
+  rw [Term.denoteIn]
+  congr 1
+  funext values env
+  congr 1
+  funext a env
+  congr 1
+  funext b env
+  by_cases outside : a.val < 0 ∨ b.val < a.val ∨ values.values.size < b.val.toNat
+  · simp only [if_pos outside]
+  · have bounded := (reverseSliceBounded values a.val.toNat b.val.toNat).bounded
+    change (reverseSlice values.values a.val.toNat b.val.toNat).size < 2 ^ 64 at bounded
+    simp only [if_neg outside, SpecVector.ofArray?, dif_pos bounded]
+    rfl
+
+@[vir_denote_norm] theorem reverseSliceBounded_values {α : Type} (v : SpecVector α)
+    (left right : Nat) :
+    (reverseSliceBounded v left right).values = reverseSlice v.values left right := rfl
+
+theorem NTy.Holds.reverseSliceBounded [Carriers] {τ : NTy} {vector : (NTy.vector τ).carrier}
+    (held : NTy.Holds (.vector τ) vector) (left right : Nat) :
+    NTy.Holds (.vector τ) (Denote.reverseSliceBounded vector left right) :=
+  NTy.Holds.reverseSlice (start := left) (stop := right) held (by
+    have bounded := (Denote.reverseSliceBounded vector left right).bounded
+    change (Denote.reverseSlice vector.values left right).size < 2 ^ 64 at bounded
+    simp only [SpecVector.ofArray?, dif_pos bounded]
+    rfl)
+
 -- Keep the certified constructors folded; their projections have normalization rules.
 -- The element read stays folded until its split or its decided branch.
-attribute [irreducible] swapBounded eraseBounded insertBounded withVectorElem ElementFactOf
+attribute [irreducible] swapBounded eraseBounded insertBounded concatBounded reverseSliceBounded withVectorElem ElementFactOf
 attribute [vir_denote_norm] Array.size_swapIfInBounds
 
 /-- An optional read of a swapped array at one of the two positions the swap
@@ -335,6 +448,22 @@ theorem getElem?_swapIfInBounds_right {α : Type} {xs : Array α} {i j : Nat} (h
     simpa only [Array.size_swapIfInBounds] using hj
   rw [Array.getElem?_eq_getElem bound, getElem_swapIfInBounds_right hi bound,
     Array.getElem?_eq_getElem hi]
+
+/-- An optional read of a swapped array at a position the swap leaves alone:
+the array before the swap, read there. The swap moves the two positions it
+names and nothing else, and it keeps the array's size, so the read needs no
+bound of its own (as `Array.getElem?_setIfInBounds_ne` for a write). -/
+theorem getElem?_swapIfInBounds_ne {α : Type} {xs : Array α} {i j k : Nat}
+    (atFirst : k ≠ i) (atSecond : k ≠ j) : (xs.swapIfInBounds i j)[k]? = xs[k]? := by
+  by_cases inside : k < xs.size
+  · have moved : k < (xs.swapIfInBounds i j).size := by
+      simpa only [Array.size_swapIfInBounds] using inside
+    rw [Array.getElem?_eq_getElem moved, Array.getElem?_eq_getElem inside,
+      Array.getElem_swapIfInBounds moved, dif_neg (fun both => atFirst both.1),
+      dif_neg (fun both => atSecond both.1)]
+  · have moved : ¬k < (xs.swapIfInBounds i j).size := by
+      simpa only [Array.size_swapIfInBounds] using inside
+    rw [Array.getElem?_eq_none (by omega), Array.getElem?_eq_none (by omega)]
 
 open Lean Meta in
 /-- A read whose array holds, in the normal form of its optional read, a

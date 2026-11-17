@@ -237,6 +237,14 @@ def SpecVector.extract (vector : SpecVector α) (lower upper : Nat) : SpecVector
 @[simp] theorem SpecVector.values_extract (vector : SpecVector α) (lower upper : Nat) :
     (vector.extract lower upper).values = vector.values.extract lower upper := rfl
 
+/-- Two reads of the same position in range agree whatever default they are
+given: the position is present, so neither default is consumed. A read of a
+vector's elements carries the default of the family the element belongs to,
+so a fact and the goal that uses it can read one position at two defaults. -/
+theorem getElem?_getD_in_bounds {α : Type} {values : Array α} {index : Nat} (left right : α)
+    (bounded : index < values.size) : values[index]?.getD left = values[index]?.getD right := by
+  simp only [Array.getElem?_eq_getElem bounded, Option.getD_some]
+
 /-- The entries of an intrinsic map, as many as a Move vector holds: the
 map's representation keeps them in vectors, whose unsigned-64 length bound
 the abstract map inherits. -/

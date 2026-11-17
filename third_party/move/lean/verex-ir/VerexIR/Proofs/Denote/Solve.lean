@@ -517,10 +517,61 @@ private def solveLeaf (normalization : Simp.Context × Simp.SimprocsArray)
   reportRuntimeMention
   return (closed, stageCost)
 
+/-- The kind of a condition a function's proof is given at a site: the step
+that reads it, each with the interface of its rule. A site names an
+expression, and one expression can owe conditions of several kinds: a mutable
+borrow of a resource owes the namespace invariants where its write of memory
+ends and a data invariant where its mutation ends, at one site. -/
+inductive SiteCondition.Kind where
+  /-- A loop's invariant, over the function's start, the loop's entry, and
+  the current locals and state (`wp_loopAt`). -/
+  | loopInvariant
+  /-- An assertion, over the function's start, the anchors it reads, and the
+  locals and state (`wp_assertAt`). -/
+  | assertion
+  /-- The data invariant owed where a mutation ends, over the function's
+  start and the locals and state (`wp_mutationEndAt`). -/
+  | mutationEnd
+  /-- The data invariant owed of a constructed value, over the function's
+  start, the value, and the state (`wp_constructedAt`). -/
+  | construction
+  /-- The namespace invariants owed where a write of memory ends, over the
+  function's start, the anchor the write saved, and the locals and state
+  (`wp_memoryWrittenAt`). -/
+  | memoryWritten
+  /-- The namespace invariants owed where a call returns, over the function's
+  start and the memory before and after the call (`wp_callAt_checked`). -/
+  | afterCall
+  deriving DecidableEq, Repr, Inhabited, Lean.ToExpr
+
+/-- Every kind of condition. -/
+def SiteCondition.Kind.all : Array SiteCondition.Kind :=
+  #[.loopInvariant, .assertion, .mutationEnd, .construction, .memoryWritten, .afterCall]
+
+/-- A kind's name, as the artifacts of a target's conditions carry it. -/
+def SiteCondition.Kind.name : SiteCondition.Kind → String
+  | .loopInvariant => "loopInvariant"
+  | .assertion => "assertion"
+  | .mutationEnd => "mutationEnd"
+  | .construction => "construction"
+  | .memoryWritten => "memoryWritten"
+  | .afterCall => "afterCall"
+
+/-- A condition a function's proof is given: the site and the kind of the
+step that reads it, the function owning the site, whose start the condition
+is over, and the predicate. -/
+structure SiteCondition where
+  site : Nat
+  kind : SiteCondition.Kind
+  function : Lean.Expr
+  condition : Lean.Expr
+
 /-- What every step of `solveGoals` reads: the target's data and the
 solver's settings. -/
 structure SolveContext where
-  invariants : Array (Nat × Lean.Expr × Lean.Expr)
+  /-- The conditions of the sites the walk meets, one of a kind at a site
+  (`elabObligationArguments` refuses two). -/
+  conditions : Array SiteCondition
   callees : Array (Lean.Expr × String × Lean.Expr)
   equations : Array Lean.Expr
   /-- The equivalences of the callees' contracts specialized at the type
@@ -562,6 +613,19 @@ structure SolveContext where
   /-- The compiled callees whose summaries are being derived, innermost
   last: such a walk hands its leaves over as the summary's conjuncts. -/
   summarizing : Array Name := #[]
+
+/-- The condition of a kind a step reads at its site. A condition of another
+kind at the site is another step's, and never stands for it. -/
+private def SolveContext.conditionOf? (ctx : SolveContext) (kind : SiteCondition.Kind) (site : Nat) :
+    Option SiteCondition :=
+  ctx.conditions.find? fun entry => entry.site == site && entry.kind == kind
+
+/-- Whether the proof is given a condition of a function, of any kind: its
+start is then recorded where its body is entered, for the conditions to
+read. -/
+private def SolveContext.ownsConditions (ctx : SolveContext) (goal : MVarId)
+    (handle : Lean.Expr) : MetaM Bool :=
+  goal.withContext (ctx.conditions.anyM fun entry => isDefEq entry.function handle)
 
 /-- The number of a call among the target's calls of its callee, by its
 site. -/
@@ -818,6 +882,27 @@ private def queue (goals : List MVarId) (provenance : Option Provenance)
         | none => owed.erase goal) s.goalOwed
       goalSummaries := goals.foldl (fun under goal =>
         if s.activeSummary then under.insert goal else under.erase goal) s.goalSummaries }
+
+/-- An obligation is a proposition. A goal that is not one was built from a
+condition whose interface is not that of the rule of its step: a defect of
+what produced the condition and no claim of the target, which no proof
+closes. The walk stops there with an internal error naming the step, so
+that the goal is never handed on as a leaf, where it would be reported as a
+proof that failed, and nothing is put in its place. -/
+private def requireObligations (goals : List MVarId) (step : MessageData) : MetaM Unit := do
+  for goal in goals do
+    if ← goal.isAssigned then continue
+    goal.withContext do
+      let target ← instantiateMVars (← goal.getType)
+      let proposition ← try isProp target catch failure =>
+        if failure.isRuntime || failure.isInterrupt then throw failure else pure false
+      unless proposition do
+        throwError m!"internal: malformed obligation of {step}: what it owes is no \
+          proposition{indentExpr target}"
+
+/-- The step of a condition at a site, for `requireObligations`. -/
+private def conditionStep (kind : SiteCondition.Kind) (site : Nat) : MessageData :=
+  m!"the `{kind.name}` condition at the site {site}"
 
 /-- Queues `goals` as `queue` does, their path taking `decision` beside the
 decisions of the goal being stepped. -/
@@ -1455,8 +1540,8 @@ private def callAtStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := 
   let { goal, provenance, clauses, stageStart, .. } := step
   let some (site, arguments) ← callAtGoal? goal | return false
   let arguments := arguments.modify 3 (·.consumeMData.headBeta)
-  let rule ← match ctx.invariants.find? (·.1 == site) with
-    | some (_, function, condition) => do
+  let rule ← match ctx.conditionOf? .afterCall site with
+    | some { function, condition, .. } => do
         let owed ← atStart goal function (← conditionAt goal condition none) site #[]
         pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_callAt_checked)
           (arguments.extract 0 4 ++ #[owed] ++ arguments.extract 4 7))
@@ -1568,6 +1653,9 @@ private def callCheckedStep (ctx : SolveContext) (step : SolveStep) : SolveM Boo
   match ← goal.withContext (goal.apply
       (mkApp2 (mkConst ``VerexIR.Proofs.Denote.CallChecked.intro) owed rest)) with
   | [holds, continues] =>
+      requireObligations [holds] <| match step.callSite with
+        | some site => conditionStep .afterCall site
+        | none => m!"the `{SiteCondition.Kind.afterCall.name}` condition of a call"
       setGoals [continues]
       evalTactic (← `(tactic| intro invariantHolds))
       evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
@@ -1805,7 +1893,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
     queue (← getGoals) provenance clauses
     charge "unroll entry" stageStart
     return true
-  let some (_, function, invariant) := ctx.invariants.find? (·.1 == site)
+  let some { function, condition := invariant, .. } := ctx.conditionOf? .loopInvariant site
     | throwError m!"no invariant for the loop at site {site}"
   -- The predicate uses the loop's interpretation; an explicit concrete
   -- adapter selects the frame of an inlined concrete callee.
@@ -1841,6 +1929,7 @@ private def loopStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let subgoals ← goal.withContext (goal.apply rule)
   match subgoals with
   | [entryHolds, step] =>
+      requireObligations [entryHolds] (conditionStep .loopInvariant site)
       let stepStart ← IO.getNumHeartbeats
       let mut marks : Array (String × Nat) := #[]
       setGoals [step]
@@ -1923,7 +2012,7 @@ after it. -/
 private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   let some (site, arguments) ← assertionGoal? goal | return false
-  let some (_, function, condition) := ctx.invariants.find? (·.1 == site)
+  let some { function, condition, .. } := ctx.conditionOf? .assertion site
     | throwError m!"no condition for the assertion at site {site}"
   let condition ← resolveAnchors goal
     (← atStart goal function (← conditionAt goal condition (some arguments[0]!)) site #[])
@@ -1931,6 +2020,7 @@ private def assertionStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool 
     (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9)
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
+      requireObligations [holds] (conditionStep .assertion site)
       setGoals [continues]
       let (_, continued) ← (← getMainGoal).intro `assertionHolds
       let holdsIdent := mkIdent `assertionHolds
@@ -1988,8 +2078,8 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       fun state =>
       mkLambdaFVars #[env, state] (mkConst ``True)
   -- A write of an inlined callee owes nothing where it ends.
-  let (condition, owed) ← match ctx.invariants.find? (·.1 == site) with
-    | some (_, function, condition) =>
+  let (condition, owed) ← match ctx.conditionOf? .memoryWritten site with
+    | some { function, condition, .. } =>
         if ← anchorRecorded goal site then
           pure (← resolveAnchors goal
             (← atStart goal function (← conditionAt goal condition (some arguments[0]!)) site #[]), true)
@@ -1999,6 +2089,7 @@ private def memoryWrittenStep (ctx : SolveContext) (step : SolveStep) : SolveM B
     (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9)
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
+      requireObligations [holds] (conditionStep .memoryWritten site)
       setGoals [continues]
       evalTactic (← `(tactic| intro invariantHolds))
       evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
@@ -2175,15 +2266,18 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
           #[arguments[arguments.size - 1]!], origin, site)
     | none =>
       let some (site, arguments, constructed) := check | return false
-      -- The predicate a `constructedAt` or `mutationEndAt` marker checks.
+      -- The predicate a `constructedAt` or `mutationEndAt` marker checks: the
+      -- condition of its own kind at its site, never another step's there
+      -- (a write of memory ending at the site owes its own, `memoryWrittenStep`).
       -- Where the unit states none the marker checks nothing: the obligation
       -- is the checking step's, and these two markers retire with the open
       -- problem `doc/plan/data-and-global-invariants.md`, "`constructedAt` and
       -- `mutationEndAt` are emitted where they check nothing".  The marker's
       -- own terms are read in the goal's context: their types mention the
       -- goal's locals, a reference local of a reborrow among them.
-      let condition ← match ctx.invariants.find? (·.1 == site) with
-        | some (_, function, condition) =>
+      let kind : SiteCondition.Kind := if constructed then .construction else .mutationEnd
+      let condition ← match ctx.conditionOf? kind site with
+        | some { function, condition, .. } =>
             atStart goal function (← conditionAt goal condition (some arguments[0]!)) site #[]
         | none => goal.withContext do
             -- A construction's marker checks its value, a mutation end's
@@ -2200,8 +2294,13 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
         pure (mkAppN (mkConst ``VerexIR.Proofs.Denote.wp_mutationEndAt)
             (arguments.extract 0 6 ++ #[condition] ++ arguments.extract 6 9),
           #[arguments[5]!, arguments[8]!], Provenance.mutationEnd, site)
+  let owner : MessageData := match check with
+    | some (_, _, constructed) =>
+        conditionStep (if constructed then .construction else .mutationEnd) site
+    | none => m!"the check of a value at the site {site}"
   match ← goal.withContext (goal.apply rule) with
   | [holds, continues] =>
+      requireObligations [holds] owner
       setGoals [continues]
       evalTactic (← `(tactic| intro invariantHolds))
       evalTactic (← `(tactic| try simp only [VerexIR.Proofs.Obligation_eq] at invariantHolds))
@@ -2229,7 +2328,12 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
       -- spells it (`openHoldsGoal`, `doc/plan/one-spelling.md`, D1).
       let mut unfolded := #[]
       for owed in ← getGoals do
-        unfolded := unfolded ++ (← openHoldsGoal owed).toArray
+        let opened ← openHoldsGoal owed
+        if verex.solverDebug.get (← getOptions) then
+          let fact ← owed.withContext do ppExpr (← instantiateMVars (← owed.getType))
+          IO.println s!"    checked fact {((toString fact).replace "\n" " ").take 400}: {
+            opened.length} goals"
+        unfolded := unfolded ++ opened.toArray
       setGoals unfolded.toList
       normalizeGoals ctx
       -- A declaration's data invariant of the encoding of the value packed:
@@ -2418,7 +2522,7 @@ private def enterCallee (ctx : SolveContext) (step : SolveStep) (handle : Lean.E
   let precondition? := registered?.filter fun (_, condition) =>
     !condition.consumeMData.isConstOf ``noPrecondition
   if precondition?.isSome ||
-      (← ctx.invariants.anyM fun (_, function, _) => goal.withContext (isDefEq function handle)) then
+      (← ctx.ownsConditions goal handle) then
     let inlined ← getMainGoal
     let started ← inlined.withContext do
       let proof ← mkAppM ``FunctionStart.intro #[handle, arguments, state]
@@ -3067,7 +3171,7 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
         let mut candidates : Array (TSyntax `tactic) :=
           #[← `(tactic| exact VerexIR.Proofs.Denote.FrameOf.empty),
             ← `(tactic| exact VerexIR.Proofs.Denote.FrameOf.frame rfl),
-            ← `(tactic| assumption)]
+            ← `(tactic| verex_assumption)]
         for equation in ctx.equations do
           let term ← goal.withContext (Lean.Elab.Term.exprToSyntax equation)
           candidates := candidates.push (← `(tactic| exact VerexIR.Proofs.Denote.FrameOf.rewrite
@@ -3099,7 +3203,7 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
           (match body.getAppFn with
             | .const (.str _ part) _ => part.startsWith "lemmaTrusted_"
             | _ => false))
-      if native then id.assumption
+      if native then closeByStated id
   let subgoals ← (← getGoals).filterM fun g => return !(← g.isAssigned)
   -- The roles of the rule's obligations: the arguments' validity, what the
   -- callee's theorem assumes, its precondition, the continuation, and the
@@ -3437,7 +3541,7 @@ private def applySummaryAt (ctx : SolveContext) (step : SolveStep) (handle : Lea
   unless (collectFVars {} meaning).fvarIds.all base.1.contains do return ← skip "base"
   if ← goal.withContext (ctx.preconditions.anyM fun (function, _) => isDefEq function handle) then
     return ← skip "precondition"
-  if ← goal.withContext (ctx.invariants.anyM fun (_, function, _) => isDefEq function handle) then
+  if ← ctx.ownsConditions goal handle then
     return ← skip "invariant"
   -- Derived before the module's proofs (`deriveModuleSummary`); a callee
   -- without one inlines.
@@ -3474,10 +3578,10 @@ private def applySummaryAt (ctx : SolveContext) (step : SolveStep) (handle : Lea
         else pure none
       for argument in arguments.pop do
         let .mvar id ← instantiateMVars argument | continue
-        let some local_ ← findLocalDeclWithType? (← instantiateMVars (← id.getType))
+        let some stated ← statedProof? (← instantiateMVars (← id.getType))
           | return .error m!"the summary of `{calleeName}` needs a hypothesis the call lacks: \
               {← instantiateMVars (← id.getType)}"
-        id.assign (mkFVar local_)
+        id.assign stated
       let premise ← mkFreshExprSyntheticOpaqueMVar
         (← instantiateMVars (← inferType arguments.back!))
       arguments.back!.mvarId!.assign premise
@@ -3961,6 +4065,9 @@ per-attempt windows. An owner's allowance therefore bounds the walk's work for
 its clause, not the whole work of the clause. -/
 private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := do
   let { goal, provenance, clauses, .. } := step
+  requireObligations [goal] <| match provenance with
+    | some origin => m!"a leaf owing `{origin.key.text}`"
+    | none => m!"a leaf of the target's clauses"
   setGoals [goal]
   modify fun s => { s with leaves := s.leaves + 1 }
   if !ctx.handOver && !ctx.summarizing.isEmpty then
@@ -4698,7 +4805,7 @@ initialize summaryTraversal.set fun ctx state => do
 loop hypothesis, a call by the callee's theorem, a structural node by
 splitting, and a leaf by `solveLeaf`, or, with `handOver`, as the leaf of
 an authored proof, named by what it owes (`leafName`). -/
-partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
+partial def solveGoals (conditions : Array SiteCondition)
     (callees : Array (Lean.Expr × String × Lean.Expr)) (equations : Array Lean.Expr := #[])
     (handOver : Bool := false) (labeled : Bool := false)
     (unrolls : Array (Nat × Nat) := #[])
@@ -4773,7 +4880,7 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   let base? ← pending[0]?.mapM fun (goal, _) => goal.withContext do
     return (← getLCtx, ← getLocalInstances)
   let ctx : SolveContext := {
-    invariants := invariants
+    conditions := conditions
     callees := callees
     equations := equations
     specializations := specializations
@@ -4956,7 +5063,7 @@ syntax "verex_solve_goals" (obligationArguments)? : tactic
 
 /-- What a function's obligation arguments state, elaborated. -/
 private structure ObligationData where
-  invariants : Array (Nat × Lean.Expr × Lean.Expr)
+  conditions : Array SiteCondition
   callees : Array (Lean.Expr × String × Lean.Expr)
   equations : Array Lean.Expr
   specializations : Array Lean.Expr
@@ -4984,17 +5091,29 @@ private def elabObligationArguments (arguments : TSyntax ``obligationArguments) 
       let loops := some loops
       if verex.solverDebug.get (← getOptions) then
         logInfo m!"normalized verification condition:\n{← getMainGoal}"
-      let mut invariants : Array (Nat × Lean.Expr × Lean.Expr) := #[]
+      let mut conditions : Array SiteCondition := #[]
       for loop in (loops.map (·.getElems)).getD #[] do
-        let triple ← Lean.Elab.Tactic.elabTerm loop none
-        let triple ← whnf (← instantiateMVars triple)
-        let rest ← whnf (triple.getArg! 3)
-        unless triple.isAppOfArity ``Prod.mk 4 && rest.isAppOfArity ``Prod.mk 4 do
-          throwError m!"a loop invariant must be a `(site, function, invariant)` triple, \
-            not {triple}"
-        let some site ← siteOf? (triple.getArg! 2)
-          | throwError m!"a loop site must be a numeral, not {triple.getArg! 2}"
-        invariants := invariants.push (site, rest.getArg! 2, rest.getArg! 3)
+        let entry ← Lean.Elab.Tactic.elabTerm loop none
+        let entry ← whnf (← instantiateMVars entry)
+        let malformed : TacticM Unit := throwError
+          m!"a condition must be a `(site, kind, function, condition)` entry, not {entry}"
+        unless entry.isAppOfArity ``Prod.mk 4 do malformed
+        let kinded ← whnf (entry.getArg! 3)
+        unless kinded.isAppOfArity ``Prod.mk 4 do malformed
+        let owned ← whnf (kinded.getArg! 3)
+        unless owned.isAppOfArity ``Prod.mk 4 do malformed
+        let some site ← siteOf? (entry.getArg! 2)
+          | throwError m!"a condition's site must be a numeral, not {entry.getArg! 2}"
+        let spelled := (← whnf (kinded.getArg! 2)).consumeMData
+        let some kind := SiteCondition.Kind.all.find? fun kind => spelled == toExpr kind
+          | throwError m!"a condition's kind must be a `SiteCondition.Kind`, not {kinded.getArg! 2}"
+        -- A step reads the one condition of its kind at its site: a second
+        -- would be passed over without a word.
+        if conditions.any fun other => other.site == site && other.kind == kind then
+          throwError m!"two conditions of the kind `{kind.name}` at the site {site}: a step reads \
+            one"
+        conditions := conditions.push
+          { site, kind, function := owned.getArg! 2, condition := owned.getArg! 3 }
       let mut callees : Array (Lean.Expr × String × Lean.Expr) := #[]
       let mut inlinedHandles : Array (Lean.Expr × Lean.Expr) := #[]
       for call in (calls.map (·.getElems)).getD #[] do
@@ -5078,7 +5197,7 @@ private def elabObligationArguments (arguments : TSyntax ``obligationArguments) 
         | _ => throwError "a site must be `(site, kind, number, label)`"
       let labeled := flags.any (·.raw.isOfKind ``labeledFlag)
       return {
-        invariants := invariants
+        conditions := conditions
         callees := callees
         equations := equations
         specializations := specializations
@@ -5104,7 +5223,7 @@ private def obligations (arguments : Option (TSyntax ``obligationArguments)) (ha
       solveGoals #[] #[]
   | some arguments =>
       let data ← elabObligationArguments arguments
-      solveGoals data.invariants data.callees data.equations handOver data.labeled data.unrolls
+      solveGoals data.conditions data.callees data.equations handOver data.labeled data.unrolls
         data.preconditions data.inlinedHandles data.names data.ghostWrites preparing?
         data.specializations data.callSites data.sites points
 
@@ -5177,7 +5296,7 @@ def deriveModuleSummary (name : Name) (arguments : TSyntax ``obligationArguments
       (← targetState).moduleFacts.set ((← goal.getNondepPropHyps).foldl (·.insert ·) {})
       recordModuleFactsNormal goal
       let ctx : SolveContext := {
-        invariants := data.invariants
+        conditions := data.conditions
         callees := data.callees
         equations := data.equations
         specializations := data.specializations

@@ -1280,8 +1280,25 @@ def vectorLiteralElements? (vector : Lean.Expr) : Option (Lean.Expr × List Lean
   let (_, elements) ← (vector.getArg! 1).arrayLit?
   return (vector.getArg! 0, elements)
 
+/-- Concatenating the literal vector of one element is appending that
+element, also at a full vector, which both leave as it is. -/
+theorem append_singleton_eq_push {α : Type} (vector : VerexIR.SpecVector α) (element : α)
+    (bounded : #[element].size < 2 ^ 64) :
+    vector.append ⟨#[element], bounded⟩ = vector.push element := by
+  by_cases room : vector.values.size + 1 < 2 ^ 64
+  · have joined : vector.values.size + (#[element] : Array α).size < 2 ^ 64 := room
+    apply VerexIR.SpecVector.ext
+    rw [VerexIR.SpecVector.values_append joined, VerexIR.SpecVector.values_push element room,
+      Array.append_singleton]
+  · have full : ¬vector.values.size + (#[element] : Array α).size < 2 ^ 64 := room
+    simp only [VerexIR.SpecVector.append, VerexIR.SpecVector.push, dif_neg room, dif_neg full]
+
 /-- The concatenation of two native vectors: the literal of their elements
-where both are literals, else their concatenation (`SpecVector.append`). -/
+where both are literals; the left vector with an element appended
+(`SpecVector.push`, the term a program's append of that element is) where
+the right one is the literal of that one element
+(`append_singleton_eq_push`); else their concatenation
+(`SpecVector.append`). -/
 def nativeVectorConcat (left right : Lean.Expr) : MetaM Lean.Expr := do
   if let (some (carrier, leftElements), some (_, rightElements)) :=
       (vectorLiteralElements? left, vectorLiteralElements? right) then
@@ -1289,6 +1306,8 @@ def nativeVectorConcat (left right : Lean.Expr) : MetaM Lean.Expr := do
     let bounded ← VerexIR.Proofs.Denote.decidedLemma (← mkAppM ``LT.lt
       #[← mkAppM ``Array.size #[array], mkNatLit (2 ^ 64)])
     return mkApp3 (mkConst ``VerexIR.SpecVector.mk) carrier array bounded
+  if let some (_, [element]) := vectorLiteralElements? right then
+    return ← mkAppM ``VerexIR.SpecVector.push #[left, element]
   mkAppM ``VerexIR.SpecVector.append #[left, right]
 
 /-- The equation of two native values of a type, as a specification's
@@ -1554,12 +1573,15 @@ def nativeOwner (carriers : Lean.Expr) (owner : VerexIR.Proofs.Denote.NTy) (valu
     | throwError "a map's owner of type {repr owner} is not a native owner"
   pure nativeValue
 
-/-- An owner's map discipline observes only keys. Keep its values in their
-native representation so generic and concrete clauses construct the same
-validity predicate, independently of their specification value readers. The
-map's keys, values and entries are stated at one family, the one the owner's
-table is at: its keys are read by that family's typed view of the key type,
-a type parameter of an instantiated family included. -/
+/-- An owner's map discipline observes only keys, so its values' reader is
+free: a value of a fixed-width integer type is read as the integer a
+specification states it at, the spelling a clause's reading of the same
+entries holds, and any other value stays in its native representation, as a
+generic clause and an abstract parameter's sort read it. The map's keys,
+values and entries are stated at one family, the one the owner's table is at:
+its keys are read by that family's typed view of the key type, a type
+parameter of an instantiated family included, and its values by that family's
+view of the value type where that view reads an integer. -/
 def NativeOwner.valid (owner : NativeOwner) (model : MapModel) : MetaM Lean.Expr := do
   let_expr VerexIR.Proofs.Denote.NTy.carrier carriers table :=
       (← instantiateMVars (← inferType owner.table)).consumeMData
@@ -1568,11 +1590,20 @@ def NativeOwner.valid (owner : NativeOwner) (model : MapModel) : MetaM Lean.Expr
     | throwError "internal: an owner's table is not at a table type"
   let some keys ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers key (resolve := false)
     | throwError "the map's keys of type {key} have no typed view"
-  let nativeValue := carrierType carriers value
-  let identity ← withLocalDeclD `value nativeValue fun value => mkLambdaFVars #[value] value
-  let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries keys.read identity owner.table
-  let typed : TypedTable := { owner.typed with keys, map }
-  mkAppOptM ``VerexIR.SpecMap.Valid #[keys.carrier, nativeValue, ← typed.discipline model, map]
+  let integerValues? : Option VerexIR.Proofs.Denote.NativeMaps.TypedView ← do
+    let some values ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers value (resolve := false)
+      | pure none
+    pure (if values.integer then some values else none)
+  let (valueRead, valueCarrier) ← match integerValues? with
+    | some values => pure (values.read, values.carrier)
+    | none => do
+        let nativeValue := carrierType carriers value
+        let identity ← withLocalDeclD `value nativeValue fun value => mkLambdaFVars #[value] value
+        pure (identity, nativeValue)
+  let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries keys.read valueRead owner.table
+  let typed : TypedTable :=
+    { owner.typed with keys, values := integerValues?.getD owner.typed.values, map }
+  mkAppOptM ``VerexIR.SpecMap.Valid #[keys.carrier, valueCarrier, ← typed.discipline model, map]
 
 /-- The table a typed map is written back as (`SpecMap.writeBack`): its
 entries, each key and value its native value (`NTy.unread`). -/

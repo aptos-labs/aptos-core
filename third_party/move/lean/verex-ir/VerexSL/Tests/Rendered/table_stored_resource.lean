@@ -150,7 +150,8 @@ verex module 0x1::table_stored_resource where
 
   spec read where
     aborts_if !exists<Holder>(@0x1)
-    ensures result == spec_contains(global<Holder>(@0x1).entries, key)
+    ensures result
+        == spec_contains::<Address, u64>(global<Holder>(@0x1).entries, key)
 
   fun read_false(key : Address) -> Bool := do
     let entries := &Holder[@0x1].entries
@@ -167,8 +168,8 @@ verex module 0x1::table_stored_resource where
 
   spec write where
     aborts_if !exists<Holder>(@0x1)
-    aborts_if spec_contains(global<Holder>(@0x1).entries, key)
-    ensures spec_contains(global<Holder>(@0x1).entries, key)
+    aborts_if spec_contains::<Address, u64>(global<Holder>(@0x1).entries, key)
+    ensures spec_contains::<Address, u64>(global<Holder>(@0x1).entries, key)
     modifies global<Holder>(@0x1), *
 
   fun publish(account : &Signer) -> Unit := do

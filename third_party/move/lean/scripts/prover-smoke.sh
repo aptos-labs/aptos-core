@@ -100,7 +100,10 @@ IR_TESTS=(
 # beside its module's own verification, a residual and the callee's row it
 # belongs to, a dictionary's contract that is missing or another's, the
 # generated bridges of own invariants, the domain a call binds its result
-# at, guarded woven behaviors, and a nested read under a pinned budget.
+# at, guarded woven behaviors, a nested read under a pinned budget, the
+# element a successful read of a typed literal lookup yields, a range goal
+# stated on a named result, a read of a written vector at a position the
+# write leaves alone, and the conditions of two kinds one site owes.
 BOUNDARY_TESTS=(
   VerexIR/Tests/VectorElementReads.lean
   VerexSL/Tests/ExecutableVectorReads.lean
@@ -121,6 +124,17 @@ BOUNDARY_TESTS=(
   VerexSL/Tests/CallResultHolds.lean
   VerexSL/Tests/GuardedWovenReadings.lean
   VerexSL/Tests/CertifiedFieldProjections.lean
+  VerexSL/Tests/MiniAmmPositives.lean
+  VerexSL/Tests/MapDefaultPositives.lean
+  VerexSL/Tests/MapSizeUpdatePositives.lean
+  VerexSL/Tests/ConditionKindPositives.lean
+  VerexSL/Tests/ClauseSingletonConcat.lean
+  VerexSL/Tests/LiteralVectorPush.lean
+  VerexSL/Tests/CanonicalMapValidity.lean
+  VerexSL/Tests/WrittenBackRoundTrip.lean
+  VerexSL/Tests/LiteralVectorReads.lean
+  VerexSL/Tests/RangeNamedResults.lean
+  VerexIR/Tests/VectorWriteSizes.lean
 )
 # Renderings of source fixtures as a frontend writes them
 # (verex-ir/VerexSL/Tests/Rendered/<name>.lean), checked in with the fixture's
@@ -135,6 +149,11 @@ RENDERED=(
   library_option_map
   table_stored_resource
   generic_function_literals_model
+  mini_amm
+  map_key_default
+  map_value_default
+  map_size_update
+  condition_kinds
 )
 # Check fixtures of verex-e2e-tests (VerexE2ETests/Check/<name>.lean), each
 # elaborated as the Check driver elaborates it. These print nothing.

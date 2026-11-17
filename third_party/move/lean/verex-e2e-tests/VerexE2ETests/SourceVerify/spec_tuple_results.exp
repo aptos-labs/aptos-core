@@ -1,4 +1,4 @@
-VerexE2ETests/SourceVerify/spec_tuple_results.move:38:9: error: the specification clause `ensures mixed(1, 42) == (1, 43)` is not established
+VerexE2ETests/SourceVerify/spec_tuple_results.move:38:9: error: the specification clause `ensures mixed::<u64>(1, 42) == (1, 43)` is not established
 VerexE2ETests/SourceVerify/spec_tuple_results.move:37:5: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in `VerexE2ETests/SourceVerify/spec_tuple_results.proof.lean`:
   verify wrong by lean =>
     verex_obligations

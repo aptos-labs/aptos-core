@@ -19,17 +19,20 @@ verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
 s : VerexIR.Proofs.Denote.NTy.signer.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-val✝ : 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝⁹⁻⁰.carrier
+permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+fst✝ :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
 heq :
   VerexIR.Proofs.Denote.Skolems.plainAt 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝⁹⁻⁰
       VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address modifier_addr) initialState✝ =
-    some val✝.val
-permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+    some (fst✝, ())
 stored_1 :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 stored_2 :
   VerexIR.Proofs.FramedAt executable✝
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
@@ -50,24 +53,25 @@ stored_2 :
                 { type := 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝³⁻⁰,
                   arguments := VerexIR.Proofs.Denote.NRow.nil } →
             post resource = pre resource)
-    val✝.val.fst
+    fst✝
 verexFinal : VerexIR.Proofs.Denote.Memory unit
+verexResultHolds : True
 verexEnsures :
   VerexIR.Proofs.EnsuresOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) PUnit.unit
-    initialState✝ verexFinal
+    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) PUnit.unit initialState✝
+    verexFinal
 verexUnaborted :
   ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝
 verexStateOf :
   VerexIR.Proofs.StateOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝ =
@@ -116,34 +120,38 @@ verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
 s : VerexIR.Proofs.Denote.NTy.signer.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-val✝ : 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝¹²⁻⁰.carrier
+permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+fst✝ :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
 heq :
   VerexIR.Proofs.Denote.Skolems.plainAt 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝¹²⁻⁰
       VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address modifier_addr) initialState✝ =
-    some val✝.val
-permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+    some (fst✝, ())
 stored :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 verexFinal : VerexIR.Proofs.Denote.Memory unit
+verexResultHolds : True
 verexEnsures :
   VerexIR.Proofs.EnsuresOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) PUnit.unit
-    initialState✝ verexFinal
+    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) PUnit.unit initialState✝
+    verexFinal
 verexUnaborted :
   ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝
 verexStateOf :
   VerexIR.Proofs.StateOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝ =
@@ -173,34 +181,38 @@ verexResources : VerexIR.Proofs.ResourcesTyped unit
 modifier_addr : VerexIR.Proofs.Denote.NTy.address.carrier
 s : VerexIR.Proofs.Denote.NTy.signer.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-val✝ : 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝¹²⁻⁰.carrier
+permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+fst✝ :
+  (VerexIR.Proofs.Denote.NTy.function
+      (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
 heq :
   VerexIR.Proofs.Denote.Skolems.plainAt 0x42.stored_fun_values.unit.nominal.namespace.0.declaration✝¹²⁻⁰
       VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address modifier_addr) initialState✝ =
-    some val✝.val
-permitted_2 : VerexIR.Proofs.Denote.DataInvariants (storedInvariant unit executable✝) initialState✝
+    some (fst✝, ())
 stored :
   ∀ (memory : VerexIR.Proofs.Denote.Memory unit) (s : String),
     ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) memory
+        { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) memory
 verexFinal : VerexIR.Proofs.Denote.Memory unit
+verexResultHolds : True
 verexEnsures :
   VerexIR.Proofs.EnsuresOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst (s, ()) PUnit.unit
-    initialState✝ verexFinal
+    { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝ (s, ()) PUnit.unit initialState✝
+    verexFinal
 verexUnaborted :
   ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝
 verexStateOf :
   VerexIR.Proofs.StateOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
       (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none val✝.val.fst
+      { parameters := [true], results := [] } VerexIR.Proofs.Denote.ResultShape.none fst✝
       (VerexIR.Proofs.Denote.HList.settle
         (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer VerexIR.Proofs.Denote.NRow.nil) (s, ()))
       initialState✝ =

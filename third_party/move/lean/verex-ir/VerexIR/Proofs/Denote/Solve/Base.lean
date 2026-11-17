@@ -6981,11 +6981,14 @@ gone, so a write at the position of a later write is dead.  An inserting one
 puts an element of its own between the elements its vector holds, which it
 asks the fact of too; it keeps every one of them, so no earlier insertion is
 dead, and it is legal at the length as well as inside it; an append is the
-insertion at the length. -/
+insertion at the length.  A joining one puts the elements of a second vector
+after those its vector holds: its result holds exactly the elements of both,
+so it asks the fact of that second vector, whole, as it does of its own. -/
 private inductive VectorElements where
   | preserves
   | replaces
   | inserts
+  | joins
   deriving BEq
 
 /-- An operation a vector's fact passes through: its application, with the
@@ -7005,6 +7008,10 @@ private structure VectorOperation where
   operation adds.  Its lemma takes the facts of the vector and of that
   element, then the operation's remaining arguments in their order. -/
   element : Nat := 3
+  /-- The argument of the application that is the second vector a joining
+  operation is of.  Its lemma takes the facts of both vectors, then the
+  operation's remaining arguments in their order. -/
+  joined : Nat := 2
 
 private def vectorOperations : Array VectorOperation :=
   #[{ operation := ``VerexIR.SpecVector.set, arity := 4,
@@ -7013,10 +7020,16 @@ private def vectorOperations : Array VectorOperation :=
       preservation := ``NTy.Holds.swapBounded, elements := .preserves },
     { operation := ``eraseBounded, arity := 3,
       preservation := ``NTy.Holds.eraseBounded, elements := .preserves },
+    { operation := ``VerexIR.SpecVector.extract, arity := 4,
+      preservation := ``NTy.Holds.extract, elements := .preserves },
+    { operation := ``reverseSliceBounded, arity := 4,
+      preservation := ``NTy.Holds.reverseSliceBounded, elements := .preserves },
     { operation := ``insertBounded, arity := 5,
       preservation := ``NTy.Holds.insertBounded, elements := .inserts },
     { operation := ``VerexIR.SpecVector.push, arity := 3,
-      preservation := ``NTy.Holds.vector_push, elements := .inserts, element := 2 }]
+      preservation := ``NTy.Holds.vector_push, elements := .inserts, element := 2 },
+    { operation := ``concatBounded, arity := 4,
+      preservation := ``NTy.Holds.concatBounded, elements := .joins }]
 
 /-- Whether a fact is among stated ones: the same proposition, also where
 its carriers or type are spelled apart at reducible transparency, of the same
@@ -7079,11 +7092,15 @@ and a replacing operation also only where the position it writes has an
 in-bounds witness; once selected there is no fallback to an elementwise
 reading.  A dead write at the position the next write takes collapses
 (`holds_vector_set_overwrite`).  An insertion keeps the elements it was
-given, so it collapses with nothing and takes any position.  Restores the
-state where nothing is selected.  Under the closed policy an element an
+given, so it collapses with nothing and takes any position.  A joining
+operation is selected where the fact of one of its two vectors is reached:
+the other one is then asked for its fact whole, as a goal the opener reads
+as any vector's, and where neither is reached nothing is selected.  Restores
+the state where nothing is selected.  Under the closed policy an element an
 operation puts into the vector is asked of the context
 (`writtenElementHolds?`) and not of the caller, so the proof leaves no goal,
-and nothing is selected where the context does not settle such an element;
+and nothing is selected where the context does not settle such an element,
+or the fact of both vectors of a joining operation;
 and the fact of a vector is also the one a value that holds it states
 (`projectedVectorHolds?`), which a goal's own opener has opened by then.
 `known` are facts a worklist has produced and not yet stated, taken as the
@@ -7122,6 +7139,27 @@ private partial def vectorHoldsProof? (carriers elemTy vec : Lean.Expr) (closed 
       let proof := mkAppN (mkConst operation.preservation)
         (#[carriers, elemTy, base, element, baseProof, elementProof] ++ remaining)
       return some (proof, baseGoals ++ elementGoals)
+    if operation.elements == .joins then
+      let joined := peeled.getArg! operation.joined
+      let baseHeld? ← vectorHoldsProof? carriers elemTy base closed known
+      let joinedHeld? ← vectorHoldsProof? carriers elemTy joined closed known
+      if baseHeld?.isNone && joinedHeld?.isNone then return none
+      -- The vector whose fact is not reached is asked for it whole.
+      let asked (vector : Lean.Expr) : Option (Lean.Expr × List MVarId) →
+          MetaM (Option (Lean.Expr × List MVarId))
+        | some held => pure (some held)
+        | none => do
+            if closed then return none
+            let goal ← mkFreshExprMVar (some (mkApp3 (mkConst ``NTy.Holds) carriers
+              (mkApp (mkConst ``NTy.vector) elemTy) vector)) .syntheticOpaque
+            return some (goal, [goal.mvarId!])
+      let some (baseProof, baseGoals) ← asked base baseHeld? | return none
+      let some (joinedProof, joinedGoals) ← asked joined joinedHeld? | return none
+      let remaining := (peeled.getAppArgs.extract 2 operation.arity).eraseIdxIfInBounds
+        (operation.joined - 2)
+      let proof := mkAppN (mkConst operation.preservation)
+        (#[carriers, elemTy, base, joined, baseProof, joinedProof] ++ remaining)
+      return some (proof, baseGoals ++ joinedGoals)
     let index := peeled.getArg! 2
     let element := peeled.getArg! 3
     let basePeeled := peelSpecVectorExpr base
@@ -8624,40 +8662,45 @@ def goalContent (goal : MVarId) : MetaM (Lean.Expr × Array Lean.Expr) := goal.w
       hypotheses := hypotheses.push (← instantiateMVars decl.type)
   return (← instantiateMVars (← goal.getType), hypotheses.qsort (·.lt ·))
 
-/-- A goal some hypothesis states, or reflexivity, up to reducible
-unfolding. Plain `assumption` compares at default transparency, which
-unfolds large verification conditions at length before failing on the
-leaves nothing closes. Source-location markers do not change a proposition:
-compare their contents, retaining the markers when the attempt fails. -/
+/-- The proof of a proposition by a hypothesis of the context that states
+it: the same proposition up to reducible unfolding and source-location
+markers, or the same equation with its sides exchanged, its sides compared
+syntactically so that unrelated equalities trigger no search. A lookup is not
+a computation: plain `assumption` and `findLocalDeclWithType?` compare at
+default transparency, which evaluates a hypothesis that merely has the
+proposition's shape, such as an equation between written-back maps. -/
+def statedProof? (proposition : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  let statement (type : Lean.Expr) : Lean.Expr := Id.run do
+    let mut type := type.consumeMData
+    while type.isAppOfArity ``VerexIR.Proofs.Obligation 4 do
+      type := (type.getArg! 3).consumeMData
+    return type
+  let target := statement (← instantiateMVars proposition)
+  for decl in ← getLCtx do
+    if decl.isImplementationDetail then continue
+    let supplied := statement (← instantiateMVars decl.type)
+    if ← withReducible (isDefEq target supplied) then return some decl.toExpr
+    if let some (_, left, right) := target.eq? then
+      if let some (type, otherLeft, otherRight) := supplied.eq? then
+        if left == otherRight && right == otherLeft then
+          return some (mkApp4 (mkConst ``Eq.symm [← getLevel type])
+            type otherLeft otherRight decl.toExpr)
+  return none
+
+/-- Close a goal by the hypothesis stating it (`statedProof?`). -/
+def closeByStated (goal : MVarId) : MetaM Unit := goal.withContext do
+  goal.checkNotAssigned `verex_assumption
+  let some proof ← statedProof? (← goal.getType)
+    | throwError "no hypothesis states the goal"
+  goal.assign proof
+
+/-- A goal some hypothesis states (`statedProof?`), or reflexivity, up to
+reducible unfolding. Source-location markers do not change a proposition:
+their contents are compared, the markers retained when the attempt fails. -/
 elab "verex_assumption" : tactic => focusGoal do
   let goal ← getMainGoal
-  if ← closeReflexive goal then
-    replaceMainGoal []
-    return
-  goal.withContext do
-    let statement (type : Lean.Expr) : Lean.Expr := Id.run do
-      let mut type := type.consumeMData
-      while type.isAppOfArity ``VerexIR.Proofs.Obligation 4 do
-        type := (type.getArg! 3).consumeMData
-      return type
-    let target := statement (← instantiateMVars (← goal.getType))
-    for decl in ← getLCtx do
-      if decl.isImplementationDetail then continue
-      let supplied := statement (← instantiateMVars decl.type)
-      if ← withReducible (isDefEq target supplied) then
-        goal.assign decl.toExpr
-        replaceMainGoal []
-        return
-      -- Symmetry is still a direct lookup of the same equation. Keep its
-      -- sides syntactic, so unrelated equalities trigger no search.
-      if let some (_, left, right) := target.eq? then
-        if let some (type, otherLeft, otherRight) := supplied.eq? then
-          if left == otherRight && right == otherLeft then
-            goal.assign (mkApp4 (mkConst ``Eq.symm [← getLevel type])
-              type otherLeft otherRight decl.toExpr)
-            replaceMainGoal []
-            return
-    throwError "no hypothesis states the goal"
+  unless ← closeReflexive goal do closeByStated goal
+  replaceMainGoal []
 
 /-- Use marked contract facts before decomposing the rest of a leaf's
 context. Ordinary assumption lookups remain a direct comparison. -/
