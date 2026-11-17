@@ -33,7 +33,7 @@ use crate::{
     value_conv::{bcs::DeserializeHooks, rust::write_value},
 };
 use mono_move_core::{
-    captured_values_size,
+    borrow_cell, captured_values_size,
     interner::{
         is_script_module_id, module_id_of, InternedFunctionRef, InternedIdentifier,
         InternedModuleId,
@@ -102,7 +102,8 @@ struct LoaderAdapter<'a, 'guard> {
     loader: &'a Loader<'guard, 'guard>,
     /// Held in an [`UnsafeCell`] because [`LoaderAccess`] takes `&self` but the
     /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
-    /// at most one borrow is live at a time.
+    /// at most one borrow is live at a time, which the `unsafe_cell_reborrow`
+    /// lint checks.
     read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
     /// The transaction's gas meter, charged by loads. Held like `read_set`.
     gas_meter: UnsafeCell<&'a mut GasMeter<'guard>>,
@@ -110,9 +111,8 @@ struct LoaderAdapter<'a, 'guard> {
 
 impl LoaderAccess for LoaderAdapter<'_, '_> {
     fn resource_group_of(&self, ty: InternedType) -> VMResult<Option<InternedType>> {
-        // SAFETY: this is the only borrow of the read-set, and it does not
-        // outlive the call.
-        let read_set = unsafe { &**self.read_set.get() };
+        // SAFETY: this is the only borrow of the read-set while the call runs.
+        borrow_cell!(let read_set = unsafe { &**self.read_set.get() });
         resolve_resource_group!(self.loader, read_set, ty)
     }
 
@@ -122,10 +122,10 @@ impl LoaderAccess for LoaderAdapter<'_, '_> {
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
-        // SAFETY: these are the only borrows of the read-set and the gas meter,
-        // and they do not outlive the call.
-        let read_set = unsafe { &mut **self.read_set.get() };
-        let gas_meter = unsafe { &mut **self.gas_meter.get() };
+        // SAFETY: these are the only borrows of the read-set and the gas meter
+        // while the call runs.
+        borrow_cell!(let read_set = unsafe { &mut **self.read_set.get() });
+        borrow_cell!(let gas_meter = unsafe { &mut **self.gas_meter.get() });
         self.loader
             .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
     }
@@ -3733,6 +3733,11 @@ impl InterpreterContext<'_> {
                 read_set: UnsafeCell::new(&mut self.read_set),
                 gas_meter: UnsafeCell::new(&mut self.gas_meter),
             };
+            // The adapter is handed over as a `dyn LoaderAccess`, which the
+            // lint cannot follow. This is fine: only the native context calls
+            // it, and while an adapter method holds a cell it calls only the
+            // loader, which has no reference to the adapter or the context.
+            #[cfg_attr(dylint_lib = "aptos_lints", allow(unsafe_cell_reborrow))]
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,

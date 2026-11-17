@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::borrow_cell;
 use smallvec::SmallVec;
 use std::{cell::UnsafeCell, ptr};
 
@@ -26,8 +27,12 @@ struct Entry {
 /// Soundness relies on
 /// 1. the pool being single-threaded (`!Sync`), and
 /// 2. every method holding at most one borrow of the inner store at a time, never
-///    across a call that could reborrow it. [`RootPool::relocate_each`]
-///    additionally requires the caller's closure not to re-enter the pool.
+///    across a call that could reborrow it, and never past its own return.
+///
+/// Every borrow of the store is made with `borrow_cell!`, which makes the
+/// compiler enforce the last part of (2). This type is also opted in to the
+/// `unsafe_cell_reborrow` lint, which checks a conservative version of the
+/// rest on every change; see `devtools/lints/docs/unsafe_cell_reborrow.md`.
 pub struct RootPool {
     inner: UnsafeCell<RootPoolInner>,
 }
@@ -102,17 +107,13 @@ impl RootPool {
     /// new address for a live heap object, or `None` to skip — including for the
     /// null bases of freed slots and empty vectors, and for non-heap pointers.
     /// Every entry is therefore passed through unconditionally.
-    ///
-    /// It must also guarantee that it does NOT call any other methods on this pool,
-    /// as that kind of re-entrancy breaks interior mutability -- only one mutable
-    /// borrow is allowed at a time.
     pub unsafe fn relocate_each(&self, mut relocate: impl FnMut(*mut u8) -> Option<*mut u8>) {
-        // SAFETY: short, exclusive reborrow; the caller guarantees `relocate`
-        // does not re-enter, and GC is stop-the-world, so no handle read overlaps.
-        let inner = unsafe { &mut *self.inner.get() };
-        for entry in inner.entries.iter_mut() {
-            if let Some(new) = relocate(entry.base) {
-                entry.base = new;
+        // No borrow of the store is held while `relocate` runs: each slot is
+        // read and written through its own short reborrow, so the callback
+        // may use the pool itself.
+        for idx in 0..self.slot_count() {
+            if let Some(new) = relocate(self.entry(idx).base) {
+                self.set_base(idx, new);
             }
         }
     }
@@ -120,7 +121,7 @@ impl RootPool {
     /// Allocates a slot for `entry`, recycling a freed index when one exists.
     fn alloc(&self, entry: Entry) -> usize {
         // SAFETY: short, exclusive reborrow; single-threaded, leaf call.
-        let inner = unsafe { &mut *self.inner.get() };
+        borrow_cell!(let inner = unsafe { &mut *self.inner.get() });
         match inner.free.pop() {
             Some(idx) => {
                 inner.entries[idx] = entry;
@@ -137,29 +138,36 @@ impl RootPool {
     /// The base needs to be nulled so the GC skips it.
     fn release(&self, idx: usize) {
         // SAFETY: short, exclusive reborrow; single-threaded.
-        let inner = unsafe { &mut *self.inner.get() };
+        borrow_cell!(let inner = unsafe { &mut *self.inner.get() });
         inner.entries[idx].base = ptr::null_mut();
         inner.free.push(idx);
     }
 
     fn entry(&self, idx: usize) -> Entry {
         // SAFETY: short shared reborrow; `idx` is a live slot and `Entry: Copy`.
-        let inner = unsafe { &*self.inner.get() };
+        borrow_cell!(let inner = unsafe { &*self.inner.get() });
         inner.entries[idx]
     }
 
-    /// Number of slots ever allocated (live + freed-but-not-reclaimed). For tests.
-    #[cfg(test)]
+    /// Points slot `idx` at `base`.
+    fn set_base(&self, idx: usize, base: *mut u8) {
+        // SAFETY: short, exclusive reborrow; `idx` is an allocated slot.
+        borrow_cell!(let inner = unsafe { &mut *self.inner.get() });
+        inner.entries[idx].base = base;
+    }
+
+    /// Number of slots ever allocated (live + freed-but-not-reclaimed).
     fn slot_count(&self) -> usize {
         // SAFETY: short shared reborrow; single-threaded.
-        unsafe { &*self.inner.get() }.entries.len()
+        borrow_cell!(let inner = unsafe { &*self.inner.get() });
+        inner.entries.len()
     }
 
     /// True if a handle is still outstanding. A freed slot keeps its index but
     /// nulls its base, so this checks the bases rather than the slot count.
     pub fn has_live_roots(&self) -> bool {
         // SAFETY: short shared reborrow; single-threaded.
-        let inner = unsafe { &*self.inner.get() };
+        borrow_cell!(let inner = unsafe { &*self.inner.get() });
         inner.entries.iter().any(|entry| !entry.base.is_null())
     }
 }

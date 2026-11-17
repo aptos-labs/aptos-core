@@ -23,6 +23,8 @@ use serde::Deserialize;
 #[serde(default)]
 pub struct Config {
     pub no_std_hash_map: Scope,
+    /// A scope plus the lint's own struct and trait lists; see its module.
+    pub unsafe_cell_reborrow: crate::unsafe_cell_reborrow::Config,
 }
 
 impl Config {

@@ -18,6 +18,14 @@ Current lints:
   accident) or `BTreeMap`/`BTreeSet` when ordered iteration is needed. The
   lint only removes accidental dependence on hash order; it does not make a
   site correct. See "Choosing a map" below.
+- `unsafe_cell_reborrow` — opt-in check of structs whose `&self` methods
+  mutate through `UnsafeCell` fields; today `ProductionNativeContext`,
+  `LoaderAdapter` and `RootPool` (the list is in `/dylint.toml`). Reborrow a field with
+  `borrow_cell!`, once per method, at the entry point, and pass the
+  reference down to free helpers;
+  while holding one, call nothing that could reborrow the same field or that
+  is handed `self`. The
+  exact rules are in `devtools/lints/docs/unsafe_cell_reborrow.md`.
 
 ### Choosing a map
 
