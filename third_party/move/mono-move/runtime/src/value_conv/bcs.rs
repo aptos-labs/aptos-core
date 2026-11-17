@@ -3265,8 +3265,8 @@ mod tests {
         a: *mut u8,
         b: *mut u8,
     ) -> VMResult<bool> {
-        let (slot_a, slot_b) = (a as u64, b as u64);
-        // SAFETY: a `u64` holding the closure pointer is exactly a function
+        let (slot_a, slot_b) = (a, b);
+        // SAFETY: a slot holding the closure pointer is exactly a function
         // value's in-memory image.
         unsafe { equals_impl(layouts, ptr(&slot_a), ptr(&slot_b), FUNCTION_LAYOUT_ID) }
     }

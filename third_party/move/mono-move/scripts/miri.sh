@@ -29,7 +29,7 @@ REPO_ROOT="$(cd "$MONO_MOVE/../../.." && pwd)"
 # Miri is nightly-only, and rust-toolchain.toml pins stable. Pinned by date so
 # local and CI runs get the same Miri; bump when rust-toolchain.toml does, so
 # this stays ahead of stable.
-NIGHTLY="nightly-2026-06-23"
+NIGHTLY="nightly-2026-11-16"
 
 # Miri artifacts are incompatible with the normal build cache; a separate
 # directory keeps the two from evicting each other on every switch.
