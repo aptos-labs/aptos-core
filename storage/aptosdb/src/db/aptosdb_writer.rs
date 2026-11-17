@@ -761,9 +761,17 @@ impl AptosDB {
         let mut ledger_metadata_batch = SchemaBatch::new();
         let mut sharded_state_kv_batches = self.state_kv_db.new_sharded_native_batches();
 
+        let block_ends: Vec<_> = chunk
+            .transaction_infos
+            .iter()
+            .enumerate()
+            .filter(|(_, txn_info)| txn_info.has_state_checkpoint_hash())
+            .map(|(i, _)| chunk.first_version + i as Version)
+            .collect();
         self.state_store.put_state_updates(
             chunk.state,
             &chunk.state_update_refs.per_version,
+            &block_ends,
             chunk.state_reads,
             &mut ledger_metadata_batch,
             &mut sharded_state_kv_batches,
