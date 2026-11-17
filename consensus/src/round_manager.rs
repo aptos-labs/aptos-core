@@ -26,6 +26,7 @@ use crate::{
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
+    pending_slim_votes::{PendingSlimVotes, MAX_FUTURE_ORDER_VOTE_ROUNDS},
     pending_votes::{VoteReceptionResult, VoteStatus},
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
@@ -47,6 +48,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason},
+    slim_vote_msg::{SlimOrderVoteMsg, SlimVoteMsg, SyncInfoRequest},
     sync_info::SyncInfo,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
@@ -75,7 +77,13 @@ use fail::fail_point;
 use futures::{channel::oneshot, stream::FuturesUnordered, Future, FutureExt, SinkExt, StreamExt};
 use serde::Serialize;
 use std::{
-    collections::BTreeMap, fmt, mem::Discriminant, ops::Add, pin::Pin, sync::Arc, time::Duration,
+    collections::{BTreeMap, HashMap},
+    fmt,
+    mem::Discriminant,
+    ops::Add,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
 };
 use tokio::{
     sync::oneshot as TokioOneshot,
@@ -88,6 +96,9 @@ pub enum UnverifiedEvent {
     VoteMsg(Box<VoteMsg>),
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
+    SlimVoteMsg(Box<SlimVoteMsg>),
+    SlimOrderVoteMsg(Box<SlimOrderVoteMsg>),
+    SyncInfoRequest(Box<SyncInfoRequest>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg<BatchInfo>>),
     BatchMsgV2(Box<BatchMsg<BatchInfoExt>>),
@@ -99,6 +110,13 @@ pub enum UnverifiedEvent {
 }
 
 pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
+
+/// A slim vote this many rounds ahead of the current round makes a node ask for `SyncInfo`.
+const SYNC_INFO_REQUEST_ROUND_GAP: Round = 2;
+
+/// The shortest time between two `SyncInfo` requests from this node, and between two replies
+/// from this node to the same peer.
+const SYNC_INFO_REQUEST_INTERVAL: Duration = Duration::from_millis(200);
 
 impl UnverifiedEvent {
     pub fn verify(
@@ -184,6 +202,26 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::OrderVoteMsg(v)
             },
+            UnverifiedEvent::SlimVoteMsg(v) => {
+                if !self_message {
+                    v.verify(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["slim_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::SlimVoteMsg(v)
+            },
+            UnverifiedEvent::SlimOrderVoteMsg(v) => {
+                if !self_message {
+                    v.verify(peer_id, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["slim_order_vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::SlimOrderVoteMsg(v)
+            },
+            // The network authenticates the sender, and the request carries no claims to verify.
+            UnverifiedEvent::SyncInfoRequest(r) => VerifiedEvent::SyncInfoRequest(r),
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
@@ -281,6 +319,9 @@ impl UnverifiedEvent {
             UnverifiedEvent::OptProposalMsg(p) => Ok(p.epoch()),
             UnverifiedEvent::VoteMsg(v) => Ok(v.epoch()),
             UnverifiedEvent::OrderVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::SlimVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::SlimOrderVoteMsg(v) => Ok(v.epoch()),
+            UnverifiedEvent::SyncInfoRequest(r) => Ok(r.epoch()),
             UnverifiedEvent::SyncInfo(s) => Ok(s.epoch()),
             UnverifiedEvent::BatchMsg(b) => b.epoch(),
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
@@ -327,6 +368,27 @@ impl fmt::Display for UnverifiedEvent {
                 m.epoch(),
                 m.order_vote().ledger_info().commit_info().round(),
                 m.order_vote().author().short_str(),
+            ),
+            UnverifiedEvent::SlimVoteMsg(m) => write!(
+                f,
+                "SlimVoteMsg(epoch={}, round={}, block_id={}, author={})",
+                m.epoch(),
+                m.vote().vote_data().proposed().round(),
+                m.proposed_block_id(),
+                m.vote().author().short_str(),
+            ),
+            UnverifiedEvent::SlimOrderVoteMsg(m) => write!(
+                f,
+                "SlimOrderVoteMsg(epoch={}, round={}, author={})",
+                m.epoch(),
+                m.order_vote().ledger_info().commit_info().round(),
+                m.order_vote().author().short_str(),
+            ),
+            UnverifiedEvent::SyncInfoRequest(m) => write!(
+                f,
+                "SyncInfoRequest(epoch={}, round={})",
+                m.epoch(),
+                m.round(),
             ),
             UnverifiedEvent::SyncInfo(m) => write!(
                 f,
@@ -379,6 +441,9 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::OptProposalMsg(m) => UnverifiedEvent::OptProposalMsg(m),
             ConsensusMsg::VoteMsg(m) => UnverifiedEvent::VoteMsg(m),
             ConsensusMsg::OrderVoteMsg(m) => UnverifiedEvent::OrderVoteMsg(m),
+            ConsensusMsg::SlimVoteMsg(m) => UnverifiedEvent::SlimVoteMsg(m),
+            ConsensusMsg::SlimOrderVoteMsg(m) => UnverifiedEvent::SlimOrderVoteMsg(m),
+            ConsensusMsg::SyncInfoRequest(m) => UnverifiedEvent::SyncInfoRequest(m),
             ConsensusMsg::SyncInfo(m) => UnverifiedEvent::SyncInfo(m),
             ConsensusMsg::BatchMsg(m) => UnverifiedEvent::BatchMsg(m),
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
@@ -400,6 +465,9 @@ pub enum VerifiedEvent {
     VoteMsg(Box<VoteMsg>),
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
+    SlimVoteMsg(Box<SlimVoteMsg>),
+    SlimOrderVoteMsg(Box<SlimOrderVoteMsg>),
+    SyncInfoRequest(Box<SyncInfoRequest>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg<BatchInfoExt>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
@@ -443,6 +511,11 @@ pub struct RoundManager {
     chunky_dkg_config: OnChainChunkyDKGConfig,
     // Stores the order votes from all the rounds above highest_ordered_round
     pending_order_votes: PendingOrderVotes,
+    // Slim votes and slim order votes that this node cannot process yet
+    pending_slim_votes: PendingSlimVotes,
+    // When this node last asked a peer for its SyncInfo, and when it last replied to each peer
+    last_sync_info_request: Option<Instant>,
+    last_sync_info_reply: HashMap<Author, Instant>,
     futures: FuturesUnordered<
         Pin<Box<dyn Future<Output = (anyhow::Result<()>, Block, Instant)> + Send>>,
     >,
@@ -500,6 +573,9 @@ impl RoundManager {
             jwk_consensus_config,
             chunky_dkg_config,
             pending_order_votes: PendingOrderVotes::new(),
+            pending_slim_votes: PendingSlimVotes::new(),
+            last_sync_info_request: None,
+            last_sync_info_reply: HashMap::new(),
             futures: FuturesUnordered::new(),
             proposal_status_tracker,
             pending_opt_proposals: BTreeMap::new(),
@@ -1550,13 +1626,20 @@ impl RoundManager {
 
         let vote = self.create_vote(proposal).await?;
         self.round_state.record_vote(vote.clone());
-        let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        if self.local_config.broadcast_vote {
+        if self.local_config.broadcast_vote && self.local_config.slim_vote_msgs {
+            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            PROPOSAL_VOTE_BROADCASTED.inc();
+            self.network
+                .broadcast_slim_vote(SlimVoteMsg::new(vote.clone()))
+                .await;
+        } else if self.local_config.broadcast_vote {
+            let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             PROPOSAL_VOTE_BROADCASTED.inc();
             self.network.broadcast_vote(vote_msg).await;
         } else {
+            let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
             let recipient = self
                 .proposer_election
                 .get_valid_proposer(proposal_round + 1);
@@ -1821,12 +1904,23 @@ impl RoundManager {
                     BlockStage::ORDER_VOTED_OPT_BLOCK,
                 );
             }
-            let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
-            info!(
-                self.new_log(LogEvent::BroadcastOrderVote),
-                "{}", order_vote_msg
-            );
-            self.network.broadcast_order_vote(order_vote_msg).await;
+            if self.local_config.slim_vote_msgs {
+                let slim_order_vote_msg = SlimOrderVoteMsg::new(order_vote);
+                info!(
+                    self.new_log(LogEvent::BroadcastOrderVote),
+                    "{}", slim_order_vote_msg
+                );
+                self.network
+                    .broadcast_slim_order_vote(slim_order_vote_msg)
+                    .await;
+            } else {
+                let order_vote_msg = OrderVoteMsg::new(order_vote, qc.as_ref().clone());
+                info!(
+                    self.new_log(LogEvent::BroadcastOrderVote),
+                    "{}", order_vote_msg
+                );
+                self.network.broadcast_order_vote(order_vote_msg).await;
+            }
             if proposed_block.pipeline_futs().is_some() {
                 if let Some(tx) = proposed_block.pipeline_tx().lock().as_mut() {
                     let _ = tx.order_vote_tx.take().map(|tx| tx.send(()));
@@ -1862,6 +1956,223 @@ impl RoundManager {
                 .context("[RoundManager] Add a new vote")?;
         }
         Ok(())
+    }
+
+    /// Processes a vote that has no `SyncInfo`. A vote for a later round cannot move this
+    /// node forward, so it waits in `pending_slim_votes` until this node enters that round.
+    pub async fn process_slim_vote_msg(
+        &mut self,
+        slim_vote_msg: SlimVoteMsg,
+    ) -> anyhow::Result<()> {
+        let vote = slim_vote_msg.vote();
+        let round = vote.vote_data().proposed().round();
+        let current_round = self.round_state.current_round();
+        if round < current_round {
+            return Ok(());
+        }
+        if round > current_round {
+            let outcome = if self
+                .pending_slim_votes
+                .insert_vote(current_round, vote.clone())
+            {
+                "buffered"
+            } else {
+                "dropped"
+            };
+            counters::SLIM_VOTE_MSGS
+                .with_label_values(&["vote", outcome])
+                .inc();
+            // One round behind is normal: the votes that form the previous QC may still be
+            // in flight. Two or more rounds behind means this node missed certificates.
+            if round >= current_round + SYNC_INFO_REQUEST_ROUND_GAP {
+                self.maybe_request_sync_info(vote.author()).await;
+            }
+            return Ok(());
+        }
+        counters::SLIM_VOTE_MSGS
+            .with_label_values(&["vote", "processed"])
+            .inc();
+        self.process_vote(vote)
+            .await
+            .context("[RoundManager] Add a new slim vote")
+    }
+
+    /// Processes an order vote that has no QC. The order vote uses the QC that this node
+    /// already has for the block. Without that QC, it waits in `pending_slim_votes`.
+    async fn process_slim_order_vote_msg(
+        &mut self,
+        slim_order_vote_msg: SlimOrderVoteMsg,
+    ) -> anyhow::Result<()> {
+        if !self.onchain_config.order_vote_enabled() {
+            return Ok(());
+        }
+        let order_vote = slim_order_vote_msg.order_vote();
+        if self
+            .pending_order_votes
+            .has_enough_order_votes(order_vote.ledger_info())
+        {
+            return Ok(());
+        }
+        let highest_ordered_round = self
+            .block_store
+            .highest_ordered_cert()
+            .commit_info()
+            .round();
+        let order_vote_round = order_vote.ledger_info().round();
+        if order_vote_round <= highest_ordered_round
+            || order_vote_round >= highest_ordered_round + MAX_FUTURE_ORDER_VOTE_ROUNDS
+        {
+            ORDER_VOTE_NOT_IN_RANGE.inc();
+            return Ok(());
+        }
+        match self
+            .block_store
+            .get_quorum_cert_for_block(order_vote.ledger_info().consensus_block_id())
+        {
+            Some(qc) => {
+                counters::SLIM_VOTE_MSGS
+                    .with_label_values(&["order_vote", "processed"])
+                    .inc();
+                self.add_order_vote_with_local_qc(order_vote, &qc).await
+            },
+            None => {
+                let outcome = if self
+                    .pending_slim_votes
+                    .insert_order_vote(highest_ordered_round, order_vote.clone())
+                {
+                    "buffered"
+                } else {
+                    "dropped"
+                };
+                counters::SLIM_VOTE_MSGS
+                    .with_label_values(&["order_vote", outcome])
+                    .inc();
+                let highest_certified_round = self
+                    .block_store
+                    .highest_quorum_cert()
+                    .certified_block()
+                    .round();
+                if order_vote_round >= highest_certified_round + SYNC_INFO_REQUEST_ROUND_GAP {
+                    self.maybe_request_sync_info(order_vote.author()).await;
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Asks `peer` for its `SyncInfo`, at most once per `SYNC_INFO_REQUEST_INTERVAL`.
+    async fn maybe_request_sync_info(&mut self, peer: Author) {
+        let now = Instant::now();
+        if self
+            .last_sync_info_request
+            .is_some_and(|last| now.duration_since(last) < SYNC_INFO_REQUEST_INTERVAL)
+        {
+            return;
+        }
+        self.last_sync_info_request = Some(now);
+        counters::SLIM_VOTE_MSGS
+            .with_label_values(&["sync_info_request", "sent"])
+            .inc();
+        self.network
+            .send_sync_info_request(
+                SyncInfoRequest::new(self.epoch_state.epoch, self.round_state.current_round()),
+                peer,
+            )
+            .await;
+    }
+
+    /// Replies with this node's `SyncInfo` if this node is ahead of the requester, at most
+    /// once per `SYNC_INFO_REQUEST_INTERVAL` for each peer.
+    async fn process_sync_info_request(
+        &mut self,
+        request: SyncInfoRequest,
+        peer: Author,
+    ) -> anyhow::Result<()> {
+        if request.round() >= self.round_state.current_round() {
+            return Ok(());
+        }
+        let now = Instant::now();
+        if self
+            .last_sync_info_reply
+            .get(&peer)
+            .is_some_and(|last| now.duration_since(*last) < SYNC_INFO_REQUEST_INTERVAL)
+        {
+            counters::SLIM_VOTE_MSGS
+                .with_label_values(&["sync_info_request", "rate_limited"])
+                .inc();
+            return Ok(());
+        }
+        self.last_sync_info_reply.insert(peer, now);
+        counters::SLIM_VOTE_MSGS
+            .with_label_values(&["sync_info_request", "replied"])
+            .inc();
+        self.network
+            .send_sync_info(self.block_store.sync_info(), peer)
+            .await;
+        Ok(())
+    }
+
+    /// Adds an order vote for a block whose QC is in the block store, so the QC is verified.
+    async fn add_order_vote_with_local_qc(
+        &mut self,
+        order_vote: &OrderVote,
+        qc: &QuorumCert,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            qc.certified_block() == order_vote.ledger_info().commit_info(),
+            "QuorumCert and OrderVote do not match"
+        );
+        // Only the first order vote for a ledger info needs the QC.
+        let li_digest = order_vote.ledger_info().hash();
+        let qc = (!self.pending_order_votes.exists(&li_digest)).then(|| qc.clone());
+        let vote_reception_result =
+            self.pending_order_votes
+                .insert_order_vote(order_vote, &self.epoch_state.verifier, qc);
+        self.process_order_vote_reception_result(vote_reception_result, order_vote.author())
+            .await
+    }
+
+    /// Processes the buffered slim votes and slim order votes that are now ready. The event
+    /// loop calls this after each event. Processing a vote can start a new round, which can
+    /// make more buffered votes ready, so this repeats until nothing is ready.
+    async fn process_pending_slim_votes(&mut self) {
+        while !self.pending_slim_votes.is_empty() {
+            let current_round = self.round_state.current_round();
+            let votes = self.pending_slim_votes.take_votes(current_round);
+            let highest_ordered_round = self
+                .block_store
+                .highest_ordered_cert()
+                .commit_info()
+                .round();
+            let block_store = self.block_store.clone();
+            let order_votes = self
+                .pending_slim_votes
+                .take_ready_order_votes(highest_ordered_round, |block_id| {
+                    block_store.get_quorum_cert_for_block(block_id).is_some()
+                });
+            if votes.is_empty() && order_votes.is_empty() {
+                return;
+            }
+            for vote in votes {
+                counters::SLIM_VOTE_MSGS
+                    .with_label_values(&["vote", "replayed"])
+                    .inc();
+                if let Err(e) = self.process_vote(&vote).await {
+                    debug!("Failed to process a buffered slim vote: {:#}", e);
+                }
+            }
+            for order_vote in order_votes {
+                counters::SLIM_VOTE_MSGS
+                    .with_label_values(&["order_vote", "replayed"])
+                    .inc();
+                if let Err(e) = self
+                    .process_slim_order_vote_msg(SlimOrderVoteMsg::new(order_vote))
+                    .await
+                {
+                    debug!("Failed to process a buffered slim order vote: {:#}", e);
+                }
+            }
+        }
     }
 
     /// Add a vote to the pending votes.
@@ -2316,6 +2627,15 @@ impl RoundManager {
                         VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
                             monitor!("process_order_vote", self.process_order_vote_msg(*order_vote_msg).await)
                         }
+                        VerifiedEvent::SlimVoteMsg(slim_vote_msg) => {
+                            monitor!("process_slim_vote", self.process_slim_vote_msg(*slim_vote_msg).await)
+                        }
+                        VerifiedEvent::SlimOrderVoteMsg(slim_order_vote_msg) => {
+                            monitor!("process_slim_order_vote", self.process_slim_order_vote_msg(*slim_order_vote_msg).await)
+                        }
+                        VerifiedEvent::SyncInfoRequest(request) => {
+                            monitor!("process_sync_info_request", self.process_sync_info_request(*request, peer_id).await)
+                        }
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
@@ -2340,6 +2660,7 @@ impl RoundManager {
                     }
                 },
             }
+            self.process_pending_slim_votes().await;
         }
         info!(epoch = self.epoch_state.epoch, "RoundManager stopped");
     }

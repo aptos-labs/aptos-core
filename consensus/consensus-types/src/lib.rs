@@ -27,6 +27,7 @@ pub mod randomness;
 pub mod request_response;
 pub mod round_timeout;
 pub mod safety_data;
+pub mod slim_vote_msg;
 pub mod sync_info;
 pub mod timeout_2chain;
 pub mod utils;

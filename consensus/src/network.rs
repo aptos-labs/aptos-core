@@ -32,6 +32,7 @@ use aptos_consensus_types::{
     },
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
+    slim_vote_msg::{SlimOrderVoteMsg, SlimVoteMsg, SyncInfoRequest},
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -483,6 +484,12 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
+    pub async fn broadcast_slim_vote(&self, slim_vote_msg: SlimVoteMsg) {
+        fail_point!("consensus::send::vote", |_| ());
+        let msg = ConsensusMsg::SlimVoteMsg(Box::new(slim_vote_msg));
+        self.broadcast(msg).await
+    }
+
     pub async fn broadcast_round_timeout(&self, round_timeout: RoundTimeoutMsg) {
         fail_point!("consensus::send::round_timeout", |_| ());
         let msg = ConsensusMsg::RoundTimeoutMsg(Box::new(round_timeout));
@@ -493,6 +500,24 @@ impl NetworkSender {
         fail_point!("consensus::send::order_vote", |_| ());
         let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
         self.broadcast(msg).await
+    }
+
+    pub async fn broadcast_slim_order_vote(&self, slim_order_vote_msg: SlimOrderVoteMsg) {
+        fail_point!("consensus::send::order_vote", |_| ());
+        let msg = ConsensusMsg::SlimOrderVoteMsg(Box::new(slim_order_vote_msg));
+        self.broadcast(msg).await
+    }
+
+    pub async fn send_sync_info_request(&self, request: SyncInfoRequest, recipient: Author) {
+        fail_point!("consensus::send::sync_info_request", |_| ());
+        let msg = ConsensusMsg::SyncInfoRequest(Box::new(request));
+        self.send(msg, vec![recipient]).await
+    }
+
+    pub async fn send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
+        fail_point!("consensus::send::sync_info", |_| ());
+        let msg = ConsensusMsg::SyncInfo(Box::new(sync_info));
+        self.send(msg, vec![recipient]).await
     }
 
     pub async fn broadcast_commit_vote(&self, commit_vote_msg: CommitVote) {
@@ -865,6 +890,9 @@ impl NetworkTask {
                         consensus_msg @ (ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::OptProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::SlimVoteMsg(_)
+                        | ConsensusMsg::SlimOrderVoteMsg(_)
+                        | ConsensusMsg::SyncInfoRequest(_)
                         | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::SyncInfo(_)
@@ -1034,6 +1062,9 @@ impl NetworkTask {
                         ConsensusMsg::ProposalMsg(_)
                         | ConsensusMsg::OptProposalMsg(_)
                         | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::SlimVoteMsg(_)
+                        | ConsensusMsg::SlimOrderVoteMsg(_)
+                        | ConsensusMsg::SyncInfoRequest(_)
                         | ConsensusMsg::OrderVoteMsg(_)
                         | ConsensusMsg::RoundTimeoutMsg(_)
                         | ConsensusMsg::SyncInfo(_)

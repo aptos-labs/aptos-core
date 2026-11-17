@@ -22,6 +22,7 @@ use aptos_consensus_types::{
     proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
+    slim_vote_msg::{SlimOrderVoteMsg, SlimVoteMsg, SyncInfoRequest},
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
 };
@@ -102,6 +103,12 @@ pub enum ConsensusMsg {
     ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
     /// Secret share message: Used to share secrets per consensus round
     SecretShareMsg(SecretShareNetworkMessage),
+    /// A vote without the sender's SyncInfo.
+    SlimVoteMsg(Box<SlimVoteMsg>),
+    /// An order vote without the quorum certificate.
+    SlimOrderVoteMsg(Box<SlimOrderVoteMsg>),
+    /// Asks a peer for its SyncInfo.
+    SyncInfoRequest(Box<SyncInfoRequest>),
 }
 
 /// Network type for consensus
@@ -136,6 +143,9 @@ impl ConsensusMsg {
             ConsensusMsg::SignedBatchInfoMsgV2(_) => "SignedBatchInfoMsgV2",
             ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
             ConsensusMsg::SecretShareMsg(_) => "SecretShareMsg",
+            ConsensusMsg::SlimVoteMsg(_) => "SlimVoteMsg",
+            ConsensusMsg::SlimOrderVoteMsg(_) => "SlimOrderVoteMsg",
+            ConsensusMsg::SyncInfoRequest(_) => "SyncInfoRequest",
         }
     }
 }

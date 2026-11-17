@@ -631,6 +631,18 @@ ConsensusMsg:
       SecretShareMsg:
         NEWTYPE:
           TYPENAME: SecretShareNetworkMessage
+    26:
+      SlimVoteMsg:
+        NEWTYPE:
+          TYPENAME: SlimVoteMsg
+    27:
+      SlimOrderVoteMsg:
+        NEWTYPE:
+          TYPENAME: SlimOrderVoteMsg
+    28:
+      SyncInfoRequest:
+        NEWTYPE:
+          TYPENAME: SyncInfoRequest
 ContractEvent:
   ENUM:
     0:
@@ -1290,6 +1302,14 @@ SlhDsa_Sha2_128s_PublicKey:
   NEWTYPESTRUCT: BYTES
 SlhDsa_Sha2_128s_Signature:
   NEWTYPESTRUCT: BYTES
+SlimOrderVoteMsg:
+  STRUCT:
+    - order_vote:
+        TYPENAME: OrderVote
+SlimVoteMsg:
+  STRUCT:
+    - vote:
+        TYPENAME: Vote
 StateKey:
   ENUM:
     0:
@@ -1352,6 +1372,10 @@ SyncInfo:
     - highest_2chain_timeout_cert:
         OPTION:
           TYPENAME: TwoChainTimeoutCertificate
+SyncInfoRequest:
+  STRUCT:
+    - epoch: U64
+    - round: U64
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress

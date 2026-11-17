@@ -772,6 +772,17 @@ pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Outcomes of received slim votes and slim order votes: processed at once, buffered,
+/// replayed from the buffer, or dropped.
+pub static SLIM_VOTE_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_slim_vote_msgs",
+        "Count of received slim votes and slim order votes by outcome",
+        &["type", "outcome"]
+    )
+    .unwrap()
+});
+
 pub static ORDER_VOTE_NOT_IN_RANGE: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_not_in_range",

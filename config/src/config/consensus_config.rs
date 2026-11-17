@@ -99,6 +99,9 @@ pub struct ConsensusConfig {
     pub max_blocks_per_receiving_request: u64,
     pub max_blocks_per_receiving_request_quorum_store_override: u64,
     pub broadcast_vote: bool,
+    /// Broadcast votes without the sender's SyncInfo and order votes without the QC. Only
+    /// applies when `broadcast_vote` is set. Receivers accept both forms either way.
+    pub slim_vote_msgs: bool,
     pub proof_cache_capacity: u64,
     pub rand_rb_config: ReliableBroadcastConfig,
     pub secret_share_rb_config: ReliableBroadcastConfig,
@@ -393,6 +396,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
             broadcast_vote: true,
+            slim_vote_msgs: false,
             proof_cache_capacity: 10_000,
             rand_rb_config: ReliableBroadcastConfig {
                 backoff_policy_base_ms: 2,

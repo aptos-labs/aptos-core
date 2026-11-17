@@ -48,7 +48,10 @@ pub(crate) fn get_realistic_env_test(
             realistic_env_max_load_test(duration, test_cmd, 20, 10, 0)
         },
         "realistic_env_max_load_50_validators" => {
-            realistic_env_max_load_50_validators_test(duration)
+            realistic_env_max_load_50_validators_test(duration, false)
+        },
+        "realistic_env_max_load_50_validators_slim" => {
+            realistic_env_max_load_50_validators_test(duration, true)
         },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
@@ -526,8 +529,12 @@ pub(crate) fn realistic_env_max_load_test(
 /// does not gate.
 ///
 /// Randomness, Chunky DKG, and encrypted transactions are off, so that the consensus
-/// signatures are the only change between the two builds.
-pub(crate) fn realistic_env_max_load_50_validators_test(duration: Duration) -> ForgeConfig {
+/// signatures are the only change between the two builds. With `slim_vote_msgs`, validators
+/// send votes without SyncInfo and order votes without QC.
+pub(crate) fn realistic_env_max_load_50_validators_test(
+    duration: Duration,
+    slim_vote_msgs: bool,
+) -> ForgeConfig {
     let num_validators = 50;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
@@ -558,6 +565,9 @@ pub(crate) fn realistic_env_max_load_50_validators_test(duration: Duration) -> F
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            config.consensus.slim_vote_msgs = slim_vote_msgs;
+        }))
         // Higher gas-fee traffic at a constant rate. Its latency is the headline latency.
         .with_emit_job(
             EmitJobRequest::default()
@@ -565,8 +575,9 @@ pub(crate) fn realistic_env_max_load_50_validators_test(duration: Duration) -> F
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
                 .latency_polling_interval(Duration::from_millis(100)),
         )
+        // The global TPS check applies to the 100 TPS traffic above, so require less than 100.
         .with_success_criteria(
-            SuccessCriteria::new(100)
+            SuccessCriteria::new(50)
                 .add_no_restarts()
                 .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
                 .add_chain_progress(StateProgressThreshold {
