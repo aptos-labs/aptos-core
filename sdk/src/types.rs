@@ -63,6 +63,8 @@ enum LocalAccountAuthenticator {
     FederatedKeyless(FederatedKeylessAccount),
     Abstraction(AbstractedAccount), // TODO: Add support for keyless authentication
     DerivableAbstraction(DomainAbstractedAccount), // TODO: Add support for keyless authentication
+    /// FN-DSA-512 (Falcon-512) single-key account. EXPERIMENT ONLY.
+    FnDsa512(std::sync::Arc<aptos_types::fn_dsa::FnDsa512PrivateKey>),
 }
 
 impl LocalAccountAuthenticator {
@@ -86,6 +88,10 @@ impl LocalAccountAuthenticator {
             },
             LocalAccountAuthenticator::Abstraction(..) => unreachable!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => unreachable!(),
+            LocalAccountAuthenticator::FnDsa512(key) => txn
+                .sign_fn_dsa_512(key)
+                .expect("Signing a txn can't fail")
+                .into_inner(),
         }
     }
 
@@ -166,6 +172,20 @@ impl LocalAccount {
         Self {
             address,
             auth: LocalAccountAuthenticator::from(key),
+            sequence_number: AtomicU64::new(sequence_number),
+        }
+    }
+
+    /// An account that signs transactions with FN-DSA-512 (experiment only). Its address is
+    /// the single-key authentication key of the public key.
+    pub fn new_fn_dsa_512(
+        key: aptos_types::fn_dsa::FnDsa512PrivateKey,
+        sequence_number: u64,
+    ) -> Self {
+        let key = Arc::new(key);
+        Self {
+            address: fn_dsa_512_authentication_key(&key).account_address(),
+            auth: LocalAccountAuthenticator::FnDsa512(key),
             sequence_number: AtomicU64::new(sequence_number),
         }
     }
@@ -473,6 +493,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::FnDsa512(_) => todo!(),
         }
     }
 
@@ -483,6 +504,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::FnDsa512(_) => todo!(),
         }
     }
 
@@ -497,6 +519,7 @@ impl LocalAccount {
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::FnDsa512(key) => fn_dsa_512_authentication_key(key),
         }
     }
 
@@ -510,6 +533,7 @@ impl LocalAccount {
                 Some(federated_keyless_account.authentication_key())
             },
             LocalAccountAuthenticator::Abstraction(..) => None,
+            LocalAccountAuthenticator::FnDsa512(key) => Some(fn_dsa_512_authentication_key(key)),
             LocalAccountAuthenticator::DerivableAbstraction(account) => {
                 Some(AuthenticationKey::domain_abstraction_address(
                     bcs::to_bytes(&account.function_info).expect("FunctionInfo must serialize"),
@@ -524,6 +548,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => Auth::Ed25519(key.private_key()),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::FnDsa512(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(aa) => {
                 Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone())
             },
@@ -570,6 +595,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
+            LocalAccountAuthenticator::FnDsa512(_) => todo!(),
         }
     }
 
@@ -1229,6 +1255,12 @@ async fn get_pepper_from_jwt(
     };
     let response = rest_client.make_pepper_request(pepper_request).await?;
     Ok(response)
+}
+
+fn fn_dsa_512_authentication_key(
+    key: &aptos_types::fn_dsa::FnDsa512PrivateKey,
+) -> AuthenticationKey {
+    AuthenticationKey::any_key(AnyPublicKey::fn_dsa_512(key.public_key().clone()))
 }
 
 #[cfg(test)]

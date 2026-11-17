@@ -1922,6 +1922,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-fn-dsa"
+version = "0.1.0"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "aptos-forge"
 version = "0.0.0"
 dependencies = [
@@ -5051,6 +5058,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-dkg",
+ "aptos-fn-dsa",
  "aptos-infallible",
  "aptos-proptest-helpers",
  "arbitrary",

@@ -1,0 +1,7 @@
+Vendored from https://github.com/pornin/c-fn-dsa-fx32.64
+Commit 10e9c031bce4705965305bb7e5923f8cd8e286e5 (2026-10-28).
+
+Only the portable C sources are copied: no Cortex-M4 assembly, tests, or
+benchmarks. The files are unmodified.
+
+License: Unlicense (see LICENSE).

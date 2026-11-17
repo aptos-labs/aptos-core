@@ -11,7 +11,8 @@ pub mod transaction_executor;
 use crate::emitter::{
     account_minter::{bulk_create_accounts, SourceAccountManager},
     local_account_generator::{
-        create_keyless_account_generator, create_private_key_account_generator,
+        create_fn_dsa_512_account_generator, create_keyless_account_generator,
+        create_private_key_account_generator,
     },
     metrics::update_tps_gauges,
     stats::{DynamicStatsTracking, TxnStats},
@@ -834,6 +835,7 @@ impl TxnEmitter {
             usize::try_from(init_expiration_time / req.init_retry_interval.as_secs()).unwrap();
         let account_generator = match req.account_type {
             AccountType::Local => create_private_key_account_generator(),
+            AccountType::FnDsa512 => create_fn_dsa_512_account_generator(),
             AccountType::Keyless => {
                 let ephem_sk = Ed25519PrivateKey::try_from(
                     req.keyless_ephem_secret_key

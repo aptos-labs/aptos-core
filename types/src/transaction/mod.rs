@@ -644,6 +644,17 @@ impl RawTransaction {
         ))
     }
 
+    /// Signs the raw transaction with an FN-DSA-512 key (experiment only).
+    pub fn sign_fn_dsa_512(
+        self,
+        private_key: &crate::fn_dsa::FnDsa512PrivateKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let signature = private_key.sign(&self)?;
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_fn_dsa_512(self, private_key.public_key().clone(), signature),
+        ))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -1460,6 +1471,18 @@ impl SignedTransaction {
         let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
             AnyPublicKey::slh_dsa_sha2_128s(public_key),
             AnySignature::slh_dsa_sha2_128s(signature),
+        ));
+        Self::new_single_sender(raw_txn, authenticator)
+    }
+
+    pub fn new_fn_dsa_512(
+        raw_txn: RawTransaction,
+        public_key: crate::fn_dsa::FnDsa512PublicKey,
+        signature: crate::fn_dsa::FnDsa512Signature,
+    ) -> SignedTransaction {
+        let authenticator = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+            AnyPublicKey::fn_dsa_512(public_key),
+            AnySignature::fn_dsa_512(signature),
         ));
         Self::new_single_sender(raw_txn, authenticator)
     }

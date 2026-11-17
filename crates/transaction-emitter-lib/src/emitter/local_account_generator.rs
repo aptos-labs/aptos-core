@@ -7,12 +7,13 @@ use aptos_sdk::types::{
 };
 use aptos_transaction_generator_lib::ReliableTransactionSubmitter;
 use aptos_types::{
+    fn_dsa::FnDsa512PrivateKey,
     keyless,
     keyless::{Claims, OpenIdSig, Pepper, ZeroKnowledgeSig},
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, Rng};
 use std::{
     fs::File,
     io::{self, BufRead},
@@ -101,6 +102,53 @@ impl LocalAccountGenerator for PrivateKeyAccountGenerator {
                 )
             })
             .collect();
+        Ok(accounts)
+    }
+}
+
+pub fn create_fn_dsa_512_account_generator() -> Box<dyn LocalAccountGenerator> {
+    Box::new(FnDsa512AccountGenerator)
+}
+
+/// Generates single-key accounts that sign with FN-DSA-512 (experiment only). The minter
+/// creates each account by transferring coins to its address.
+pub struct FnDsa512AccountGenerator;
+
+#[async_trait]
+impl LocalAccountGenerator for FnDsa512AccountGenerator {
+    async fn gen_local_accounts(
+        &self,
+        txn_executor: &dyn ReliableTransactionSubmitter,
+        num_accounts: usize,
+        rng: &mut StdRng,
+    ) -> anyhow::Result<Vec<LocalAccount>> {
+        let seeds: Vec<[u8; 32]> = (0..num_accounts).map(|_| rng.r#gen()).collect();
+        // Key generation takes milliseconds per key, so it runs off the async runtime.
+        let keys = tokio::task::spawn_blocking(move || {
+            seeds
+                .iter()
+                .map(FnDsa512PrivateKey::from_seed)
+                .collect::<Vec<_>>()
+        })
+        .await?;
+
+        let mut accounts: Vec<LocalAccount> = keys
+            .into_iter()
+            .map(|key| LocalAccount::new_fn_dsa_512(key, 0))
+            .collect();
+        let result_futures = accounts
+            .iter()
+            .map(|account| txn_executor.query_sequence_number(account.address()))
+            .collect::<Vec<_>>();
+        let seq_nums = futures::stream::iter(result_futures)
+            .buffered(QUERY_PARALLELISM)
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+        for (account, sequence_number) in accounts.iter_mut().zip(seq_nums) {
+            account.set_sequence_number(sequence_number);
+        }
         Ok(accounts)
     }
 }

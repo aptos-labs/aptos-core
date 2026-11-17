@@ -118,6 +118,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: SlhDsa_Sha2_128s_PublicKey
+    6:
+      FnDsa512:
+        STRUCT:
+          - public_key:
+              TYPENAME: FnDsa512PublicKey
 AnySignature:
   ENUM:
     0:
@@ -145,6 +150,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: SlhDsa_Sha2_128s_Signature
+    5:
+      FnDsa512:
+        STRUCT:
+          - signature:
+              TYPENAME: FnDsa512Signature
 AssertionSignature:
   ENUM:
     0:
@@ -557,6 +567,10 @@ FeeDistribution:
               MAP:
                 KEY: U64
                 VALUE: U64
+FnDsa512PublicKey:
+  NEWTYPESTRUCT: BYTES
+FnDsa512Signature:
+  NEWTYPESTRUCT: BYTES
 FunctionInfo:
   STRUCT:
     - module_address:

@@ -16,8 +16,8 @@ use aptos_forge::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
         SuccessCriteria, SystemMetricsThreshold,
     },
-    EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkTest, NodeResourceOverride,
-    TransactionType,
+    AccountType, EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkTest,
+    NodeResourceOverride, TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
@@ -48,10 +48,16 @@ pub(crate) fn get_realistic_env_test(
             realistic_env_max_load_test(duration, test_cmd, 20, 10, 0)
         },
         "realistic_env_max_load_50_validators" => {
-            realistic_env_max_load_50_validators_test(duration, false)
+            realistic_env_max_load_50_validators_test(duration, false, AccountType::Local)
         },
         "realistic_env_max_load_50_validators_slim" => {
-            realistic_env_max_load_50_validators_test(duration, true)
+            realistic_env_max_load_50_validators_test(duration, true, AccountType::Local)
+        },
+        "realistic_env_max_load_50_validators_falcon_txns" => {
+            realistic_env_max_load_50_validators_test(duration, false, AccountType::FnDsa512)
+        },
+        "realistic_env_max_load_50_validators_falcon_txns_slim" => {
+            realistic_env_max_load_50_validators_test(duration, true, AccountType::FnDsa512)
         },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
@@ -530,10 +536,12 @@ pub(crate) fn realistic_env_max_load_test(
 ///
 /// Randomness, Chunky DKG, and encrypted transactions are off, so that the consensus
 /// signatures are the only change between the two builds. With `slim_vote_msgs`, validators
-/// send votes without SyncInfo and order votes without QC.
+/// send votes without SyncInfo and order votes without QC. `account_type` selects the key
+/// type of the accounts that send the user transactions.
 pub(crate) fn realistic_env_max_load_50_validators_test(
     duration: Duration,
     slim_vote_msgs: bool,
+    account_type: AccountType,
 ) -> ForgeConfig {
     let num_validators = 50;
     ForgeConfig::default()
@@ -543,7 +551,8 @@ pub(crate) fn realistic_env_max_load_50_validators_test(
                 .mode(EmitJobMode::MaxLoad {
                     mempool_backlog: 19000,
                 })
-                .init_gas_price_multiplier(20),
+                .init_gas_price_multiplier(20)
+                .account_type(account_type),
             inner_success_criteria: SuccessCriteria::new(100),
         }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -573,7 +582,8 @@ pub(crate) fn realistic_env_max_load_50_validators_test(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 100 })
                 .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100)),
+                .latency_polling_interval(Duration::from_millis(100))
+                .account_type(account_type),
         )
         // The global TPS check applies to the 100 TPS traffic above, so require less than 100.
         .with_success_criteria(

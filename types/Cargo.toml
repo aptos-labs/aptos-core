@@ -29,7 +29,11 @@ fuzzing = [
 # EXPERIMENT ONLY. Validators sign consensus messages with ML-DSA-65 instead of BLS12-381.
 # The ML-DSA keys are derived from public data, so a network built with this feature has
 # no security. Use it only to measure performance.
-pq-consensus = ["dep:libcrux-ml-dsa"]
+pq-consensus = ["dep:libcrux-ml-dsa", "pq-consensus-any"]
+# EXPERIMENT ONLY. Like `pq-consensus`, but with FN-DSA-512 (Falcon-512) instead of ML-DSA-65.
+pq-consensus-falcon = ["pq-consensus-any"]
+# Set by either post-quantum consensus feature. Do not enable directly.
+pq-consensus-any = []
 
 [dependencies]
 anyhow = { workspace = true }
@@ -38,6 +42,7 @@ aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
+aptos-fn-dsa = { workspace = true }
 aptos-infallible = { workspace = true }
 arbitrary = { workspace = true, features = ["derive"], optional = true }
 ark-bls12-381 = { workspace = true }

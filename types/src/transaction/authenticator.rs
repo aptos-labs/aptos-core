@@ -3,6 +3,7 @@
 
 use crate::{
     account_address::AccountAddress,
+    fn_dsa::{FnDsa512PublicKey, FnDsa512Signature},
     function_info::FunctionInfo,
     keyless::{
         EphemeralCertificate, FederatedKeylessPublicKey, KeylessPublicKey, KeylessSignature,
@@ -1390,6 +1391,9 @@ pub enum AnySignature {
     SlhDsa_Sha2_128s {
         signature: Box<slh_dsa_sha2_128s::Signature>,
     },
+    FnDsa512 {
+        signature: FnDsa512Signature,
+    },
 }
 
 impl AnySignature {
@@ -1411,6 +1415,10 @@ impl AnySignature {
         Self::WebAuthn { signature }
     }
 
+    pub fn fn_dsa_512(signature: FnDsa512Signature) -> Self {
+        Self::FnDsa512 { signature }
+    }
+
     pub fn keyless(signature: KeylessSignature) -> Self {
         Self::Keyless { signature }
     }
@@ -1422,6 +1430,7 @@ impl AnySignature {
             Self::SlhDsa_Sha2_128s { .. } => "SlhDsaSha2_128s",
             Self::WebAuthn { .. } => "WebAuthn",
             Self::Keyless { .. } => "Keyless",
+            Self::FnDsa512 { .. } => "FnDsa512",
         }
     }
 
@@ -1442,6 +1451,9 @@ impl AnySignature {
                 AnyPublicKey::SlhDsa_Sha2_128s { public_key },
             ) => signature.verify(message, public_key),
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
+            (Self::FnDsa512 { signature }, AnyPublicKey::FnDsa512 { public_key }) => {
+                signature.verify(message, public_key)
+            },
             (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
                 Self::verify_keyless_ephemeral_signature(message, signature)
             },
@@ -1517,6 +1529,9 @@ pub enum AnyPublicKey {
     SlhDsa_Sha2_128s {
         public_key: slh_dsa_sha2_128s::PublicKey,
     },
+    FnDsa512 {
+        public_key: FnDsa512PublicKey,
+    },
 }
 
 impl AnyPublicKey {
@@ -1544,12 +1559,17 @@ impl AnyPublicKey {
         Self::FederatedKeyless { public_key }
     }
 
+    pub fn fn_dsa_512(public_key: FnDsa512PublicKey) -> Self {
+        Self::FnDsa512 { public_key }
+    }
+
     pub fn supports_encrypted_txn(&self) -> bool {
         match self {
             Self::Ed25519 { .. }
             | Self::Secp256k1Ecdsa { .. }
             | Self::Secp256r1Ecdsa { .. }
-            | Self::SlhDsa_Sha2_128s { .. } => true,
+            | Self::SlhDsa_Sha2_128s { .. }
+            | Self::FnDsa512 { .. } => true,
             Self::Keyless { .. } | Self::FederatedKeyless { .. } => false,
         }
     }

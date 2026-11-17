@@ -316,6 +316,7 @@ fn matches_any_public_key_address(any_public_key: &AnyPublicKey, address: &Accou
         | AnyPublicKey::Secp256k1Ecdsa { .. }
         | AnyPublicKey::Secp256r1Ecdsa { .. }
         | AnyPublicKey::SlhDsa_Sha2_128s { .. }
+        | AnyPublicKey::FnDsa512 { .. }
         | AnyPublicKey::Keyless { .. } => false,
         AnyPublicKey::FederatedKeyless { public_key } => {
             // Check if the public key's JWK address matches the given address

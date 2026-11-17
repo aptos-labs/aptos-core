@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#[cfg(feature = "pq-consensus")]
-use crate::consensus_signature::ml_dsa::MlDsaSigningKey;
+#[cfg(feature = "pq-consensus-any")]
+use crate::consensus_signature::PqSigningKey;
 use crate::{account_address::AccountAddress, consensus_signature::ConsensusSignature};
-#[cfg(not(feature = "pq-consensus"))]
+#[cfg(not(feature = "pq-consensus-any"))]
 use aptos_crypto::SigningKey;
 use aptos_crypto::{
     bls12381, hash::CryptoHash, test_utils::TEST_SEED, CryptoMaterialError, PrivateKey, Uniform,
@@ -21,16 +21,16 @@ use std::{convert::TryFrom, sync::Arc};
 pub struct ValidatorSigner {
     author: AccountAddress,
     private_key: Arc<bls12381::PrivateKey>,
-    #[cfg(feature = "pq-consensus")]
-    pq_signing_key: Arc<MlDsaSigningKey>,
+    #[cfg(feature = "pq-consensus-any")]
+    pq_signing_key: Arc<PqSigningKey>,
 }
 
 impl ValidatorSigner {
     pub fn new(author: AccountAddress, private_key: Arc<bls12381::PrivateKey>) -> Self {
         ValidatorSigner {
             author,
-            #[cfg(feature = "pq-consensus")]
-            pq_signing_key: Arc::new(MlDsaSigningKey::derive(&private_key.public_key())),
+            #[cfg(feature = "pq-consensus-any")]
+            pq_signing_key: Arc::new(PqSigningKey::derive(&private_key.public_key())),
             private_key,
         }
     }
@@ -40,11 +40,11 @@ impl ValidatorSigner {
         &self,
         message: &T,
     ) -> Result<ConsensusSignature, CryptoMaterialError> {
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         {
             self.private_key.sign(message)
         }
-        #[cfg(feature = "pq-consensus")]
+        #[cfg(feature = "pq-consensus-any")]
         {
             self.pq_signing_key.sign(message)
         }

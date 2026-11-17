@@ -110,6 +110,8 @@ pub enum AccountType {
     #[default]
     Local,
     Keyless,
+    /// Single-key accounts that sign with FN-DSA-512 (Falcon-512). EXPERIMENT ONLY.
+    FnDsa512,
 }
 
 #[derive(Debug, Copy, Clone)]

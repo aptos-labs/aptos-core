@@ -172,6 +172,44 @@ static TRANSACTION_MIX_PER_PHASE: Lazy<Vec<Vec<(TransactionType, usize)>>> = Laz
     ]
 });
 
+/// The emitter creates FN-DSA-512 accounts and sends Falcon-signed coin transfers.
+#[tokio::test]
+async fn test_fn_dsa_512_txn_emitter() {
+    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let emit_job_request = create_emit_job_request(
+        &mut swarm,
+        &all_validators,
+        100,
+        vec![vec![(
+            TransactionTypeArg::CoinTransfer.materialize_default(),
+            1,
+        )]],
+        AccountType::FnDsa512,
+    )
+    .await
+    .unwrap();
+    let transaction_factory =
+        TransactionFactory::new(swarm.chain_info().chain_id).with_gas_unit_price(100);
+    let rest_cli = swarm.validators().next().unwrap().rest_client();
+    let emitter = TxnEmitter::new(
+        transaction_factory,
+        SeedableRng::from_rng(OsRng).unwrap(),
+        rest_cli,
+    );
+    let txn_stat = emitter
+        .emit_txn_for_with_stats(
+            swarm.chain_info().root_account,
+            emit_job_request,
+            Duration::from_secs(30),
+            3,
+        )
+        .await
+        .unwrap();
+    println!("{:?}", txn_stat.rate());
+    assert!(txn_stat.committed > 100, "committed {}", txn_stat.committed);
+}
+
 #[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {

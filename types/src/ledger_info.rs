@@ -716,7 +716,7 @@ mod tests {
     /// `decompressed_signature()` is explicitly called. This is the property
     /// that lets callers reject oversized/malformed messages on cheap
     /// structural checks before paying per-signature decompression cost.
-    #[cfg(not(feature = "pq-consensus"))]
+    #[cfg(not(feature = "pq-consensus-any"))]
     #[test]
     fn deserialize_defers_decompression() {
         // 0xff.. is not a valid compressed G2 point (its flag bits are
@@ -979,7 +979,7 @@ mod tests {
             LazyConsensusSignature::from_raw_bytes_for_test([0xFFu8; ConsensusSignature::LENGTH]),
         );
         // An ML-DSA signature has no decompression step. The poison is only invalid.
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         assert!(poison.decompressed_signature().is_err());
         signature_aggregator.add_signature(validator_signers[5].author(), &poison);
 

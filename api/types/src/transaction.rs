@@ -23,6 +23,7 @@ use aptos_types::{
     dkg::{
         chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
     },
+    fn_dsa::{FnDsa512PublicKey, FnDsa512Signature},
     function_info::FunctionInfo,
     jwks::{jwk::JWK, ProviderJWKs, QuorumCertifiedUpdate},
     keyless,
@@ -1831,6 +1832,7 @@ pub enum Signature {
     WebAuthn(WebAuthn),
     Keyless(Keyless),
     SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
+    FnDsa512(FnDsa512),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -1873,6 +1875,18 @@ pub struct SlhDsa_Sha2_128s {
 }
 
 impl SlhDsa_Sha2_128s {
+    pub fn new(value: HexEncodedBytes) -> Self {
+        Self { value }
+    }
+}
+
+/// FN-DSA-512 (Falcon-512) key or signature bytes. EXPERIMENT ONLY.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FnDsa512 {
+    pub value: HexEncodedBytes,
+}
+
+impl FnDsa512 {
     pub fn new(value: HexEncodedBytes) -> Self {
         Self { value }
     }
@@ -1922,6 +1936,7 @@ impl TryFrom<&Signature> for AnySignature {
             Signature::SlhDsa_Sha2_128s(s) => {
                 AnySignature::slh_dsa_sha2_128s(s.value.inner().try_into()?)
             },
+            Signature::FnDsa512(s) => AnySignature::fn_dsa_512(s.value.inner().try_into()?),
             Signature::WebAuthn(s) => AnySignature::webauthn(s.value.inner().try_into()?),
             Signature::Keyless(s) => AnySignature::keyless(s.value.inner().try_into()?),
         })
@@ -1940,6 +1955,9 @@ impl From<&AnySignature> for Signature {
             AnySignature::SlhDsa_Sha2_128s { signature } => Signature::SlhDsa_Sha2_128s(
                 SlhDsa_Sha2_128s::new(signature.to_bytes().to_vec().into()),
             ),
+            AnySignature::FnDsa512 { signature } => {
+                Signature::FnDsa512(FnDsa512::new(signature.to_bytes().into()))
+            },
             AnySignature::WebAuthn { signature } => {
                 Signature::WebAuthn(WebAuthn::new(signature.to_bytes().to_vec().into()))
             },
@@ -1961,6 +1979,7 @@ pub enum PublicKey {
     Keyless(Keyless),
     FederatedKeyless(FederatedKeyless),
     SlhDsa_Sha2_128s(SlhDsa_Sha2_128s),
+    FnDsa512(FnDsa512),
 }
 
 impl TryFrom<&PublicKey> for AnyPublicKey {
@@ -1978,6 +1997,7 @@ impl TryFrom<&PublicKey> for AnyPublicKey {
             PublicKey::SlhDsa_Sha2_128s(p) => {
                 AnyPublicKey::slh_dsa_sha2_128s(p.value.inner().try_into()?)
             },
+            PublicKey::FnDsa512(p) => AnyPublicKey::fn_dsa_512(p.value.inner().try_into()?),
             PublicKey::Keyless(p) => AnyPublicKey::keyless(p.value.inner().try_into()?),
             PublicKey::FederatedKeyless(p) => {
                 AnyPublicKey::federated_keyless(p.value.inner().try_into()?)
@@ -2001,6 +2021,9 @@ impl From<&AnyPublicKey> for PublicKey {
             AnyPublicKey::SlhDsa_Sha2_128s { public_key } => PublicKey::SlhDsa_Sha2_128s(
                 SlhDsa_Sha2_128s::new(public_key.to_bytes().to_vec().into()),
             ),
+            AnyPublicKey::FnDsa512 { public_key } => {
+                PublicKey::FnDsa512(FnDsa512::new(public_key.to_bytes().into()))
+            },
             AnyPublicKey::Keyless { public_key } => {
                 PublicKey::Keyless(Keyless::new(public_key.to_bytes().into()))
             },
@@ -2039,6 +2062,14 @@ impl VerifyInput for SingleKeySignature {
                     signature: s.value.clone(),
                 }
                 .verify()
+            },
+            (PublicKey::FnDsa512(p), Signature::FnDsa512(s)) => {
+                if p.value.inner().len() != FnDsa512PublicKey::LENGTH
+                    || s.value.inner().len() != FnDsa512Signature::LENGTH
+                {
+                    bail!("FnDsa512 public key or signature has an invalid number of bytes")
+                }
+                Ok(())
             },
             (PublicKey::Secp256r1Ecdsa(p), Signature::WebAuthn(s)) => WebAuthnSignature {
                 public_key: p.value.clone(),
@@ -2100,6 +2131,13 @@ impl TryFrom<&SingleKeySignature> for AccountAuthenticator {
                     )?;
                     AnyPublicKey::slh_dsa_sha2_128s(key)
                 },
+                PublicKey::FnDsa512(ref p) => {
+                    let key =
+                        p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as FnDsa512PublicKey",
+                        )?;
+                    AnyPublicKey::fn_dsa_512(key)
+                },
                 PublicKey::Keyless(ref p) => {
                     let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
@@ -2135,6 +2173,14 @@ impl TryFrom<&SingleKeySignature> for AccountAuthenticator {
                     "Failed to parse given signature bytes as SlhDsa_Sha2_128sSignature",
                 )?;
                 AnySignature::slh_dsa_sha2_128s(signature)
+            },
+            Signature::FnDsa512(ref s) => {
+                let signature = s
+                    .value
+                    .inner()
+                    .try_into()
+                    .context("Failed to parse given signature bytes as FnDsa512Signature")?;
+                AnySignature::fn_dsa_512(signature)
             },
             Signature::WebAuthn(ref s) => {
                 let signature = s
@@ -2215,45 +2261,51 @@ impl TryFrom<&MultiKeySignature> for AccountAuthenticator {
     fn try_from(value: &MultiKeySignature) -> Result<Self, Self::Error> {
         let mut public_keys = vec![];
         for public_key in value.public_keys.iter() {
-            let key = match public_key {
-                PublicKey::Ed25519(p) => {
-                    let key =
-                        p.value.inner().try_into().context(
+            let key =
+                match public_key {
+                    PublicKey::Ed25519(p) => {
+                        let key = p.value.inner().try_into().context(
                             "Failed to parse given public_key bytes as Ed25519PublicKey",
                         )?;
-                    AnyPublicKey::ed25519(key)
-                },
-                PublicKey::Secp256k1Ecdsa(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as Secp256k1EcdsaPublicKey",
-                    )?;
-                    AnyPublicKey::secp256k1_ecdsa(key)
-                },
-                PublicKey::Secp256r1Ecdsa(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as Secp256r1EcdsaPublicKey",
-                    )?;
-                    AnyPublicKey::secp256r1_ecdsa(key)
-                },
-                PublicKey::SlhDsa_Sha2_128s(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as SlhDsa_Sha2_128sPublicKey",
-                    )?;
-                    AnyPublicKey::slh_dsa_sha2_128s(key)
-                },
-                PublicKey::Keyless(p) => {
-                    let key = p.value.inner().try_into().context(
-                        "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
-                    )?;
-                    AnyPublicKey::keyless(key)
-                },
-                PublicKey::FederatedKeyless(p) => {
-                    let key = p.value.inner().try_into().context(
+                        AnyPublicKey::ed25519(key)
+                    },
+                    PublicKey::Secp256k1Ecdsa(p) => {
+                        let key = p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as Secp256k1EcdsaPublicKey",
+                        )?;
+                        AnyPublicKey::secp256k1_ecdsa(key)
+                    },
+                    PublicKey::Secp256r1Ecdsa(p) => {
+                        let key = p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as Secp256r1EcdsaPublicKey",
+                        )?;
+                        AnyPublicKey::secp256r1_ecdsa(key)
+                    },
+                    PublicKey::SlhDsa_Sha2_128s(p) => {
+                        let key = p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as SlhDsa_Sha2_128sPublicKey",
+                        )?;
+                        AnyPublicKey::slh_dsa_sha2_128s(key)
+                    },
+                    PublicKey::FnDsa512(p) => {
+                        let key = p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as FnDsa512PublicKey",
+                        )?;
+                        AnyPublicKey::fn_dsa_512(key)
+                    },
+                    PublicKey::Keyless(p) => {
+                        let key = p.value.inner().try_into().context(
+                            "Failed to parse given public_key bytes as AnyPublicKey::Keyless",
+                        )?;
+                        AnyPublicKey::keyless(key)
+                    },
+                    PublicKey::FederatedKeyless(p) => {
+                        let key = p.value.inner().try_into().context(
                         "Failed to parse given public_key bytes as AnyPublicKey::FederatedKeyless",
                     )?;
-                    AnyPublicKey::federated_keyless(key)
-                },
-            };
+                        AnyPublicKey::federated_keyless(key)
+                    },
+                };
             public_keys.push(key);
         }
 
@@ -2278,6 +2330,14 @@ impl TryFrom<&MultiKeySignature> for AccountAuthenticator {
                             "Failed to parse given signature as SlhDsa_Sha2_128sSignature",
                         )?;
                         AnySignature::slh_dsa_sha2_128s(signature)
+                    },
+                    Signature::FnDsa512(s) => {
+                        let signature = s
+                            .value
+                            .inner()
+                            .try_into()
+                            .context("Failed to parse given signature as FnDsa512Signature")?;
+                        AnySignature::fn_dsa_512(signature)
                     },
                     Signature::WebAuthn(s) => {
                         let paar = s.value.inner().try_into().context(

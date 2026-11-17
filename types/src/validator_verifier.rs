@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#[cfg(feature = "pq-consensus")]
-use crate::consensus_signature::{ml_dsa::MlDsaVerificationKey, ConsensusMultiSignature};
+#[cfg(feature = "pq-consensus-any")]
+use crate::consensus_signature::{pq_verification_key, ConsensusMultiSignature, PqVerificationKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use crate::{
@@ -12,9 +12,9 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
-#[cfg(feature = "pq-consensus")]
+#[cfg(feature = "pq-consensus-any")]
 use aptos_crypto::traits::signing_message;
-#[cfg(not(feature = "pq-consensus"))]
+#[cfg(not(feature = "pq-consensus-any"))]
 use aptos_crypto::{bls12381, Signature, VerifyingKey};
 use aptos_crypto::{
     bls12381::{bls12381_keys, PublicKey},
@@ -25,25 +25,25 @@ use derivative::Derivative;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
-#[cfg(feature = "pq-consensus")]
+#[cfg(feature = "pq-consensus-any")]
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
-#[cfg(feature = "pq-consensus")]
-use std::sync::OnceLock;
+#[cfg(feature = "pq-consensus-any")]
+use std::sync::{Arc, OnceLock};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
 use thiserror::Error;
 
-#[cfg(feature = "pq-consensus")]
+#[cfg(feature = "pq-consensus-any")]
 const PQ_MIN_SIGNATURES_PER_TASK: usize = 4;
 
 /// A certificate has one ML-DSA signature per signer, and they verify in parallel.
 /// A dedicated pool keeps this verification out of the queue of the global rayon pool,
 /// which other components share.
-#[cfg(feature = "pq-consensus")]
+#[cfg(feature = "pq-consensus-any")]
 static PQ_VERIFICATION_POOL: once_cell::sync::Lazy<rayon::ThreadPool> =
     once_cell::sync::Lazy::new(|| {
         rayon::ThreadPoolBuilder::new()
@@ -184,10 +184,10 @@ pub struct ValidatorVerifier {
     optimistic_sig_verification: bool,
     /// The ML-DSA verification key of each validator, in the order of `validator_infos`.
     /// Each key is derived on first use.
-    #[cfg(feature = "pq-consensus")]
+    #[cfg(feature = "pq-consensus-any")]
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
-    pq_verification_keys: Vec<OnceLock<MlDsaVerificationKey>>,
+    pq_verification_keys: Vec<OnceLock<Arc<PqVerificationKey>>>,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -222,7 +222,7 @@ impl ValidatorVerifier {
             .map(|(index, info)| (info.address, index))
             .collect();
         Self {
-            #[cfg(feature = "pq-consensus")]
+            #[cfg(feature = "pq-consensus-any")]
             pq_verification_keys: validator_infos.iter().map(|_| OnceLock::new()).collect(),
             validator_infos,
             quorum_voting_power,
@@ -290,7 +290,7 @@ impl ValidatorVerifier {
         message: &T,
         signature: &ConsensusSignature,
     ) -> std::result::Result<(), VerifyError> {
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         {
             match self.get_public_key(&author) {
                 Some(public_key) => public_key
@@ -299,7 +299,7 @@ impl ValidatorVerifier {
                 None => Err(VerifyError::UnknownAuthor),
             }
         }
-        #[cfg(feature = "pq-consensus")]
+        #[cfg(feature = "pq-consensus-any")]
         {
             self.address_to_validator_index
                 .get(&author)
@@ -310,16 +310,19 @@ impl ValidatorVerifier {
         }
     }
 
-    #[cfg(feature = "pq-consensus")]
-    fn pq_verification_key(&self, index: usize) -> Option<&MlDsaVerificationKey> {
+    #[cfg(feature = "pq-consensus-any")]
+    fn pq_verification_key(&self, index: usize) -> Option<&PqVerificationKey> {
         let validator = self.validator_infos.get(index)?;
         let key = self.pq_verification_keys.get(index)?;
-        Some(key.get_or_init(|| MlDsaVerificationKey::derive(validator.public_key())))
+        Some(
+            key.get_or_init(|| pq_verification_key(validator.public_key()))
+                .as_ref(),
+        )
     }
 
     /// Verifies each signature of `aggregated_signature` against the bytes that
     /// `message_bytes` returns for its position among the signers.
-    #[cfg(feature = "pq-consensus")]
+    #[cfg(feature = "pq-consensus-any")]
     fn pq_verify_each<'a>(
         &self,
         aggregated_signature: &AggregateSignature,
@@ -428,12 +431,12 @@ impl ValidatorVerifier {
             masks.set(index as u16);
             sigs.push((index, sig.clone()));
         }
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         // Perform an optimistic aggregation of the signatures without verification.
         let aggregated_sig =
             bls12381::Signature::aggregate(sigs.into_iter().map(|(_, sig)| sig).collect())
                 .map_err(|_| VerifyError::FailedToAggregateSignature)?;
-        #[cfg(feature = "pq-consensus")]
+        #[cfg(feature = "pq-consensus-any")]
         // ML-DSA has no aggregation. Keep each signature, in the order of the bitmask.
         let aggregated_sig = {
             sigs.sort_by_key(|(index, _)| *index);
@@ -479,7 +482,7 @@ impl ValidatorVerifier {
                 return Ok(());
             }
         }
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         {
             // Verify empty multi signature. Decompression of the G2 point is
             // deferred to here, after the cheap structural checks above.
@@ -496,7 +499,7 @@ impl ValidatorVerifier {
                 .map_err(|_| VerifyError::InvalidMultiSignature)?;
             Ok(())
         }
-        #[cfg(feature = "pq-consensus")]
+        #[cfg(feature = "pq-consensus-any")]
         {
             if multi_signature.sig().is_none() {
                 return Err(VerifyError::EmptySignature);
@@ -529,7 +532,7 @@ impl ValidatorVerifier {
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
-        #[cfg(not(feature = "pq-consensus"))]
+        #[cfg(not(feature = "pq-consensus-any"))]
         {
             // Verify empty aggregated signature. Decompression of the G2 point is
             // deferred to here, after the cheap structural checks above.
@@ -543,7 +546,7 @@ impl ValidatorVerifier {
                 .map_err(|_| VerifyError::InvalidAggregatedSignature)?;
             Ok(())
         }
-        #[cfg(feature = "pq-consensus")]
+        #[cfg(feature = "pq-consensus-any")]
         {
             if aggregated_signature.sig().is_none() {
                 return Err(VerifyError::EmptySignature);
@@ -1208,7 +1211,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "pq-consensus")]
+    #[cfg(feature = "pq-consensus-any")]
     fn pq_signatures(aggregated_signature: &AggregateSignature) -> Vec<ConsensusSignature> {
         aggregated_signature
             .sig()
@@ -1220,7 +1223,7 @@ mod tests {
 
     /// A certificate holds one ML-DSA signature per signer, in bitmask order. Every
     /// signature must verify against the validator at its position.
-    #[cfg(feature = "pq-consensus")]
+    #[cfg(feature = "pq-consensus-any")]
     #[test]
     fn test_pq_multi_signatures() {
         // Random addresses, so the address order differs from the validator index order.
@@ -1269,7 +1272,7 @@ mod tests {
     }
 
     /// A timeout certificate holds signatures on different messages, one per signer.
-    #[cfg(feature = "pq-consensus")]
+    #[cfg(feature = "pq-consensus-any")]
     #[test]
     fn test_pq_aggregate_signatures() {
         let (validator_signers, validator_verifier) = random_validator_verifier(4, None, true);

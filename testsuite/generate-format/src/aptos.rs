@@ -81,6 +81,9 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &slh_dsa_sha2_128s_private_key)?;
     tracer.trace_value(samples, &slh_dsa_sha2_128s_public_key)?;
     tracer.trace_value(samples, &slh_dsa_sha2_128s_signature)?;
+    let fn_dsa_512_private_key = aptos_types::fn_dsa::FnDsa512PrivateKey::from_seed(&[1u8; 32]);
+    tracer.trace_value(samples, fn_dsa_512_private_key.public_key())?;
+    tracer.trace_value(samples, &fn_dsa_512_private_key.sign(&message).unwrap())?;
 
     crate::trace_keyless_structs(tracer, samples, public_key, signature)?;
     crate::trace_encrypted_txn_structs(tracer, samples)?;

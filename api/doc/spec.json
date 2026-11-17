@@ -18591,6 +18591,18 @@
           }
         }
       },
+      "FnDsa512": {
+        "type": "object",
+        "description": "FN-DSA-512 (Falcon-512) key or signature bytes. EXPERIMENT ONLY.",
+        "required": [
+          "value"
+        ],
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        }
+      },
       "GasEstimation": {
         "type": "object",
         "description": "Struct holding the outputs of the estimate gas API",
@@ -19540,6 +19552,9 @@
           },
           {
             "$ref": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s"
+          },
+          {
+            "$ref": "#/components/schemas/PublicKey_FnDsa512"
           }
         ],
         "discriminator": {
@@ -19550,7 +19565,8 @@
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_Secp256r1Ecdsa",
             "keyless": "#/components/schemas/PublicKey_Keyless",
             "federated_keyless": "#/components/schemas/PublicKey_FederatedKeyless",
-            "slh_dsa__sha2_128s": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s"
+            "slh_dsa__sha2_128s": "#/components/schemas/PublicKey_SlhDsa_Sha2_128s",
+            "fn_dsa512": "#/components/schemas/PublicKey_FnDsa512"
           }
         }
       },
@@ -19595,6 +19611,28 @@
           },
           {
             "$ref": "#/components/schemas/FederatedKeyless"
+          }
+        ]
+      },
+      "PublicKey_FnDsa512": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "fn_dsa512"
+                ],
+                "example": "fn_dsa512"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/FnDsa512"
           }
         ]
       },
@@ -19869,6 +19907,9 @@
           },
           {
             "$ref": "#/components/schemas/Signature_SlhDsa_Sha2_128s"
+          },
+          {
+            "$ref": "#/components/schemas/Signature_FnDsa512"
           }
         ],
         "discriminator": {
@@ -19878,7 +19919,8 @@
             "secp256k1_ecdsa": "#/components/schemas/Signature_Secp256k1Ecdsa",
             "web_authn": "#/components/schemas/Signature_WebAuthn",
             "keyless": "#/components/schemas/Signature_Keyless",
-            "slh_dsa__sha2_128s": "#/components/schemas/Signature_SlhDsa_Sha2_128s"
+            "slh_dsa__sha2_128s": "#/components/schemas/Signature_SlhDsa_Sha2_128s",
+            "fn_dsa512": "#/components/schemas/Signature_FnDsa512"
           }
         }
       },
@@ -19901,6 +19943,28 @@
           },
           {
             "$ref": "#/components/schemas/Ed25519"
+          }
+        ]
+      },
+      "Signature_FnDsa512": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "fn_dsa512"
+                ],
+                "example": "fn_dsa512"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/FnDsa512"
           }
         ]
       },

@@ -751,6 +751,12 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
                 },
             )),
         },
+        // The protobuf schema has no FN-DSA type (experiment only), so only the bytes are kept.
+        Signature::FnDsa512(s) => transaction::AnySignature {
+            r#type: transaction::any_signature::Type::Unspecified as i32,
+            signature: s.value.clone().into(),
+            signature_variant: None,
+        },
     }
 }
 
@@ -778,6 +784,11 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
         },
         PublicKey::SlhDsa_Sha2_128s(p) => transaction::AnyPublicKey {
             r#type: transaction::any_public_key::Type::SlhDsaSha2128s as i32,
+            public_key: p.value.clone().into(),
+        },
+        // The protobuf schema has no FN-DSA type (experiment only), so only the bytes are kept.
+        PublicKey::FnDsa512(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::Unspecified as i32,
             public_key: p.value.clone().into(),
         },
     }
