@@ -78,12 +78,13 @@ impl NativeExtensions {
     ///
     /// Panics if an extension of the same type is already present.
     pub fn add<T: NativeExtension>(&mut self, ext: T) {
-        let prev = self.index.insert(TypeId::of::<T>(), self.exts.len());
+        let id = TypeId::of::<T>();
         assert!(
-            prev.is_none(),
+            !self.index.contains_key(&id),
             "duplicate native extension of type {}",
             std::any::type_name::<T>(),
         );
+        self.index.insert(id, self.exts.len());
         self.exts.push(RefCell::new(Box::new(ext)));
     }
 
