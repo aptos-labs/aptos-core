@@ -7,15 +7,6 @@ VerexE2ETests/SourceVerify/generic_spec_vars.move:67:5: error: verex verificatio
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/SourceVerify/generic_spec_vars.move:91:9: error: the specification clause `ensures global<«Ghost$minted»<B> >(@0x0).v
-        == old(global<«Ghost$minted»<B> >(@0x0).v)` is not established
-VerexE2ETests/SourceVerify/generic_spec_vars.move:88:5: error: verex verification failed: the automatic verification of `count_twice` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:
-  verify count_twice by lean =>
-    verex_obligations
-    verex_on
-    | ensures_2 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/generic_spec_vars.move:103:9: error: the specification clause `ensures global<«Ghost$minted»<A> >(@0x0).v
         == old(global<«Ghost$minted»<A> >(@0x0).v) + value` is not established
 VerexE2ETests/SourceVerify/generic_spec_vars.move:101:5: error: verex verification failed: the automatic verification of `count_again` failed; provide a proof in `VerexE2ETests/SourceVerify/generic_spec_vars.proof.lean`:

@@ -1,4 +1,3 @@
-VerexE2ETests/SourceVerify/static_fnonce_errors.rs:8:1: info: `apply` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
 VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:18:3: error: the specification clause `ensures result != value` is not established
 VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `wrong` failed; provide a proof in the module:
   verify wrong by lean =>
@@ -8,7 +7,7 @@ VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:17:6: error: verex ver
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:26:6: error: verification failed with a residual obligation:
-case continues.continues.refine_1.refine_4
+case continues.continues.refine_2.refine_5
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 nativesTyped : VerexIR.NativesTyped executable✝
@@ -27,10 +26,11 @@ verexMethodArguments :
     (VerexIR.Proofs.Denote.NRow.cons static_fnonce_errors.unit.nominal.namespace.0.declaration✝²⁻⁰
       VerexIR.Proofs.Denote.NRow.nil)
 verexMethodInitial : VerexIR.Proofs.Denote.Memory unit
+verexMethodValidArgs : static_fnonce_errors.unit.nominal.namespace.0.declaration✝²⁻⁰.Holds verexMethodArguments.fst
 error : VerexIR.Proofs.Failure
 a✝ :
   VerexIR.Proofs.Obligation "static_fnonce_errors.rs.lean" 1696 1727
-    (verexMethodArguments.fst.val.fst.fst.val = 0)
+    (verexMethodArguments.fst.fst.fst.val = 0)
 ⊢ False
 VerexE2ETests/SourceVerify/static_fnonce_errors.spec.lean:26:6: error: verex verification failed: the automatic verification of `panicking` failed; provide a proof in the module:
   verify panicking by lean =>

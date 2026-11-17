@@ -125,12 +125,7 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:34:3: error: `decide` d
   ⊢ named < named
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:33:8: error: verex verification failed: the proof of `pick` does not establish its specification
 VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:47:5: error: the step's fact is not proved:
-  p_a p_b : Proofs.Denote.NTy.plainOf Proofs.Denote.Carriers.toPlain (Proofs.Denote.NTy.int 64 false)
-  p_property✝ :
-    (Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 0 } Proofs.Denote.NRow.nil
-          (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false)
-            (Proofs.Denote.NRow.cons (Proofs.Denote.NTy.int 64 false) Proofs.Denote.NRow.nil))).deepHolds
-      (p_a, p_b, PUnit.unit)
+  p_a p_b : (Proofs.Denote.NTy.int 64 false).carrier
   initialState✝ : Proofs.Denote.Memory unit
   assumed permitted : True
   p_a_lower : 0 ≤ p_a
@@ -155,11 +150,11 @@ VerexE2ETests/SourceVerify/proof_steps_errors.proof.lean:53:5: error: the step's
   x : (Proofs.Denote.NTy.int 64 false).carrier
   assumed : True
   permitted : x + 2 ≤ 18446744073709551615
-  old_inc_result : inc.shape.carrier
+  old_inc_result : (Proofs.Denote.NTy.int 64 false).carrier
   inc_ensures✝ : x + 1 ≤ 18446744073709551615
   a✝⁵ : x < old_inc_result
   a✝⁴ : old_inc_result ≤ x + 1
-  inc_result : inc.shape.carrier
+  inc_result : (Proofs.Denote.NTy.int 64 false).carrier
   final : Proofs.Denote.Memory unit
   inc_ensures : old_inc_result + 1 ≤ 18446744073709551615
   a✝³ : old_inc_result < inc_result

@@ -525,8 +525,8 @@ section states its design.
 
 **A differential check.** `compileFunction_agrees` is an axiom, so a mistake here
 has no proof to catch it. `verex-rust/VerexRust/Tests/DifferentialCheck.lean`, run
-natively by `lake test` (the smoke suite thins its inputs with
-`VEREX_DIFFERENTIAL=smoke`), exports `Tests/Differential/*.rs` and the exporter's
+natively by `lake test` (`VEREX_DIFFERENTIAL=smoke` thins its inputs),
+exports `Tests/Differential/*.rs` and the exporter's
 fixtures, runs the interpreter on the exported unit, and compares its outcome with
 the term compiled from the rendering lowered back: boundary values per integer
 type, every row of 8-bit integers for the operations and casts. A `&mut`

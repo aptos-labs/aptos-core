@@ -35,7 +35,7 @@ assumed :
     (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)
     { parameters := [false], results := [false] }
     (VerexIR.Proofs.Denote.ResultShape.one 0x99.result_validity.unit.nominal.namespace.0.declaration✝⁻⁰) f
-permitted validArgs : True
+permitted : True
 x_lower : 0 ≤ x.val
 x_upper : x.val ≤ 18446744073709551615
 ⊢ VerexIR.Proofs.wp

@@ -470,5 +470,38 @@ the next chapter. An authored VerexSL file may also hold `theorem` and
 `verify f by …` items among the module's declarations, which the renderer
 leaves to the proof file.
 
+`pragma verify = false` on a function with a body turns off the proof of the
+body. It does not remove what the function's contract assumes of its function
+arguments: its callers establish that, as they do for a verified function.
+(A function without a body has the contract its specification states, and
+that contract is trusted.) For a higher-order function this means:
+
+- A call that passes a function value to a parameter whose result type states
+  a data invariant owes that the value's invocations return valid results.
+  For a named function the fact comes from that function's theorem, so the
+  function is verified before its caller; in a module under `pragma verify =
+  false` it needs a `verify` item of its own.
+- A generic `pragma opaque` higher-order function whose function-typed
+  parameter mentions a type parameter is restricted, whether its body is
+  verified or not: the rule for invoking a function value the proof does not
+  see is stated for rows of scalar types, and the contract states of each
+  argument row and result row of the function value that mentions a type
+  parameter that it resolves to scalar types. With `f : Fn(u64) -> T`, a call
+  at `T := Percent`, a struct, is rejected at the precondition, and verifying
+  the function that is passed does not change that. A type parameter that no
+  such row mentions is not restricted.
+
+The message of a precondition that is not established names the call and the
+clause. The fact owed is shown by the proof skeleton the message prints, with
+`trace_state` after `verex_prepare`:
+
+```lean
+verify f by lean =>
+  verex_obligations
+  verex_on
+  | requires_of_g_at_call_1 => verex_prepare; trace_state; sorry
+  | _ => verex_decide
+```
+
 The full workflow, flags, and pragmas:
 [`../designs/source-verification.md`](../designs/source-verification.md).

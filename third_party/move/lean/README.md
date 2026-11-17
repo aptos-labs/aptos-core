@@ -53,7 +53,7 @@ verex-rust verify bounds.rs      # specifications in bounds.spec.lean
 | [`verex-move`](verex-move/) | The Move semantic profile and intrinsic registry, the Move exchange frontend (`VerexMove/Frontend`), and the XIR backend (`VerexMove/Xir`) through which compiler-v2 compiles `.lean` sources to Move bytecode. |
 | [`verex-rust`](verex-rust/) | The Rust semantic profile, source backend, and the Lean-owned import CLI over [`rust-exporter`](verex-rust/rust-exporter/), a standalone Rustc Public exporter of borrow-checked MIR. [`lib/`](verex-rust/lib/) is the standard-library specification library: VerexSL contracts and type models of `core` and `alloc`. |
 | [`verex-e2e-tests`](verex-e2e-tests/) | Move-to-VerexSL and Rust-to-VerexSL baselines, verification of Move and Rust sources, and the verification check fixtures under `VerexE2ETests/Check/`. |
-| [`scripts`](scripts/) | The smoke suite (`smoke.sh`), per-module package verification (`verify-modules.py`), single-target isolation (`isolate-target.py`), the baseline error delta after a `UB=1` run (`exp-error-delta.sh`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), and the verification benchmark driver (`verex-bench.py`). |
+| [`scripts`](scripts/) | The prover's inner-loop suite (`prover-smoke.sh`, with its cost pins and the tool that regenerates its rendered fixtures), per-module package verification (`verify-modules.py`) with the gate's package over compiled namespaces (`verify-compiled-namespaces.sh`), single-target isolation (`isolate-target.py`), the baseline error delta after a `UB=1` run (`exp-error-delta.sh`), the Rust pipeline benchmark (`bench-rust-pipeline.sh`), and the verification benchmark driver (`verex-bench.py`). |
 | [`bench`](bench/) | The verification benchmark's problems (`problems.toml`), a Move package written for them (`package/`), and their Rust counterparts (`rust/`). |
 
 [`v0/`](v0/) holds the deprecated reference packages `move`, `move-model`,
@@ -108,7 +108,10 @@ lake exe verex-rust verify <Cargo.toml> --package <name> # a library crate, a .s
 process. `scripts/verify-modules.py <package> [--filter <part>] [--jobs N]`
 runs one process per module with specifications, several at a time, each
 importing the package's namespaces compiled to `.olean` files by a first pass,
-and prints the modules' reports in module order.
+and prints the modules' reports in module order. The gate's own run of that
+route is `scripts/verify-compiled-namespaces.sh`: the package
+`verex-e2e-tests/VerexE2ETests/CompiledNamespaces`, whose report is compared
+with its `client.exp`.
 
 From the Move CLI, a package is verified in place; the Move Prover's unit
 tests run with it on request:

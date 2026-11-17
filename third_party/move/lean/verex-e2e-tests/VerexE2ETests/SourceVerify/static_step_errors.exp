@@ -6,8 +6,6 @@ VerexE2ETests/SourceVerify/static_step_errors.spec.lean:11:8: error: verex verif
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/SourceVerify/static_step_errors.rs:22:5: info: `step_twice` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
-VerexE2ETests/SourceVerify/static_step_errors.rs:22:5: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
 VerexE2ETests/SourceVerify/static_step_errors.spec.lean:23:3: error: the specification clause `ensures value == old(value)` is not established
 VerexE2ETests/SourceVerify/static_step_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `forward` failed; provide a proof in the module:
   verify forward by lean =>

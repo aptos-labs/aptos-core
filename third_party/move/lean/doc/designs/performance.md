@@ -200,7 +200,8 @@ on an idle machine (libraries + executable):
 | `Solve.Decide` / `Solve.Base` | 164 s | 88 s / 96 s |
 | `Contract` (assembly) / `Contract.Clauses` | 80 s | 51 s / 50 s |
 
-The smoke suite went from 304 s to 66 s warm: fixtures as parallel
+The smoke suite of that measurement, which also built the executable and
+ran Move Prover tests, went from 304 s to 66 s warm: fixtures as parallel
 processes, the executable built beside them, and the Move Prover tests'
 verifier snapshot (1 GB digested twice) from 79 s to 12 s with `sha2`
 compiled optimized in the dev profile.

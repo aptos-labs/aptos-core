@@ -2354,7 +2354,14 @@ def ensureOwnBridge (segments : Array String) (unit : ValidatedUnit)
                        reason := s!"the kernel does not accept the equivalence: {reason}" }
       let entry : VerexIR.Proofs.Denote.OwnBridge.Entry := {
         unit := unitName, source := bridge.source, row := bridge.row, theoremName := name
+        functions := functionsName, params := bridge.params, instanceType := bridge.instanceType
         declaration, rowSpelling, clauses := bridge.clauses }
+      -- The kernel accepted the theorem; that does not say the descriptor
+      -- recorded beside it describes the theorem's telescope. A mismatch is a
+      -- producer error, not a decline at a leaf.
+      if let some wrong ← liftTermElabM entry.describesTheorem? then
+        throwError "internal: the own bridge recorded for {declaration} does not describe its \
+          theorem: {wrong}"
       modifyEnv (VerexIR.Proofs.Denote.OwnBridge.registry.addEntry · (.bridge entry))
       report entry.describe
       return some name

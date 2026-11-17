@@ -900,23 +900,6 @@ def NRow.isParamsFrom (start : Nat) : NRow → Bool
   | .nil => true
   | .cons τ rest => τ == .param start && rest.isParamsFrom (start + 1)
 
-/-- A row's entries with each replaced. -/
-theorem NRow.getD_map_params (g : NTy → NTy) :
-    (params : NRow) → (start : Nat) → params.isParamsFrom start = true → (index : Nat) →
-      index < params.length → (default : NTy) →
-      (params.map g).getD index default = g (.param (start + index))
-  | .nil, _, _, _, below, _ => absurd below (Nat.not_lt_zero _)
-  | .cons τ rest, start, own, 0, _, _ => by
-      simp only [NRow.isParamsFrom, Bool.and_eq_true, beq_iff_eq] at own
-      simp only [NRow.map, NRow.getD, own.1, Nat.add_zero]
-  | .cons _ rest, start, own, index + 1, below, default => by
-      simp only [NRow.isParamsFrom, Bool.and_eq_true] at own
-      simp only [NRow.map, NRow.getD]
-      rw [NRow.getD_map_params g rest (start + 1) own.2 index
-        (by simp only [NRow.length] at below; omega) default]
-      congr 2
-      omega
-
 /-- An entry inside a row, with the entry replaced. Beyond the row the two
 differ, as the default is not replaced. -/
 theorem NRow.getD_map (g : NTy → NTy) :
@@ -941,6 +924,15 @@ theorem NRow.getD_params : (params : NRow) → (start : Nat) →
       simp only [NRow.length] at below
       rw [show start + (index + 1) = start + 1 + index from by omega]
       exact NRow.getD_params rest (start + 1) own.2 index (by omega) default
+
+/-- A row's entries with each replaced. -/
+theorem NRow.getD_map_params (g : NTy → NTy) :
+    (params : NRow) → (start : Nat) → params.isParamsFrom start = true → (index : Nat) →
+      index < params.length → (default : NTy) →
+      (params.map g).getD index default = g (.param (start + index)) :=
+  fun params start own index below default =>
+    (NRow.getD_map g params index below default).trans
+      (congrArg g (NRow.getD_params params start own index below default))
 
 /-- A declaration's parameters are below their number. -/
 theorem NRow.paramsAll_params : (params : NRow) → (start bound : Nat) →

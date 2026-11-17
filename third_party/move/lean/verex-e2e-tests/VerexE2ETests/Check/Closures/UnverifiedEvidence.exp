@@ -1,0 +1,8 @@
+VerexE2ETests/Check/Closures/UnverifiedEvidence.lean:40:4: error: the specification clause `aborts_if false` is not established
+VerexE2ETests/Check/Closures/UnverifiedEvidence.lean:39:7: error: verex verification failed: the automatic verification of `overclaim` failed; provide a proof in the module:
+  verify overclaim by lean =>
+    verex_obligations
+    verex_on
+    | aborts_if_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

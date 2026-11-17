@@ -168,17 +168,18 @@ partial def movedValue (installed caller : Lean.Expr) : BuildM Moved := do
   let finish (type : Lean.Expr) (proof : Lean.Expr) : BuildM Moved := do
     let moved ← moveOf type caller
     return { type, caller, moved, proof := ← stated proof installed moved }
+  -- A field read moves with the row it reads: the head field or the rest.
+  let field (row row' : Lean.Expr) (head : Bool) : BuildM Moved := do
+    let whole ← movedValue row row'
+    let (type, proof) ← component whole head
+    finish type (← mkEqTrans (← mkCongrArg installed.appFn! whole.proof) proof)
   match_expr installed with
   | Prod.fst _ _ row =>
       let_expr Prod.fst _ _ row' := caller | different "a field read" installed caller
-      let whole ← movedValue row row'
-      let (type, proof) ← component whole true
-      finish type (← mkEqTrans (← mkCongrArg installed.appFn! whole.proof) proof)
+      field row row' true
   | Prod.snd _ _ row =>
       let_expr Prod.snd _ _ row' := caller | different "a field read" installed caller
-      let whole ← movedValue row row'
-      let (type, proof) ← component whole false
-      finish type (← mkEqTrans (← mkCongrArg installed.appFn! whole.proof) proof)
+      field row row' false
   | Option.getD _ read fallback =>
       let_expr Option.getD _ read' fallback' := caller
         | different "a read with a fallback" installed caller
@@ -318,6 +319,12 @@ partial def frameFree (installed caller : Lean.Expr) : BuildM (Option Lean.Expr)
   let arguments' := caller.getAppArgs
   let result (proof : Lean.Expr) : BuildM (Option Lean.Expr) :=
     return some (← stated proof installed caller)
+  -- A field read, or a read with a fallback, over a domain the two sides
+  -- spell differently is a closed value on both sides; over the same domain it
+  -- is the congruence of the reads.
+  if #[``Prod.fst, ``Prod.snd, ``Option.getD].any (installed.isAppOfArity · 3) &&
+      installed.getArg! 0 != arguments'[0]! then
+    return some (← closedValue installed caller)
   match_expr installed with
   | NTy.order _ rank type left right =>
       let_expr NTy.order _ rank' _ left' right' := caller | different "an order" installed caller
@@ -423,15 +430,6 @@ partial def frameFree (installed caller : Lean.Expr) : BuildM (Option Lean.Expr)
             pure (mkApp applied reads)
         | _ => throwError "the discipline `{← spelled discipline}` of a table's map has no law"
       result (← mkEqTrans moved (mkApp3 (mkConst ``propext) atMoved caller equivalence))
-  | Prod.fst left _ _ =>
-      if left == arguments'[0]! then congruence installed caller
-      else return some (← closedValue installed caller)
-  | Prod.snd left _ _ =>
-      if left == arguments'[0]! then congruence installed caller
-      else return some (← closedValue installed caller)
-  | Option.getD domain _ _ =>
-      if domain == arguments'[0]! then congruence installed caller
-      else return some (← closedValue installed caller)
   | Skolems.reframeAtInstance _ _ _ _ _ _ _ _ _ _ _ _ => return some (← closedValue installed caller)
   | _ => congruence installed caller
 
@@ -598,6 +596,10 @@ structure Built where
   proof : Lean.Expr
   source : Lean.Expr
   row : Lean.Expr
+  /-- The declaration's parameter row and the instance type the statement is
+  at, both closed: the application descriptor the registry records. -/
+  params : Lean.Expr
+  instanceType : Lean.Expr
   clauses : Nat
 
 /-- The clause the construction is in, for a report. -/
@@ -728,6 +730,7 @@ def build (unit : ValidatedUnit) (unitName functionsName baseName installed : Na
         return .ok {
           statement := ← mkForallFVars binders statement
           proof := ← mkLambdaFVars binders proof
-          source := view.getArg! 0, row := view.getArg! 1, clauses := clauses.size }
+          source := view.getArg! 0, row := view.getArg! 1, params, instanceType
+          clauses := clauses.size }
 
 end VerexSL.Verify.OwnBridge

@@ -93,6 +93,13 @@ theorem Carriers.own_bridge {source : StructHandle} {σ : NTy}
   exact OwnAtArguments.bridge sameCarrier sameFunctions sameNominals Θ params inhabitable bounded
     holds caller value agree
 
+/-- The declaration's own clause reads the instance row as it reads the
+declaration's parameters, which that row substitutes to themselves. -/
+private theorem ownAtInstanceRow {source : StructHandle} {arguments : NRow}
+    (ownRow : NRow.subst params arguments = params) : ∀ encoded : RuntimeValue,
+    @Carriers.own Θ.toCarriers source (NRow.subst params arguments) encoded =
+      @Carriers.own Θ.toCarriers source params encoded := fun encoded => by rw [ownRow]
+
 /-- The bridge over a struct's fact: a value of a declared struct at an
 instance row is valid exactly where the declaration's clauses read at the
 caller's frame hold of it and its fields are valid. The declaration's own
@@ -121,10 +128,7 @@ theorem NTy.holds_struct_bridge {source : StructHandle} {arguments fields : NRow
     @NTy.Holds Θ.toCarriers
         (.struct source (NRow.subst params arguments) (NRow.subst params fields)) value ↔
       caller value ∧ @HList.Holds Θ.toCarriers (NRow.subst params fields) value := by
-  have row : ∀ encoded : RuntimeValue,
-      @Carriers.own Θ.toCarriers source (NRow.subst params arguments) encoded =
-        @Carriers.own Θ.toCarriers source params encoded := fun encoded => by rw [ownRow]
-  rw [@NTy.holds_struct Θ.toCarriers, row]
+  rw [@NTy.holds_struct Θ.toCarriers, ownAtInstanceRow Θ params (source := source) ownRow]
   exact and_congr_left' (Carriers.own_bridge sameCarrier sameFunctions sameNominals Θ params
     inhabitable bounded holds installed caller value agree)
 
@@ -157,10 +161,7 @@ theorem NTy.holds_enum_bridge {source : StructHandle} {arguments : NRow} {names 
         (.enum source (NRow.subst params arguments) names (NRows.subst params rows) distinct)
         value ↔
       caller value ∧ @variantCarrier.Holds Θ.toCarriers names (NRows.subst params rows) value := by
-  have row : ∀ encoded : RuntimeValue,
-      @Carriers.own Θ.toCarriers source (NRow.subst params arguments) encoded =
-        @Carriers.own Θ.toCarriers source params encoded := fun encoded => by rw [ownRow]
-  rw [@NTy.holds_enum Θ.toCarriers, row]
+  rw [@NTy.holds_enum Θ.toCarriers, ownAtInstanceRow Θ params (source := source) ownRow]
   exact and_congr_left' (Carriers.own_bridge sameCarrier sameFunctions sameNominals Θ params
     inhabitable bounded holds installed caller value agree)
 
@@ -316,8 +317,7 @@ clause agree under the same marker where they agree. -/
 theorem _root_.VerexIR.Proofs.Obligation.congr {file : String} {startByte endByte : Nat}
     {p q : Prop} (same : p ↔ q) :
     VerexIR.Proofs.Obligation file startByte endByte p ↔
-      VerexIR.Proofs.Obligation file startByte endByte q := by
-  unfold VerexIR.Proofs.Obligation
-  exact same
+      VerexIR.Proofs.Obligation file startByte endByte q :=
+  VerexIR.Proofs.Obligation_iff.trans (same.trans VerexIR.Proofs.Obligation_iff.symm)
 
 end VerexIR.Proofs.Denote

@@ -1,0 +1,82 @@
+# Copyright © Aptos Foundation
+# SPDX-License-Identifier: Apache-2.0
+#
+# The pinned verification costs of prover-smoke (scripts/prover-smoke.sh), in
+# heartbeats of the interpreted elaboration (`lake env lean`); a native
+# executable counts differently and is not compared with these. A fixture
+# named here is elaborated with a stage log, which records the heartbeats of
+# each verified target.
+#
+#   pin   <fixture source> <module::target> <heartbeats>
+#   ratio <fixture source> <module::target> <module::target> <quotient>
+#
+# A target is one record of the log: a target of a module that is verified
+# where it is elaborated is `<module>::<target>`, a target of a `verify`
+# command has no module in the log and is `::<target>`. No pin is a sum: two
+# verified records of one name in a file fail the pin, so a pinned target
+# has a name of its own in its file. A pinned target may hold spaces; the
+# two targets of a ratio may not.
+#
+# A measured cost or quotient may differ from its pin by the margin of
+# scripts/prover-smoke.sh (COST_MARGIN, 5%) in either direction. Two
+# elaborations of one build differed by at most 0.05% on every target below.
+# An `initialize` added at one place of the solver's base shifted target
+# costs by up to 1.7%; an inert `def` at the top of the same file did not;
+# the two interventions differ and the cause is unresolved. The margin is
+# what has been observed to leave room for, not a bound: it can alarm falsely.
+# Costs complement the fixtures' own expectations and replace none of them.
+# A cost under its pin fails too, so that a pin stays where the cost is; that
+# is neither a defect nor a reason to re-pin by itself, and a pin says
+# nothing of whether the target still proves what it proved: the fixture's
+# own expectation does. prover-smoke never writes this file:
+# `scripts/prover-smoke.sh --costs` prints every measured figure beside its
+# pin, and a pin is changed by hand, with the reason in the commit.
+#
+# What is pinned: targets of tens of millions of heartbeats; a smaller target
+# only with its own measurement beside it. A ratio pairs two sizes of
+# the same verification path, not distinct modes: that reduces what moves
+# both costs together, it does not cancel it. Two sizes detect a chosen
+# regression; they bound no complexity. Each ratio line says what it
+# observes.
+
+# The OrderedMap benchmark: the authored generic bodies and the two largest
+# scenarios.
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::add 88008095
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::remove 67906876
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::borrow 42320704
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::lower_bound_loop 47732831
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::lookup_scenario 109881098
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::remove_edges_scenario 185951383
+# Relative cost, not a size pair: three insertions and a borrow of a present
+# key against one insertion and a membership test of an absent key.
+ratio ../bench/lean/OrderedMap.lean «0x42».ordered_map::lookup_scenario «0x42».ordered_map::absent_lookup_scenario 2.656
+# Relative cost, not a size pair: three insertions, two removals and a borrow
+# against three insertions, one removal and a membership test.
+ratio ../bench/lean/OrderedMap.lean «0x42».ordered_map::remove_edges_scenario «0x42».ordered_map::remove_scenario 1.264
+
+# A size pair: the same closure target in a module of three sites and in one
+# of nine. The cost of the target does not grow with the sites of its module,
+# so the quotient stays at one; the targets themselves are small and carry no
+# pin of their own.
+ratio VerexE2ETests/Check/Closures/KnownSiteCost.lean «0x9b».nine_sites::generic «0x9a».three_sites::generic 1.000
+
+# Quicksort: the authored partition loop over array lemmas, and the recursion.
+pin   VerexE2ETests/Check/Examples/Quicksort.lean «0x42».quicksort::partition 139241273
+pin   VerexE2ETests/Check/Examples/Quicksort.lean «0x42».quicksort::quick_sort_range 75734391
+
+# A table's invariant at an instance row, and read through a nested table.
+# The first is under ten million: it is pinned because its two elaborations
+# differed by 0.001% and an unrelated definition at the top of the solver's
+# base moved it by 0.03%.
+pin   VerexSL/Tests/Shapes/TableRows.lean ::row_instance_ok 9763110
+pin   VerexSL/Tests/Shapes/TableRows.lean ::row_nested_ok 20476270
+
+# Two map calls with an optional result, in each representation: the cost of
+# the call-contract stages.
+pin   VerexSL/Tests/Shapes/Enums.lean ::enum_replaced_ok 22224320
+pin   VerexSL/Tests/Shapes/Enums.lean ::vector_replaced_ok 33613040
+
+# A size pair: three and six insertions of distinct keys into a fresh map.
+pin   VerexSL/Tests/Cost/MapScaling.lean ::three 45853819
+pin   VerexSL/Tests/Cost/MapScaling.lean ::six 93729935
+ratio VerexSL/Tests/Cost/MapScaling.lean ::six ::three 2.044

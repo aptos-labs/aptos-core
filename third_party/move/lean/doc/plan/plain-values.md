@@ -30,7 +30,7 @@ The work is done when all four hold.
 
 1. **Completeness as before the carriers.** Every target that verified at the
    reference verifies. The four Lean suites, the Move Prover's lean gate and
-   the smoke suite pass. A recorded baseline differs from the reference's
+   prover-smoke pass. A recorded baseline differs from the reference's
    only where the expectation ledger names the reason.
 2. **Cost as before the carriers, target by target.** No target of the
    reference costs more than it did, except where a later feature is named as
@@ -673,7 +673,7 @@ before advancing to the next part and before running the full gate:
 Then two gates, kept apart because they answer different questions.
 
 **G2a, semantic acceptance.** The tree is plain and correct:
-- the four suites, the smoke suite and the Move Prover's lean gate pass, with
+- the four suites, prover-smoke and the Move Prover's lean gate pass, with
   the ledger;
 - every row postponed at G1 is back, or goes to the user with its cause — in
   particular, on the `find_entry` pair (`SourceVerify/library_iter_adapters` and

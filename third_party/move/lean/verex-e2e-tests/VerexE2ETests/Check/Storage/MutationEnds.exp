@@ -38,7 +38,7 @@ VerexE2ETests/Check/Storage/MutationEnds.lean:75:6: error: verex verification fa
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/Check/Storage/MutationEnds.lean:34:4: error: the specification clause `invariant count > 0` is not established
+VerexE2ETests/Check/Storage/MutationEnds.lean:34:4: error: the data invariant `invariant count > 0` does not hold where a mutable parameter's loan ends, at the function's exit
 VerexE2ETests/Check/Storage/MutationEnds.lean:105:6: error: verex verification failed: the automatic verification of `set_zero` failed; provide a proof in the module:
   verify set_zero by lean =>
     verex_obligations

@@ -365,7 +365,10 @@ frame states the same for the slots its body changes.
   function value carries it in the behavioural stored invariant. It is stated
   once and the method contract of a trait method reads the same statement.
   It is not part of `NTy.Holds`, which stays `True` at a function value, and
-  it is not stated for a result type without invariants.
+  it is not stated for a result type without invariants. A function with
+  a body under `pragma verify = false` assumes it as a verified one does: the
+  pragma turns off the proof of the body, not this assumption, and a caller
+  that passes a named function proves the fact from that function's theorem.
 - A call the walk inlines: there is no boundary, the facts remain, and the
   hand-over check stays (section 3).
 - An exit proves the validity of its results, which is unconditional

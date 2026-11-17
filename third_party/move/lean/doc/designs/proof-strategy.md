@@ -106,7 +106,7 @@ more than checking it ([`performance.md`](performance.md)).
 
 ## Measurement
 
-Focused targets and `scripts/smoke.sh` between edit batches; the full gates
+Focused targets and `scripts/prover-smoke.sh` between edit batches; the full gates
 at checkpoints. Do not sum nested `verex.solverDebug` stage lines; use the
 solver's summary and native target totals. Lowering a cap only affects
 attempts that reach it. Methods and levers: [`performance.md`](performance.md).

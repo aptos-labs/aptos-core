@@ -69,7 +69,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:27:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:30:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:51:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+  from: (panic_macros_errors.unit.nominal.namespace.1.declaration✝²⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false)).Holds value; variant✝ value = "None"
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:30:6: error: verex verification failed: the automatic verification of `expect_option` failed; provide a proof in the module:
   verify expect_option by lean =>
     verex_obligations
@@ -78,7 +78,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:30:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:33:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:55:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+  from: (panic_macros_errors.unit.nominal.namespace.1.declaration✝²⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false)).Holds value; variant✝ value = "None"
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:33:6: error: verex verification failed: the automatic verification of `unwrap_option` failed; provide a proof in the module:
   verify unwrap_option by lean =>
     verex_obligations
@@ -87,7 +87,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:33:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:36:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:59:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "Err"
+  from: (panic_macros_errors.unit.nominal.namespace.1.declaration✝³⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NTy.int 64 false)).Holds value; variant✝ value = "Err"
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:36:6: error: verex verification failed: the automatic verification of `expect_result` failed; provide a proof in the module:
   verify expect_result by lean =>
     verex_obligations
@@ -96,7 +96,7 @@ VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:36:6: error: verex veri
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:39:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/panic_macros_errors.rs:63:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["Ok", "Err"] (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "Err"
+  from: (panic_macros_errors.unit.nominal.namespace.1.declaration✝³⁻⁰ (VerexIR.Proofs.Denote.NTy.int 64 false) (VerexIR.Proofs.Denote.NTy.int 64 false)).Holds value; variant✝ value = "Err"
 VerexE2ETests/SourceVerify/panic_macros_errors.spec.lean:39:6: error: verex verification failed: the automatic verification of `unwrap_result` failed; provide a proof in the module:
   verify unwrap_result by lean =>
     verex_obligations

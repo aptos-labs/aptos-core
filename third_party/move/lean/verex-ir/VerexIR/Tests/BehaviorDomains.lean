@@ -330,6 +330,46 @@ theorem frameOf_silent_on_invalid_results (invoke : InvokeMeaning)
     FramedAtOf invoke parameters shared shape (fun _ _ _ => False) function :=
   fun _ result _ _ _ validResult _ _ => (invalid result validResult).elim
 
+omit [Skolems unit] in
+/-- A value that keeps memory over a model's meaning at the outer frame
+keeps it at the frame a call's type arguments induce, by the meaning's
+coherence alone (`FramedAtOf.of_instantiate`): the obligation a generic
+callee's contract states of a function argument is the one its monomorphic
+caller holds. `KeepsMemoryAtOf` is the frame that keeps memory, so it
+transports by the frame rule itself. -/
+theorem keepsMemoryOf_at_induced_frame
+    {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
+    (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
+    (free : θ.1.refFree = true)
+    {value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (kept : @KeepsMemoryAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared
+      (shape.subst θ.1) (shape.functionOfSkolem θ parameters shared value)) :
+    @KeepsMemoryAtOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ))
+      parameters shared shape value :=
+  FramedAtOf.of_instantiate coherent Θ θ free kept
+
+omit [Skolems unit] in
+/-- An application of the law does not close the induced-frame goal from the
+assumptions at hand when the coherence is not among them: the premise has
+nothing to take it from. The goal is also given, so this says nothing about
+whether the conclusion could follow some other way; and it is about the law,
+not about the step that applies it, which is controlled in
+`VerexIR/Tests/ModelFramePeel.lean`. -/
+theorem induced_frame_needs_coherence (Θ : Skolems unit) (θ : TypeArgs)
+    (_free : θ.1.refFree = true)
+    {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
+    {value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (_kept : @KeepsMemoryAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared
+      (shape.subst θ.1) (shape.functionOfSkolem θ parameters shared value))
+    (given : @KeepsMemoryAtOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ))
+      parameters shared shape value) :
+    @KeepsMemoryAtOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ))
+      parameters shared shape value := by
+  fail_if_success (apply FramedAtOf.of_instantiate <;> assumption)
+  exact given
+
 /-- At a run on valid arguments of a value whose results are valid, the
 frame is the run's. -/
 theorem frame_at_valid_run {frame : HList parameters → Memory unit → Memory unit → Prop}
@@ -378,6 +418,8 @@ elab "#standard_axioms " names:ident+ : command => do
   labels_read_valid_run
   frame_silent_on_invalid_results
   frameOf_silent_on_invalid_results
+  keepsMemoryOf_at_induced_frame
+  induced_frame_needs_coherence
   frame_at_valid_run
   VerexIR.Proofs.FramedAt.at_run
   VerexIR.Proofs.FramedAt.mono
@@ -399,5 +441,6 @@ elab "#standard_axioms " names:ident+ : command => do
   VerexIR.Proofs.FramedAt.ofBody
   VerexIR.Proofs.FramedAt.of_instantiate
   VerexIR.Proofs.FramedAtOf.ofRouted
+  VerexIR.Proofs.FramedAtOf.of_instantiate
 
 end VerexIR.Tests.BehaviorDomains

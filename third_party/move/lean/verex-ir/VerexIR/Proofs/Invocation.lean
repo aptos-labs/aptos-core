@@ -2061,6 +2061,36 @@ theorem FramedAtOf.ofRouted {invoke : InvokeMeaning} {full captured supplied : N
   rw [routes] at run
   exact (kept args pre valid memoryTyped).1 result post run
 
+omit [Skolems unit] in
+/-- A frame over a meaning at the frame a call's type arguments induce holds
+of a function value where the frame read in the outer view does at the outer
+frame: invoking the value at the induced frame is invoking it at the outer
+frame on the arguments read there, the result carried back
+(`InvokeMeaning.Coherent`), as it is for the behavioral predicates
+(`ensuresOf_instantiate`). The model's counterpart of
+`FramedAt.of_instantiate`; `KeepsMemoryAtOf` is the frame that keeps memory,
+so it transports by the same rule. -/
+theorem FramedAtOf.of_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
+    (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
+    (free : θ.1.refFree = true) {parameters : NRow} {shared : Sharing} {shape : ResultShape}
+    {frame : @HList (Skolems.instantiate θ Θ).toCarriers parameters → Memory unit → Memory unit →
+      Prop}
+    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+      (.function parameters shared shape.row)}
+    (framed : @FramedAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
+      (fun args => frame (HList.toSkolem θ parameters args))
+      (shape.functionOfSkolem θ parameters shared function)) :
+    @FramedAtOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) parameters
+      shared shape frame function := by
+  intro args result pre post valid validResult typed run
+  rw [coherent Θ θ free parameters shared shape function args] at run
+  simp only [Spec.bind_ok, Spec.pure_ok] at run
+  obtain ⟨value, middle, ran, rfl, rfl⟩ := run
+  have := framed (HList.ofSkolem θ parameters args) value pre _
+    ((HList.holds_ofSkolem_iff θ parameters args).mpr valid)
+    ((ResultShape.holds_toSkolem_iff θ shape value).mp validResult) typed ran
+  simpa only [HList.toSkolem_ofSkolem] using this
+
 /-- An invocation of a function value the proof does not see, over a
 meaning, on valid arguments: defined by hypothesis, its runs and aborts
 stated by the behavioral predicates. -/

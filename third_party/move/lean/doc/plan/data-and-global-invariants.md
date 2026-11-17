@@ -240,9 +240,9 @@ still singles these clauses out.
 
 **What is missing.** `no_violation` is rejected although it breaks nothing.
 
-**Why it matters.** It is a Move Prover fixture in the smoke set
-(`scripts/smoke.sh`), so the false alarm is in front of everyone who runs the
-smoke suite, and it is the measured cost of a deliberate over-approximation.
+**Why it matters.** It is a Move Prover fixture of the lean gate, so the
+false alarm is in front of everyone who runs the gate, and it is the measured
+cost of a deliberate over-approximation.
 
 **What is known.** A holder resolves once per loan death, and every loan fact
 naming the holder is treated as a possible origin (`holderResolves`,

@@ -4207,6 +4207,9 @@ theorem HList.holds_nil (values : HList .nil) :
 theorem HList.holds_cons (τ : NTy) (rest : NRow) (values : HList (.cons τ rest)) :
     HList.Holds (.cons τ rest) values =
       (NTy.Holds τ values.1 ∧ HList.Holds rest values.2) := rfl
+theorem HList.holds_cons_mk (τ : NTy) (rest : NRow) (head : τ.carrier) (tail : HList rest) :
+    HList.Holds (.cons τ rest) (head, tail) =
+      (NTy.Holds τ head ∧ HList.Holds rest tail) := rfl
 
 theorem variantCarrier.holds_inl (name : String) (names : List String) (fields : NRow)
     (rest : NRows) (values : HList fields) :

@@ -1,5 +1,4 @@
 VerexE2ETests/SourceVerify/proof_stored_clauses_errors.proof.lean:11:13: error: the witness's premise is not established:
-  verexInhabitants : Proofs.Denote.CarriersNonempty (Proofs.Denote.Carriers.runtime unit)
   account : Proofs.Denote.NTy.signer.carrier
   half small : (Proofs.Denote.NTy.int 64 false).carrier
   initialState✝ : Proofs.Denote.Memory unit

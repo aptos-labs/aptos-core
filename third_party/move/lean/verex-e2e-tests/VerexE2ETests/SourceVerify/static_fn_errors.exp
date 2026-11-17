@@ -1,5 +1,3 @@
-VerexE2ETests/SourceVerify/static_fn_errors.rs:4:1: info: `apply` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
-VerexE2ETests/SourceVerify/static_fn_errors.rs:4:1: info: `forward` uses concrete verification: Given interpretation does not yet support behavioral contract interpretation
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:18:3: error: the specification clause `ensures result == value` is not established
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:17:6: error: verex verification failed: the automatic verification of `scalar` failed; provide a proof in the module:
   verify scalar by lean =>
@@ -16,7 +14,6 @@ VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:26:6: error: verex verific
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/SourceVerify/static_fn_errors.rs:4:1: info: `two` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:47:3: error: the specification clause `ensures result == value` is not established
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:46:6: error: verex verification failed: the automatic verification of `multiple` failed; provide a proof in the module:
   verify multiple by lean =>
@@ -25,9 +22,8 @@ VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:46:6: error: verex verific
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/SourceVerify/static_fn_errors.rs:4:1: info: `apply_unit` uses concrete verification: Given interpretation does not yet support recursive or function-value call interpretation
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:54:3: error: `no panic when aborts at op 1` is not established: the operation `value + x` at VerexE2ETests/SourceVerify/static_fn_errors.rs:43:34 may panic
-  from: (VerexIR.Proofs.Denote.NTy.struct { namespaceId := { index := 0 }, structId := 5 } VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 64 false) VerexIR.Proofs.Denote.NRow.nil)).deepHolds (self_value, PUnit.unit); ¬(0 ≤ self_value.val + x.val ∧ self_value.val + x.val ≤ 18446744073709551615)
+  from: ¬(0 ≤ self_value.val + x.val ∧ self_value.val + x.val ≤ 18446744073709551615)
 VerexE2ETests/SourceVerify/static_fn_errors.spec.lean:54:8: error: verex verification failed: the automatic verification of `panicking::{closure#0}::call` failed; provide a proof in the module:
   verify «panicking::{closure#0}»::call by lean =>
     verex_obligations

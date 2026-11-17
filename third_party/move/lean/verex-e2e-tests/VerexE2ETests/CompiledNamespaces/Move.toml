@@ -1,8 +1,11 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 #
-# A package verified over compiled namespaces (`scripts/smoke.sh`): `client`
-# imports `base`, and a clause of `base` fails where `client` inlines it.
+# A package verified over compiled namespaces by
+# `scripts/verify-compiled-namespaces.sh`, which the gate runs: it drives
+# `scripts/verify-modules.py VerexE2ETests/CompiledNamespaces --modules
+# fixture::client` and compares the report with `client.exp`. `client` imports
+# `base`, and a clause of `base` fails where `client` inlines it.
 
 [package]
 name = "CompiledNamespaces"

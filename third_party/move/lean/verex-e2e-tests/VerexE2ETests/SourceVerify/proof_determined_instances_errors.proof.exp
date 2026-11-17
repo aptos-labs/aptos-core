@@ -7,20 +7,22 @@ VerexE2ETests/SourceVerify/proof_determined_instances_errors.proof.lean:11:5: er
     ∀ (j : Int),
       1 ≤ j →
         j < ↑v.values.size →
-          v.values[(j - 1).toNat]?.getD { val := 0, fits := ⋯ } < v.values[j.toNat]?.getD { val := 0, fits := ⋯ }
+          v.values[(j - 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) <
+            v.values[j.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯)
   permitted_2 : k < ↑v.values.size
   bounds : v.values.size < 2 ^ 64
   k_lower : 0 ≤ k
   k_upper : k ≤ 2 ^ 64 - 1
-  left✝¹ : 0 ≤ v.values[k.toNat]?.getD { val := 0, fits := ⋯ }
-  right✝¹ : v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ 64 - 1
-  left✝ : 0 ≤ v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ }
-  right✝ : v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ 64 - 1
+  left✝¹ : 0 ≤ v.values[k.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯)
+  right✝¹ : v.values[k.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ≤ 2 ^ 64 - 1
+  left✝ : 0 ≤ v.values[(k + 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯)
+  right✝ : v.values[(k + 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ≤ 2 ^ 64 - 1
   read_bounds_0 :
-    0 ≤ v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ∧
-      v.values[k.toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ (63 + 1) - 1
+    0 ≤ v.values[k.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ∧
+      v.values[k.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ≤ 2 ^ (63 + 1) - 1
   read_bounds_1 :
-    0 ≤ v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ∧
-      v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ } ≤ 2 ^ (63 + 1) - 1
-  ⊢ v.values[k.toNat]?.getD { val := 0, fits := ⋯ } < v.values[(k + 1).toNat]?.getD { val := 0, fits := ⋯ }
+    0 ≤ v.values[(k + 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ∧
+      v.values[(k + 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) ≤ 2 ^ (63 + 1) - 1
+  ⊢ v.values[k.toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯) <
+      v.values[(k + 1).toNat]?.getD ((Proofs.Denote.NTy.int 64 false).plainFallback ⋯)
 VerexE2ETests/SourceVerify/proof_determined_instances_errors.proof.lean:9:8: error: verex verification failed: the proof of `not_an_instance` does not establish its specification

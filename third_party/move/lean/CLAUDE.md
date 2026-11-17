@@ -72,6 +72,19 @@ are the test matrix:
 (cd verex-e2e-tests && lake build && lake test)
 ```
 
+One check of the gate is in no suite, because no suite verifies a Move package
+over compiled namespaces: `scripts/verify-compiled-namespaces.sh` renders and
+compiles the namespaces of `verex-e2e-tests/VerexE2ETests/CompiledNamespaces`
+and compares the report of `fixture::client` with the package's `client.exp`
+(about 20 s with `verex-move` built; it needs the Move CLI and never writes the
+baseline). The fixture is a negative, so a matching report is not by itself a
+pass: the run must also end with the status its reported errors give, its
+`--json` result must name that one module ended with those errors, with no
+timeout, crash or namespace that did not compile, and nothing it wrote may hold
+a `PANIC`; `--self-test` checks that verdict against stub runs. The step that
+runs it beside the four suites in `.github/workflows/lean.yaml` lands with the
+script.
+
 Run downstream suites when changing a shared boundary:
 
 | Changed area | Minimum relevant verification |
@@ -122,15 +135,23 @@ under `target/tmp`, so a concurrent Lake build cannot change what a test loads,
 and a harness failure of the verifier is never written as a baseline; see
 `doc/designs/source-verification.md` ("From the Move Prover").
 
-### Between turns: the smoke suite
+### Between turns: prover-smoke
 
-Between edit batches, run `scripts/smoke.sh`, described in
+Between edit batches of the prover (kernel laws, solver, specification
+layer), run `scripts/prover-smoke.sh`, described in
 [`.cursor/skills/verex-smoke/SKILL.md`](../../../.cursor/skills/verex-smoke/SKILL.md):
-it builds in place and runs the fixtures that catch this stack's regressions,
-read-only against their `.exp`, and refuses `UB=1`. `--rust` runs the Rust path
-instead, `--no-exe` skips the executable and the two items needing it. Green
-smoke is not the commit gate; the four suites and the Move Prover's lean gate
-are.
+it builds the libraries in place and elaborates small VerexSL fixtures with
+them alone (the shape matrix, control modules, check fixtures, a few rendered
+source fixtures and a performance tier with pinned heartbeat costs), read-only
+against their expectations and pins, and refuses `UB=1`. It runs no frontend:
+no executable, no Move CLI, no cargo, no e2e driver.
+[`scripts/prover-smoke-coverage.md`](scripts/prover-smoke-coverage.md) says
+what each fixture stands for and what is not covered. Green prover-smoke is
+not evidence for a frontend change and is not the commit gate; the four
+suites, the e2e sweeps and the Move Prover's lean gate are, and the gate also
+runs `scripts/prover-smoke-renderings.sh`, which tells a rendered fixture the
+frontends no longer produce, and `scripts/verify-compiled-namespaces.sh`, the
+package verified over compiled namespaces.
 
 The commit gate is run once on the tree to be committed, not between fixes: a
 fix made after it started is not in its result. A gate's table is taken from
@@ -142,8 +163,7 @@ While iterating, build libraries, not executables: `lake build` in `verex-ir`,
 and `lake build VerexE2ETests` in `verex-e2e-tests`. The default targets of
 `verex-move` and `verex-e2e-tests` also build the
 `verex-move` executable and the e2e driver, whose C compilation and linking the
-Lean fixtures do not need (10–30 s after an edit of one part of the solver). The
-smoke suite builds the executable beside its Lean fixtures. To verify a Move
+Lean fixtures do not need (10–30 s after an edit of one part of the solver). To verify a Move
 package while iterating,
 `scripts/verify-modules.py <package> [--filter <part>]` runs one `verex-move
 verify` process per module, several at a time.

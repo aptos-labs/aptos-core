@@ -11,7 +11,7 @@ Run by `lake test`. `--verbose` prints a line per function; a directory argument
 checks its fixtures instead of the suite's. With `--strict`, every selected fixture
 must execute conclusively without unchecked or refused functions.
 `VEREX_DIFFERENTIAL=smoke` runs the most
-telling boundary values only, for the smoke suite.
+telling boundary values only, for a quick run.
 -/
 
 open VerexIR.Rust.Tests.Differential

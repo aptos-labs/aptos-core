@@ -254,15 +254,6 @@ theorem Skolems.resolve_atArguments {unit : Validation.ValidatedUnit}
   generalize params.argument index = entry
   cases entry <;> first | rfl | exact NTy.unmark_unmark _
 
-/-- The instance row of a declaration's own parameters substitutes a type over
-them to itself, so the general resolution reads as it did. -/
-theorem Skolems.resolve_atArguments_params {unit : Validation.ValidatedUnit}
-    {functions : FunctionCarriers unit}
-    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy}
-    (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
-    τ.subst (params.map Θ.resolve) = Θ.resolve τ := by
-  rw [Θ.resolve_atArguments params bounded, NTy.subst_params own bounded]
-
 private theorem runtimeCarrier_with_own {unit : Validation.ValidatedUnit}
     {functions base : FunctionCarriers unit}
     (sameCarrier : functions.carrier = base.carrier)
@@ -297,19 +288,6 @@ private theorem runtimeEncode_with_own {unit : Validation.ValidatedUnit}
   runtimeEncode_eq_of_eq
     (FunctionCarriers.eq_with_own functions base sameCarrier sameFunctions sameNominals)
     ρ _ v
-
-theorem Skolems.runtimeCarrierEq {unit : Validation.ValidatedUnit}
-    {functions base : FunctionCarriers unit}
-    (sameCarrier : functions.carrier = base.carrier)
-    (sameFunctions : HEq functions.functions base.functions)
-    (sameNominals : functions.nominals = base.nominals)
-    (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true)
-    {τ : NTy} (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :
-    @NTy.carrier (@Carriers.runtime unit functions) (Θ.resolve τ) =
-      @NTy.carrier (@Carriers.runtime unit base) (τ.subst (params.map Θ.resolve)) :=
-  (runtimeCarrier_with_own sameCarrier sameFunctions sameNominals (Θ.resolve τ)).trans
-    (congrArg (@NTy.carrier (@Carriers.runtime unit base))
-      (Skolems.resolve_atArguments_params Θ own bounded).symm)
 
 /-- The carriers of a type over a declaration's parameters at an instance row:
 what the frame reads the instance as, and what the frame the row's resolutions

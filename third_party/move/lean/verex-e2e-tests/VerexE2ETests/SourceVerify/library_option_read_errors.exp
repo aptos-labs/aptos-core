@@ -1,5 +1,5 @@
 VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:4:1: error: `no panic when aborts at call 1 of expect` is not established: the call `value.expect("a value")` at VerexE2ETests/SourceVerify/library_option_read_errors.rs:5:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+  from: (library_option_read_errors.unit.nominal.namespace.1.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 32 false)).Holds value; variant✝ value = "None"
 VerexE2ETests/SourceVerify/library_option_read_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `or_panic` failed; provide a proof in the module:
   verify or_panic by lean =>
     verex_obligations

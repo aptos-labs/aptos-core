@@ -34,11 +34,17 @@ private def identifierPart (name : String) : String :=
   let last := (name.splitOn "::").getLast?.getD name
   String.map (fun c => if c.isAlphanum then c else '_') last
 
-/-- The key a leaf's origin gives it, where no clause names it. -/
-private def Provenance.key : Provenance → ObligationKey
+/-- The key a leaf's origin gives it, where no clause names it.  A control
+reads it to check what an origin's key does and does not carry
+(`VerexIR/Tests/UnseenArgumentValidity.lean`). -/
+def Provenance.key : Provenance → ObligationKey
   | .precondition callee call => { kind := "requires", callee := identifierPart callee, call }
   | .callArgument callee call position =>
       { kind := "argument", index := some position, callee := identifierPart callee, call }
+  -- The value an invocation reads is named for the message, never for the
+  -- key: a rendering is no identifier a proof selects an obligation by.
+  | .invocationArgument _ call position =>
+      { kind := "argument", index := some position, call }
   | .continuation callee call => { kind := "after", callee := identifierPart callee, call }
   | .loopEntry loop => { kind := "invariant", phase := "entry", loop }
   | .loopIteration loop => { kind := "invariant", phase := "step", loop }
@@ -101,7 +107,7 @@ private def routedInvariantKey (routed : Array ObligationKey) (name : String) : 
 /-- A leaf's key: the clause it owes, as `names` names the function's
 clauses and its callees', at entry or after an iteration for a loop
 invariant, at the call for a callee's precondition; else its origin. -/
-private def leafKey (goal : MVarId) (provenance : Option Provenance)
+def leafKey (goal : MVarId) (provenance : Option Provenance)
     (clauses : Array ObligationRange) (names : Array (ObligationRange × String)) :
     MetaM ObligationKey := goal.withContext do
   let target ← instantiateMVars (← goal.getType)
@@ -124,6 +130,8 @@ private def leafKey (goal : MVarId) (provenance : Option Provenance)
     -- names.
     | some (.callArgument callee call position), _ =>
         (Provenance.callArgument callee call position).key
+    | some (.invocationArgument value call position), _ =>
+        (Provenance.invocationArgument value call position).key
     | some (.loopEntry loop), some name => { clauseKey name with phase := "entry", loop }
     | some (.loopIteration loop), some name => { clauseKey name with phase := "step", loop }
     | _, some name => clauseKey name
@@ -175,23 +183,25 @@ private def pathKeys (goal : MVarId) (provenance : Option Provenance)
 
 /-- Restore the context-dependent caches along with a failed automatic
 attempt. Measurements and budget debits deliberately survive rollback. -/
-private def runAutomatic (ledger : IO.Ref SharedBudgets.Ledger)
+def runAutomatic (ledger : IO.Ref SharedBudgets.Ledger)
     (owners : Array SharedBudgets.OwnerId) (work : SharedBudgets.Work)
     (action : TacticM α) (cacheOwners : Option (Array SharedBudgets.OwnerId) := none) :
     TacticM (SharedBudgets.Outcome α × Nat) := do
   let restore ← IO.mkRef (pure () : IO Unit)
+  -- The commit is read where the restore runs, which a `let mut` of this
+  -- block does not reach.
+  let committed ← IO.mkRef false
   let previousOwners ← (← targetState).preparationOwners.get
-  let mut committed := false
   try
     (← targetState).preparationOwners.set (cacheOwners.getD owners)
     let result ← SharedBudgets.run ledger owners work do
       restore.set (← saveWalkCaches)
       action
-    if let .done _ := result.1 then committed := true
+    if let .done _ := result.1 then committed.set true
     return result
   finally
     (← targetState).preparationOwners.set previousOwners
-    unless committed do (← restore.get)
+    unless ← committed.get do (← restore.get)
 
 private def countWoken : MetaM Unit :=
   countStructure fun counts => { counts with woken := counts.woken + 1 }
@@ -2281,8 +2291,24 @@ private def withTargetClause (goal : MVarId) (clauses : Array ObligationRange) :
     | some range => if clauses.contains range then clauses else clauses.push range
     | none => clauses
 
-/-- The scalar, closure and invocation steps, each a rule of its own. -/
-private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
+/-- The atoms of a call's or an invocation's argument validity, each opened
+to the invariants it reads and annotated with the origin of the argument it
+belongs to (`openFoldedInvariant`).  What queues them is the scheduler each
+caller has, under the policy that caller already follows. -/
+private def annotatedValidityResiduals (ctx : SolveContext)
+    (atoms : Array (Option Provenance × MVarId)) :
+    SolveM (Array (MVarId × Option Provenance)) := do
+  let mut residuals : Array (MVarId × Option Provenance) := #[]
+  for (origin, atom) in atoms do
+    match ← openFoldedInvariant ctx atom with
+    | some opened => residuals := residuals ++ opened.toArray.map (·, origin)
+    | none => residuals := residuals.push (atom, origin)
+  return residuals
+
+/-- The scalar, closure and invocation steps, each a rule of its own.  A
+control runs this step and reads what it queues
+(`VerexIR/Tests/InvocationResidualScheduling.lean`). -/
+def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
   let { goal, provenance, clauses, stageStart, .. } := step
   if ← scalarAt? (← contextFacts goal) goal then
     charge "scalar rows" stageStart
@@ -2323,8 +2349,21 @@ private def invocationSteps (ctx : SolveContext) (step : SolveStep) : SolveM Boo
     queue (← getGoals) provenance clauses
     charge "invoke" stageStart
     return true
-  if let some remaining ← unseenInvocation? goal then
-    setGoals remaining
+  if let some invocation ← unseenInvocation? goal then
+    -- The arguments' validity the rule owes: each atom opened to the
+    -- invariants it reads and queued under the argument it belongs to
+    -- (`annotatedValidityResiduals`, `Provenance.invocationArgument`). The
+    -- owners and the clause ranges the step inherited are the ones the
+    -- invocation's own goals keep, so an argument and what follows the
+    -- invocation share one allowance, as they did when one queue took them
+    -- both. They are scheduled before the invocation's own goals are.
+    unless invocation.owed.isEmpty do
+      let call := ctx.callNumber step.callSite
+      let atoms := invocation.owed.map fun (position, atom) =>
+        (some (Provenance.invocationArgument invocation.value call (position + 1)), atom)
+      for (residual, origin) in ← annotatedValidityResiduals ctx atoms do
+        queue [residual] origin clauses
+    setGoals invocation.continuations
     evalTactic (← `(tactic|
       all_goals (try dsimp only [VerexIR.Proofs.Denote.ResultShape.row] at *)))
     evalTactic (← `(tactic|
@@ -2658,14 +2697,11 @@ residuals of the call are one child set, split once from the budget the step
 inherited. -/
 private def consumeArgumentValidity (ctx : SolveContext) (owed : List MVarId)
     (calleeName : String) (call : Option Nat) : SolveM Unit := do
-  let mut residuals : Array (MVarId × Option Provenance) := #[]
+  let mut atoms : Array (Option Provenance × MVarId) := #[]
   for goal in owed do
     for (position, atom) in ← argumentValidityGoals goal 0 #[] do
-      let origin := some (Provenance.callArgument calleeName call (position + 1))
-      match ← openFoldedInvariant ctx atom with
-      | some opened => residuals := residuals ++ opened.toArray.map (·, origin)
-      | none => residuals := residuals.push (atom, origin)
-  queueOpenedResiduals ctx residuals.toList #[] false
+      atoms := atoms.push (some (Provenance.callArgument calleeName call (position + 1)), atom)
+  queueOpenedResiduals ctx (← annotatedValidityResiduals ctx atoms).toList #[] false
 
 /-- The conditions of a contract the call rules take as equations: those of
 `wp_call_equations_valid` in its order; `wp_call_normal_valid_eq` takes all but the
@@ -3222,7 +3258,7 @@ owe, with no clause of its own. -/
 private def summaryStates (provenance : Option Provenance) (clauses : Array ObligationRange) : Bool :=
   clauses.isEmpty &&
     (provenance matches none | some .returns | some (.continuation ..) | some (.precondition ..) |
-      some (.callArgument ..))
+      some (.callArgument ..) | some (.invocationArgument ..))
 
 /-- The leading binders of a goal, `∀` and `let`. -/
 private partial def leadingBinders : Lean.Expr → Nat
@@ -3799,7 +3835,7 @@ private def splitStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := d
 has no theorem and its abort by its body where the proof inlines it, its
 behavior by its target's theorem, then `solveLeaf`, or, with `handOver`,
 the leaf of an authored proof, named by what it owes (`leafName`). -/
-private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Option MVarId) := do
+def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Option MVarId) := do
   let pins ← sharedPins
   withSharedPinsLifted do
   let goal ← substitutePinEquations step.goal pins
@@ -3903,12 +3939,11 @@ private def prepareLeafStep (ctx : SolveContext) (step : SolveStep) : SolveM (Op
   -- The argument validity a behavior rule states is discharged as a call's
   -- is, and what stays open is a residual of the argument it belongs to
   -- (`openValidityGoal`, `Provenance.callArgument`).
-  let owed ← IO.mkRef #[]
-  let dispatched ← dispatchBehavior goal ctx.callees (owed := some owed)
-  let residuals ← owed.get
-  unless residuals.isEmpty do
-    queueOpenedResiduals ctx (residuals.toList.map fun (origin, goal) => (goal, some origin))
+  let dispatch ← dispatchBehavior goal ctx.callees
+  unless dispatch.owed.isEmpty do
+    queueOpenedResiduals ctx (dispatch.owed.toList.map fun (origin, goal) => (goal, some origin))
       clauses false
+  let dispatched := dispatch.continuation
   let now ← IO.getNumHeartbeats
   let costs := #[("terminating facts", terminatingDone - behaviorStart),
     ("result/state rewriting", rewritingDone - terminatingDone),
@@ -3936,7 +3971,8 @@ private def decideLeaf (ctx : SolveContext) (step : SolveStep) : SolveM Unit := 
         {(provenance.map fun p => s!"{p.key.kind} {p.key.callee}").getD "none"}, {clauses.size} clauses"
     -- A callee's precondition and the validity of a call's arguments hold,
     -- or are what its callers owe.
-    if provenance matches some (.precondition ..) | some (.callArgument ..) then
+    if provenance matches some (.precondition ..) | some (.callArgument ..)
+        | some (.invocationArgument ..) then
       let saved ← Tactic.saveState
       let (closed, _) ← solveLeaf ctx.normalization goal provenance clauses #[]
       if closed then return
@@ -4320,7 +4356,8 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   let (goal, clauses) ← match provenance with
     | some (.loopEntry _) | some (.loopIteration _) | some .assertion | some .mutationEnd
     | some .construction | some .publish | some .memoryWritten | some .callReturned
-    | some (.precondition _ _) | some (.callArgument ..) | some (.joinPremise _ _) =>
+    | some (.precondition _ _) | some (.callArgument ..) | some (.invocationArgument ..)
+    | some (.joinPremise _ _) =>
         stripObligations goal clauses
     | _ => pure (goal, clauses)
   let goal ← markPointSites ctx goal
@@ -4403,8 +4440,10 @@ private def advance (ctx : SolveContext) (step : SolveStep) : SolveM (Option Sol
   return some { step with goal }
 
 /-- Tactic and scheduler state commit together. Failed work still debits
-its owners, but cannot retain queued goals or half-built summaries. -/
-private def runOwned (ctx : SolveContext) (owners : Array (List Bool × SharedBudgets.OwnerId))
+its owners, but cannot retain queued goals or half-built summaries.  A
+control runs a leaf step inside this boundary and reads what a failure after
+it restores (`VerexIR/Tests/InvocationResidualScheduling.lean`). -/
+def runOwned (ctx : SolveContext) (owners : Array (List Bool × SharedBudgets.OwnerId))
     (action : SolveM α) : SolveM (SharedBudgets.Outcome α) := do
   if owners.isEmpty then return .done (← action)
   let state ← get
@@ -4700,7 +4739,6 @@ partial def solveGoals (invariants : Array (Nat × Lean.Expr × Lean.Expr))
   (← targetState).fixedPoints.set {}
   (← targetState).dsimpResults.set {}
   (← targetState).fixedPointCounts.set #[0, 0, 0, 0, 0, 0]
-  (← targetState).familyProofs.set {}
   (← targetState).contextRules.set {}
   (← targetState).stageNormalHypotheses.set {}
   (← targetState).familyNormalHypotheses.set {}

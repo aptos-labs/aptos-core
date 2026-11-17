@@ -2744,11 +2744,22 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
       let clauses ← groups.requires.mapM (translate context ·.1)
       mkLambdaFVars #[unitExpr, functions, args, state] (← conjunction clauses)
 
+/-- Whether a function has a body: then a proof of its contract is asked for,
+by the automatic verification or by a `verify` item, and what that proof needs
+of a run it cannot see is the function's own to assume. A function without a
+body stands on the other side of the trust boundary: its contract enters the
+proofs that use it as an explicit `Satisfies` hypothesis, declared and not
+established here (`Verify/Members.lean`, the native contract of a member and
+the acceptance of a bodyless callee). -/
+private def hasBody (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
+    Bool :=
+  declaration.body != .absent
+
 /-- Whether a function's body is verified: it has one, and neither its
 specification nor its module sets `pragma verify = false`. -/
 private def verifiedBody (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) :
     Bool :=
-  declaration.body != .absent &&
+  hasBody declaration &&
     !(declaration.pragmas.any fun
       | .assign "verify" (.constant (.bool false)) _ => true
       | _ => false)
@@ -2773,23 +2784,36 @@ private def directCallees (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return callees
 
+/-- Whether the type `id` stands for carries a data invariant with a
+behavioral predicate `needed` reads. -/
+private def carriesNeededInvariant (unit : ValidatedUnit) (ns : ValidatedNamespace)
+    (needed : SpecReads → Bool) (id : VerexIR.TypeId) : Bool :=
+  match ns.typeOf id with
+  | some (.reference reference) =>
+      (ns.tables.types[reference.referent.index]?).any
+        (carriesMatchingInvariant unit needed · #[] 0)
+  | some ty => carriesMatchingInvariant unit needed ty #[] 0
+  | none => false
+
+/-- Behavioral predicates in the data invariants of a function's interface:
+the values it takes and returns. They need the same proof assumptions as
+predicates written in the function's own contract. -/
+private def signatureInvariantNeeds (unit : ValidatedUnit)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (needed : SpecReads → Bool) : Bool :=
+  declaration.signature.parameters.any
+      (carriesNeededInvariant unit ns needed ·.typeUse.typeId) ||
+    declaration.signature.results.any (carriesNeededInvariant unit ns needed ·.typeId)
+
 /-- Behavioral predicates in the data invariants a body must use or establish,
-including constructed local values and stored resources. They need the same
-proof assumptions as predicates written in the function's own contract. -/
-private def invariantNeeds (unit : ValidatedUnit)
+including constructed local values and stored resources. -/
+private def bodyInvariantNeeds (unit : ValidatedUnit)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
     (needed : SpecReads → Bool) : Bool := Id.run do
-  let carries (id : VerexIR.TypeId) : Bool :=
-    match ns.typeOf id with
-    | some (.reference reference) =>
-        (ns.tables.types[reference.referent.index]?).any
-          (carriesMatchingInvariant unit needed · #[] 0)
-    | some ty => carriesMatchingInvariant unit needed ty #[] 0
-    | none => false
-  if declaration.locals.any (carries ·.type.typeId) ||
-      declaration.signature.parameters.any (carries ·.typeUse.typeId) ||
-      declaration.signature.results.any (carries ·.typeId) then return true
+  let carries := carriesNeededInvariant unit ns needed
+  if declaration.locals.any (carries ·.type.typeId) then return true
   let .structured root := declaration.body | return false
   let mut pending := #[root]
   let mut visited : Array Nat := #[]
@@ -2802,6 +2826,15 @@ private def invariantNeeds (unit : ValidatedUnit)
     pending := pending ++ VerexIR.Validation.expressionChildren expression.kind
   return false
 
+/-- Behavioral predicates in the data invariants a function's interface and
+its body both state. -/
+private def invariantNeeds (unit : ValidatedUnit)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody)
+    (needed : SpecReads → Bool) : Bool :=
+  signatureInvariantNeeds unit ns declaration needed ||
+    bodyInvariantNeeds unit ns declaration needed
+
 /-- What the specifications inside a verified body read: its loop
 invariants, assertions, and assumptions. -/
 private def bodyReads (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
@@ -2810,11 +2843,37 @@ private def bodyReads (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
   | .structured root => if verifiedBody declaration then readsFrom unit [(namespaceId, root)] else {}
   | .absent => {}
 
+/-- Whether a function's interface — its signature and its contract — states
+the typing a run of a function value the proof cannot see needs: a parameter
+of function type, a condition stating `aborts_of` or `result_of`, or a data
+invariant of a value it takes or returns that states a behavioral predicate.
+These are facts of the declaration alone, so they hold of a function whose
+body no automatic verification walks. -/
+private def interfaceAssumesTyping (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  signatureInvariantNeeds unit ns declaration (·.determinism) ||
+    declaration.contract.conditions.any (fun condition =>
+      (readsFrom unit [(namespaceId, condition.expression)]).determinism) ||
+    declaration.signature.parameters.any (fun parameter =>
+      ns.typeOf parameter.typeUse.typeId matches some (.function ..))
+
+/-- Whether a function's body states that typing: an inner specification
+stating `aborts_of` or `result_of`, or a data invariant of a local or of a
+value it constructs that states a behavioral predicate. -/
+private def bodyAssumesTyping (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
+    (ns : ValidatedNamespace)
+    (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool :=
+  bodyInvariantNeeds unit ns declaration (·.determinism) ||
+    (bodyReads unit namespaceId declaration).determinism
+
 /-- Whether a function's theorem assumes the typing a run of a function
-value it cannot see needs (`doc/historical/static-typing.md`, Phase 5): a body it
-verifies with a parameter of function type, or calling, through verified
-bodies, one that has; or a verified body whose contract or inner
-specifications state `aborts_of` or `result_of`. -/
+value it cannot see needs (`doc/historical/static-typing.md`, Phase 5): its own
+interface states it, or, through verified bodies, the interface of a function
+it calls does, or a verified body of one of them states it. A body is walked
+only where `verifiedBody` holds; what the interface states is read wherever
+there is a body at all, because its contract owes it to its callers whether or
+not the automatic verification is the one that asks. -/
 def assumesTyping (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     (ns : ValidatedNamespace)
     (declaration : VerexIR.FunctionDecl VerexIR.Validation.FunctionBody) : Bool := Id.run do
@@ -2824,15 +2883,10 @@ def assumesTyping (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     pending := pending.pop
     if visited.contains (namespaceId.index, declaration.name.index) then continue
     visited := visited.push (namespaceId.index, declaration.name.index)
+    if hasBody declaration && interfaceAssumesTyping unit namespaceId ns declaration then
+      return true
     unless verifiedBody declaration do continue
-    if invariantNeeds unit ns declaration (·.determinism) then return true
-    if declaration.contract.conditions.any (fun condition =>
-        (readsFrom unit [(namespaceId, condition.expression)]).determinism) then
-      return true
-    if (bodyReads unit namespaceId declaration).determinism then return true
-    if declaration.signature.parameters.any (fun parameter =>
-        ns.typeOf parameter.typeUse.typeId matches some (.function ..)) then
-      return true
+    if bodyAssumesTyping unit namespaceId ns declaration then return true
     for callee in directCallees unit namespaceId ns declaration do
       let some calleeNs := unit.namespaces[callee.namespaceId.index]? | continue
       let some calleeDeclaration := calleeNs.functions[callee.functionId.index]? | continue

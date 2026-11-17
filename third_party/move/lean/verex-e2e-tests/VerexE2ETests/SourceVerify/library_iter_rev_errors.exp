@@ -1,11 +1,9 @@
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:6:3: error: the specification clause `ensures 2 * result == n * (n + 1)` is not established
-VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:10:15: error: the loop invariant `2 * total == n * (n - 1) - iter.iter.end * (iter.iter.end - 1)` is not preserved by an iteration
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `rev_range_sum` failed; provide a proof in the module:
   verify rev_range_sum by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | invariant_3_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:13:3: error: the specification clause `ensures n > 0 ==> result == 0` is not established
@@ -17,13 +15,11 @@ VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:12:6: error: verex 
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:17:3: error: the specification clause `ensures result == n` is not established
-VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:20:15: error: the loop invariant `!iter.iter.exhausted ==> iter.iter.end <= n && total == n - iter.iter.end` is not preserved by an iteration
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:16:6: error: verex verification failed: the automatic verification of `rev_inclusive_count` failed; provide a proof in the module:
   verify rev_inclusive_count by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | invariant_2_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_rev_errors.spec.lean:26:15: error: the loop invariant `iter.iter.pos == 0 && iter.iter.slice == values && iter.iter.end == values.length` is not preserved by an iteration

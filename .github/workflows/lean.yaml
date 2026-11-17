@@ -88,6 +88,19 @@ jobs:
           source "$HOME/.profile"
           lake test
 
+      - name: Verify a package over compiled namespaces
+        # No package suite verifies a Move package over compiled namespaces.
+        # The script renders and compiles the namespaces of
+        # VerexE2ETests/CompiledNamespaces and compares the report of
+        # `fixture::client` with the package's baseline; it builds the
+        # `verex-move` executable the Move Prover step below needs too, and
+        # uses the `move` CLI built above.
+        working-directory: third_party/move/lean
+        run: |
+          source "$HOME/.profile"
+          scripts/verify-compiled-namespaces.sh --self-test
+          scripts/verify-compiled-namespaces.sh
+
       - name: Build the verification benchmark
         # Run nightly by verex-bench.yaml; built here so a change breaking
         # it shows on the pull request.

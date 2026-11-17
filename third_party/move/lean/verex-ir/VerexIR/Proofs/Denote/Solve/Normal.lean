@@ -1026,12 +1026,16 @@ private def keptArgumentsConvert (fn : Lean.Expr) (args : Array Lean.Expr)
     (boundary : Nat) : MetaM Bool := do
   if boundary ≥ args.size then return true
   let functionType ← inferType fn
+  -- The prefix is instantiated once and one binder peeled per step, through
+  -- `instantiateForall`, which unfolds a body that is no `forallE` as the
+  -- restart from the whole type did.
+  let mut bound ← instantiateForall functionType (args.extract 0 boundary)
   for index in [boundary:args.size] do
-    let bound ← instantiateForall functionType (args.extract 0 index)
     let .forallE _ expected _ _ := bound | return false
     if expected.hasLooseBVars then return false
     let actual ← inferType args[index]!
     unless expected == actual || (← withNewMCtxDepth (isDefEq actual expected)) do return false
+    if index + 1 < args.size then bound ← instantiateForall bound #[args[index]!]
   return true
 
 private def isCarrierFamilyHead (name : Name) : Bool :=
@@ -1224,16 +1228,21 @@ private partial def convertsAtSites (left right : Lean.Expr) : MetaM Bool := do
           let some name := left.getAppFn.constName? | pure false
           pure (((← getEnv).find? name).any (· matches .ctorInfo _))) then
         arguments.size.allM fun index _ => isDefEq arguments[index]! arguments'[index]!
-      else if ← pure sameHead <&&> (do
-          let some name := left.getAppFn.constName? | pure false
-          pure (← getProjectionFnInfo? name).isSome) then
-        let some name := left.getAppFn.constName? | isDefEq left right
-        let some info ← getProjectionFnInfo? name | isDefEq left right
-        if ← (min info.numParams arguments.size).allM fun index _ =>
-            isDefEq arguments[index]! arguments'[index]! then
-          isDefEq left right
-        else
-          pure false
+      else if sameHead then
+        -- The head's projection info is read once: a projection erases its
+        -- structure's parameters, so those are converted at their own sites
+        -- and the projection itself carries the owner.
+        match left.getAppFn.constName? with
+        | none => isDefEq left right
+        | some name =>
+          match ← getProjectionFnInfo? name with
+          | none => isDefEq left right
+          | some info =>
+            if ← (min info.numParams arguments.size).allM fun index _ =>
+                isDefEq arguments[index]! arguments'[index]! then
+              isDefEq left right
+            else
+              pure false
       else isDefEq left right
     | _, _ => isDefEq left right
   unless left.hasMVar || right.hasMVar do conversions.modify (·.insert (left, right) result)
@@ -3388,54 +3397,14 @@ theorem Skolems.reframeAtBase_of_encode {τ : NTy} (bounded) (value : @NTy.carri
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable (τ := .char) bounded value = value :=
   Skolems.reframeAtBase_of_encode sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value rfl fun _ => rfl
 
-private theorem pHead {f : Nat → Bool} {τ : NTy} {rest : NRow}
-    (bounded : NRow.paramsAll f (.cons τ rest) = true) : τ.paramsAll f = true :=
-  (Bool.and_eq_true _ _ |>.mp bounded).1
-
-private theorem pTail {f : Nat → Bool} {τ : NTy} {rest : NRow}
-    (bounded : NRow.paramsAll f (.cons τ rest) = true) : rest.paramsAll f = true :=
-  (Bool.and_eq_true _ _ |>.mp bounded).2
-
-private theorem pFields {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
-    (bounded : (NTy.struct source arguments fields).paramsAll f = true) : fields.paramsAll f = true :=
-  (Bool.and_eq_true _ _ |>.mp bounded).2
-
-private theorem pStruct {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
-    (arguments' : arguments.paramsAll f = true) (fields' : fields.paramsAll f = true) :
-    (NTy.struct source arguments fields).paramsAll f = true :=
-  Bool.and_eq_true _ _ |>.mpr ⟨arguments', fields'⟩
-
-private theorem encFields {Φ Ψ : Carriers} {source : StructHandle} {arguments : NRow}
-    {τ : NTy} {rest : NRow} (left : @HList Φ (.cons τ rest)) (right : @HList Ψ (.cons τ rest))
-    (same : @NTy.encode Φ (.struct source arguments (.cons τ rest)) left =
-      @NTy.encode Ψ (.struct source arguments (.cons τ rest)) right) :
-    @NTy.encode Φ τ left.1 = @NTy.encode Ψ τ right.1 ∧
-      @NTy.encode Φ (.struct source arguments rest) left.2 =
-        @NTy.encode Ψ (.struct source arguments rest) right.2 := by
-  simp only [NTy.encode_struct, HList.encode_cons, RuntimeValue.nominal.injEq, true_and] at same
-  have fields := List.toArray_inj same
-  simp only [List.cons.injEq] at fields
-  exact ⟨fields.1, by simp only [NTy.encode_struct, fields.2]⟩
-
-private theorem encElements {Φ Ψ : Carriers} {τ : NTy} {rest : NRow}
-    (left : @HList Φ (.cons τ rest)) (right : @HList Ψ (.cons τ rest))
-    (same : @NTy.encode Φ (.tuple (.cons τ rest)) left =
-      @NTy.encode Ψ (.tuple (.cons τ rest)) right) :
-    @NTy.encode Φ τ left.1 = @NTy.encode Ψ τ right.1 ∧
-      @NTy.encode Φ (.tuple rest) left.2 = @NTy.encode Ψ (.tuple rest) right.2 := by
-  simp only [NTy.encode_tuple, HList.encode_cons, RuntimeValue.tuple.injEq] at same
-  have elements := List.toArray_inj same
-  simp only [List.cons.injEq] at elements
-  exact ⟨elements.1, by simp only [NTy.encode_tuple, elements.2]⟩
-
 @[vir_denote_norm] theorem Skolems.reframeAtBase_struct_fst {source : StructHandle}
     {arguments : NRow} {τ : NTy} {rest : NRow} (bounded)
     (value : @NTy.carrier Θ.toCarriers (.struct source arguments (.cons τ rest))) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value).1 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
-        (pHead (pFields bounded)) value.1 := by
+        (paramsHead (paramsFields bounded)) value.1 := by
   apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
-  rw [(encFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
+  rw [(encodeFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
     Skolems.encode_reframeAtBase]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_struct_snd {source : StructHandle}
@@ -3444,10 +3413,10 @@ private theorem encElements {Φ Ψ : Carriers} {τ : NTy} {rest : NRow}
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value).2 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .struct source arguments rest)
-        (pStruct (Bool.and_eq_true _ _ |>.mp bounded).1 (pTail (pFields bounded))) value.2 := by
+        (paramsStruct (Bool.and_eq_true _ _ |>.mp bounded).1 (paramsTail (paramsFields bounded))) value.2 := by
   apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
     (.struct source arguments rest)
-  rw [(encFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
+  rw [(encodeFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
     Skolems.encode_reframeAtBase]
 
 simproc [vir_denote_norm] reframeStructFst (Prod.fst _) := fun e => do
@@ -3480,9 +3449,9 @@ simproc [vir_denote_norm] reframeStructFst (Prod.fst _) := fun e => do
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple (.cons τ rest)) bounded value).1 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
-        (τ := τ) (pHead bounded) value.1 := by
+        (τ := τ) (paramsHead bounded) value.1 := by
   apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
-  rw [(encElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
+  rw [(encodeElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
     Skolems.encode_reframeAtBase]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_tuple_snd {τ : NTy} {rest : NRow} (bounded)
@@ -3490,9 +3459,9 @@ simproc [vir_denote_norm] reframeStructFst (Prod.fst _) := fun e => do
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple (.cons τ rest)) bounded value).2 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
-        (τ := .tuple rest) (pTail bounded) value.2 := by
+        (τ := .tuple rest) (paramsTail bounded) value.2 := by
   apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers (.tuple rest)
-  rw [(encElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
+  rw [(encodeElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
     Skolems.encode_reframeAtBase]
 
 private theorem pVariant {f : Nat → Bool} {source : StructHandle}
@@ -3502,14 +3471,6 @@ private theorem pVariant {f : Nat → Bool} {source : StructHandle}
     fields.paramsAll f = true := by
   simp only [NTy.paramsAll, NRows.paramsAll, Bool.and_eq_true] at bounded
   exact bounded.2.1
-
-private theorem pVariants {f : Nat → Bool} {source : StructHandle}
-    {arguments fields : NRow} {name : String} {names : List String} {rest : NRows}
-    {distinct : (name :: names).Nodup}
-    (bounded : (NTy.enum source arguments (name :: names) (.cons fields rest) distinct).paramsAll f = true) :
-    (NTy.enum source arguments names rest (List.nodup_cons.mp distinct).2).paramsAll f = true := by
-  simp only [NTy.paramsAll, NRows.paramsAll, Bool.and_eq_true] at bounded ⊢
-  exact ⟨bounded.1, bounded.2.2⟩
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_enum_inl {source : StructHandle}
     {arguments fields : NRow} {name : String} {names : List String} {rest : NRows}
@@ -3533,7 +3494,7 @@ private theorem pVariants {f : Nat → Bool} {source : StructHandle}
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .enum source arguments (name :: names) (.cons fields rest) distinct) bounded (.inr value) =
       .inr (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
-        (τ := .enum source arguments names rest (List.nodup_cons.mp distinct).2) (pVariants bounded) value) := by
+        (τ := .enum source arguments names rest (List.nodup_cons.mp distinct).2) (paramsVariants bounded) value) := by
   apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
     (.enum source arguments (name :: names) (.cons fields rest) distinct)
   simp only [Skolems.encode_reframeAtBase, NTy.encode_enum_inr]

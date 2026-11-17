@@ -1973,14 +1973,12 @@ projection-free types) hold whatever goal computed them, and are kept. -/
 def saveWalkCaches : CoreM (IO Unit) := do
   let state ← targetState
   let bounds ← state.assertedBounds.get
-  let families ← state.familyProofs.get
   let rules ← state.contextRules.get
   let assumed ← state.assumedClauses.get
   let slots ← state.assumedSlotSizes.get
   let preparation? ← (← state.preparationProofs.get).mapM fun cache => return (cache, ← cache.get)
   return do
     state.assertedBounds.set bounds
-    state.familyProofs.set families
     state.contextRules.set rules
     state.assumedClauses.set assumed
     state.assumedSlotSizes.set slots
@@ -4540,11 +4538,15 @@ private def arrayLookups (terms : Array Lean.Expr) : Array Lean.Expr :=
 elab_rules : tactic
   | `(tactic| verex_name_lookups) => focusGoal do
     let mut goal ← getMainGoal
-    let (sizeContext, sizeSimprocs) ← sizeRulesContext
     let lookups ← goal.withContext do
       let hypotheses ← (← goal.getNondepPropHyps).mapM fun fvarId => do
         instantiateMVars (← fvarId.getType)
       pure (arrayLookups (#[← instantiateMVars (← goal.getType)] ++ hypotheses))
+    -- With no lookup there is nothing to name, and the size rules the naming
+    -- reads are not built: the tactic fails as it does after a lookup that
+    -- names nothing.
+    if lookups.isEmpty then throwError "no lookup at a position in bounds to name"
+    let (sizeContext, sizeSimprocs) ← sizeRulesContext
     let mut named := false
     for lookup in lookups do
       let array := lookup.getArg! 5
@@ -5588,11 +5590,18 @@ its equation with the clause given; none where no behavioral clause is
 transported, and the clause is then left as it is. -/
 def callerClause? (clause : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
   let exposed := (← unfoldDefinition? clause).getD clause
-  let mut theorems : SimpTheorems := {}
-  for rule in [``Skolems.reframe_struct_fst, ``Skolems.reframe_struct_snd] do
-    theorems ← theorems.addConst rule
-  let observations ← Simp.SimprocsArray.add #[] ``nominalReframeHead true
-  let observations ← observations.add ``nominalReframeRest true
+  -- The rules are the environment's, the same at every call of this target.
+  let cache := (← targetState).callerClauseRules
+  let (theorems, observations) ← match ← cache.get with
+    | some rules => pure rules
+    | none =>
+      let mut theorems : SimpTheorems := {}
+      for rule in [``Skolems.reframe_struct_fst, ``Skolems.reframe_struct_snd] do
+        theorems ← theorems.addConst rule
+      let observations ← Simp.SimprocsArray.add #[] ``nominalReframeHead true
+      let observations ← observations.add ``nominalReframeRest true
+      cache.set (some (theorems, observations))
+      pure (theorems, observations)
   let context ← Simp.mkContext
     { zeta := false, beta := false, iota := false, proj := false } #[theorems]
     (← getSimpCongrTheorems)
@@ -7135,6 +7144,12 @@ private def clauseFailure (origin : Option Provenance) (snippet : String) : Mess
   | some (.callArgument callee (some call) position) =>
       m!"the data invariant `{snippet}` does not hold for argument {position} of call {call} of \
         `{callee}`"
+  | some (.invocationArgument value none position) =>
+      m!"the data invariant `{snippet}` does not hold for argument {position} of the invocation \
+        of `{value}`"
+  | some (.invocationArgument value (some call) position) =>
+      m!"the data invariant `{snippet}` does not hold for argument {position} of the invocation \
+        of `{value}` at call {call}"
   | some .copyOut =>
       m!"the data invariant `{snippet}` does not hold where a value is copied out of a mutable \
         reference"

@@ -24,7 +24,7 @@ VerexE2ETests/SourceVerify/library_option_errors.spec.lean:11:6: error: verex ve
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_option_errors.spec.lean:14:1: error: `no panic when aborts at call 1 of unwrap` is not established: the call `value.unwrap()` at VerexE2ETests/SourceVerify/library_option_errors.rs:21:5 may panic
-  from: VerexIR.Proofs.Denote.variantPlainName ["None", "Some"] (VerexIR.Proofs.Denote.NRows.cons VerexIR.Proofs.Denote.NRow.nil (VerexIR.Proofs.Denote.NRows.cons (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 32 false) VerexIR.Proofs.Denote.NRow.nil) VerexIR.Proofs.Denote.NRows.nil)) value.val = "None"
+  from: (library_option_errors.unit.nominal.namespace.1.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 32 false)).Holds value; variant✝ value = "None"
 VerexE2ETests/SourceVerify/library_option_errors.spec.lean:14:6: error: verex verification failed: the automatic verification of `must_unstated` failed; provide a proof in the module:
   verify must_unstated by lean =>
     verex_obligations

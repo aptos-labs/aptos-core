@@ -425,4 +425,110 @@ error: verex verification failed: the automatic verification of `unchecked_hande
 #guard_msgs in
 verify 0x42::call_argument_validity::unchecked_handed
 
+/-! A row's validity is split whether or not the row is written out as a pair.
+Written out, the law of the constructor states the head and the tail
+themselves (`HList.holds_cons_mk`), so each fact names its parameter; over a
+value that is no constructor application the general law
+(`HList.holds_cons`) states them as the row's projections, and the facts are
+the projections. Both leave one hypothesis per position, in the row's order. -/
+
+open Lean Meta Elab Command VerexIR.Proofs.Denote in
+run_cmd liftTermElabM do
+  let τ := mkApp2 (mkConst ``NTy.int) (mkNatLit 64) (mkConst ``Bool.false)
+  let row := mkApp2 (mkConst ``NRow.cons) τ (mkApp2 (mkConst ``NRow.cons) τ (mkConst ``NRow.nil))
+  withLocalDeclD `Θ (mkConst ``Carriers) fun carriers => do
+    let rowType := mkApp2 (mkConst ``HList) carriers row
+    let held (values : Lean.Expr) : Lean.Expr :=
+      mkApp3 (mkConst ``HList.Holds) carriers row values
+    let component (index : Nat) (values : Lean.Expr) : MetaM Lean.Expr :=
+      mkAppM (if index == 0 then ``Prod.fst else ``Prod.snd) #[values]
+    -- A row that is no constructor application: the general law.
+    withLocalDeclD `values rowType fun values => do
+      withLocalDeclD `valid (held values) fun valid => do
+        let goal := (← mkFreshExprMVar (mkConst ``True)).mvarId!
+        let (_, goal) ← goal.assertHypotheses
+          #[{ userName := `valid, type := held values, value := valid }]
+        let split ← splitEntryValidity goal `valid #[`first, `second]
+        split.withContext do
+          let lctx ← getLCtx
+          let some head := lctx.findFromUserName? `first | throwError "no first fact"
+          unless (← instantiateMVars head.type).isAppOfArity ``NTy.Holds 3 do
+            throwError "the first fact of a row that is no pair is not a fact: {head.type}"
+          unless ((← instantiateMVars head.type).getArg! 2).isAppOfArity ``Prod.fst 3 do
+            throwError "the general law did not state the row's projection: {head.type}"
+          let some tail := lctx.findFromUserName? `second | throwError "no second fact"
+          unless ((← instantiateMVars tail.type).getArg! 2).isAppOf ``Prod.fst do
+            throwError "the second fact is not of the tail's head: {tail.type}"
+        discard (component 0 values)
+    -- The same row written out as a pair: the facts name the components.
+    withLocalDeclD `head (mkApp2 (mkConst ``NTy.carrier) carriers τ) fun first => do
+    withLocalDeclD `tail (mkApp2 (mkConst ``HList) carriers
+        (mkApp2 (mkConst ``NRow.cons) τ (mkConst ``NRow.nil))) fun rest => do
+      let pair ← mkAppM ``Prod.mk #[first, rest]
+      withLocalDeclD `valid (held pair) fun valid => do
+        let goal := (← mkFreshExprMVar (mkConst ``True)).mvarId!
+        let (_, goal) ← goal.assertHypotheses
+          #[{ userName := `valid, type := held pair, value := valid }]
+        let split ← splitEntryValidity goal `valid #[`first, `second]
+        split.withContext do
+          let some head := (← getLCtx).findFromUserName? `first | throwError "no first fact"
+          unless ((← instantiateMVars head.type).getArg! 2) == first do
+            throwError "the written-out row's first fact is not of its head: {head.type}"
+
+/-! ## The argument validity of an invocation of a function value
+
+An invocation of a function value the proof does not see owes the data
+invariants of the arguments it passes.  The condition is the row's, so it is
+read by the reader every call's condition has: the conditions below arrive
+as the entry's row validity, which preparation splits, and as a value
+certified where it is copied out of a mutable reference.
+-/
+
+verex module 0x42::invocation_argument_validity where
+  -- The argument is the caller's own parameter at a type parameter: its
+  -- fact is a conjunct of the entry's row validity until preparation splits
+  -- it, and the atom the invocation owes is stated at the caller's family.
+  fun pass {T} {R}(f : Fn(T) -> R, x : T) -> R := invoke(f, x)
+  spec pass where
+    ensures ensures_of<f>(x, result)
+
+  -- Two positions of one row: each argument's atom is read at its own
+  -- position of the condition.
+  fun pass_two {T} {R}(f : Fn(T, T) -> R, x : T, y : T) -> R := invoke(f, x, y)
+  spec pass_two where
+    ensures ensures_of<f>(x, y, result)
+
+  -- The argument is copied out of a mutable reference's current, which is
+  -- certified where it is copied; the invocation reads that fact.
+  fun pass_current {T} {R}(f : Fn(T) -> R, r : &mut T) -> R := invoke(f, *r)
+  spec pass_current where
+    ensures ensures_of<f>(old(*r), result)
+
+/-! ## An invocation the rule does not take
+
+A function value whose rows are a declared type, or a tuple, is outside the
+rule's domain: the rule requires the rows to resolve to scalars at the frame,
+which the frontend states of a type parameter's row and of the result row
+(`wp_closureMeaning_unseen_at`).  The invocation is
+not taken and the leaf reports what it reports of any undecided leaf; the
+argument's validity is never reached.  In the source shapes examined here an
+invocation's arguments are the caller's own, whose validity its entry states,
+so none of them leaves an atom unpaid; that is a reading of these examples
+and not a property of every program or of a later rule.  An unpaid atom is
+exercised where the rule a dictionary's contract gives takes the invocation
+(`VerexIR/Tests/UnseenArgumentValidity.lean`).
+-/
+
+#guard_reports "the automatic verification of `pass_percent` failed"
+    "verification failed with a residual obligation" in
+verex module 0x42::invocation_argument_domain where
+  struct Percent has Copy, Drop, Store where
+    value : u64
+  spec Percent where
+    invariant value <= 100
+
+  fun pass_percent {R}(f : Fn(Percent) -> R, p : Percent) -> R := invoke(f, p)
+  spec pass_percent where
+    ensures ensures_of<f>(p, result)
+
 end VerexSL.Tests.CallArgumentValidity

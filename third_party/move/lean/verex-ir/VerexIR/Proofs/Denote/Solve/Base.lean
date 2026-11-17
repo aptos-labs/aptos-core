@@ -220,10 +220,10 @@ coverage aid, not an inventory: a declaration with a recorded gap counts as
 recorded, a declaration with no record at any row stays invisible, and the
 notes are told apart by the rendered line.  It decides nothing. -/
 def noteInstalledRoute (line : String) : MetaM Unit := do
+  unless ← noteChannelEnabled do return
   let options ← getOptions
   let path : String := options.get `verex.stageLog ""
   let debug := options.getBool `verex.solverDebug
-  if path.isEmpty && !debug then return
   let fresh ← installedRouteNotes.modifyGet fun noted => (!noted.contains line, noted.insert line)
   unless fresh do return
   unless path.isEmpty do
@@ -269,35 +269,28 @@ partial def ownBridge? (carriers τ value : Lean.Expr) : MetaM (Option Lean.Expr
         installed route, recorded bridge declined: {reason}"
     return none
   let frame := family.getArg! 2
-  let stated := mkConst entry.theoremName
-  let .forallE _ frameType afterFrame _ ← inferType stated
-    | declined "the theorem takes no frame"
-  unless ← withNewMCtxDepth (withReducible (isDefEq (← inferType frame) frameType)) do
+  -- The theorem's telescope is the descriptor's (`Entry.describesTheorem?`
+  -- checked that when the entry was registered), so it is not read back from
+  -- the statement here. Three conditions are the leaf's own and decline.
+  unless ← withNewMCtxDepth (withReducible (isDefEq (← inferType frame) entry.frameType)) do
     return ← declined "the leaf's frame is not at the unit's function values"
-  let .forallE _ premise afterPremise _ := afterFrame.instantiate1 frame
-    | declined "the theorem takes no inhabitability premise"
-  let_expr Eq _ inhabitableOf _ := premise | declined "the premise is no equation"
-  let resolutions := inhabitableOf.appArg!
-  unless resolutions.isAppOfArity ``NRow.map 2 do return ← declined "the premise is of no row"
-  -- The row of resolutions, entry by entry: what the premise's map unfolds to.
-  let rec entries (row : Lean.Expr) : MetaM (Option Lean.Expr) := do
-    let row ← whnfR row
-    if row.isConstOf ``NRow.nil then return some row
-    unless row.isAppOfArity ``NRow.cons 2 do return none
-    let some rest ← entries (row.getArg! 1) | return none
-    return some (mkApp2 (mkConst ``NRow.cons) (mkApp (resolutions.getArg! 0) (row.getArg! 0)) rest)
-  let some explicit ← entries (resolutions.getArg! 1) | declined "the row is no literal"
+  -- The fact the theorem states of this value, against the one the leaf asks
+  -- for: a respelled type or family declines here, before the row is read.
+  unless entry.factAt frame value ==
+      mkApp3 (mkConst ``NTy.Holds) carriers.consumeMData τ.consumeMData value do
+    return ← declined "the fact is not spelled as the theorem states it"
+  -- The resolutions of the declaration's parameters at this frame, entry by
+  -- entry, built once: what the premise's map unfolds to.
+  let resolve := mkApp3 (mkConst ``Skolems.resolve)
+    (mkConst entry.unit) (mkConst entry.functions) frame
+  let some parameters := OwnBridge.rowEntries? entry.params
+    | throwError "internal: the own bridge recorded for {entry.declaration} has no literal row"
+  let explicit := parameters.foldr
+    (fun τ rest => mkApp2 (mkConst ``NRow.cons) (mkApp resolve τ) rest) (mkConst ``NRow.nil)
   let some decided ← rowInhabitableEntries? explicit
     | declined "the row's resolutions are not known to be inhabitable"
-  let inhabitable ← mkExpectedTypeHint decided premise
-  let .forallE _ _ body _ := afterPremise.instantiate1 inhabitable
-    | declined "the theorem takes no value"
-  -- The fact is the theorem's own left-hand side, family and type as the
-  -- theorem spells them, so the value is at the type the theorem takes.
-  let_expr Iff held _ := body.instantiate1 value | declined "the theorem states no equivalence"
-  unless held == mkApp3 (mkConst ``NTy.Holds) carriers.consumeMData τ.consumeMData value do
-    return ← declined "the fact is not spelled as the theorem states it"
-  return some (mkApp3 stated frame inhabitable value)
+  let inhabitable ← mkExpectedTypeHint decided (← entry.premiseAt frame)
+  return some (mkApp3 (mkConst entry.theoremName) frame inhabitable value)
 
 /-- A program point of a term, as a number: a site is a numeral in the
 compiled form, but a generator may name one with a definition of its own
@@ -594,6 +587,13 @@ inductive Provenance where
   argument of the callee's `call`-th call where the call is the target's
   own; positions count from one. -/
   | callArgument (callee : String) (call : Option Nat) (position : Nat)
+  /-- The data invariants an argument of an invocation of a function value
+  the proof does not see owes, at the `position`-th argument of the value's
+  row and at the `call`-th call of the target's body where the invocation is
+  the target's own; positions count from one.  `value` names the value as
+  the source names it, which the message reads and the obligation's key does
+  not. -/
+  | invocationArgument (value : String) (call : Option Nat) (position : Nat)
   /-- What follows a call, at the callee's `call`-th call where the call is
   the target's own. -/
   | continuation (callee : String) (call : Option Nat)
@@ -734,9 +734,6 @@ structure TargetState where
   walk. Authored tactics and subsequent verification targets have no access
   to its cache; nested invocations restore their enclosing cache. -/
   preparationProofs : IO.Ref (Option (IO.Ref PreparationCache.Cache))
-  /-- Encoding equalities also serve authored preparation after the walker
-  hands over its goals. Dependencies and paying owners delimit their reuse. -/
-  familyProofs : IO.Ref (PreparationCache.Cache)
   /-- A request is reusable only by the owners paying for its derivation.
   An empty set disables requests outside an owned operation, including the
   temporary ledger used before clause allocation. -/
@@ -783,6 +780,11 @@ structure TargetState where
   (`leafValidityNormalization`), built once per target: its `simp only` set names
   global lemmas and simprocs only, the same at every call. -/
   validityReadings : IO.Ref (Option (Simp.Context × Simp.SimprocsArray))
+  /-- The rules a caller's clause is read with (`callerClause?`), built once
+  per target: the reframing laws and the two observation simprocs, which the
+  environment fixes, and nothing of a goal's context. The `Simp.Context`
+  itself is made per use. -/
+  callerClauseRules : IO.Ref (Option (SimpTheorems × Simp.SimprocsArray))
   /-- Under `verex.solverDebug`: the discharger's calls, their heartbeats,
   and the conditions asked. -/
   dischargeLog : IO.Ref (Nat × Nat × Array String)
@@ -974,7 +976,6 @@ def TargetState.new : IO TargetState := do
     activeSteps := ← IO.mkRef #[]
     interruptedSteps := ← IO.mkRef #[]
     preparationProofs := ← IO.mkRef none
-    familyProofs := ← IO.mkRef {}
     preparationOwners := ← IO.mkRef #[]
     reducedBounds := ← IO.mkRef {}
     statedReads := ← IO.mkRef {}
@@ -986,6 +987,7 @@ def TargetState.new : IO TargetState := do
     normalHypotheses := ← IO.mkRef {}
     normalSimpContexts := ← IO.mkRef #[]
     validityReadings := ← IO.mkRef none
+    callerClauseRules := ← IO.mkRef none
     dischargeLog := ← IO.mkRef (0, 0, #[])
     stageNormalHypotheses := ← IO.mkRef {}
     normalForms := ← IO.mkRef {}
@@ -1745,6 +1747,10 @@ def Provenance.describe : Provenance → String
   | .callArgument callee none position => s!"argument {position} of the call to `{callee}`"
   | .callArgument callee (some call) position =>
       s!"argument {position} of call {call} of `{callee}`"
+  | .invocationArgument value none position =>
+      s!"argument {position} of the invocation of `{value}`"
+  | .invocationArgument value (some call) position =>
+      s!"argument {position} of the invocation of `{value}` at call {call}"
   | .continuation callee none => s!"the continuation after `{callee}`"
   | .continuation callee (some call) => s!"the continuation after call {call} of `{callee}`"
   | .loopEntry none => "a loop invariant at entry"
@@ -2998,7 +3004,23 @@ by the read's law (`Skolems.holds_plainAt`, `InterpreterOps.read_holds`),
 which holds of any memory, a written one included
 (`doc/plan/plain-values-semantics.md`, section 7). The statement and its
 proof, or none where the equation is no read of storage. -/
-def storageReadFact? (equation : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+structure StorageRead where
+  /-- The fact the read states of the value it gives. The fact states the
+  value the read gives, not an ascription of it: the ascription belongs to
+  the proof, and a fact about `id v` would be a second spelling of the fact
+  about `v`. -/
+  statement : Lean.Expr
+  /-- The law that states it of this read. -/
+  law : Name
+  /-- The read's frame, the type read, the read's arguments and the value. -/
+  carriers : Lean.Expr
+  τ : Lean.Expr
+  args : Array Lean.Expr
+  value : Lean.Expr
+
+/-- The statement of `storageReadFact?`, without its proof: a context that
+already states the fact needs no proof built for it. -/
+def storageReadStatement? (equation : Lean.Expr) : MetaM (Option StorageRead) := do
   let some (_, lhs, rhs) := (← instantiateMVars (← inferType equation)).consumeMData.eq?
     | return none
   let lhs := lhs.consumeMData
@@ -3014,19 +3036,31 @@ def storageReadFact? (equation : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.E
       some (``InterpreterOps.read_holds, args[1]!, args[4]!)
     else none
   let some (law, carriers, τ) := read? | return none
+  return some { statement := mkApp3 (mkConst ``NTy.Holds) carriers τ value
+                law, carriers, τ, args, value }
+
+/-- The proof of a read's statement (`storageReadStatement?`), type-checked:
+none where the law does not state it of this read. -/
+def storageReadProof? (equation : Lean.Expr) (read : StorageRead) :
+    MetaM (Option Lean.Expr) := do
+  let some (_, lhs, _) := (← instantiateMVars (← inferType equation)).consumeMData.eq?
+    | return none
+  let lhs := lhs.consumeMData
   try withDefault do
-    let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers τ
-    let valueTyped ← mkExpectedTypeHint value carrierTy
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) read.carriers read.τ
+    let valueTyped ← mkExpectedTypeHint read.value carrierTy
     let stated ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy valueTyped)
     let typed ← mkExpectedTypeHint equation stated
-    -- The fact states the value the read gives, not an ascription of it:
-    -- the ascription belongs to the proof, and a fact about `id v` would be
-    -- a second spelling of the fact about `v`.
-    let statement := mkApp3 (mkConst ``NTy.Holds) carriers τ value
-    let fact ← mkExpectedTypeHint (mkAppN (mkConst law) (args ++ #[valueTyped, typed])) statement
+    let fact ← mkExpectedTypeHint
+      (mkAppN (mkConst read.law) (read.args ++ #[valueTyped, typed])) read.statement
     unless ← isTypeCorrect fact do return none
-    return some (statement, fact)
+    return some fact
   catch _ => return none
+
+def storageReadFact? (equation : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr)) := do
+  let some read ← storageReadStatement? equation | return none
+  let some fact ← storageReadProof? equation read | return none
+  return some (read.statement, fact)
 
 /-- A goal with the fact a read of storage states of the value its equation
 yields (`storageReadFact?`): a read gives a value and its fact, so every
@@ -3037,12 +3071,17 @@ the equation is no read of storage, where it yields no value, or where the
 context already states the fact. -/
 def statedReadFact (goal : MVarId) (equation : Lean.Expr) : MetaM (MVarId × Option FVarId) :=
   goal.withContext do
-    let some (statement, fact) ← (try storageReadFact? equation catch _ => pure none)
+    let some read ← (try storageReadStatement? equation catch _ => pure none)
       | return (goal, none)
+    let statement := read.statement
+    -- The context is asked before a proof is built: a fact it already states
+    -- needs none.
     if ← (← getLCtx).anyM fun decl => do
         if decl.isImplementationDetail then return false
         withNewMCtxDepth (withReducible (isDefEq decl.type statement)) then
       return (goal, none)
+    let some fact ← (try storageReadProof? equation read catch _ => pure none)
+      | return (goal, none)
     let asserted ← (try pure (some (← goal.assert `verexRead statement fact)) catch _ => pure none)
     let some asserted := asserted | return (goal, none)
     let (introduced, goal) ← asserted.intro1P

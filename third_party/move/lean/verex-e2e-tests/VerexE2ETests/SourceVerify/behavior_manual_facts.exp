@@ -18,7 +18,7 @@ increment_returns :
       18446744073709551615 <
         ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
                     Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-                (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val +
+                (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val +
           1)
 a✝⁷ :
   ¬Proofs.AbortsOfEntries (Proofs.Denote.closureMeaning executable✝)
@@ -127,20 +127,20 @@ increment_ensures_1 :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val =
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val =
     ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
                 Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val +
+            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val +
       1
 left✝² :
   0 ≤
     ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
               Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val
 right✝² :
   ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
               Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val ≤
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val ≤
     18446744073709551615
 left✝¹ :
   0 ≤
@@ -150,7 +150,7 @@ left✝¹ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val
 right✝¹ :
   ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
               Proofs.Denote.NRow.nil (StorageKey.address addr)
@@ -158,7 +158,7 @@ right✝¹ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val ≤
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val ≤
     18446744073709551615
 flip_flag_returns :
   (Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰
@@ -175,11 +175,11 @@ flip_flag_ensures_1 :
                     (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                     { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                     (addr, ()) initialState✝))).getD
-            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯).val).fst =
+            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰.plainFallback ⋯)).fst =
         true ↔
       ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰
                 Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯).val).fst =
+            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝¹⁻⁰.plainFallback ⋯)).fst =
         true)
 left✝ :
   0 ≤
@@ -189,7 +189,7 @@ left✝ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val
 right✝ :
   ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
               Proofs.Denote.NRow.nil (StorageKey.address addr)
@@ -197,7 +197,7 @@ right✝ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val ≤
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val ≤
     18446744073709551615
 ⊢ ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
               Proofs.Denote.NRow.nil (StorageKey.address addr)
@@ -205,9 +205,9 @@ right✝ :
                 (Proofs.Denote.NRow.cons Proofs.Denote.NTy.address Proofs.Denote.NRow.nil)
                 { parameters := [false], results := [] } Proofs.Denote.ResultShape.none (FunctionValue.site0 ())
                 (addr, ()) initialState✝)).getD
-          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val =
+          (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val =
     ((Proofs.Denote.Skolems.plainAt 0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰
                 Proofs.Denote.NRow.nil (StorageKey.address addr) initialState✝).getD
-            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.inhabitant ⋯).val).fst.val +
+            (0x42.behavior_manual_facts.unit.nominal.namespace.0.declaration✝⁻⁰.plainFallback ⋯)).fst.val +
       2
 VerexE2ETests/SourceVerify/behavior_manual_facts.proof.lean:14:8: error: verex verification failed: the proof of `wrong_final_value` does not establish its specification

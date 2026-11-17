@@ -495,3 +495,27 @@ run_cmd do
     let count := (lines.filter fun line => (line.splitOn kind).length == 2).size
     unless count == 1 do throwError "after a silent opening `{kind}` is noted {count} times: {lines}"
   unless lines.size == 3 do throwError "{lines.size} notes after a silent opening: {lines}"
+
+
+-- The descriptor a bridge is recorded with describes its theorem, and a
+-- descriptor that does not is a producer error rather than a decline: each
+-- recorded entry passes the registration check, and the same entry with
+-- another instance type, another parameter row or another declaration's
+-- theorem is rejected by it.
+run_cmd liftTermElabM do
+  let (bridges, _) := OwnBridge.recorded (← getEnv)
+  unless bridges.size > 0 do throwError "no bridge is recorded"
+  for entry in bridges do
+    if let some wrong ← entry.describesTheorem? then
+      throwError "the recorded descriptor of {entry.declaration} does not describe its \
+        theorem: {wrong}"
+  let entry := bridges[0]!
+  let bool := mkConst ``VerexIR.Proofs.Denote.NTy.bool
+  let mutations : Array (String × OwnBridge.Entry) := #[
+    ("another instance type", { entry with instanceType := bool }),
+    ("another parameter row", { entry with
+      params := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.cons) bool entry.params }),
+    ("a theorem that is not declared", { entry with theoremName := `no.such.bridge })]
+  for (what, wrong) in mutations do
+    if (← wrong.describesTheorem?).isNone then
+      throwError "a descriptor with {what} was accepted"

@@ -1,0 +1,206 @@
+-- Copyright © Aptos Foundation
+-- SPDX-License-Identifier: Apache-2.0
+
+import VerexSL
+import VerexSL.Tests.Rendered.Support
+
+/-!
+# `fnonce_forward` as a frontend renders it
+
+The namespaces below are the rendering of
+`VerexE2ETests/SourceVerify/fnonce_forward.rs`, the items of its
+`fnonce_forward.spec.lean` and the contracts its calls reach spliced in, which
+the verification of the source renders and elaborates; its `verex sources at`
+command is dropped and the diagnostics are those of `fnonce_forward.exp`.
+Neither is edited here: `scripts/prover-smoke-renderings.sh --write` writes
+this file again, and without `--write` tells whether it is what the frontend
+renders. The crate's own namespace, which the diagnostics are of, is the last
+command; the namespaces before it are what it uses, and report nothing.
+
+`fnonce_forward.exp` records 9 further messages of the Given route (`uses
+concrete verification`). The option that takes that route, `verex.givenRoute`,
+is unset and nothing sets it, so no configuration produces them and they are
+no part of the diagnostics below.
+-/
+
+#guard_rendering in
+verex namespace fnonce_forward where
+  @[method_evidence = 2]
+  fun once {F} {R}(
+    callback : F, value : u64,
+    __trait_FnOnce_call_once : Fn(F, u64) -> R has Copy, Drop
+  ) -> R := invoke(__trait_FnOnce_call_once, callback, value)
+
+  @[method_evidence = 2, scoped_method_evidence = 2]
+  fun shared {F} {R}(
+    callback : F, value : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R :=
+    once(
+      callback, value,
+      function[Fn(F, u64) -> R has Copy, Drop](__borrowed_to_fnonce_shared_0::<F, R>, _,
+      _,
+      __trait_Fn_call)
+    )
+
+  @[method_evidence = 2, scoped_method_evidence = 2, consuming_method_adapter = 2]
+  fun __borrowed_to_fnonce_shared_0 {F} {R}(
+    receiver : F, arg_1 : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R := do
+    let result := invoke(__trait_Fn_call, &receiver, arg_1)
+    drop(receiver)
+    result
+
+  @[method_evidence = 2, scoped_method_evidence = 2]
+  fun mutable {F} {R}(
+    callback : F, value : u64,
+    __trait_FnMut_call_mut : Fn(&mut F, u64) -> R has Copy, Drop
+  ) -> R :=
+    once(
+      callback, value,
+      function[Fn(F, u64) -> R has Copy, Drop](__borrowed_to_fnonce_mutable_0::<F, R>, _,
+      _,
+      __trait_FnMut_call_mut)
+    )
+
+  @[method_evidence = 2, scoped_method_evidence = 2, consuming_method_adapter = 2]
+  fun __borrowed_to_fnonce_mutable_0 {F} {R}(
+    mut receiver : F, arg_1 : u64,
+    __trait_FnMut_call_mut : Fn(&mut F, u64) -> R has Copy, Drop
+  ) -> R := do
+    let result := invoke(__trait_FnMut_call_mut, &mut receiver, arg_1)
+    drop(receiver)
+    result
+
+  -- Two forwarding hops require the original Fn dictionary to be scoped.
+  @[method_evidence = 2, scoped_method_evidence = 2]
+  fun forward {F} {R}(
+    callback : F, value : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R :=
+    mutable(
+      callback, value,
+      function[Fn(&mut F, u64) -> R has Copy, Drop](__fn_to_fnmut_forward_0::<F, R>, _,
+      _,
+      __trait_Fn_call)
+    )
+
+  @[method_evidence = 2, scoped_method_evidence = 2, shared_method_adapter = 2]
+  fun __fn_to_fnmut_forward_0 {F} {R}(
+    receiver : &mut F, arg_1 : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R := invoke(__trait_Fn_call, &*receiver, arg_1)
+
+  @[method_evidence = 2, scoped_method_evidence = 2]
+  fun relay {F} {R}(
+    callback : F, value : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R := forward(callback, value, __trait_Fn_call)
+
+  -- A borrowed dictionary not used by consuming adapters remains unrestricted.
+  @[method_evidence = 2]
+  fun direct {F} {R}(
+    callback : &F, value : u64,
+    __trait_Fn_call : Fn(&F, u64) -> R has Copy, Drop
+  ) -> R := invoke(__trait_Fn_call, callback, value)
+
+  fun scalar(value : u64) -> u64 :=
+    relay(
+      closure «scalar::{closure#0}» has Copy (value : u64 := value)
+        fun call(
+          self : &«scalar::{closure#0}», x : u64
+        ) -> u64 := (*self).value + x,
+      1u64,
+      function[Fn(&«scalar::{closure#0}», u64) -> u64 has Copy, Drop](«scalar::{closure#0}»::call)
+    )
+
+  fun counter(value : u64) -> u64 :=
+    mutable(
+      closure «counter::{closure#0}» has Copy (state : u64 := value)
+        fun call_mut(self : &mut «counter::{closure#0}», x : u64) -> u64 := do
+          (*self).state := (*self).state + x
+          (*self).state,
+      1u64,
+      function[Fn(&mut «counter::{closure#0}», u64) -> u64 has Copy, Drop](«counter::{closure#0}»::call_mut)
+    )
+
+  fun pair(value : u64) -> (u64, Bool) :=
+    mutable(
+      closure «pair::{closure#0}» has Copy (state : u64 := value)
+        fun call_mut(
+          self : &mut «pair::{closure#0}», x : u64
+        ) -> (u64, Bool) := do
+          (*self).state := (*self).state + x
+          ((*self).state, true),
+      1u64,
+      function[Fn(&mut «pair::{closure#0}», u64) -> (u64, Bool) has Copy, Drop](«pair::{closure#0}»::call_mut)
+    )
+
+  spec «__fn_to_fnmut_forward_0» where
+    pragma opaque
+    ensures «receiver» == old(«receiver»)
+    ensures ensures_of<«__trait_Fn_call»>(old(«receiver»), «arg_1», result)
+
+  spec «__borrowed_to_fnonce_mutable_0» where
+    pragma opaque
+    ensures exists («__verex_final_receiver» : F), ensures_of<«__trait_FnMut_call_mut»>(old(«receiver»), «arg_1», result, «__verex_final_receiver»)
+
+  spec «__borrowed_to_fnonce_shared_0» where
+    pragma opaque
+    ensures ensures_of<«__trait_Fn_call»>(old(«receiver»), «arg_1», result)
+
+  -- Copyright © Aptos Foundation
+  -- SPDX-License-Identifier: Apache-2.0
+
+  spec once where
+    pragma opaque
+    ensures ensures_of<__trait_FnOnce_call_once>(callback, value, result)
+
+  spec shared where
+    pragma opaque
+    ensures ensures_of<__trait_Fn_call>(callback, value, result)
+
+  spec mutable where
+    pragma opaque
+    ensures exists (final_callback : F), ensures_of<__trait_FnMut_call_mut>(callback, value, result, final_callback)
+
+  impl «scalar::{closure#0}» where
+    spec call where
+      pragma opaque
+      ensures result == (self.value + x) % 18446744073709551616
+
+  spec scalar where
+    ensures result == (value + 1) % 18446744073709551616
+
+  impl «counter::{closure#0}» where
+    spec call_mut where
+      pragma opaque
+      ensures self.state == (old(self.state) + x) % 18446744073709551616
+      ensures result == self.state
+
+  spec counter where
+    ensures result == (value + 1) % 18446744073709551616
+
+  impl «pair::{closure#0}» where
+    spec call_mut where
+      pragma opaque
+      ensures self.state == (old(self.state) + x) % 18446744073709551616
+      ensures spec.result[0] == self.state
+      ensures spec.result[1]
+
+  spec pair where
+    ensures spec.result[0] == (value + 1) % 18446744073709551616
+    ensures spec.result[1]
+
+  spec forward where
+    pragma opaque
+    ensures ensures_of<__trait_Fn_call>(callback, value, result)
+
+  spec direct where
+    pragma opaque
+    ensures ensures_of<__trait_Fn_call>(callback, value, result)
+
+  spec relay where
+    pragma opaque
+    ensures ensures_of<__trait_Fn_call>(callback, value, result)

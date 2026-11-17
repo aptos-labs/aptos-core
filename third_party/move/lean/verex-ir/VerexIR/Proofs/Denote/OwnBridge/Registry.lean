@@ -28,11 +28,91 @@ structure Entry where
   source : Lean.Expr
   row : Lean.Expr
   theoremName : Name
+  /-- The application descriptor, closed data: the unit's function values, the
+  declaration's parameter row and the instance type the theorem is stated at.
+  The theorem's telescope is `∀ (frame) (inhabitable) (value), NTy.Holds …`,
+  and these three spell every type in it, so a consumer applies the theorem
+  without reading its statement back. Checked against the theorem when the
+  entry is registered (`Entry.describesTheorem?`). -/
+  functions : Name
+  params : Lean.Expr
+  instanceType : Lean.Expr
   /-- The declaration and the row, spelled for a listing. -/
   declaration : String
   rowSpelling : String
   clauses : Nat
   deriving Inhabited
+
+open Lean Meta in
+/-- The frame the theorem takes: a frame of the unit at its function values. -/
+def Entry.frameType (entry : Entry) : Lean.Expr :=
+  mkApp2 (mkConst ``Skolems) (mkConst entry.unit) (mkConst entry.functions)
+
+open Lean Meta in
+/-- The carriers a frame induces, as the theorem spells them. -/
+def Entry.carriersAt (entry : Entry) (frame : Lean.Expr) : Lean.Expr :=
+  mkApp3 (mkConst ``Skolems.toCarriers) (mkConst entry.unit) (mkConst entry.functions) frame
+
+open Lean Meta in
+/-- The resolutions of the declaration's parameters at a frame, as the
+theorem's premise maps them. -/
+def Entry.resolutionsAt (entry : Entry) (frame : Lean.Expr) : Lean.Expr :=
+  mkApp2 (mkConst ``NRow.map)
+    (mkApp3 (mkConst ``Skolems.resolve) (mkConst entry.unit) (mkConst entry.functions) frame)
+    entry.params
+
+open Lean Meta in
+/-- The inhabitability the theorem takes of those resolutions. -/
+def Entry.premiseAt (entry : Entry) (frame : Lean.Expr) : MetaM Lean.Expr :=
+  mkEq (mkApp (mkConst ``NRow.inhabitable) (entry.resolutionsAt frame)) (mkConst ``Bool.true)
+
+open Lean Meta in
+/-- The value the theorem takes, at the frame's carriers. -/
+def Entry.valueType (entry : Entry) (frame : Lean.Expr) : Lean.Expr :=
+  mkApp2 (mkConst ``NTy.carrier) (entry.carriersAt frame) entry.instanceType
+
+open Lean Meta in
+/-- The fact the theorem states of such a value: the left side of its
+equivalence. -/
+def Entry.factAt (entry : Entry) (frame value : Lean.Expr) : Lean.Expr :=
+  mkApp3 (mkConst ``NTy.Holds) (entry.carriersAt frame) entry.instanceType value
+
+/-- The declaration's parameters, entry by entry: the row the descriptor
+carries must be a literal, so that a consumer can state the resolutions one by
+one. -/
+partial def rowEntries? (row : Lean.Expr) : Option (Array Lean.Expr) :=
+  if row.isConstOf ``NRow.nil then some #[]
+  else if row.isAppOfArity ``NRow.cons 2 then
+    (rowEntries? (row.getArg! 1)).map (#[row.getArg! 0] ++ ·)
+  else none
+
+open Lean Meta in
+/-- Whether the descriptor describes the theorem it names: the application the
+descriptor builds at fresh binders is type-correct, and its type is the
+equivalence whose left side the descriptor states. The reason it does not,
+which is a producer error at registration and never a decline at a leaf. -/
+def Entry.describesTheorem? (entry : Entry) : MetaM (Option String) := do
+  let some info := (← getEnv).find? entry.theoremName
+    | return some s!"the theorem {entry.theoremName} is not declared"
+  unless info.levelParams.isEmpty do
+    return some s!"the theorem {entry.theoremName} takes universe parameters"
+  unless (rowEntries? entry.params).isSome do
+    return some s!"the descriptor's parameter row is no literal: {entry.params}"
+  withLocalDeclD `frame entry.frameType fun frame => do
+    let premise ← entry.premiseAt frame
+    withLocalDeclD `inhabitable premise fun inhabitable =>
+    withLocalDeclD `value (entry.valueType frame) fun value => do
+      let applied := mkApp3 (mkConst entry.theoremName) frame inhabitable value
+      let some _ ← observing? (Meta.check applied)
+        | return some s!"the descriptor does not apply {entry.theoremName} at the binders it \
+            spells"
+      let type ← whnfR (← inferType applied)
+      let_expr Iff held _ := type
+        | return some s!"the theorem {entry.theoremName} states no equivalence: {type}"
+      unless held == entry.factAt frame value do
+        return some s!"the theorem {entry.theoremName} states {held}, not the fact the \
+          descriptor claims"
+      return none
 
 /-- A declaration at a row without a bridge, and why. -/
 structure Gap where
@@ -92,13 +172,14 @@ the absence of one, at some row: a scan of the records, there being no key of
 a declaration alone.  For a listing of a declaration whose record is at
 another row than the one asked for. -/
 def declarationRecorded? (env : Environment) (unit : Name) (source : Lean.Expr) : Option String :=
-  let state := registry.getState env
-  let atDeclaration (key : Key) : Bool := key.unit == unit && key.source == source
-  let bridged := state.bridges.fold (init := none) fun found key entry =>
-    found <|> (if atDeclaration key then some entry.declaration else none)
-  let absent := state.gaps.fold (init := none) fun found key gap =>
-    found <|> (if atDeclaration key then some gap.declaration else none)
-  bridged <|> absent
+  Id.run do
+    let state := registry.getState env
+    let atDeclaration (key : Key) : Bool := key.unit == unit && key.source == source
+    for (key, entry) in state.bridges do
+      if atDeclaration key then return some entry.declaration
+    for (key, gap) in state.gaps do
+      if atDeclaration key then return some gap.declaration
+    return none
 
 /-- Every bridge recorded, and every recorded absence. -/
 def recorded (env : Environment) : Array Entry × Array Gap :=

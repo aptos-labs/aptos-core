@@ -109,19 +109,19 @@ at the row, whose fields are the substituted ones. A declaration's descriptor
 unfolds to that shape, so the laws are instantiated at a descriptor by its
 handle, arguments and fields and need no syntactic match on the type. -/
 
-private theorem paramsHead {f : Nat → Bool} {τ : NTy} {rest : NRow}
+theorem paramsHead {f : Nat → Bool} {τ : NTy} {rest : NRow}
     (bounded : NRow.paramsAll f (.cons τ rest) = true) : τ.paramsAll f = true :=
   (Bool.and_eq_true _ _ |>.mp bounded).1
 
-private theorem paramsTail {f : Nat → Bool} {τ : NTy} {rest : NRow}
+theorem paramsTail {f : Nat → Bool} {τ : NTy} {rest : NRow}
     (bounded : NRow.paramsAll f (.cons τ rest) = true) : rest.paramsAll f = true :=
   (Bool.and_eq_true _ _ |>.mp bounded).2
 
-private theorem paramsFields {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
+theorem paramsFields {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
     (bounded : (NTy.struct source arguments fields).paramsAll f = true) : fields.paramsAll f = true :=
   (Bool.and_eq_true _ _ |>.mp bounded).2
 
-private theorem paramsStruct {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
+theorem paramsStruct {f : Nat → Bool} {source : StructHandle} {arguments fields : NRow}
     (arguments' : arguments.paramsAll f = true) (fields' : fields.paramsAll f = true) :
     (NTy.struct source arguments fields).paramsAll f = true :=
   Bool.and_eq_true _ _ |>.mpr ⟨arguments', fields'⟩
@@ -142,7 +142,7 @@ theorem NTy.paramsAll_struct_tail {f : Nat → Bool} {source : StructHandle}
 
 /-- The encodings of a struct row's fields, from the row's, at two families
 and two spellings of the declaration's arguments and fields. -/
-private theorem encodeFields {Φ Ψ : Carriers} {source : StructHandle}
+theorem encodeFields {Φ Ψ : Carriers} {source : StructHandle}
     {arguments arguments' : NRow} {τ τ' : NTy} {rest rest' : NRow}
     (left : @HList Φ (.cons τ rest)) (right : @HList Ψ (.cons τ' rest'))
     (same : @NTy.encode Φ (.struct source arguments (.cons τ rest)) left =
@@ -200,7 +200,7 @@ value. A value whose carrier and encoding do not read the frame stays itself. -/
 
 /-- The encodings of a tuple's head and rest, from the tuple's, at two
 families and two spellings of its elements. -/
-private theorem encodeElements {Φ Ψ : Carriers} {τ τ' : NTy} {rest rest' : NRow}
+theorem encodeElements {Φ Ψ : Carriers} {τ τ' : NTy} {rest rest' : NRow}
     (left : @HList Φ (.cons τ rest)) (right : @HList Ψ (.cons τ' rest'))
     (same : @NTy.encode Φ (.tuple (.cons τ rest)) left =
       @NTy.encode Ψ (.tuple (.cons τ' rest')) right) :
@@ -248,7 +248,7 @@ private theorem paramsVariant {f : Nat → Bool} {source : StructHandle}
   simp only [NTy.paramsAll, NRows.paramsAll, Bool.and_eq_true] at bounded ⊢
   exact bounded.2.1
 
-private theorem paramsVariants {f : Nat → Bool} {source : StructHandle}
+theorem paramsVariants {f : Nat → Bool} {source : StructHandle}
     {arguments fields : NRow} {name : String} {names : List String} {rest : NRows}
     {distinct : (name :: names).Nodup}
     (bounded : (NTy.enum source arguments (name :: names) (.cons fields rest) distinct).paramsAll f
@@ -468,18 +468,14 @@ with, is valid exactly where the caller's map with the caller's key reader is,
 given that the two readers agree on that relation across the move. The value
 readers are free on both sides: no discipline observes values. -/
 
-private theorem tableKeyBounded {allowed : Nat → Bool} {key value : NTy}
-    (bounded : (NTy.table key value).paramsAll allowed = true) : key.paramsAll allowed = true := by
-  simp only [NTy.paramsAll, Bool.and_eq_true] at bounded; exact bounded.1
-
 private theorem tableValueBounded {allowed : Nat → Bool} {key value : NTy}
     (bounded : (NTy.table key value).paramsAll allowed = true) : value.paramsAll allowed = true := by
   simp only [NTy.paramsAll, Bool.and_eq_true] at bounded; exact bounded.2
 
 /-- A table's key type over a declaration's parameters is over them. -/
 theorem NTy.paramsAll_table_key {allowed : Nat → Bool} {key value : NTy}
-    (bounded : (NTy.table key value).paramsAll allowed = true) : key.paramsAll allowed = true :=
-  tableKeyBounded bounded
+    (bounded : (NTy.table key value).paramsAll allowed = true) : key.paramsAll allowed = true := by
+  simp only [NTy.paramsAll, Bool.and_eq_true] at bounded; exact bounded.1
 
 /-- A table's entries move with it, each at its substituted type. -/
 theorem Skolems.reframeAtInstance_table_entries {key value : NTy} (bounded)
@@ -488,7 +484,7 @@ theorem Skolems.reframeAtInstance_table_entries {key value : NTy} (bounded)
         (τ := .table key value) bounded table).entries =
       table.entries.map fun entry =>
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
-           (tableKeyBounded bounded) entry.1,
+           (NTy.paramsAll_table_key bounded) entry.1,
          Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
            (tableValueBounded bounded) entry.2) := by
   let Ψ := (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
@@ -506,7 +502,7 @@ theorem Skolems.reframeAtInstance_table_entries {key value : NTy} (bounded)
           @NTy.encode Θ.toCarriers (value.subst params) entry.2]) =
       (table.entries.map fun entry =>
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
-           (tableKeyBounded bounded) entry.1,
+           (NTy.paramsAll_table_key bounded) entry.1,
          Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
            (tableValueBounded bounded) entry.2)).map
         (fun entry => RuntimeValue.tuple #[@NTy.encode Ψ key entry.1, @NTy.encode Ψ value entry.2]) by
@@ -544,9 +540,9 @@ theorem Skolems.valid_sequence_reframeAtInstance_of_agree {key value : NTy} (bou
     Function.comp_def]
   have reads : ∀ a b,
       readKey (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
-        (tableKeyBounded bounded) a) ≠
+        (NTy.paramsAll_table_key bounded) a) ≠
       readKey (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
-        (tableKeyBounded bounded) b) ↔
+        (NTy.paramsAll_table_key bounded) b) ↔
       readKey' a ≠ readKey' b := fun a b => not_congr (agree a b)
   simp only [reads]
 
@@ -617,14 +613,7 @@ theorem Skolems.valid_ordered_reframeAtInstance {key value : NTy} (bounded)
       SpecMap.Valid (.ordered order') (SpecMap.ofEntries readKey' readValue' table) := by
   simp only [SpecMap.Valid, SpecMap.Ascending, SpecMap.ofEntries,
     Skolems.reframeAtInstance_table_entries, List.map_map, List.pairwise_map, Function.comp_def]
-  have reads : ∀ a b,
-      order.compare
-          (readKey (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params
-            inhabitable (tableKeyBounded bounded) a))
-          (readKey (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params
-            inhabitable (tableKeyBounded bounded) b)) =
-        order'.compare (readKey' a) (readKey' b) := agree
-  simp only [reads]
+  simp only [agree]
 
 /-- An ordered map as the declaration states it, keyed by the native values
 under their structural order (`NTy.keyOrder`), is valid exactly where the

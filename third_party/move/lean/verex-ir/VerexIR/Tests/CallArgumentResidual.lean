@@ -99,6 +99,10 @@ theorem caller_holds (G : GivenFrame) (State : Type) (unit : Validation.Validate
     (PProd.mk "guarded_callee" verified)]
   all_goals verex_solve
 
+/--
+info: 'VerexIR.Tests.CallArgumentResidual.caller_holds' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
 #print axioms caller_holds
 
 /-! ## The same contract with its slots swapped
@@ -197,5 +201,27 @@ set_option linter.unusedVariables false
 #guard_binders "c_ensures : 0 = 0", "c_frame : 1 = 1", "c_returns : 2 = 2" in
   ∀ (c_valid : True ∧ True) (c_ensures : 0 = 0) (c_frame : 1 = 1)
     (c_returns : 2 = 2), True
+
+-- An owned attempt that commits keeps what it wrote to the caches a failed
+-- attempt restores (`runAutomatic`); a failed one loses it.
+open Lean Meta Elab Tactic in
+example : True := by
+  run_tac do
+    let ledger ← IO.mkRef (({} : SharedBudgets.Ledger).allocate 20000000).1
+    let slotsAfter (commits : Bool) : TacticM Nat := do
+      (← targetState).assumedSlotSizes.set #[]
+      let (outcome, _) ← runAutomatic ledger #[0] .preparation do
+        (← targetState).assumedSlotSizes.modify (·.push (1, 1))
+        unless commits do throwError "deliberate failure of an owned attempt"
+      match outcome, commits with
+      | .done _, true => pure ()
+      | .failed _, false => pure ()
+      | _, _ => throwError "the attempt did not end as the control runs it"
+      return (← (← targetState).assumedSlotSizes.get).size
+    unless (← slotsAfter true) == 1 do
+      throwError "a committed owned attempt lost the cache entry it wrote"
+    unless (← slotsAfter false) == 0 do
+      throwError "a failed owned attempt kept the cache entry it wrote"
+  trivial
 
 end VerexIR.Tests.CallArgumentResidual

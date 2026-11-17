@@ -1,13 +1,9 @@
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:7:3: error: the specification clause `ensures result < entries.length ==> entries[result].value == key` is not established
-VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:10:15: error: the loop invariant `iter.iter.slice == entries && iter.iter.end == entries.length && iter.iter.pos <= iter.iter.end` is not preserved by an iteration
-VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:12:15: error: the loop invariant `∀ (k in 0 .. iter.iter.pos), entries[k].key != key` is not preserved by an iteration
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:4:6: error: verex verification failed: the automatic verification of `find_entry` failed; provide a proof in the module:
   verify find_entry by lean =>
     verex_obligations
     verex_on
     | ensures_2 => verex_prepare; sorry
-    | invariant_1_step => verex_prepare; sorry
-    | invariant_3_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:15:3: error: the specification clause `ensures values.length > 0 ==> result == values.length - 1` is not established
@@ -27,22 +23,18 @@ VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:17:6: error: v
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:23:3: error: the specification clause `ensures result < values.length ==> ∀ (k in 0 .. result), values[k] != target` is not established
-VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:27:15: error: the loop invariant `∀ (k in iter.iter.iter.end .. values.length), values[k] != target` is not preserved by an iteration
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:21:6: error: verex verification failed: the automatic verification of `last_position` failed; provide a proof in the module:
   verify last_position by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | invariant_3_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:30:3: error: the specification clause `ensures result == values.length + 1` is not established
-VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:32:15: error: the loop invariant `iter.iter.iter.pos == 0 && iter.iter.iter.slice == values` is not preserved by an iteration
 VerexE2ETests/SourceVerify/library_iter_adapters_errors.spec.lean:29:6: error: verex verification failed: the automatic verification of `rev_ranks` failed; provide a proof in the module:
   verify rev_ranks by lean =>
     verex_obligations
     verex_on
     | ensures_1 => verex_prepare; sorry
-    | invariant_1_step => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
