@@ -82,8 +82,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.99.1-trixie` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.99.1-trixie@sha256:4c4c8ec55be09785e6d6ac45ea9853525a73c15db74009100ac08952e773dfb8"
+    # Run `docker buildx imagetools inspect rust:1.100.0-trixie` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.100.0-trixie@sha256:e19840879045c951c905d0eaa9887f3439c62000e429963371b376bac8d38c31"
   }
   args = {
     PROFILE            = "${PROFILE}"
