@@ -124,16 +124,19 @@ impl BinaryUpdater for AptosUpdateTool {
 
         // Build a new configuration that will direct the library to download the
         // binary with the target version tag and target that we determined above.
-        Update::configure()
+        // The tag prefix lets self_update parse the release version from the tag.
+        let updater = Update::configure()
             .repo_owner(&self.repo_owner)
             .repo_name(&self.repo_name)
             .bin_name("aptos")
             .current_version(current_version)
-            .target_version_tag(&format!("{}{}", CLI_TAG_PREFIX, info.target_version))
+            .tag_prefix(CLI_TAG_PREFIX)
+            .release_tag(format!("{}{}", CLI_TAG_PREFIX, info.target_version))
             .target(target)
             .no_confirm(self.prompt_options.assume_yes)
             .build()
-            .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
+            .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))?;
+        Ok(Box::new(updater))
     }
 }
 

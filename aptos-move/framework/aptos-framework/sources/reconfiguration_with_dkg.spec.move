@@ -8,7 +8,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::staking_config;
         use aptos_framework::reconfiguration;
         use aptos_framework::reconfiguration_state;
-        pragma verify_duration_estimate = 120;
         requires exists<reconfiguration::Configuration>(@aptos_framework);
         requires chain_status::is_operating();
         include stake::ResourceRequirement;
@@ -82,6 +81,8 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config_seqnum::RandomnessConfigSeqNum>;
         include config_buffer::OnNewEpochRequirement<epoch_timeout_config::EpochTimeoutConfig>;
+        include config_buffer::OnNewEpochRequirement<chunky_dkg_config_seqnum::ChunkyDKGConfigSeqNum>;
+        include config_buffer::OnNewEpochRequirement<chunky_dkg_config::ChunkyDKGConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::AllowCustomMaxGasFlag>;
         include config_buffer::OnNewEpochRequirement<randomness_api_v0_config::RequiredGasDeposit>;
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;

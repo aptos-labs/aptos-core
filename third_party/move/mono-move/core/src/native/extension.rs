@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{native::native_invariant_violation, VMResult};
+use shared_dsa::UnorderedMap;
 use std::{
     any::{Any, TypeId},
     cell::{Ref, RefCell, RefMut},
-    collections::BTreeMap,
 };
 
 /// An extensible state defined by a native function. Persisted throughout
@@ -43,40 +43,49 @@ pub trait NativeExtension: Any {
 /// This is currently ensured by storing each extension in its own [`RefCell`];
 /// the extra indirection is unlikely to matter performance-wise.
 ///
-/// Keyed by `TypeId`, which orders the whole-collection walks (GC root
-/// relocation, checkpoint, rollback). That order is fixed within a build but
-/// not across compiler versions, since `TypeId`'s ordering is its hash. Today
-/// it is believed to affect only to-space layout and which extension reports
-/// an error first, not a committed result, but nothing enforces that.
-//
-// TODO(correctness): this must be fixed. The walks below follow `TypeId`'s
-// ordering, which is not stable across compiler versions, so two builds can
-// walk the extensions in different orders. Key the walks by registration
-// order instead (a `Vec` plus a `TypeId -> index` lookup).
+/// Whole-collection walks (GC root relocation, checkpoint, rollback) visit
+/// extensions in registration order, so the order is the same on every build.
+/// `TypeId` is used only for point lookups: its ordering is a hash that is not
+/// stable across compiler versions, so it must never order a walk.
 #[derive(Default)]
 pub struct NativeExtensions {
-    map: BTreeMap<TypeId, RefCell<Box<dyn NativeExtension>>>,
+    /// Extensions in registration order. Every walk iterates this.
+    exts: Vec<RefCell<Box<dyn NativeExtension>>>,
+    /// Index into `exts` by extension type. Never walked, and `TypeId`s are
+    /// not attacker-chosen, so the default (non-collision-resistant) hasher is
+    /// fine.
+    index: UnorderedMap<TypeId, usize>,
 }
 
 impl NativeExtensions {
     pub fn new() -> Self {
-        Self {
-            map: BTreeMap::new(),
-        }
+        Self::default()
+    }
+
+    fn cell<T: NativeExtension>(&self) -> VMResult<&RefCell<Box<dyn NativeExtension>>> {
+        self.index
+            .get(&TypeId::of::<T>())
+            .map(|&i| &self.exts[i])
+            .ok_or_else(|| {
+                native_invariant_violation(format!(
+                    "native extension {} not installed for this transaction",
+                    std::any::type_name::<T>(),
+                ))
+            })
     }
 
     /// Adds the extension to the collection.
     ///
     /// Panics if an extension of the same type is already present.
     pub fn add<T: NativeExtension>(&mut self, ext: T) {
-        let prev = self
-            .map
-            .insert(TypeId::of::<T>(), RefCell::new(Box::new(ext)));
+        let id = TypeId::of::<T>();
         assert!(
-            prev.is_none(),
+            !self.index.contains_key(&id),
             "duplicate native extension of type {}",
             std::any::type_name::<T>(),
         );
+        self.index.insert(id, self.exts.len());
+        self.exts.push(RefCell::new(Box::new(ext)));
     }
 
     /// Gets immutable access to the extension of type `T`.
@@ -86,12 +95,7 @@ impl NativeExtensions {
     /// trigger GC, checkpointing, or rollback, because each requires mutable
     /// access to every extension.
     pub fn get<T: NativeExtension>(&self) -> VMResult<Ref<'_, T>> {
-        let cell = self.map.get(&TypeId::of::<T>()).ok_or_else(|| {
-            native_invariant_violation(format!(
-                "native extension {} not installed for this transaction",
-                std::any::type_name::<T>(),
-            ))
-        })?;
+        let cell = self.cell::<T>()?;
         let guard = cell.try_borrow().map_err(|_| {
             native_invariant_violation(format!(
                 "native extension {} is already mutably borrowed",
@@ -113,12 +117,7 @@ impl NativeExtensions {
     /// trigger GC, checkpointing, or rollback, because each requires mutable
     /// access to every extension.
     pub fn get_mut<T: NativeExtension>(&self) -> VMResult<RefMut<'_, T>> {
-        let cell = self.map.get(&TypeId::of::<T>()).ok_or_else(|| {
-            native_invariant_violation(format!(
-                "native extension {} not installed for this transaction",
-                std::any::type_name::<T>(),
-            ))
-        })?;
+        let cell = self.cell::<T>()?;
         let guard = cell.try_borrow_mut().map_err(|_| {
             native_invariant_violation(format!(
                 "native extension {} is already borrowed",
@@ -147,7 +146,7 @@ impl NativeExtensions {
         &self,
         relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>,
     ) -> VMResult<()> {
-        for ext in self.map.values() {
+        for ext in &self.exts {
             let mut ext = ext.try_borrow_mut().map_err(|_| {
                 native_invariant_violation(
                     "a native extension is borrowed during GC (held across an allocation?)".into(),
@@ -161,7 +160,7 @@ impl NativeExtensions {
 
     /// Signals a checkpoint to every extension.
     pub fn checkpoint(&self) -> VMResult<()> {
-        for ext in self.map.values() {
+        for ext in &self.exts {
             ext.try_borrow_mut()
                 .map_err(|_| {
                     native_invariant_violation(
@@ -180,7 +179,7 @@ impl NativeExtensions {
         if n == 0 {
             return Ok(());
         }
-        for ext in self.map.values() {
+        for ext in &self.exts {
             ext.try_borrow_mut()
                 .map_err(|_| {
                     native_invariant_violation(
@@ -197,6 +196,7 @@ impl NativeExtensions {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::rc::Rc;
 
     struct Counter(u64);
     impl NativeExtension for Counter {
@@ -316,5 +316,59 @@ mod tests {
 
         // Nothing left to roll back.
         assert!(exts.rollback(1).is_err());
+    }
+
+    /// Records every hook call as `(hook, ID)` in a shared log. Each `ID`
+    /// is a distinct type, hence a distinct `TypeId`.
+    struct Probe<const ID: u8>(Rc<RefCell<Vec<(&'static str, u8)>>>);
+    impl<const ID: u8> NativeExtension for Probe<ID> {
+        unsafe fn relocate_roots(&mut self, _relocate: &mut dyn FnMut(*mut u8) -> Option<*mut u8>) {
+            self.0.borrow_mut().push(("relocate", ID));
+        }
+
+        fn on_checkpoint(&mut self) {
+            self.0.borrow_mut().push(("checkpoint", ID));
+        }
+
+        fn on_rollback(&mut self, _n: usize) -> VMResult<()> {
+            self.0.borrow_mut().push(("rollback", ID));
+            Ok(())
+        }
+    }
+
+    /// Registers the probes in `order` and returns the IDs each walk visited,
+    /// per hook.
+    fn walk_orders(order: [u8; 3]) -> [Vec<u8>; 3] {
+        let log = Rc::new(RefCell::new(vec![]));
+        let mut exts = NativeExtensions::new();
+        for id in order {
+            match id {
+                0 => exts.add(Probe::<0>(log.clone())),
+                1 => exts.add(Probe::<1>(log.clone())),
+                2 => exts.add(Probe::<2>(log.clone())),
+                _ => unreachable!("test only registers probes 0..3"),
+            }
+        }
+        // SAFETY: the probes hold no heap pointers and never call `relocate`.
+        unsafe { exts.relocate_all_roots(&mut |p| Some(p)) }.unwrap();
+        exts.checkpoint().unwrap();
+        exts.rollback(1).unwrap();
+
+        let log = log.borrow();
+        ["relocate", "checkpoint", "rollback"].map(|hook| {
+            log.iter()
+                .filter(|(h, _)| *h == hook)
+                .map(|(_, id)| *id)
+                .collect()
+        })
+    }
+
+    #[test]
+    fn walks_follow_registration_order() {
+        for order in [[0, 1, 2], [2, 0, 1], [1, 2, 0]] {
+            for visited in walk_orders(order) {
+                assert_eq!(visited, order);
+            }
+        }
     }
 }

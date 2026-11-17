@@ -49,16 +49,6 @@ impl EventStore {
             .ok_or_else(|| AptosDbError::NotFound(format!("Event {} of Txn {}", index, version)))
     }
 
-    pub fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {
-        let (ver, _) = self
-            .event_db
-            .get::<EventByKeySchema>(&(*event_key, seq_num))?
-            .ok_or_else(|| {
-                AptosDbError::NotFound(format!("Index entry should exist for seq_num {}", seq_num))
-            })?;
-        Ok(ver)
-    }
-
     pub fn get_event_by_key(
         &self,
         event_key: &EventKey,

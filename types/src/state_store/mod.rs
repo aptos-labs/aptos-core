@@ -39,6 +39,7 @@ pub enum StateKind {
     MainState,
     Position,
     Order,
+    Collateral,
 }
 
 pub type StateViewResult<T, E = StateViewError> = std::result::Result<T, E>;

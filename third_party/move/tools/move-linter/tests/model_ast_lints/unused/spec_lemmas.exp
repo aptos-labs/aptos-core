@@ -1,0 +1,9 @@
+
+Diagnostics:
+warning: [lint] function `unused_helper` is unused
+   ┌─ tests/model_ast_lints/unused/spec_lemmas.move:11:9
+   │
+11 │     fun unused_helper(): u64 {
+   │         ^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).

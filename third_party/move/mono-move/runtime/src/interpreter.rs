@@ -104,6 +104,8 @@ struct LoaderAdapter<'a, 'guard> {
     /// loader needs the read-set by `&mut`. As in [`ProductionNativeContext`],
     /// at most one borrow is live at a time.
     read_set: UnsafeCell<&'a mut ModuleReadSet<'guard>>,
+    /// The transaction's gas meter, charged by loads. Held like `read_set`.
+    gas_meter: UnsafeCell<&'a mut GasMeter<'guard>>,
 }
 
 impl LoaderAccess for LoaderAdapter<'_, '_> {
@@ -116,14 +118,14 @@ impl LoaderAccess for LoaderAdapter<'_, '_> {
 
     fn resolve_function(
         &self,
-        gas_meter: &mut GasMeter,
         module_id: InternedModuleId,
         func_name: &IdentStr,
         expected_ty: InternedType,
     ) -> VMResult<Result<InternedFunctionRef, FunctionResolutionError>> {
-        // SAFETY: this is the only borrow of the read-set, and it does not
-        // outlive the call.
+        // SAFETY: these are the only borrows of the read-set and the gas meter,
+        // and they do not outlive the call.
         let read_set = unsafe { &mut **self.read_set.get() };
+        let gas_meter = unsafe { &mut **self.gas_meter.get() };
         self.loader
             .resolve_function(read_set, gas_meter, module_id, func_name, expected_ty)
     }
@@ -591,7 +593,7 @@ impl fmt::Display for CallError<'_, '_> {
 }
 
 /// The [`ModuleId`] naming a frame's module, or [`None`] for a script frame.
-fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
+pub(crate) fn frame_module(module_id: InternedModuleId) -> Option<ModuleId> {
     (!is_script_module_id(module_id)).then(|| module_id_of(module_id))
 }
 
@@ -668,8 +670,28 @@ unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalE
 }
 
 /// Returns the callers of the frame identified by `regs`, most recent caller
-/// first, each at its call instruction. Excludes the current frame, so the
-/// root frame has an empty trace.
+/// first, each at its call instruction. See [`walk_callers`].
+///
+/// # Safety
+///
+/// Same as [`walk_callers`], with `regs.fp` as the frame pointer.
+#[cold]
+unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+    // SAFETY: forwarded from the caller.
+    let callers = unsafe { walk_callers(stack, regs.fp)? };
+    Ok(callers
+        .into_iter()
+        .map(|(caller, offset)| CallFrame {
+            module: frame_module(caller.module_id),
+            function: caller.def_idx,
+            offset,
+        })
+        .collect())
+}
+
+/// Returns the callers of the frame at `fp`, most recent caller first, each
+/// with the bytecode offset of its call instruction. Excludes the frame at
+/// `fp` itself, so the root frame has no callers.
 ///
 /// Each callee frame starts at a higher address than its caller. Bounds and
 /// ordering checks require each caller's frame pointer to be lower than its
@@ -678,18 +700,20 @@ unsafe fn locate_rejected_call(err: VMInternalError, fp: *mut u8) -> VMInternalE
 ///
 /// # Safety
 ///
-/// `regs.fp` must point to the root frame of `stack`, or to a frame from its
-/// last run with the stack unchanged since. The metadata chain must be the one
-/// written by the call protocol, and every function it references must still
-/// be alive.
+/// `fp` must point to the root frame of `stack`, to a live frame of the
+/// current run, or to a frame from its last run with the stack unchanged since.
+/// The metadata chain must be the one written by the call protocol, and every
+/// function it references must stay alive while `stack` is borrowed.
 // TODO(completeness): consider including the current frame. It is excluded to
 // match V1, and because the error or abort location already records it.
 #[cold]
-unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<Vec<CallFrame>> {
+pub(crate) unsafe fn walk_callers(
+    stack: &MemoryRegion,
+    mut fp: *mut u8,
+) -> VMResult<Vec<(&Function, BytecodeOffset)>> {
     let lowest = root_frame_base(stack);
     let highest = stack.as_ptr().wrapping_add(stack.len());
     let mut frames = Vec::new();
-    let mut fp = regs.fp;
     loop {
         if !(lowest..highest).contains(&fp) {
             invariant_violation!(Unreachable(
@@ -706,7 +730,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
         let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
         // The saved pc is the return address, one past the call micro-op.
         let (return_pc, _) = unsafe { saved_return_pc(fp) };
-        let Some((function, offset)) = return_pc
+        let Some((_, offset)) = return_pc
             .checked_sub(1)
             .and_then(|call_pc| bytecode_origin(caller, call_pc))
         else {
@@ -715,11 +739,7 @@ unsafe fn walk_stack_trace(stack: &MemoryRegion, regs: VMRegisters) -> VMResult<
                 caller.name()
             )));
         };
-        frames.push(CallFrame {
-            module: frame_module(caller.module_id),
-            function,
-            offset,
-        });
+        frames.push((caller, offset));
         let caller_fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
         if caller_fp >= fp {
             invariant_violation!(Unreachable(
@@ -743,7 +763,7 @@ pub struct InterpreterContext<'guard> {
     pub(crate) loader: Loader<'guard, 'guard>,
     /// Read-set of the modules loaded by this transaction.
     read_set: ModuleReadSet<'guard>,
-    pub(crate) gas_meter: GasMeter,
+    pub(crate) gas_meter: GasMeter<'guard>,
     /// A process-wide global native function table.
     natives: &'guard ProductionNativeRegistry,
     /// Per-transaction native extensions, shared across native calls.
@@ -766,6 +786,8 @@ pub struct InterpreterContext<'guard> {
     /// Per-session reentrancy checker state.
     reentrancy: ReentrancyState,
     rng: StdRng,
+    /// See [`InterpreterOptions::enable_debugging`].
+    enable_debugging: bool,
 }
 
 /// Construction options for an [`InterpreterContext`].
@@ -775,12 +797,23 @@ pub struct InterpreterContext<'guard> {
 pub struct InterpreterOptions {
     /// The VM heap's capacity in bytes.
     pub heap_size: usize,
+    /// Debug mode. It only affects the debug natives: `0x1::debug::native_print`
+    /// prints to stdout, and `0x1::debug::native_stack_trace` returns the
+    /// caller's call stack. Outside debug mode, the first does nothing and the
+    /// second returns an empty string. Nothing else changes.
+    ///
+    /// Enable it only for local testing, such as unit tests and test harnesses,
+    /// where V1 enables its `testing` feature. Never enable it on validators or
+    /// wherever execution must be deterministic: the stack trace is a value
+    /// visible to Move code, so nodes in different modes can diverge.
+    pub enable_debugging: bool,
 }
 
 impl Default for InterpreterOptions {
     fn default() -> Self {
         Self {
             heap_size: DEFAULT_HEAP_SIZE,
+            enable_debugging: false,
         }
     }
 }
@@ -789,7 +822,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// Creates a context with no call prepared, with default options.
     pub fn new(
         loader: Loader<'guard, 'guard>,
-        gas_meter: GasMeter,
+        gas_meter: GasMeter<'guard>,
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
     ) -> Self {
@@ -805,7 +838,7 @@ impl<'guard> InterpreterContext<'guard> {
     /// Creates a context with no call prepared.
     pub fn new_with_options(
         loader: Loader<'guard, 'guard>,
-        gas_meter: GasMeter,
+        gas_meter: GasMeter<'guard>,
         resource_provider: &'guard dyn ResourceProvider,
         natives: &'guard ProductionNativeRegistry,
         options: InterpreterOptions,
@@ -853,6 +886,7 @@ impl<'guard> InterpreterContext<'guard> {
             read_write_set: ResourceReadWriteSet::new(),
             reentrancy: ReentrancyState::new(),
             rng: StdRng::seed_from_u64(0),
+            enable_debugging: options.enable_debugging,
         }
     }
 
@@ -1038,6 +1072,7 @@ impl<'guard> InterpreterContext<'guard> {
             mut read_write_set,
             reentrancy: _,
             rng: _,
+            enable_debugging: _,
         } = self;
 
         // The call stack is gone and every handle is scoped to one allocation,
@@ -1075,9 +1110,12 @@ impl<'guard> InterpreterContext<'guard> {
     /// Runs `f` with gas metering suspended: the meter is swapped for an
     /// effectively unbounded one and restored afterwards, so loads and
     /// execution inside `f` never touch the transaction's budget. Used for
-    /// system code (prologue, epilogue) that runs unmetered by design.
+    /// system code (prologue, epilogue) that runs unmetered by design. The
+    /// swapped-in meter keeps the interrupt listener, so a session that polls
+    /// for interrupts keeps polling inside `f`.
     pub fn unmetered<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
-        let saved = std::mem::replace(&mut self.gas_meter, GasMeter::with_max_budget());
+        let unbounded = self.gas_meter.unbounded();
+        let saved = std::mem::replace(&mut self.gas_meter, unbounded);
         let result = f(self);
         self.gas_meter = saved;
         result
@@ -1187,12 +1225,7 @@ impl<'guard> InterpreterContext<'guard> {
 // in one place.
 //
 // `#[inline(always)]` ensures the closures and the helper itself are
-// folded into the caller in release builds. Inlining verified by
-// inspecting the release-build x64 asm for `step::<SimpleGasMeter>` on
-// 2026-04-30: zero standalone definitions for any helper or closure,
-// zero call/jmp instructions targeting them, and individual arms
-// compile to a handful of direct memory ops (e.g. AddU64 is 4 movs +
-// addq + jae + jmp).
+// folded into the caller in release builds.
 //
 // TODO(perf): re-verify inlining after non-trivial changes to the helpers,
 // the call sites, or the rustc/LLVM versions the workspace pins to.
@@ -1716,6 +1749,13 @@ unsafe fn int_cmp_bool(fp: *mut u8, lhs: FrameOffset, op: CmpKind, rhs: &IntOper
 // ---------------------------------------------------------------------------
 
 impl InterpreterContext<'_> {
+    /// Charges `amount` units at a jump, a call, or the entry of a run. Every
+    /// loop iteration and every recursion passes one of these.
+    #[inline(always)]
+    fn charge_gas(&mut self, amount: u64) -> VMResult<()> {
+        Ok(self.gas_meter.charge(amount)?)
+    }
+
     /// Shared body of the conditional `Jump*` micro-ops: charge the chosen
     /// edge's cost, then jump to `target` or fall through to the next pc.
     #[inline(always)]
@@ -1728,10 +1768,10 @@ impl InterpreterContext<'_> {
         regs: &mut VMRegisters,
     ) -> VMResult<()> {
         if cond {
-            self.gas_meter.charge(gas_taken)?;
+            self.charge_gas(gas_taken)?;
             regs.pc = target.into();
         } else {
-            self.gas_meter.charge(gas_fallthrough)?;
+            self.charge_gas(gas_fallthrough)?;
             regs.pc += 1;
         }
         Ok(())
@@ -1780,7 +1820,7 @@ impl InterpreterContext<'_> {
     fn dispatch_loop(&mut self, regs: &mut VMRegisters) -> VMResult<RuntimeStatus> {
         // Charge the entry function's entry block before any of its instructions run.
         let entry_gas = unsafe { regs.func.as_ref() }.entry_gas;
-        self.gas_meter.charge(entry_gas)?;
+        self.charge_gas(entry_gas)?;
 
         Ok(loop {
             // SAFETY: Current function is always a valid, non-null pointer because
@@ -2135,7 +2175,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Jump { target, gas } => {
-                        self.gas_meter.charge(gas)?;
+                        self.charge_gas(gas)?;
                         regs.pc = target.into();
                         continue;
                     },
@@ -3589,7 +3629,7 @@ impl InterpreterContext<'_> {
         flag: FrameFlag,
     ) -> VMResult<()> {
         // Charge the callee's entry block before any of its instructions run.
-        self.gas_meter.charge(callee.entry_gas)?;
+        self.charge_gas(callee.entry_gas)?;
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
@@ -3691,18 +3731,19 @@ impl InterpreterContext<'_> {
             let loader = LoaderAdapter {
                 loader: &self.loader,
                 read_set: UnsafeCell::new(&mut self.read_set),
+                gas_meter: UnsafeCell::new(&mut self.gas_meter),
             };
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
                 view_type_list(ty_args),
-                &mut self.gas_meter,
                 guard,
                 self.resource_provider,
                 &loader,
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,
+                self.enable_debugging.then_some(&self.stack),
             );
             func(&ctx)
         };

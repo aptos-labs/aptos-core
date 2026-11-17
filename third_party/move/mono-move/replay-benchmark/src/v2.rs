@@ -19,7 +19,9 @@ use aptos_types::{
 };
 use aptos_vm_environment::environment::AptosEnvironment;
 use mono_move_aptos_state_view_providers::{StateViewModuleProvider, StateViewResourceProvider};
-use mono_move_aptos_transaction_executor::{production_natives, AptosTransactionExecutor};
+use mono_move_aptos_transaction_executor::{
+    production_natives, AptosTransactionExecutor, NoInterrupts,
+};
 use mono_move_global_context::GlobalContext;
 
 pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun> {
@@ -41,6 +43,7 @@ pub fn run(input: &BenchmarkInput, timing: &TimingConfig) -> Result<BenchmarkRun
         natives,
         &module_provider,
         &data_provider,
+        &NoInterrupts,
         &env,
         usage,
     )

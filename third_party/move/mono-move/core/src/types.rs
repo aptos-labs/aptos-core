@@ -560,7 +560,7 @@ pub fn intrinsic_slot_size_and_align(ty: &Type) -> Option<(Size, Alignment)> {
         // References are 16-byte fat pointers, 8-byte aligned.
         Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
 
-        // Function values - TODO(completeness): for now use heap pointer values.
+        // Function values: pointer to the heap-allocated closure object.
         Type::Function { .. } => (8, 8),
 
         // Nominal size is the sum of its fields (resolved through the layout

@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function argument may modify resource `state_stored_spec_mention::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:46:40
+   │
+46 │     fun via_modifies(): H acquires R { store_modifies(|_x| { bump(); 0 }) }
+   │                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument may modify resource `state_stored_spec_mention::S`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:48:26
+   │
+48 │     fun via_proof(): H { store_proof(|_x| { bump(); 0 }, 1) }
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

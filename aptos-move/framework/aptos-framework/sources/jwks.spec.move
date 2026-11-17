@@ -5,9 +5,8 @@ spec aptos_framework::jwks {
     }
 
     spec on_new_epoch(framework: &signer) {
-        requires @aptos_framework == std::signer::address_of(framework);
-        include config_buffer::OnNewEpochRequirement<SupportedOIDCProviders>;
-        aborts_if false;
+        pragma opaque;
+        include config_buffer::OnNewEpochApply<SupportedOIDCProviders>;
     }
 
     spec initialize(fx: &signer) {
@@ -28,7 +27,17 @@ spec aptos_framework::jwks {
     }
 
     spec initialize_with_defaults(fx: &signer, providers: vector<OIDCProvider>, patches: vector<Patch>) {
-        pragma verify = false;
+        // Aborts from applying `patches` are not specified.
+        pragma aborts_if_is_partial;
+        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        aborts_if exists<SupportedOIDCProviders>(@aptos_framework);
+        aborts_if exists<ObservedJWKs>(@aptos_framework);
+        aborts_if exists<Patches>(@aptos_framework);
+        aborts_if exists<PatchedJWKs>(@aptos_framework);
+        ensures global<SupportedOIDCProviders>(@aptos_framework).providers == providers;
+        ensures global<ObservedJWKs>(@aptos_framework).jwks.entries == vector[];
+        ensures global<Patches>(@aptos_framework).patches == patches;
+        ensures exists<PatchedJWKs>(@aptos_framework);
     }
 
     spec upsert_oidc_provider(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> {
@@ -113,6 +122,42 @@ spec aptos_framework::jwks {
 
     spec try_get_jwk_by_id(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
         pragma verify_duration_estimate = 80;
+    }
+
+    spec get_jwk_id(jwk: &JWK): vector<u8> {
+        use aptos_std::from_bcs;
+        let name = jwk.variant.type_name.bytes;
+        let data = jwk.variant.data;
+        aborts_if name != b"0x1::jwks::RSA_JWK" && name != b"0x1::jwks::UnsupportedJWK"
+            with error::INVALID_ARGUMENT;
+        aborts_if name == b"0x1::jwks::RSA_JWK" && !from_bcs::deserializable<RSA_JWK>(data);
+        aborts_if name == b"0x1::jwks::UnsupportedJWK" && !from_bcs::deserializable<UnsupportedJWK>(data);
+        ensures name == b"0x1::jwks::RSA_JWK" ==> result == from_bcs::deserialize<RSA_JWK>(data).kid.bytes;
+        ensures name == b"0x1::jwks::UnsupportedJWK" ==> result == from_bcs::deserialize<UnsupportedJWK>(data).id;
+    }
+
+    /// Either an existing entry is replaced and returned, or a new entry is inserted.
+    spec upsert_provider_jwks(jwks: &mut AllProvidersJWKs, provider_jwks: ProviderJWKs): Option<ProviderJWKs> {
+        use std::option;
+        use std::vector;
+        // Aborts are not specified: the search loop has no invariant bounding the index.
+        pragma aborts_if_is_partial;
+        ensures option::is_none(result) ==> len(jwks.entries) == len(old(jwks).entries) + 1;
+        ensures option::is_some(result) ==> len(jwks.entries) == len(old(jwks).entries)
+            && vector::spec_contains(old(jwks).entries, option::borrow(result));
+    }
+
+    /// Either an existing JWK is replaced and returned, or a new JWK is inserted; issuer and version are unchanged.
+    spec upsert_jwk(set: &mut ProviderJWKs, jwk: JWK): Option<JWK> {
+        use std::option;
+        use std::vector;
+        // Aborts are not specified: the search loop has no invariant bounding the index.
+        pragma aborts_if_is_partial;
+        ensures set.issuer == old(set).issuer;
+        ensures set.version == old(set).version;
+        ensures option::is_none(result) ==> len(set.jwks) == len(old(set).jwks) + 1;
+        ensures option::is_some(result) ==> len(set.jwks) == len(old(set).jwks)
+            && vector::spec_contains(old(set).jwks, option::borrow(result));
     }
 
     spec remove_issuer(jwks: &mut AllProvidersJWKs, issuer: vector<u8>): Option<ProviderJWKs> {

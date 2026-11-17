@@ -30,7 +30,8 @@ spec aptos_framework::randomness_api_v0_config {
 
     spec on_new_epoch(framework: &signer) {
         pragma opaque;
-        include config_buffer::OnNewEpochApply<RequiredGasDeposit>;
-        include config_buffer::OnNewEpochApply<AllowCustomMaxGasFlag>;
+        include config_buffer::OnNewEpochApplyBase<RequiredGasDeposit>;
+        include config_buffer::OnNewEpochApplyBase<AllowCustomMaxGasFlag>;
+        include config_buffer::OtherPendingConfigsUnchanged<RequiredGasDeposit, AllowCustomMaxGasFlag>;
     }
 }

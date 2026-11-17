@@ -109,7 +109,38 @@ spec aptos_framework::genesis {
         ensures exists<stake::AptosCoinCapabilities>(@aptos_framework);
     }
 
-    spec initialize_validator {
+    spec initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
+        use aptos_framework::reconfiguration_state;
+        // Aborts of the key validation and of joining the validator set are not specified.
+        pragma aborts_if_is_partial;
+        aborts_if reconfiguration_state::spec_is_in_progress();
+        aborts_if !exists<stake::StakePool>(pool_address);
+        aborts_if !exists<stake::ValidatorConfig>(pool_address);
+        aborts_if validator.operator_address != global<stake::StakePool>(pool_address).operator_address;
+        let post config = global<stake::ValidatorConfig>(pool_address);
+        ensures config.consensus_pubkey == validator.consensus_pubkey;
+        ensures config.network_addresses == validator.network_addresses;
+        ensures config.fullnode_addresses == validator.full_node_network_addresses;
+        ensures stake::spec_contains(global<stake::ValidatorSet>(@aptos_framework).pending_active, pool_address);
+    }
+
+    spec initialize_core_resources_and_aptos_coin {
+        use aptos_framework::account;
+        // Aborts of pairing the coin and of registering and funding the core resources account are not specified.
+        pragma aborts_if_is_partial;
+        aborts_if std::signer::address_of(aptos_framework) != @aptos_framework;
+        aborts_if len(core_resources_auth_key) != 32;
+        ensures exists<stake::AptosCoinCapabilities>(@aptos_framework);
+        ensures global<account::Account>(@core_resources).authentication_key == core_resources_auth_key;
+    }
+
+    spec create_account(aptos_framework: &signer, account_address: address, balance: u64): signer {
+        use aptos_framework::account;
+        // Aborts of registering and minting the initial balance are not specified.
+        pragma aborts_if_is_partial;
+        aborts_if !account::spec_exists_at(account_address) && (account_address == @vm_reserved
+            || account_address == @aptos_framework || account_address == @aptos_token);
+        ensures std::signer::address_of(result) == account_address;
     }
 
     spec create_accounts {

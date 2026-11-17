@@ -28,7 +28,7 @@ spec aptos_framework::managed_coin {
     /// Criticality: High
     /// Implementation: The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin
     /// supply accordingly.
-    /// Enforcement: Enforced via [coin::high-level-req-4](TotalSupplyNoChange).
+    /// Enforcement: Audited that mint and burn change the supply only through coin::mint and coin::burn.
     ///
     /// No.: 5
     /// Requirement: Before burning coins, exact amount of coins are withdrawn.

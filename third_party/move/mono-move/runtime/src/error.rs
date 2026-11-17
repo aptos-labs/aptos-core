@@ -529,8 +529,8 @@ pub enum RuntimeStatus {
     Aborted {
         code: u64,
         message: Option<String>,
-        /// The module that raised the abort.
-        /// TODO(completeness): extend with aborts in scripts.
+        /// Where the abort was raised: the module, or
+        /// [`AbortLocation::Script`] for an abort in script code.
         location: AbortLocation,
         /// The aborting instruction. `None` for a native abort.
         offset: Option<(FunctionDefinitionIndex, BytecodeOffset)>,

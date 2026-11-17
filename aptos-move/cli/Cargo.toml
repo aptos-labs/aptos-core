@@ -18,7 +18,7 @@ required-features = ["binary"]
 
 [features]
 default = []
-binary = ["testing"]
+binary = ["testing", "dep:jemallocator"]
 testing = ["aptos-vm/testing", "mono-move-unit-test-backend/testing"]
 
 [dependencies]
@@ -83,7 +83,7 @@ toml = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-jemallocator = { workspace = true }
+jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
 aptos-package-builder = { workspace = true }

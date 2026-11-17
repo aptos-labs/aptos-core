@@ -1,0 +1,8 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_field_origin.move:1:1: error: VIR-SEMANTIC-TYPE: in fun framed_to_empty: function argument types differ from the callee signature at [1437, 1448)
+VIR-SEMANTIC-TYPE: in fun framed_to_framed: function argument types differ from the callee signature at [1557, 1570)
+VIR-SEMANTIC-TYPE: in fun framed_to_wild: function argument types differ from the callee signature at [1608, 1621)
+VIR-SEMANTIC-TYPE: in fun unframed_to_empty: function argument types differ from the callee signature at [1158, 1169)
+VIR-SEMANTIC-TYPE: in fun unframed_to_wild: function argument types differ from the callee signature at [1504, 1517)
+VIR-SEMANTIC-TYPE: in fun unframed_unpacked_to_empty: function argument types differ from the callee signature at [1253, 1261)
+VIR-SEMANTIC-TYPE: in fun unframed_variant_to_empty: function argument types differ from the callee signature at [1314, 1325)

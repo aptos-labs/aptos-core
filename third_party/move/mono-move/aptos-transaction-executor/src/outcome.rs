@@ -33,6 +33,10 @@ pub enum TxnOutcome {
     /// reads nor the writes survive it, so there is no per-transaction output
     /// and the block must be aborted.
     Panic(VMInternalError),
+    /// Stopped on request of the block executor, e.g. because Block-STM
+    /// aborted this incarnation. Nothing here may be published, and the
+    /// transaction must be re-executed.
+    Interrupted,
     /// Committed with no side effects and a zero fee. The reason distinguishes
     /// a transaction that had nothing to do from a block epilogue whose
     /// failure was absorbed; both render as an empty success.
@@ -59,6 +63,7 @@ impl TxnOutcome {
             TxnOutcome::Discarded { .. }
             | TxnOutcome::UnexpectedSystemTransactionFailure(_)
             | TxnOutcome::Panic(_)
+            | TxnOutcome::Interrupted
             | TxnOutcome::ExecutedNoEffects(_) => Ok(false),
         }
     }
@@ -101,6 +106,10 @@ impl TxnOutcome {
             TxnOutcome::Panic(err) => Err(MaterializationError::new(vec![format!(
                 "session could not be closed: {err:?}"
             )])),
+            // The block executor re-executes an interrupted transaction instead.
+            TxnOutcome::Interrupted => Err(MaterializationError::new(vec![
+                "interrupted transaction has no output".to_string(),
+            ])),
             TxnOutcome::ExecutedNoEffects(_) => Ok((
                 materialize::empty_success_output(auxiliary_data),
                 MaterializedGroups::new(),

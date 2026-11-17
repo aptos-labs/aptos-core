@@ -225,7 +225,11 @@ pub fn mono_runner<'a>(
         .intern_identifier(function_name)
         .into_global_arena_ptr();
 
-    let mut options = InterpreterOptions::default();
+    // Debug mode matches V1, whose debug natives the `testing` feature enables.
+    let mut options = InterpreterOptions {
+        enable_debugging: true,
+        ..InterpreterOptions::default()
+    };
     if let Some(n) = heap_size {
         options.heap_size = n;
     }

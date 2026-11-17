@@ -6,11 +6,13 @@ use crate::{
     ledger_db::LedgerDb,
     native_store::{
         bundle::{NativeStoreBundle, NativeStoreConfigs},
+        state_sync::NativeStoreReader,
         CollateralStore, NativeStoreSpec,
     },
     utils::truncation_helper::get_native_commit_progress,
 };
 use aptos_config::config::StorageDirPaths;
+use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_schemadb::{Cache, Env};
@@ -128,6 +130,51 @@ impl AptosDB {
 }
 
 impl AptosDB {
+    pub(crate) fn collateral_store_reader(&self) -> Result<NativeStoreReader<'_, CollateralStore>> {
+        let bundle = self
+            .collateral
+            .as_ref()
+            .ok_or_else(|| AptosDbError::Other("native-collateral store is not enabled".into()))?;
+        Ok(bundle.store.reader(&self.ledger_db))
+    }
+
+    /// Rebuild the collateral store against the snapshot a fast sync just
+    /// restored at `version`: the store, then the resident index and the
+    /// overlay over it.
+    pub(crate) fn reset_collateral_after_fast_sync(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        let Some(bundle) = self.collateral.as_ref() else {
+            return Ok(());
+        };
+        bundle.store.reset_after_fast_sync(
+            &self.ledger_db,
+            version,
+            expected_root_hash,
+            |rows| {
+                // Held across the rebuild: until the re-seat the published
+                // overlay relates to nothing in the base.
+                let mut tip = bundle.collateral.lock();
+                bundle.collateral_base.reset_from_rows(
+                    Some(version),
+                    COLLATERAL_INDEX_FAMILY,
+                    rows.into_iter().flatten(),
+                )?;
+                *tip = bundle.collateral_base.new_overlay();
+                Ok(())
+            },
+        )?;
+
+        info!(
+            version = version,
+            n_accounts = bundle.collateral_base.read(|view| view.num_accounts()),
+            "Collateral store reset after fast sync."
+        );
+        Ok(())
+    }
+
     /// Bring the collateral store up to the ledger after a restore saved
     /// transactions past its snapshot without executing them.
     pub(crate) fn reset_collateral_store_to_ledger(&self) -> Result<()> {

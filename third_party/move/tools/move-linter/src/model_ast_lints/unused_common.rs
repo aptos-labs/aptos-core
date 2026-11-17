@@ -22,10 +22,16 @@ const EXCLUDED_FUNCTION_NAMES: &[&str] = &["init_module"];
 const FUNCTION_SUPPRESSION_ATTRS: &[&str] = &["persistent", "view"];
 
 /// Returns true if the function should be skipped (entry, test-only, excluded,
-/// suppressed, or a synthetic `const$NAME` accessor).
+/// suppressed, a synthetic `const$NAME` accessor, or the synthetic function of a
+/// spec lemma).
+///
+/// Lemmas are used only by `apply` in proof blocks, which the call graph does not
+/// record, and `lint::skip` is not accepted on them; the prover verifies each one
+/// on its own whether or not anything applies it.
 pub fn should_skip_function(func: &FunctionEnv) -> bool {
     let env = func.module_env.env;
     func.is_const_accessor()
+        || func.is_lemma()
         || func.is_script_or_entry()
         || func.is_test_or_verify_only()
         || EXCLUDED_FUNCTION_NAMES

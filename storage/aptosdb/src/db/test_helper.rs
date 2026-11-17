@@ -783,6 +783,10 @@ pub fn verify_committed_transactions(
             txn_info.transaction_hash(),
             txn_to_commit.transaction().committed_hash()
         );
+        assert_eq!(
+            db.is_known_state_checkpoint(cur_ver),
+            txn_to_commit.has_state_checkpoint_hash()
+        );
 
         // Fetch and verify account states.
         for (state_key, state_value) in txn_to_commit.write_set().state_update_refs() {

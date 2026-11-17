@@ -42,7 +42,7 @@ use move_stackless_bytecode::{
         Operation, PropKind,
     },
     usage_analysis,
-    usage_analysis::UsageState,
+    usage_analysis::{ReachedEffects, UsageState},
     COMPILED_MODULE_AVAILABLE,
 };
 use std::{
@@ -67,12 +67,15 @@ const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness
 pub struct SpecInstrumentationProcessor {
     /// Memory usage of every function, taken before instrumentation changes the code.
     usage: Mutex<BTreeMap<QualifiedId<FunId>, UsageState>>,
+    /// Closure footprint walks, taken before instrumentation clears or rewrites any body.
+    reached: Mutex<ReachedCache>,
 }
 
 impl SpecInstrumentationProcessor {
     pub fn new() -> Box<Self> {
         Box::new(Self {
             usage: Mutex::new(BTreeMap::new()),
+            reached: Mutex::new(ReachedCache::new()),
         })
     }
 }
@@ -94,9 +97,13 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
         // a frame declaration for memory the target modifies.
         if !ProverOptions::get(env).inference {
             check_modifies(env, targets);
-            check_fun_arg_frames(env, targets, &usage);
         }
+        // Runs in every mode: the usage analysis counts an undeclared function parameter as
+        // bounded only because this check enforces its frame.
+        let reached = reached_cache(env, targets, &usage);
+        check_fun_arg_frames(env, targets, &usage, &reached);
         *self.usage.lock().unwrap() = usage;
+        *self.reached.lock().unwrap() = reached;
     }
 
     fn process(
@@ -117,6 +124,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
         let is_verified = verification_info.verified;
         let is_inlined = verification_info.inlined;
         let usage = self.usage.lock().unwrap();
+        let reached = self.reached.lock().unwrap();
 
         if is_verified {
             // Create a clone of the function data, moving annotations
@@ -130,6 +138,7 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 verification_data,
                 scc_opt,
                 &usage,
+                &reached,
             );
             verification_data = instrumented;
 
@@ -160,7 +169,8 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt, &usage);
+            let (data, _) =
+                Instrumenter::run(&options, targets, fun_env, data, scc_opt, &usage, &reached);
             data
         } else {
             // Clear code but keep function data stub.
@@ -663,6 +673,7 @@ impl<'a> Instrumenter<'a> {
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
         usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+        reached: &ReachedCache,
     ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
         // Pre-collect properties and opaque-callee effects from the original code.
         let memory_free_callees = data
@@ -764,6 +775,7 @@ impl<'a> Instrumenter<'a> {
             fun_env.module_env.env,
             fun_env.get_qualified_id(),
             usage,
+            reached,
             &data.code,
         );
 
@@ -1450,16 +1462,20 @@ impl<'a> Instrumenter<'a> {
                 .collect_vec();
             self.emit_global_havocs(unframed_memory);
 
-            // What a function-typed argument may modify: its footprint if it is a known
-            // closure, otherwise the frame the callee declares for the parameter.
+            // What a function-typed argument may modify: at least the frame the callee
+            // declares for the parameter. A known closure footprint may replace it: it covers
+            // everything the closure writes, in any module; where the frame check runs, it also
+            // lies within that frame.
             let mut arg_writes = BTreeSet::new();
             for (param, src) in callee_env.get_parameters().iter().zip(&srcs) {
                 if !param.1.skip_reference().is_function() {
                     continue;
                 }
-                if let Some(footprint) = self.closure_footprints.get(src) {
+                let footprint = self.closure_footprints.get(src);
+                if let Some(footprint) = footprint {
                     arg_writes.extend(footprint.writes.iter().cloned());
-                } else {
+                }
+                if !footprint.is_some_and(|f| f.known) {
                     let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
                     arg_writes.extend(frame.writes);
                 }
@@ -3149,17 +3165,62 @@ fn find_behavior_pre_label_for_callee(
 struct ClosureFootprint {
     /// Memory havoced across a call the closure is passed to: what its target's usage summary
     /// writes, and when the closure's effects are known, also what a call to the target
-    /// writes as the prover encodes it (`usage_analysis::call_effects`).
+    /// writes as the prover encodes it (`usage_analysis::call_effects`), what the functions
+    /// encoded from their contracts that its code reaches write, and the declared frames of
+    /// its target's captured function-typed parameters
+    /// (`usage_analysis::closures_with_known_footprint`).
     writes: BTreeSet<QualifiedInstId<StructId>>,
     /// Whether the closure's effects are known (`usage_analysis::closures_with_known_footprint`),
-    /// which is what a callee leaving the frame to the call site requires. A closure whose
-    /// effects are not known is rejected by the frame check in target modules; elsewhere,
-    /// `writes` still covers what its target's summary records.
+    /// which is what a callee leaving the frame to the call site requires, and what lets
+    /// `writes` stand in for a declared frame in the havoc. For a closure whose effects are
+    /// not known, the havoc covers the declared frame as well.
     known: bool,
-    /// Memory written by the code of the target and its callees.
-    code_writes: BTreeSet<QualifiedInstId<StructId>>,
-    /// Memory read or written by the code of the target and its callees.
-    code_accessed: BTreeSet<QualifiedInstId<StructId>>,
+}
+
+/// `usage_analysis::contract_effects_reached` for every closure target and instantiation in
+/// the program, computed in `initialize` from the bodies before instrumentation clears or
+/// rewrites any of them. The frame check and the instrumentation both read it, so they agree
+/// on every closure's footprint whatever the verification scope and processing order.
+type ReachedCache = BTreeMap<(QualifiedId<FunId>, Vec<Type>), Option<ReachedEffects>>;
+
+fn reached_cache(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+) -> ReachedCache {
+    let summary_of = |id: QualifiedId<FunId>| usage.get(&id).cloned();
+    let mut cache = ReachedCache::new();
+    for fun_id in targets.get_funs() {
+        let Some(data) = targets.get_data(&fun_id, &FunctionVariant::Baseline) else {
+            continue;
+        };
+        for bc in &data.code {
+            let Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, _), _, _) = bc else {
+                continue;
+            };
+            let target_id = mid.qualified(*fid);
+            cache.entry((target_id, targs.clone())).or_insert_with(|| {
+                usage_analysis::contract_effects_reached(
+                    env,
+                    targets,
+                    &summary_of,
+                    target_id,
+                    targs,
+                )
+            });
+        }
+    }
+    cache
+}
+
+/// The cached walk for a closure over `fun_id` at `inst`; `None` (unknown) for one the cache
+/// does not cover.
+fn reached_in(
+    reached: &ReachedCache,
+    fun_id: QualifiedId<FunId>,
+    inst: &[Type],
+) -> Option<ReachedEffects> {
+    reached.get(&(fun_id, inst.to_vec())).cloned().flatten()
 }
 
 /// Whether `temp` is bound, in `code`, to a closure whose target's usage summary has
@@ -3186,6 +3247,7 @@ fn closure_footprints(
     env: &GlobalEnv,
     enclosing: QualifiedId<FunId>,
     usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    reached: &ReachedCache,
     code: &[Bytecode],
 ) -> BTreeMap<TempIndex, ClosureFootprint> {
     // A loop head havocs every temporary the body assigns, a closure among them, so a
@@ -3202,30 +3264,28 @@ fn closure_footprints(
         }
     }
     let summary_of = |id: QualifiedId<FunId>| usage.get(&id).cloned();
-    let known = usage_analysis::closures_with_known_footprint(env, enclosing, code, &summary_of);
+    let known = usage_analysis::closures_with_known_footprint(
+        env,
+        enclosing,
+        code,
+        &summary_of,
+        &|fun_id, inst| reached_in(reached, fun_id, inst),
+    );
     code.iter()
         .filter_map(|bc| match bc {
             Bytecode::Call(_, dests, Operation::Closure(mid, fid, targs, _), _, _)
                 if dests.len() == 1 && def_counts[&dests[0]] == 1 =>
             {
                 let target_usage = usage.get(&mid.qualified(*fid))?;
-                let code_writes = target_usage.modified.get_all_inst(targs);
-                let mut writes = code_writes.clone();
+                let mut writes = target_usage.modified.get_all_inst(targs);
                 writes.extend(target_usage.invoke_frame.get_all_inst(targs));
                 let effects = known.get(&dests[0]);
                 if let Some(effects) = effects {
                     writes.extend(effects.writes.iter().cloned());
                 }
-                let code_accessed = target_usage
-                    .code_accessed
-                    .iter()
-                    .map(|mem| mem.instantiate_ref(targs))
-                    .collect();
                 Some((dests[0], ClosureFootprint {
                     writes,
                     known: effects.is_some(),
-                    code_writes,
-                    code_accessed,
                 }))
             },
             _ => None,
@@ -3249,9 +3309,13 @@ struct DeclaredFrame {
 impl DeclaredFrame {
     fn of_fun_param(fun_env: &FunctionEnv, param: Symbol, targs: &[Type]) -> Self {
         let param_access = fun_env.get_fun_param_access_of();
-        let Some(access) = param_access.iter().find(|a| a.fun_param == param) else {
-            return Self::default();
-        };
+        match param_access.iter().find(|a| a.fun_param == param) {
+            Some(access) => Self::of_access(access, targs),
+            None => Self::default(),
+        }
+    }
+
+    fn of_access(access: &ast::FunParamAccessOf, targs: &[Type]) -> Self {
         let inst = |mems: &BTreeSet<QualifiedInstId<StructId>>| {
             mems.iter()
                 .map(|mem| mem.instantiate_ref(targs))
@@ -3266,20 +3330,281 @@ impl DeclaredFrame {
     }
 }
 
-/// Checks that a closure passed to an opaque function stays within the frame the callee
-/// declares for the parameter. The callee is verified under that frame, and its callers
-/// assume the result. The closure is judged by what its code accesses; frames of function
-/// values it invokes are not included.
+/// The function-typed parameters, by function and position, whose frames the function's
+/// verification does not rely on, so a call site need not check them.
+///
+/// A parameter is exempt only when every use of it, and of every value copied from it or read
+/// through a reference to it, is one of: a direct `Ret`; a drop; or an operand of a
+/// `Pack`/`PackVariant` whose result is only returned, written through a reference parameter
+/// or into global storage (`WriteRef`, `MoveTo`) or dropped, in a function that reads no field
+/// of that struct. Storing hands the obligation to the frame of the field the value is stored
+/// in. Every other use -- an invocation, an argument of any call, a capture, a container
+/// operation, a borrow, a mention in a specification -- relies on the frame.
+fn frame_exempt_params(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+) -> BTreeSet<(QualifiedId<FunId>, usize)> {
+    let mut exempt = BTreeSet::new();
+    for fun_id in targets.get_funs() {
+        let fun = env.get_function(fun_id);
+        if fun.is_native_or_intrinsic() {
+            continue;
+        }
+        let params = fun.get_parameters();
+        let fun_params: Vec<usize> = (0..params.len())
+            .filter(|idx| params[*idx].1.skip_reference().is_function())
+            .collect();
+        if fun_params.is_empty() {
+            continue;
+        }
+        let Some(data) = targets.get_data(&fun_id, &FunctionVariant::Baseline) else {
+            continue;
+        };
+        let target = FunctionTarget::new(&fun, data);
+        let code = target.get_bytecode();
+        let mut spec_temps = BTreeSet::new();
+        let mut spec_vars = BTreeSet::new();
+        spec_mentions(&fun.get_spec(), &mut spec_temps, &mut spec_vars);
+        for bc in code {
+            match bc {
+                Bytecode::Prop(_, _, exp) => {
+                    spec_temps.extend(exp.used_temporaries());
+                    spec_vars.extend(exp.free_vars());
+                },
+                Bytecode::SpecBlock(_, spec) => {
+                    spec_mentions(spec, &mut spec_temps, &mut spec_vars)
+                },
+                _ => {},
+            }
+        }
+        for idx in fun_params {
+            if !spec_vars.contains(&params[idx].0) && only_escapes(&target, idx, &spec_temps) {
+                exempt.insert((fun_id, idx));
+            }
+        }
+    }
+    exempt
+}
+
+/// Adds the temporaries and free variables named anywhere in `spec` to `temps` and `vars`:
+/// every expression of every condition and ghost update, the `modifies` targets, the proof,
+/// and the code-point specs.
+fn spec_mentions(spec: &ast::Spec, temps: &mut BTreeSet<TempIndex>, vars: &mut BTreeSet<Symbol>) {
+    let conds = spec.conditions.iter().chain(spec.update_map.values());
+    let frame_exps = spec
+        .frame_spec
+        .iter()
+        .flat_map(|frame| frame.modifies_targets.iter());
+    for exp in conds
+        .flat_map(|cond| cond.all_exps())
+        .chain(frame_exps)
+        .chain(spec.proof_exps())
+    {
+        temps.extend(exp.used_temporaries());
+        vars.extend(exp.free_vars());
+    }
+    for on_impl in spec.on_impl.values() {
+        spec_mentions(on_impl, temps, vars);
+    }
+}
+
+/// Whether every use of the function value in parameter `param` of `target`, and of every
+/// value copied from it or read through a reference to it, is one of the escapes
+/// `frame_exempt_params` allows.
+fn only_escapes(
+    target: &FunctionTarget,
+    param: TempIndex,
+    spec_temps: &BTreeSet<TempIndex>,
+) -> bool {
+    let code = target.get_bytecode();
+    let derived = derived_by_copy(code, BTreeSet::from([param]));
+    let mut packed = BTreeSet::new();
+    let mut packed_structs = BTreeSet::new();
+    for bc in code {
+        let srcs = match bc {
+            Bytecode::Prop(..) | Bytecode::SaveMem(..) | Bytecode::SaveSpecVar(..) => continue,
+            Bytecode::SpecBlock(..) => continue,
+            _ => bc.sources(),
+        };
+        if !srcs.iter().any(|src| derived.contains(src)) {
+            continue;
+        }
+        match bc {
+            Bytecode::Assign(_, dest, _, _) if derived.contains(dest) => {},
+            Bytecode::Call(_, dests, Operation::ReadRef | Operation::FreezeRef(_), _, _)
+                if dests.iter().all(|dest| derived.contains(dest)) => {},
+            Bytecode::Ret(..) => {},
+            Bytecode::Call(_, _, op, _, _) if is_neutral_use(op) => {},
+            Bytecode::Call(_, dests, Operation::Pack(mid, sid, _), _, _)
+            | Bytecode::Call(_, dests, Operation::PackVariant(mid, sid, _, _), _, _) => {
+                packed.extend(dests.iter().copied());
+                packed_structs.insert(mid.qualified(*sid));
+            },
+            _ => return false,
+        }
+    }
+    if derived.iter().any(|temp| spec_temps.contains(temp)) {
+        return false;
+    }
+    if packed.is_empty() {
+        return true;
+    }
+    let packed = derived_by_copy(code, packed);
+    if packed.iter().any(|temp| spec_temps.contains(temp)) {
+        return false;
+    }
+    for bc in code {
+        if let Bytecode::Call(_, _, op, _, _) = bc {
+            let read = match op {
+                Operation::Unpack(mid, sid, _)
+                | Operation::UnpackVariant(mid, sid, _, _)
+                | Operation::GetField(mid, sid, _, _)
+                | Operation::GetVariantField(mid, sid, _, _, _)
+                | Operation::BorrowField(mid, sid, _, _)
+                | Operation::BorrowVariantField(mid, sid, _, _, _) => Some(mid.qualified(*sid)),
+                _ => None,
+            };
+            if read.is_some_and(|id| packed_structs.contains(&id)) {
+                return false;
+            }
+        }
+        let srcs = match bc {
+            Bytecode::Prop(..) | Bytecode::SaveMem(..) | Bytecode::SaveSpecVar(..) => continue,
+            Bytecode::SpecBlock(..) => continue,
+            _ => bc.sources(),
+        };
+        if !srcs.iter().any(|src| packed.contains(src)) {
+            continue;
+        }
+        let escapes = match bc {
+            Bytecode::Assign(_, dest, _, _) => packed.contains(dest),
+            Bytecode::Ret(..) => true,
+            Bytecode::Call(_, _, op, _, _) if is_neutral_use(op) => true,
+            Bytecode::Call(_, _, Operation::MoveTo(..), srcs, _) => {
+                srcs.get(1).is_some_and(|value| packed.contains(value))
+            },
+            Bytecode::Call(_, _, Operation::WriteRef, srcs, _) => {
+                srcs.get(1).is_some_and(|value| packed.contains(value))
+                    && !packed.contains(&srcs[0])
+                    && ref_leaves_function(target, srcs[0])
+            },
+            _ => false,
+        };
+        if !escapes {
+            return false;
+        }
+    }
+    true
+}
+
+/// Whether `op` uses a value without letting it reach anything: a drop, or a trace for
+/// counterexamples.
+fn is_neutral_use(op: &Operation) -> bool {
+    matches!(
+        op,
+        Operation::Drop
+            | Operation::Release
+            | Operation::TraceLocal(_)
+            | Operation::TraceReturn(_)
+            | Operation::TraceExp(..)
+    )
+}
+
+/// The temporaries in `code` holding a copy of a value in `roots`, directly or read through a
+/// reference to one.
+fn derived_by_copy(code: &[Bytecode], roots: BTreeSet<TempIndex>) -> BTreeSet<TempIndex> {
+    let mut derived = roots;
+    loop {
+        let more: Vec<TempIndex> = code
+            .iter()
+            .flat_map(|bc| match bc {
+                Bytecode::Assign(_, dest, src, _) if derived.contains(src) => vec![*dest],
+                Bytecode::Call(_, dests, Operation::ReadRef | Operation::FreezeRef(_), srcs, _)
+                    if srcs.iter().any(|src| derived.contains(src)) =>
+                {
+                    dests.clone()
+                },
+                _ => vec![],
+            })
+            .filter(|temp| !derived.contains(temp))
+            .collect();
+        if more.is_empty() {
+            return derived;
+        }
+        derived.extend(more);
+    }
+}
+
+/// Whether every definition of the reference in `temp` borrows from a mutable reference
+/// parameter of `target` or from global storage, so a value written through it outlives the
+/// function.
+fn ref_leaves_function(target: &FunctionTarget, temp: TempIndex) -> bool {
+    let code = target.get_bytecode();
+    let param_count = target.get_parameter_count();
+    let mut visited = BTreeSet::new();
+    let mut todo = vec![temp];
+    while let Some(t) = todo.pop() {
+        if !visited.insert(t) {
+            continue;
+        }
+        let mut defined = false;
+        if t < param_count {
+            if !target.get_local_type(t).is_mutable_reference() {
+                return false;
+            }
+            defined = true;
+        }
+        for bc in code {
+            if !bc.dests().contains(&t) {
+                continue;
+            }
+            defined = true;
+            match bc {
+                Bytecode::Assign(_, _, src, _) => todo.push(*src),
+                Bytecode::Call(_, _, Operation::BorrowGlobal(..), _, _) => {},
+                Bytecode::Call(
+                    _,
+                    _,
+                    Operation::BorrowField(..) | Operation::BorrowVariantField(..),
+                    srcs,
+                    _,
+                ) => todo.push(srcs[0]),
+                _ => return false,
+            }
+        }
+        if !defined {
+            return false;
+        }
+    }
+    true
+}
+
+/// Checks that every function value reaching a function-typed parameter stays within the
+/// frame declared for that parameter, which is empty without a declaration. The function is
+/// verified under that frame, opaque or not, and the callers of an opaque function assume the
+/// result. A value reaches a parameter as a call argument, as a value captured by a closure,
+/// or as an argument of an invoked function value (whose target is not known here, so the
+/// empty frame, which every target accepts, applies).
+///
+/// The value is judged by its origins (`fun_value_origins`): a closure built in the function,
+/// by what its target's code accesses and what it writes through function values whose
+/// frames are declared; a parameter of the function, or a struct field, by its declared
+/// frame. A value of any other origin, a field without a declared frame, or a closure whose
+/// effects are not known (`usage_analysis::closure_target_effects`) is rejected, unless the
+/// parameter declares `modifies_of<f> *`.
 ///
 /// A callee that leaves the frame to its call sites
 /// (`FunctionEnv::leaves_fun_param_frame_to_call_site`) is the exception: the call site
 /// supplies the frame instead, provided it has a closure footprint to supply, and the
 /// usage analysis carries that footprint into the summary of the function making the call.
+/// A capture is not a call site, so such a parameter is held to the empty frame there.
 fn check_fun_arg_frames(
     env: &GlobalEnv,
     targets: &FunctionTargetsHolder,
     usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    reached: &ReachedCache,
 ) {
+    let exempt = frame_exempt_params(env, targets);
     for module_env in env.get_modules().filter(|m| m.is_target()) {
         for fun_env in module_env.get_functions() {
             if fun_env.is_not_prover_target()
@@ -3290,123 +3615,727 @@ fn check_fun_arg_frames(
                 continue;
             }
             let target = targets.get_target(&fun_env, &FunctionVariant::Baseline);
-            let footprints = closure_footprints(
-                env,
-                fun_env.get_qualified_id(),
-                usage,
-                target.get_bytecode(),
-            );
-            for bc in target.get_bytecode() {
-                let Bytecode::Call(id, _, Operation::Function(mid, fid, targs), srcs, _) = bc
-                else {
-                    continue;
-                };
-                let callee_env = env.get_module(*mid).into_function(*fid);
-                if !callee_env.is_opaque() {
-                    continue;
-                }
-                for (param, src) in callee_env.get_parameters().iter().zip(srcs) {
-                    let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
-                    if frame.modifies_all {
-                        continue;
-                    }
-                    let defers = callee_env.leaves_fun_param_frame_to_call_site(param.0);
-                    let loc = target.get_bytecode_loc(*id);
-                    let param_name = param.0.display(env.symbol_pool());
-                    // A closure built here whose target runs a function value nothing bounds
-                    // has writes no footprint records, so it can be checked against neither
-                    // a declared frame nor a deferred one.
-                    if param.1.skip_reference().is_function()
-                        && closure_target_has_unbounded_invoke(usage, target.get_bytecode(), *src)
-                    {
-                        env.error(
-                            &loc,
-                            &format!(
-                                "cannot establish what function argument `{}` may modify: \
-                                 the closure's target invokes a function value whose effects \
-                                 no `modifies_of` declaration bounds",
-                                param_name
-                            ),
-                        );
-                        continue;
-                    }
-                    let Some(footprint) = footprints.get(src).filter(|f| f.known) else {
-                        // Deferring only works when this call site can answer the question
-                        // the callee left open: for a closure whose writes are known
-                        // (`closures_with_known_footprint`), which are then havoced across
-                        // the call. Any other function value -- a forwarded parameter, a
-                        // stored callback, a closure over this very function, or one that
-                        // partially applies another deferring callee -- has no footprint to
-                        // havoc, so the callee's empty frame stands and the argument has to
-                        // be rejected rather than waved through.
-                        //
-                        // Against a declared frame, a closure built once here whose effects
-                        // are not known cannot be shown to stay within it either.
-                        if !defers
-                            && param.1.skip_reference().is_function()
-                            && footprints.contains_key(src)
+            let code = target.get_bytecode();
+            let footprints =
+                closure_footprints(env, fun_env.get_qualified_id(), usage, reached, code);
+            for bc in code {
+                match bc {
+                    Bytecode::Call(id, _, Operation::Function(mid, fid, targs), srcs, _) => {
+                        let callee_env = env.get_module(*mid).into_function(*fid);
+                        let callee_id = callee_env.get_qualified_id();
+                        for (idx, (param, src)) in
+                            callee_env.get_parameters().iter().zip(srcs).enumerate()
                         {
-                            env.error(
-                                &loc,
-                                &format!(
-                                    "cannot establish what function argument `{}` may \
-                                     modify: the closure's effects are not known",
-                                    param_name
-                                ),
-                            );
-                        } else if defers && param.1.skip_reference().is_function() {
-                            env.error(
-                                &loc,
-                                &format!(
-                                    "cannot establish what function argument `{}` may \
-                                     modify: `{}` declares no `modifies_of` for it, and the \
-                                     argument is not a closure with a known footprint built \
-                                     at this call site",
-                                    param_name,
-                                    callee_env.get_full_name_str()
-                                ),
+                            if !param.1.skip_reference().is_function()
+                                || exempt.contains(&(callee_id, idx))
+                                    && !callee_env.leaves_fun_param_frame_to_call_site(param.0)
+                            {
+                                continue;
+                            }
+                            let frame = DeclaredFrame::of_fun_param(&callee_env, param.0, targs);
+                            if frame.modifies_all {
+                                continue;
+                            }
+                            let loc = target.get_bytecode_loc(*id);
+                            let param_name = param.0.display(env.symbol_pool());
+                            // A closure built here whose target runs a function value nothing
+                            // bounds has writes no footprint records, so it can be checked
+                            // against neither a declared frame nor a deferred one.
+                            if closure_target_has_unbounded_invoke(usage, code, *src) {
+                                env.error(
+                                    &loc,
+                                    &format!(
+                                        "cannot establish what function argument `{}` may \
+                                         modify: the closure's target invokes a function \
+                                         value whose effects no `modifies_of` declaration \
+                                         bounds",
+                                        param_name
+                                    ),
+                                );
+                                continue;
+                            }
+                            if callee_env.leaves_fun_param_frame_to_call_site(param.0) {
+                                // Deferring only works when this call site can answer the
+                                // question the callee left open: for a closure built here
+                                // whose writes are known (`closures_with_known_footprint`),
+                                // which are then havoced across the call. Any other function
+                                // value has no footprint to havoc, so it is rejected.
+                                if !footprints.get(src).is_some_and(|f| f.known) {
+                                    env.error(
+                                        &loc,
+                                        &format!(
+                                            "cannot establish what function argument `{}` \
+                                             may modify: `{}` declares no `modifies_of` for \
+                                             it, and the argument is not a closure with a \
+                                             known footprint built at this call site",
+                                            param_name,
+                                            callee_env.get_full_name_str()
+                                        ),
+                                    );
+                                }
+                                continue;
+                            }
+                            check_fun_value_within(
+                                env,
+                                targets,
+                                &target,
+                                usage,
+                                reached,
+                                *src,
+                                &FrameSite {
+                                    loc,
+                                    kind: "function argument",
+                                    value: format!("function argument `{}`", param_name),
+                                    param: format!("`{}`", param_name),
+                                    frame: &frame,
+                                },
                             );
                         }
-                        continue;
-                    };
-                    if defers {
-                        continue;
-                    }
-                    for mem in footprint.code_writes.difference(&frame.writes) {
-                        env.error(
-                            &loc,
-                            &format!(
-                                "function argument may modify resource `{}`, which is not \
-                                 declared in `modifies_of` for `{}`",
-                                env.display(mem),
-                                param_name
-                            ),
-                        );
-                    }
-                    if frame.reads_all {
-                        continue;
-                    }
-                    for mem in footprint
-                        .code_accessed
-                        .difference(&frame.accessed)
-                        .filter(|mem| !footprint.code_writes.contains(mem))
-                    {
-                        env.error(
-                            &loc,
-                            &format!(
-                                "function argument accesses resource `{}`, which is not \
-                                 declared in `modifies_of`/`reads_of` for `{}`",
-                                env.display(mem),
-                                param_name
-                            ),
-                        );
-                    }
+                    },
+                    Bytecode::Call(id, _, Operation::Closure(mid, fid, targs, mask), srcs, _) => {
+                        let closure_target = env.get_module(*mid).into_function(*fid);
+                        let params = closure_target.get_parameters();
+                        let closure_target_id = closure_target.get_qualified_id();
+                        let captured = (0..params.len()).filter(|i| mask.is_captured(*i));
+                        for (idx, src) in captured.zip(srcs) {
+                            let param = &params[idx];
+                            if !param.1.skip_reference().is_function()
+                                || exempt.contains(&(closure_target_id, idx))
+                            {
+                                continue;
+                            }
+                            let frame =
+                                if closure_target.leaves_fun_param_frame_to_call_site(param.0) {
+                                    DeclaredFrame::default()
+                                } else {
+                                    DeclaredFrame::of_fun_param(&closure_target, param.0, targs)
+                                };
+                            let param_desc = format!(
+                                "`{}` of `{}`",
+                                param.0.display(env.symbol_pool()),
+                                closure_target.get_full_name_str()
+                            );
+                            check_fun_value_within(
+                                env,
+                                targets,
+                                &target,
+                                usage,
+                                reached,
+                                *src,
+                                &FrameSite {
+                                    loc: target.get_bytecode_loc(*id),
+                                    kind: "captured function value",
+                                    value: format!("captured function value for {}", param_desc),
+                                    param: param_desc,
+                                    frame: &frame,
+                                },
+                            );
+                        }
+                    },
+                    Bytecode::Call(id, _, Operation::Invoke, srcs, _) => {
+                        let Some((_, args)) = srcs.split_last() else {
+                            continue;
+                        };
+                        let empty = DeclaredFrame::default();
+                        for src in args {
+                            if !target.get_local_type(*src).skip_reference().is_function() {
+                                continue;
+                            }
+                            check_fun_value_within(
+                                env,
+                                targets,
+                                &target,
+                                usage,
+                                reached,
+                                *src,
+                                &FrameSite {
+                                    loc: target.get_bytecode_loc(*id),
+                                    kind: "function value passed to an invocation",
+                                    value: "function value passed to an invocation".to_string(),
+                                    param: "the parameter of the invoked function value"
+                                        .to_string(),
+                                    frame: &empty,
+                                },
+                            );
+                        }
+                    },
+                    _ => {},
                 }
             }
         }
     }
 }
 
+/// Where a function value held in a temporary can come from.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum FunValueOrigin {
+    /// The `Closure` operation at this code offset.
+    Closure(usize),
+    /// The value the enclosing function received for this parameter.
+    Param(TempIndex),
+    /// Result `.1` of the function call at code offset `.0`.
+    CallResult(usize, usize),
+    /// A field of a struct or enum value: the struct, the variant and the field offset.
+    Field(QualifiedInstId<StructId>, Option<Symbol>, usize),
+    /// Anything else.
+    Unknown,
+}
+
+/// Every origin of the function value in `temp`, following copies and borrows back to where
+/// the value was made. A loop head's `Havoc` is not an origin: the values the temporary takes
+/// at runtime come from its other definitions. A value a mutable reference can replace --
+/// behind an incoming `&mut` parameter, a mutable borrow of a local, or a reference in the
+/// chain that is written through or passed on -- is `Unknown`, as is a field read from a struct
+/// that may have been replaced since it was made (`struct_may_be_replaced`).
+fn fun_value_origins(target: &FunctionTarget, temp: TempIndex) -> BTreeSet<FunValueOrigin> {
+    let code = target.get_bytecode();
+    let param_count = target.get_parameter_count();
+    let mut origins = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    let mut todo = vec![temp];
+    while let Some(t) = todo.pop() {
+        if !visited.insert(t) {
+            continue;
+        }
+        if t < param_count {
+            // The caller, or this function, may have stored anything behind it.
+            origins.insert(
+                if target.get_local_type(t).is_mutable_reference() {
+                    FunValueOrigin::Unknown
+                } else {
+                    FunValueOrigin::Param(t)
+                },
+            );
+        }
+        let mut defined = t < param_count;
+        for (offset, bc) in code.iter().enumerate() {
+            // A value behind a mutable borrow can be replaced through the reference.
+            if let Bytecode::Call(_, dests, Operation::BorrowLoc, srcs, _) = bc {
+                if srcs.first() == Some(&t)
+                    && dests
+                        .first()
+                        .is_some_and(|r| target.get_local_type(*r).is_mutable_reference())
+                {
+                    origins.insert(FunValueOrigin::Unknown);
+                }
+            }
+            if !bc.dests().contains(&t) {
+                continue;
+            }
+            defined = true;
+            let field_of = |mid: &ModuleId, sid: &StructId, targs: &[Type]| {
+                mid.qualified_inst(*sid, targs.to_vec())
+            };
+            let position = |dests: &[TempIndex]| {
+                dests
+                    .iter()
+                    .position(|d| *d == t)
+                    .expect("defined temporary")
+            };
+            let origin = match bc {
+                Bytecode::Call(_, _, Operation::Havoc(_), _, _) => continue,
+                Bytecode::Assign(_, _, src, _) => {
+                    todo.push(*src);
+                    continue;
+                },
+                Bytecode::Call(_, dests, op, srcs, _) => match op {
+                    Operation::Closure(..) => FunValueOrigin::Closure(offset),
+                    Operation::Function(..) => FunValueOrigin::CallResult(offset, position(dests)),
+                    Operation::FreezeRef(_) | Operation::ReadRef | Operation::BorrowLoc => {
+                        todo.push(srcs[0]);
+                        continue;
+                    },
+                    Operation::GetField(..)
+                    | Operation::BorrowField(..)
+                    | Operation::GetVariantField(..)
+                    | Operation::BorrowVariantField(..)
+                    | Operation::Unpack(..)
+                    | Operation::UnpackVariant(..)
+                        if struct_may_be_replaced(target, srcs[0]) =>
+                    {
+                        FunValueOrigin::Unknown
+                    },
+                    Operation::GetField(mid, sid, targs, field)
+                    | Operation::BorrowField(mid, sid, targs, field) => {
+                        FunValueOrigin::Field(field_of(mid, sid, targs), None, *field)
+                    },
+                    Operation::GetVariantField(mid, sid, variants, targs, field)
+                    | Operation::BorrowVariantField(mid, sid, variants, targs, field) => {
+                        FunValueOrigin::Field(
+                            field_of(mid, sid, targs),
+                            variants.first().copied(),
+                            *field,
+                        )
+                    },
+                    Operation::Unpack(mid, sid, targs) => {
+                        FunValueOrigin::Field(field_of(mid, sid, targs), None, position(dests))
+                    },
+                    Operation::UnpackVariant(mid, sid, variant, targs) => FunValueOrigin::Field(
+                        field_of(mid, sid, targs),
+                        Some(*variant),
+                        position(dests),
+                    ),
+                    _ => FunValueOrigin::Unknown,
+                },
+                _ => FunValueOrigin::Unknown,
+            };
+            origins.insert(origin);
+        }
+        if !defined {
+            origins.insert(FunValueOrigin::Unknown);
+        }
+    }
+    if written_through_mutable_ref(target, &visited) {
+        origins.insert(FunValueOrigin::Unknown);
+    }
+    origins
+}
+
+/// Whether a mutable reference in `chain`, the temporaries a function value was read through,
+/// or a copy of one, is written through or passed to code that may write through it.
+fn written_through_mutable_ref(target: &FunctionTarget, chain: &BTreeSet<TempIndex>) -> bool {
+    let code = target.get_bytecode();
+    let mut refs: BTreeSet<TempIndex> = chain
+        .iter()
+        .copied()
+        .filter(|t| target.get_local_type(*t).is_mutable_reference())
+        .collect();
+    loop {
+        let copies: Vec<TempIndex> = code
+            .iter()
+            .filter_map(|bc| match bc {
+                Bytecode::Assign(_, dest, src, _) if refs.contains(src) => Some(*dest),
+                _ => None,
+            })
+            .filter(|dest| !refs.contains(dest))
+            .collect();
+        if copies.is_empty() {
+            break;
+        }
+        refs.extend(copies);
+    }
+    code.iter().any(|bc| match bc {
+        Bytecode::Call(_, _, Operation::WriteRef, srcs, _) => {
+            srcs.first().is_some_and(|r| refs.contains(r))
+        },
+        Bytecode::Call(_, _, Operation::Function(..) | Operation::Invoke, srcs, _) => {
+            srcs.iter().any(|src| refs.contains(src))
+        },
+        _ => false,
+    })
+}
+
+/// Whether the struct in `temp` may have been replaced since it was made, so a field read from
+/// it is not bounded by the field's declared frame: field stores are not checked against that
+/// frame (#20934). The chain the struct was built or read through is trusted only along
+/// explicitly tracked definitions; everything else is replaceable. Tracked are copies,
+/// borrows, field reads, `ReadRef`, `FreezeRef`, unpacks and packs (each struct operand of
+/// a pack traced in turn) back to locals and parameters. Call results, globals, loop-head
+/// havocs and any other definition are replaceable, as is a chain with a local that is borrowed
+/// mutably or a mutable reference (or one borrowed from it) that is written through or passed
+/// to a call.
+fn struct_may_be_replaced(target: &FunctionTarget, temp: TempIndex) -> bool {
+    let code = target.get_bytecode();
+    let param_count = target.get_parameter_count();
+    let mut chain = BTreeSet::new();
+    let mut todo = vec![temp];
+    while let Some(t) = todo.pop() {
+        if !chain.insert(t) {
+            continue;
+        }
+        let mut defined = t < param_count;
+        for bc in code {
+            if !bc.dests().contains(&t) {
+                continue;
+            }
+            defined = true;
+            match bc {
+                Bytecode::Assign(_, _, src, _) => todo.push(*src),
+                Bytecode::Call(
+                    _,
+                    _,
+                    Operation::BorrowLoc
+                    | Operation::BorrowField(..)
+                    | Operation::BorrowVariantField(..)
+                    | Operation::GetField(..)
+                    | Operation::GetVariantField(..)
+                    | Operation::Unpack(..)
+                    | Operation::UnpackVariant(..)
+                    | Operation::FreezeRef(_)
+                    | Operation::ReadRef,
+                    srcs,
+                    _,
+                ) => todo.push(srcs[0]),
+                Bytecode::Call(_, _, Operation::Pack(..) | Operation::PackVariant(..), srcs, _) => {
+                    todo.extend(
+                        srcs.iter()
+                            .filter(|src| target.get_local_type(**src).is_struct()),
+                    )
+                },
+                _ => return true,
+            }
+        }
+        if !defined {
+            return true;
+        }
+    }
+    let is_mut = |t: &TempIndex| target.get_local_type(*t).is_mutable_reference();
+    let mut refs: BTreeSet<TempIndex> = chain.iter().copied().filter(is_mut).collect();
+    if code.iter().any(|bc| {
+        matches!(bc, Bytecode::Call(_, dests, Operation::BorrowLoc, srcs, _)
+            if chain.contains(&srcs[0]) && dests.iter().any(is_mut))
+    }) {
+        return true;
+    }
+    loop {
+        let more: Vec<TempIndex> = code
+            .iter()
+            .flat_map(|bc| match bc {
+                Bytecode::Assign(_, dest, src, _) if refs.contains(src) => vec![*dest],
+                Bytecode::Call(
+                    _,
+                    dests,
+                    Operation::BorrowField(..) | Operation::BorrowVariantField(..),
+                    srcs,
+                    _,
+                ) if refs.contains(&srcs[0]) => dests.clone(),
+                _ => vec![],
+            })
+            .filter(|t| is_mut(t) && !refs.contains(t))
+            .collect();
+        if more.is_empty() {
+            break;
+        }
+        refs.extend(more);
+    }
+    code.iter().any(|bc| match bc {
+        Bytecode::Call(_, _, Operation::WriteRef, srcs, _) => {
+            srcs.first().is_some_and(|r| refs.contains(r))
+        },
+        Bytecode::Call(_, _, Operation::Function(..) | Operation::Invoke, srcs, _) => {
+            srcs.iter().any(|src| refs.contains(src))
+        },
+        _ => false,
+    })
+}
+
+/// A place where a function value reaches a function-typed parameter.
+struct FrameSite<'a> {
+    loc: Loc,
+    /// What the value is, for a value without a name of its own.
+    kind: &'static str,
+    /// The value, with the parameter it reaches where that names it.
+    value: String,
+    /// The parameter.
+    param: String,
+    frame: &'a DeclaredFrame,
+}
+
+impl FrameSite<'_> {
+    /// Adds to `errors` what `bound`, a frame `what` is known to keep within, has beyond the
+    /// parameter's frame.
+    fn excess(&self, env: &GlobalEnv, what: &str, bound: &DeclaredFrame, errors: &mut Vec<String>) {
+        if self.frame.modifies_all {
+            return;
+        }
+        if bound.modifies_all {
+            errors.push(format!(
+                "{} may modify any resource, which is not declared in `modifies_of` for {}",
+                what, self.param
+            ));
+            return;
+        }
+        for mem in bound.writes.difference(&self.frame.writes) {
+            errors.push(format!(
+                "{} may modify resource `{}`, which is not declared in `modifies_of` for {}",
+                what,
+                env.display(mem),
+                self.param
+            ));
+        }
+        if self.frame.reads_all {
+            return;
+        }
+        if bound.reads_all {
+            errors.push(format!(
+                "{} may read any resource, which is not declared in `modifies_of`/`reads_of` \
+                 for {}",
+                what, self.param
+            ));
+            return;
+        }
+        for mem in bound
+            .accessed
+            .difference(&self.frame.accessed)
+            .filter(|mem| !bound.writes.contains(mem))
+        {
+            errors.push(format!(
+                "{} accesses resource `{}`, which is not declared in `modifies_of`/`reads_of` \
+                 for {}",
+                what,
+                env.display(mem),
+                self.param
+            ));
+        }
+    }
+
+    fn unknown(&self, reason: &str, errors: &mut Vec<String>) {
+        errors.push(format!(
+            "cannot establish what {} may modify: {}",
+            self.value, reason
+        ));
+    }
+}
+
+/// What a closure built by `closure` in `enclosing` can access: what a call to its target
+/// writes and accesses as the prover encodes it (`usage_analysis::closure_target_effects`),
+/// with, for a target verified from its body, what that body's code accesses and writes,
+/// including through function values whose frames are declared and through the functions
+/// encoded from their contracts it calls (`usage_analysis::contract_effects_reached`, cached),
+/// and what each captured function value may access under its parameter's declared frame.
+/// `None` when its effects are not known.
+fn closure_bound(
+    env: &GlobalEnv,
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    reached: &ReachedCache,
+    enclosing: QualifiedId<FunId>,
+    closure: &Bytecode,
+) -> Option<DeclaredFrame> {
+    let Bytecode::Call(_, _, Operation::Closure(mid, fid, targs, mask), _, _) = closure else {
+        return None;
+    };
+    let target = mid.qualified(*fid);
+    let target_env = env.get_function(target);
+    let summary_of = |id: QualifiedId<FunId>| usage.get(&id).cloned();
+    let usage_analysis::ClosureEffects {
+        mut writes,
+        accessed: contract_accessed,
+    } = usage_analysis::closure_target_effects(
+        env,
+        enclosing,
+        target,
+        targs,
+        Some(*mask),
+        &summary_of,
+    )?;
+    // A target encoded from its contract does what the contract says: its summary omits the
+    // declared `modifies` frame. Any other target accesses what its code and the
+    // contract-encoded functions it calls do; memory its spec only mentions is not accessed.
+    let mut accessed = BTreeSet::new();
+    if usage_analysis::is_encoded_from_contract(&target_env) {
+        accessed = contract_accessed;
+    } else {
+        let summary = usage.get(&target)?;
+        accessed.extend(
+            summary
+                .code_accessed
+                .iter()
+                .map(|mem| mem.instantiate_ref(targs)),
+        );
+        let reached = reached_in(reached, target, targs)?.within(env, enclosing)?;
+        writes.extend(reached.writes);
+        accessed.extend(reached.accessed);
+        // The code omits the captured parameters' declared reads; their declared writes, and
+        // the rejection of a `*` frame, come with `closure_target_effects`.
+        for access in target_env.get_fun_param_access_of() {
+            accessed.extend(
+                access
+                    .used_memory
+                    .iter()
+                    .map(|mem| mem.instantiate_ref(targs)),
+            );
+        }
+    }
+    accessed.extend(writes.iter().cloned());
+    Some(DeclaredFrame {
+        writes,
+        accessed,
+        ..DeclaredFrame::default()
+    })
+}
+
+/// What the function value returned as result `result` of `call` can access, when every value
+/// the callee returns there is a closure built in its body with known effects. The callee must
+/// be a transparent, non-native function of a target module called without type arguments:
+/// its body is then the code that runs, and this check has bounded what its closures capture.
+/// `None` otherwise.
+fn returned_closure_bound(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    reached: &ReachedCache,
+    call: &Bytecode,
+    result: usize,
+) -> Option<DeclaredFrame> {
+    let Bytecode::Call(_, _, Operation::Function(mid, fid, targs), _, _) = call else {
+        return None;
+    };
+    let callee = env.get_module(*mid).into_function(*fid);
+    if !targs.is_empty()
+        || callee.is_opaque()
+        || callee.is_native_or_intrinsic()
+        || callee.is_not_prover_target()
+        || !callee.is_compiled()
+        || !callee.module_env.is_target()
+    {
+        return None;
+    }
+    let data = targets.get_data(&callee.get_qualified_id(), &FunctionVariant::Baseline)?;
+    let callee_target = FunctionTarget::new(&callee, data);
+    let code = callee_target.get_bytecode();
+    let mut bound: Option<DeclaredFrame> = None;
+    for bc in code {
+        let Bytecode::Ret(_, srcs) = bc else {
+            continue;
+        };
+        for origin in fun_value_origins(&callee_target, *srcs.get(result)?) {
+            let FunValueOrigin::Closure(offset) = origin else {
+                return None;
+            };
+            let closure = closure_bound(
+                env,
+                usage,
+                reached,
+                callee.get_qualified_id(),
+                &code[offset],
+            )?;
+            let acc = bound.get_or_insert_with(DeclaredFrame::default);
+            acc.writes.extend(closure.writes);
+            acc.accessed.extend(closure.accessed);
+        }
+    }
+    bound
+}
+
+/// Checks the function value in `src`, used in `fun_target`, against the frame of `site`
+/// over every origin of the value.
+fn check_fun_value_within(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_target: &FunctionTarget,
+    usage: &BTreeMap<QualifiedId<FunId>, UsageState>,
+    reached: &ReachedCache,
+    src: TempIndex,
+    site: &FrameSite,
+) {
+    if site.frame.modifies_all {
+        return;
+    }
+    let fun_env = fun_target.func_env;
+    let code = fun_target.get_bytecode();
+    let mut errors = vec![];
+    for origin in fun_value_origins(fun_target, src) {
+        match origin {
+            FunValueOrigin::Closure(offset) => {
+                match closure_bound(
+                    env,
+                    usage,
+                    reached,
+                    fun_env.get_qualified_id(),
+                    &code[offset],
+                ) {
+                    Some(bound) => site.excess(env, site.kind, &bound, &mut errors),
+                    None => site.unknown("the closure's effects are not known", &mut errors),
+                }
+            },
+            FunValueOrigin::CallResult(offset, result) => {
+                match returned_closure_bound(env, targets, usage, reached, &code[offset], result) {
+                    Some(bound) => site.excess(env, site.kind, &bound, &mut errors),
+                    None => site.unknown(
+                        "it is returned by a call, and not every value the callee returns is a \
+                         closure with known effects built in a transparent function",
+                        &mut errors,
+                    ),
+                }
+            },
+            FunValueOrigin::Param(idx) => {
+                let param = fun_env.get_parameters()[idx].0;
+                let param_name = param.display(env.symbol_pool());
+                if fun_env.leaves_fun_param_frame_to_call_site(param) {
+                    site.unknown(
+                        &format!(
+                            "parameter `{}` of `{}` leaves its frame to the call sites",
+                            param_name,
+                            fun_env.get_full_name_str()
+                        ),
+                        &mut errors,
+                    );
+                    continue;
+                }
+                // An undeclared parameter of a transparent function has the empty frame only
+                // where every caller is checked against it; a dependency calling this function
+                // supplies the value unchecked.
+                let declared = fun_env
+                    .get_fun_param_access_of()
+                    .iter()
+                    .any(|access| access.fun_param == param);
+                if !declared
+                    && !fun_env.is_opaque()
+                    && !usage_analysis::all_callers_checked(fun_env)
+                {
+                    site.unknown(
+                        &format!(
+                            "it is parameter `{}` of `{}`, which declares no \
+                             `modifies_of`/`reads_of` for it and may be called from a dependency, \
+                             where nothing checks what reaches it",
+                            param_name,
+                            fun_env.get_full_name_str()
+                        ),
+                        &mut errors,
+                    );
+                    continue;
+                }
+                let bound = DeclaredFrame::of_fun_param(fun_env, param, &[]);
+                site.excess(
+                    env,
+                    &format!("{} `{}`", site.kind, param_name),
+                    &bound,
+                    &mut errors,
+                );
+            },
+            FunValueOrigin::Field(mem, variant, offset) => {
+                let struct_env = env.get_struct(mem.to_qualified_id());
+                let field_name = struct_env
+                    .get_field_by_offset_optional_variant(variant, offset)
+                    .get_name();
+                let field_desc = format!(
+                    "field `{}` of `{}`",
+                    field_name.display(env.symbol_pool()),
+                    struct_env.get_full_name_str()
+                );
+                let Some(access) = struct_env
+                    .get_field_access_of()
+                    .iter()
+                    .find(|access| access.fun_param == field_name)
+                else {
+                    site.unknown(
+                        &format!(
+                            "it is read from {}, which declares no `modifies_of`/`reads_of`",
+                            field_desc
+                        ),
+                        &mut errors,
+                    );
+                    continue;
+                };
+                let bound = DeclaredFrame::of_access(access, &mem.inst);
+                site.excess(
+                    env,
+                    &format!("{} read from {}", site.kind, field_desc),
+                    &bound,
+                    &mut errors,
+                );
+            },
+            FunValueOrigin::Unknown => site.unknown(
+                "it is not a closure built in this function, a parameter of this function, or \
+                 the value of a struct field with a declared frame",
+                &mut errors,
+            ),
+        }
+    }
+    for error in errors.into_iter().unique() {
+        env.error(&site.loc, &error);
+    }
+}
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     let mut warned_coarse_callees = BTreeSet::new();
     for module_env in env.get_modules() {

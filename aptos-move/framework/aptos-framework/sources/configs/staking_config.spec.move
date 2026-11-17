@@ -179,15 +179,39 @@ spec aptos_framework::staking_config {
     }
 
     spec calculate_and_save_latest_epoch_rewards_rate(): FixedPoint64 {
+        pragma opaque;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
         aborts_if !features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
+        modifies global<StakingRewardsConfig>(@aptos_framework);
+        ensures exists<StakingRewardsConfig>(@aptos_framework);
+        ensures result == global<StakingRewardsConfig>(@aptos_framework).rewards_rate;
+        include StakingRewardsConfigUpdateFrame;
     }
 
     spec calculate_and_save_latest_rewards_config(): StakingRewardsConfig {
+        pragma opaque;
         requires features::spec_periodical_reward_rate_decrease_enabled();
         include StakingRewardsConfigRequirement;
         aborts_if !exists<StakingRewardsConfig>(@aptos_framework);
+        modifies global<StakingRewardsConfig>(@aptos_framework);
+        ensures exists<StakingRewardsConfig>(@aptos_framework);
+        ensures result == global<StakingRewardsConfig>(@aptos_framework);
+        include StakingRewardsConfigUpdateFrame;
+    }
+
+    /// Only the rewards rate and the period start change, and only once a full period has elapsed.
+    spec schema StakingRewardsConfigUpdateFrame {
+        let pre = global<StakingRewardsConfig>(@aptos_framework);
+        let post post_config = global<StakingRewardsConfig>(@aptos_framework);
+        ensures post_config.min_rewards_rate == pre.min_rewards_rate;
+        ensures post_config.rewards_rate_period_in_secs == pre.rewards_rate_period_in_secs;
+        ensures post_config.rewards_rate_decrease_rate == pre.rewards_rate_decrease_rate;
+        ensures timestamp::spec_now_seconds() - pre.last_rewards_rate_period_start_in_secs
+            < pre.rewards_rate_period_in_secs ==> post_config == pre;
+        ensures timestamp::spec_now_seconds() - pre.last_rewards_rate_period_start_in_secs
+            >= pre.rewards_rate_period_in_secs ==> post_config.last_rewards_rate_period_start_in_secs
+                == pre.last_rewards_rate_period_start_in_secs + pre.rewards_rate_period_in_secs;
     }
 
     /// Caller must be @aptos_framework.

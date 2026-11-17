@@ -56,21 +56,30 @@ impl Cmd {
             .get_synced_version()?
             .expect("DB is empty.");
         println!("latest version: {latest_version}");
-        if self.version != Version::MAX && self.version > latest_version {
+        // Reads past the ledger tip fail since they can't check write sets.
+        let version = if self.version == Version::MAX {
+            latest_version
+        } else if self.version > latest_version {
             println!(
                 "{}",
                 format!(
-                    "warning: version {} is greater than latest version {}",
-                    self.version, latest_version
+                    "Version {} is beyond the ledger tip. Rerun with `--version {latest_version}`.",
+                    self.version
                 )
                 .red()
             );
-        }
+            return Ok(());
+        } else {
+            self.version
+        };
 
-        let mut start_version = self.version;
+        let mut start_version = version;
         let mut count = 0;
         while count < 10 {
-            match db.get_state_value_with_version_by_version(&key, start_version)? {
+            match db
+                .get_latest_state_write(&ledger_db, &key, start_version, |_, _| Ok(()))?
+                .and_then(|(version, value)| value.map(|value| (version, value)))
+            {
                 None => {
                     if count == 0 {
                         println!("{}", "Value not found.".to_string().yellow());

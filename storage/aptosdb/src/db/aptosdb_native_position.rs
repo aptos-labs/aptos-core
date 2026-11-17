@@ -12,6 +12,7 @@ use crate::{
         state_sync::NativeStoreReader,
         NativeStoreSpec, PositionStore,
     },
+    trading_native_reader::TradingNativeReader,
     utils::truncation_helper::get_native_commit_progress,
 };
 use aptos_config::config::StorageDirPaths;
@@ -83,6 +84,19 @@ impl AptosDB {
         Some(InMemoryNativeStateReader::new(
             Arc::clone(&bundle.position_base),
             Arc::clone(&bundle.positions),
+        ))
+    }
+
+    /// Reads every attached native store at the same chunk. `None` when
+    /// none is attached.
+    pub fn trading_native_reader(&self) -> Option<TradingNativeReader> {
+        if self.position.is_none() && self.order.is_none() && self.collateral.is_none() {
+            return None;
+        }
+        Some(TradingNativeReader::new(
+            self.position.clone(),
+            self.order.clone(),
+            self.collateral.clone(),
         ))
     }
 

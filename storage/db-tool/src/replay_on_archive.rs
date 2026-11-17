@@ -446,7 +446,7 @@ impl Verifier {
         );
         let state_view = self
             .arc_db
-            .state_view_at_version(current_version.checked_sub(1))?;
+            .state_view_at_checkpoint(current_version.checked_sub(1))?;
         // Batches end at epoch boundaries, so the parent state's features apply to all of them.
         let onchain_config = match Features::fetch_config(&state_view)? {
             Some(features) => {

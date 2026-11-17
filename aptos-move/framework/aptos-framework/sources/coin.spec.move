@@ -23,7 +23,8 @@ spec aptos_framework::coin {
     /// Requirement: The supply of a coin is only affected by burn and mint operations.
     /// Criticality: High
     /// Implementation: Only mint and burn operations on a coin alter the total supply of coins.
-    /// Enforcement: Formally Verified via [high-level-req-4](TotalSupplyNoChange).
+    /// Enforcement: Audited that the coin supply changes only through mint and burn, including those of coin and
+    /// fungible asset conversion.
     ///
     /// No.: 5
     /// Requirement: Users may register an account for a coin multiple times idempotently.
@@ -35,7 +36,9 @@ spec aptos_framework::coin {
     /// Requirement: Coin operations should fail if the user has not registered for the coin.
     /// Criticality: Medium
     /// Implementation: Coin operations may succeed only on valid user coin registration.
-    /// Enforcement: Formally Verified via [high-level-req-6.1](balance), [high-level-req-6.2](burn_from), [high-level-req-6.3](freeze), [high-level-req-6.4](unfreeze), [high-level-req-6.5](transfer) and [high-level-req-6.6](withdraw).
+    /// Enforcement: Formally Verified via [high-level-req-6.2](burn_from), [high-level-req-6.3](freeze_coin_store) and
+    /// [high-level-req-6.4](unfreeze_coin_store). Audited that balance, transfer and withdraw need no registration:
+    /// balance reads 0 from an absent paired store, and transfer and withdraw create it on demand.
     ///
     /// No.: 7
     /// Requirement: It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered
@@ -43,7 +46,8 @@ spec aptos_framework::coin {
     /// information of the coin: (1) Name, (2) Symbol, and (3) Supply.
     /// Criticality: Low
     /// Implementation: The following functions should never abort: (1) is_coin_initialized, and (2) is_account_registered. The following functions should not abort if the coin exists: (1) name, (2) symbol, and (3) supply.
-    /// Enforcement: Formally Verified in corresponding functions: [high-level-req-7.1](is_coin_initialized), [high-level-req-7.2](is_account_registered), [high-level-req-7.3](name), [high-level-req-7.4](symbol) and [high-level-req-7.5](supply).
+    /// Enforcement: Formally Verified in corresponding functions: [high-level-req-7.1](is_coin_initialized), [high-level-req-7.3](name), [high-level-req-7.4](symbol) and [high-level-req-7.5](coin_supply).
+    /// Audited that is_account_registered aborts only if the coin does not exist.
     ///
     /// No.: 8
     /// Requirement: Coin operations should fail if the user's CoinStore is frozen.
@@ -55,7 +59,7 @@ spec aptos_framework::coin {
     /// Requirement: Utilizing AggregatableCoins does not violate other critical invariants, such as (4).
     /// Criticality: High
     /// Implementation: Utilizing AggregatableCoin does not change the real-supply of any token.
-    /// Enforcement: Formally Verified via [high-level-req-9](TotalSupplyNoChange).
+    /// Enforcement: Audited that no operation uses AggregatableCoin.
     /// </high-level-req>
     ///
     spec module {
@@ -123,14 +127,21 @@ spec aptos_framework::coin {
     spec mint {
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
+        aborts_if (amount != 0) && !type_info::spec_is_struct<CoinType>();
+        aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
+        ensures supply<CoinType> == old(supply<CoinType>) + amount;
+        ensures result.value == amount;
+        ensures exists<CoinInfo<CoinType>>(addr) == old(exists<CoinInfo<CoinType>>(addr));
     }
 
     spec mint_internal {
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
+        aborts_if (amount != 0) && !type_info::spec_is_struct<CoinType>();
         aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
         ensures supply<CoinType> == old(supply<CoinType>) + amount;
         ensures result.value == amount;
+        ensures exists<CoinInfo<CoinType>>(addr) == old(exists<CoinInfo<CoinType>>(addr));
     }
 
     /// Get address by reflection.
@@ -146,11 +157,46 @@ spec aptos_framework::coin {
         aborts_if true;
     }
 
+    /// The balance left in a not yet migrated `CoinStore`.
+    spec fun spec_coin_balance<CoinType>(owner: address): u64 {
+        if (exists<CoinStore<CoinType>>(owner)) { global<CoinStore<CoinType>>(owner).coin.value } else { 0 }
+    }
+
+    /// The primary store of `owner` for the paired fungible asset `paired`; meaningful only if it is some.
+    spec fun spec_paired_store_address(owner: address, paired: Option<Object<Metadata>>): address {
+        primary_fungible_store::spec_primary_store_address(owner, option::borrow(paired))
+    }
+
+    spec fun spec_has_paired_store(owner: address, paired: Option<Object<Metadata>>): bool {
+        option::is_some(paired) && exists<fungible_asset::FungibleStore>(spec_paired_store_address(owner, paired))
+    }
+
+    spec fun spec_fa_balance(owner: address, paired: Option<Object<Metadata>>): u64 {
+        if (spec_has_paired_store(owner, paired)) {
+            fungible_asset::spec_balance(spec_paired_store_address(owner, paired))
+        } else { 0 }
+    }
+
+    /// The balance of `owner`'s paired store is computed by a dispatch hook rather than read from the store.
+    spec fun spec_has_balance_hook(owner: address, paired: Option<Object<Metadata>>): bool {
+        spec_has_paired_store(owner, paired)
+            && fungible_asset::spec_store_has_balance_hook(spec_paired_store_address(owner, paired))
+    }
+
+    /// The coin balance plus the balance of the paired primary store.
     spec balance<CoinType>(owner: address): u64 {
-        // TODO(fa_migration)
-        pragma verify = false;
-        aborts_if !exists<CoinStore<CoinType>>(owner);
-        ensures result == global<CoinStore<CoinType>>(owner).coin.value;
+        // Partial: the result and aborts of a derived-balance hook are not specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let total = spec_coin_balance<CoinType>(owner) + spec_fa_balance(owner, paired);
+        aborts_if !spec_has_balance_hook(owner, paired) && total > MAX_U64;
+        ensures !spec_has_balance_hook(owner, paired) ==> result == total;
+    }
+
+    spec is_balance_at_least<CoinType>(owner: address, amount: u64): bool {
+        // Partial: the result and aborts of a derived-balance hook are not specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        ensures !spec_has_balance_hook(owner, paired) ==>
+            result == (spec_coin_balance<CoinType>(owner) + spec_fa_balance(owner, paired) >= amount);
     }
 
     spec is_coin_initialized<CoinType>(): bool {
@@ -173,12 +219,13 @@ spec aptos_framework::coin {
         global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply
     }
 
-    spec fun spec_paired_metadata<CoinType>(): Option<Object<Metadata>> {
+    /// The fungible asset metadata paired with the coin type `coin_type`, if any.
+    spec fun spec_paired_metadata(coin_type: TypeInfo): Option<Object<Metadata>> {
         if (exists<CoinConversionMap>(@aptos_framework)) {
             let map =
                 global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
-            if (table::spec_contains(map, type_info::type_of<CoinType>())) {
-                let metadata = table::spec_get(map, type_info::type_of<CoinType>());
+            if (table::spec_contains(map, coin_type)) {
+                let metadata = table::spec_get(map, coin_type);
                 option::spec_some(metadata)
             } else {
                 option::spec_none()
@@ -186,6 +233,125 @@ spec aptos_framework::coin {
         } else {
             option::spec_none()
         }
+    }
+
+    spec create_coin_conversion_map(aptos_framework: &signer) {
+        pragma aborts_if_is_partial = false;
+        aborts_if signer::address_of(aptos_framework) != @aptos_framework;
+        ensures exists<CoinConversionMap>(@aptos_framework);
+    }
+
+    /// `CoinType` is paired and its metadata object holds the paired refs.
+    spec schema PairedRefsAbortsIf<CoinType> {
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        aborts_if !type_info::spec_is_struct<CoinType>();
+        aborts_if option::is_none(paired);
+        aborts_if !exists<PairedFungibleAssetRefs>(option::borrow(paired).inner);
+    }
+
+    spec get_paired_mint_copy_ref<CoinType>(mint_cap: &MintCapability<CoinType>): MintRef {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.mint_ref_opt);
+        ensures result == option::borrow(refs.mint_ref_opt);
+    }
+
+    spec get_paired_mint_ref {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        modifies global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.mint_ref_opt);
+        ensures result_1 == option::borrow(refs.mint_ref_opt);
+        ensures result_2 == MintRefReceipt { metadata };
+        ensures global<PairedFungibleAssetRefs>(metadata.inner)
+            == update_field(refs, mint_ref_opt, option::spec_none());
+    }
+
+    spec return_paired_mint_ref(mint_ref: MintRef, receipt: MintRefReceipt) {
+        pragma aborts_if_is_partial = false;
+        let addr = receipt.metadata.inner;
+        let refs = global<PairedFungibleAssetRefs>(addr);
+        modifies global<PairedFungibleAssetRefs>(addr);
+        aborts_if mint_ref.metadata != receipt.metadata;
+        aborts_if !exists<PairedFungibleAssetRefs>(addr);
+        aborts_if option::is_some(refs.mint_ref_opt);
+        ensures global<PairedFungibleAssetRefs>(addr)
+            == update_field(refs, mint_ref_opt, option::spec_some(mint_ref));
+    }
+
+    spec get_paired_transfer_ref {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        modifies global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.transfer_ref_opt);
+        ensures result_1 == option::borrow(refs.transfer_ref_opt);
+        ensures result_2 == TransferRefReceipt { metadata };
+        ensures global<PairedFungibleAssetRefs>(metadata.inner)
+            == update_field(refs, transfer_ref_opt, option::spec_none());
+    }
+
+    spec return_paired_transfer_ref(transfer_ref: TransferRef, receipt: TransferRefReceipt) {
+        pragma aborts_if_is_partial = false;
+        let addr = receipt.metadata.inner;
+        let refs = global<PairedFungibleAssetRefs>(addr);
+        modifies global<PairedFungibleAssetRefs>(addr);
+        aborts_if transfer_ref.metadata != receipt.metadata;
+        aborts_if !exists<PairedFungibleAssetRefs>(addr);
+        aborts_if option::is_some(refs.transfer_ref_opt);
+        ensures global<PairedFungibleAssetRefs>(addr)
+            == update_field(refs, transfer_ref_opt, option::spec_some(transfer_ref));
+    }
+
+    spec get_paired_burn_copy_ref<CoinType>(burn_cap: &BurnCapability<CoinType>): BurnRef {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.burn_ref_opt);
+        ensures result == option::borrow(refs.burn_ref_opt);
+    }
+
+    spec get_paired_burn_ref {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        modifies global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.burn_ref_opt);
+        ensures result_1 == option::borrow(refs.burn_ref_opt);
+        ensures result_2 == BurnRefReceipt { metadata };
+        ensures global<PairedFungibleAssetRefs>(metadata.inner)
+            == update_field(refs, burn_ref_opt, option::spec_none());
+    }
+
+    spec convert_and_take_paired_burn_ref<CoinType>(burn_cap: BurnCapability<CoinType>): BurnRef {
+        pragma aborts_if_is_partial = false;
+        let metadata = option::borrow(spec_paired_metadata(type_info::type_of<CoinType>()));
+        let refs = global<PairedFungibleAssetRefs>(metadata.inner);
+        modifies global<PairedFungibleAssetRefs>(metadata.inner);
+        include PairedRefsAbortsIf<CoinType>;
+        aborts_if option::is_none(refs.burn_ref_opt);
+        ensures result == option::borrow(refs.burn_ref_opt);
+        ensures global<PairedFungibleAssetRefs>(metadata.inner)
+            == update_field(refs, burn_ref_opt, option::spec_none());
+    }
+
+    spec return_paired_burn_ref(burn_ref: BurnRef, receipt: BurnRefReceipt) {
+        pragma aborts_if_is_partial = false;
+        let addr = receipt.metadata.inner;
+        let refs = global<PairedFungibleAssetRefs>(addr);
+        modifies global<PairedFungibleAssetRefs>(addr);
+        aborts_if burn_ref.metadata != receipt.metadata;
+        aborts_if !exists<PairedFungibleAssetRefs>(addr);
+        aborts_if option::is_some(refs.burn_ref_opt);
+        ensures global<PairedFungibleAssetRefs>(addr)
+            == update_field(refs, burn_ref_opt, option::spec_some(burn_ref));
     }
 
     spec schema CoinSubAbortsIf<CoinType> {
@@ -210,6 +376,7 @@ spec aptos_framework::coin {
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
         let addr = type_info::type_of<CoinType>().account_address;
+        aborts_if !type_info::spec_is_struct<CoinType>();
         aborts_if !exists<CoinInfo<CoinType>>(addr);
     }
 
@@ -227,14 +394,31 @@ spec aptos_framework::coin {
         include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
+    /// The coin supply plus the supply of the paired fungible asset, if the coin supply is tracked.
     spec supply<CoinType>(): Option<u128> {
-        // TODO(fa_migration)
-        pragma verify = false;
+        pragma aborts_if_is_partial = false;
+        let maybe_supply = global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply;
+        let coin_value = optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply));
+        let metadata = spec_paired_metadata(type_info::type_of<CoinType>());
+        let paired = option::is_some(metadata);
+        let fa_addr = option::borrow(metadata).inner;
+        include AbortsIfNotExistCoinInfo<CoinType>;
+        aborts_if paired && fa_addr != @aptos_fungible_asset && exists<fungible_asset::DeriveSupply>(fa_addr);
+        aborts_if paired && option::is_some(maybe_supply)
+            && !exists<fungible_asset::ConcurrentSupply>(fa_addr) && !exists<fungible_asset::Supply>(fa_addr);
+        aborts_if paired && option::is_some(maybe_supply)
+            && coin_value + fungible_asset::spec_supply(fa_addr) > MAX_U128;
+        ensures option::is_some(result) == option::is_some(maybe_supply);
+        ensures option::is_some(result) ==> option::borrow(result)
+            == coin_value + if (paired) { fungible_asset::spec_supply(fa_addr) } else { 0 };
     }
 
     spec coin_supply<CoinType>(): Option<u128> {
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         let coin_addr = type_info::type_of<CoinType>().account_address;
         /// [high-level-req-7.5]
+        aborts_if !type_info::spec_is_struct<CoinType>();
         aborts_if !exists<CoinInfo<CoinType>>(coin_addr);
         let maybe_supply = global<CoinInfo<CoinType>>(coin_addr).supply;
         let supply = option::borrow(maybe_supply);
@@ -247,89 +431,134 @@ spec aptos_framework::coin {
         };
     }
 
-    spec burn<CoinType>(coin: Coin<CoinType>, _cap: &BurnCapability<CoinType>) {
-        // TODO(fa_migration)
-        pragma verify = false;
+    /// Burning a coin decreases the tracked coin supply by its value.
+    spec schema CoinBurn<CoinType> {
+        coin: Coin<CoinType>;
         let addr = type_info::type_of<CoinType>().account_address;
+        let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
+        let post post_maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
         modifies global<CoinInfo<CoinType>>(addr);
-        include AbortsIfNotExistCoinInfo<CoinType>;
-        aborts_if coin.value == 0;
-        include CoinSubAbortsIf<CoinType> { amount: coin.value };
+        aborts_if coin.value != 0 && !type_info::spec_is_struct<CoinType>();
+        aborts_if coin.value != 0 && !exists<CoinInfo<CoinType>>(addr);
+        include coin.value != 0 ==> CoinSubAbortsIf<CoinType> { amount: coin.value };
         ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        ensures if (option::is_some(maybe_supply)) {
+            option::is_some(post_maybe_supply)
+                && optional_aggregator::optional_aggregator_value(option::borrow(post_maybe_supply))
+                    == optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply)) - coin.value
+        } else {
+            option::is_none(post_maybe_supply)
+        };
+    }
+
+    spec burn<CoinType>(coin: Coin<CoinType>, _cap: &BurnCapability<CoinType>) {
+        pragma aborts_if_is_partial = false;
+        include CoinBurn<CoinType>;
     }
 
     spec burn_internal<CoinType>(coin: Coin<CoinType>): u64 {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let addr = type_info::type_of<CoinType>().account_address;
-        modifies global<CoinInfo<CoinType>>(addr);
+        pragma aborts_if_is_partial = false;
+        include CoinBurn<CoinType>;
+        ensures result == coin.value;
+    }
+
+    /// Burns `amount` from the paired primary store of `account_addr`, ignoring its frozen flag.
+    spec schema PairedBurnFrom<CoinType> {
+        account_addr: address;
+        amount: u64;
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account_addr, paired);
+        let fa_addr = global<fungible_asset::FungibleStore>(store_addr).metadata.inner;
+        include amount != 0 ==> PairedRefsAbortsIf<CoinType>;
+        aborts_if amount != 0
+            && option::is_none(global<PairedFungibleAssetRefs>(option::borrow(paired).inner).burn_ref_opt);
+        aborts_if amount != 0 && !exists<fungible_asset::FungibleStore>(store_addr);
+        aborts_if amount != 0 && fungible_asset::spec_balance(store_addr) < amount;
+        ensures fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
+        /// [managed_coin::high-level-req-5]
+        ensures amount != 0 ==>
+            fungible_asset::spec_supply(fa_addr) == old(fungible_asset::spec_supply(fa_addr)) - amount;
     }
 
     spec burn_from<CoinType>(
         account_addr: address, amount: u64, burn_cap: &BurnCapability<CoinType>
     ) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let addr = type_info::type_of<CoinType>().account_address;
-        let coin_store = global<CoinStore<CoinType>>(account_addr);
-        let post post_coin_store = global<CoinStore<CoinType>>(account_addr);
-
-        modifies global<CoinInfo<CoinType>>(addr);
-        modifies global<CoinStore<CoinType>>(account_addr);
-
+        // Partial: the abort conditions of a mismatched burn ref and of the supply update are not specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account_addr, paired);
+        include PairedBurnFrom<CoinType>;
         /// [high-level-req-6.2]
-        aborts_if amount != 0 && !exists<CoinInfo<CoinType>>(addr);
-        aborts_if amount != 0 && !exists<CoinStore<CoinType>>(account_addr);
-        aborts_if coin_store.coin.value < amount;
-
-        let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let supply_aggr = option::borrow(maybe_supply);
-        let value = optional_aggregator::optional_aggregator_value(supply_aggr);
-
-        let post post_maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let post post_supply = option::borrow(post_maybe_supply);
-        let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
-
-        aborts_if option::is_some(maybe_supply) && value < amount;
-
-        ensures post_coin_store.coin.value == coin_store.coin.value - amount;
-        /// [managed_coin::high-level-req-5]
-        ensures if (option::is_some(maybe_supply)) {
-            post_value == value - amount
-        } else {
-            option::is_none(post_maybe_supply)
-        };
-        ensures supply<CoinType> == old(supply<CoinType>) - amount;
+        aborts_if amount != 0 && !exists<object::ObjectCore>(store_addr);
     }
 
-    /// `account_addr` is not frozen.
+    spec burn_from_for_gas<CoinType>(
+        account_addr: address, amount: u64, burn_cap: &BurnCapability<CoinType>
+    ) {
+        // Partial: the abort conditions of a mismatched burn ref and of the supply update are not specified.
+        include PairedBurnFrom<CoinType>;
+    }
+
+    /// The coin is converted and deposited into the paired primary store of `account_addr`, which is not frozen.
     spec deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        modifies global<CoinInfo<CoinType>>(account_addr);
+        // Partial: the abort conditions of creating the pairing or the store, of the supply updates and of a
+        // deposit hook are not specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account_addr, paired);
+        let existing = spec_has_paired_store(account_addr, paired);
+        aborts_if !exists<CoinConversionMap>(@aptos_framework);
         /// [high-level-req-8.3]
-        include DepositAbortsIf<CoinType>;
-        ensures global<CoinStore<CoinType>>(account_addr).coin.value
-            == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
+        aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
+        ensures existing && fungible_asset::spec_store_no_deposit_hook(store_addr) ==>
+            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + coin.value;
     }
 
+    /// Burns the coin and mints the same amount of the paired fungible asset, pairing `CoinType` if needed.
     spec coin_to_fungible_asset<CoinType>(coin: Coin<CoinType>): FungibleAsset {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let addr = type_info::type_of<CoinType>().account_address;
-        modifies global<CoinInfo<CoinType>>(addr);
+        // Partial: the abort conditions of creating the pairing and of the supply updates are not specified.
+        let metadata = spec_paired_metadata(type_info::type_of<CoinType>());
+        let fa_addr = option::borrow(metadata).inner;
+        let post post_metadata = spec_paired_metadata(type_info::type_of<CoinType>());
+        aborts_if !exists<CoinConversionMap>(@aptos_framework);
+        ensures option::is_some(post_metadata);
+        ensures result == FungibleAsset { metadata: option::borrow(post_metadata), amount: coin.value };
+        ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        ensures option::is_some(metadata) ==>
+            fungible_asset::spec_supply(fa_addr) == old(fungible_asset::spec_supply(fa_addr)) + coin.value;
     }
 
+    /// Burns a fungible asset paired with `CoinType` and mints the same amount of coin.
     spec fungible_asset_to_coin<CoinType>(fungible_asset: FungibleAsset): Coin<CoinType> {
-        // TODO(fa_migration)
-        pragma verify = false;
+        pragma aborts_if_is_partial = false;
+        let metadata_addr = fungible_asset.metadata.inner;
+        let amount = fungible_asset.amount;
+        aborts_if !exists<object::ObjectCore>(metadata_addr) || !object::spec_exists_at<PairedCoinType>(metadata_addr);
+        aborts_if !type_info::spec_is_struct<CoinType>();
+        aborts_if global<PairedCoinType>(metadata_addr).type != type_info::type_of<CoinType>();
+        aborts_if amount != 0 && !exists<fungible_asset::ConcurrentSupply>(metadata_addr)
+            && !exists<fungible_asset::Supply>(metadata_addr);
+        aborts_if amount != 0 && fungible_asset::spec_supply(metadata_addr) < amount;
+        aborts_if amount != 0 && !exists<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address);
+        include amount != 0 ==> CoinAddAbortsIf<CoinType> { amount };
+        ensures result.value == fungible_asset.amount;
+        ensures supply<CoinType> == old(supply<CoinType>) + fungible_asset.amount;
+        ensures fungible_asset::spec_supply(metadata_addr)
+            == old(fungible_asset::spec_supply(metadata_addr)) - fungible_asset.amount;
     }
 
+    /// Removes the `CoinStore`, moving its coin and frozen flag into the paired primary store.
     spec maybe_convert_to_fungible_store<CoinType>(account: address) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        modifies global<CoinInfo<CoinType>>(account);
-        modifies global<CoinStore<CoinType>>(account);
+        // Partial: the abort conditions of creating the pairing or the store and of the supply updates are not
+        // specified.
+        let coin_store = global<CoinStore<CoinType>>(account);
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account, paired);
+        let moved = exists<CoinStore<CoinType>>(account) && coin_store.coin.value > 0
+            && spec_has_paired_store(account, paired)
+            && exists<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address);
+        ensures !exists<CoinStore<CoinType>>(account);
+        ensures moved ==> global<fungible_asset::FungibleStore>(store_addr).frozen == coin_store.frozen
+            && fungible_asset::spec_balance(store_addr)
+                == old(fungible_asset::spec_balance(store_addr)) + coin_store.coin.value;
     }
 
     spec schema DepositAbortsIf<CoinType> {
@@ -339,21 +568,28 @@ spec aptos_framework::coin {
         aborts_if coin_store.frozen;
     }
 
+    /// The coin is converted and deposited into the paired primary store of `account_addr`, ignoring its frozen flag.
     spec deposit_for_gas_fee<CoinType>(account_addr: address, coin: Coin<CoinType>) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        modifies global<CoinStore<CoinType>>(account_addr);
-        aborts_if !exists<CoinStore<CoinType>>(account_addr);
-        ensures global<CoinStore<CoinType>>(account_addr).coin.value
-            == old(global<CoinStore<CoinType>>(account_addr)).coin.value + coin.value;
+        // Partial: the abort conditions of creating the pairing or the store and of the supply updates are not
+        // specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account_addr, paired);
+        let existing = spec_has_paired_store(account_addr, paired);
+        aborts_if !exists<CoinConversionMap>(@aptos_framework);
+        ensures existing ==>
+            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + coin.value;
     }
 
     /// The value of `zero_coin` must be 0.
     spec destroy_zero<CoinType>(zero_coin: Coin<CoinType>) {
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         aborts_if zero_coin.value > 0;
     }
 
     spec extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         aborts_if coin.value < amount;
         ensures result.value == amount;
         ensures coin.value == old(coin.value) - amount;
@@ -361,6 +597,7 @@ spec aptos_framework::coin {
 
     spec extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
         pragma opaque;
+        pragma aborts_if_is_partial = false;
         aborts_if false;
         ensures result.value == old(coin).value;
         ensures coin.value == 0;
@@ -369,9 +606,6 @@ spec aptos_framework::coin {
     spec freeze_coin_store<CoinType>(
         account_addr: address, _freeze_cap: &FreezeCapability<CoinType>
     ) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        // pragma opaque;
         modifies global<CoinStore<CoinType>>(account_addr);
         /// [high-level-req-6.3]
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
@@ -382,9 +616,6 @@ spec aptos_framework::coin {
     spec unfreeze_coin_store<CoinType>(
         account_addr: address, _freeze_cap: &FreezeCapability<CoinType>
     ) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        // pragma opaque;
         modifies global<CoinStore<CoinType>>(account_addr);
         /// [high-level-req-6.4]
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
@@ -393,20 +624,41 @@ spec aptos_framework::coin {
     }
 
     /// The creator of `CoinType` must be `@aptos_framework`.
-    /// `SupplyConfig` allow upgrade.
+    /// A parallelizable supply is switched to a non-parallelizable one with the same value.
     spec upgrade_supply<CoinType>(account: &signer) {
-        // aborts_if true;
-        pragma verify = false;
+        pragma aborts_if_is_partial = false;
+        let account_addr = signer::address_of(account);
+        let maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
+        let post post_maybe_supply = global<CoinInfo<CoinType>>(account_addr).supply;
+        modifies global<CoinInfo<CoinType>>(account_addr);
+        aborts_if account_addr != @aptos_framework;
+        aborts_if !type_info::spec_is_struct<CoinType>();
+        /// [high-level-req-1.1]
+        aborts_if type_info::type_of<CoinType>().account_address != account_addr;
+        aborts_if !exists<CoinInfo<CoinType>>(account_addr);
+        ensures if (option::is_some(maybe_supply)) {
+            option::is_some(post_maybe_supply)
+                && !optional_aggregator::is_parallelizable(option::borrow(post_maybe_supply))
+                && optional_aggregator::optional_aggregator_value(option::borrow(post_maybe_supply))
+                    == optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply))
+        } else {
+            option::is_none(post_maybe_supply)
+        };
     }
 
     spec initialize {
         let account_addr = signer::address_of(account);
         /// [high-level-req-1.2]
-        aborts_if type_info::type_of<CoinType>().account_address != account_addr;
         /// [high-level-req-2]
-        aborts_if exists<CoinInfo<CoinType>>(account_addr);
-        aborts_if string::length(name) > MAX_COIN_NAME_LENGTH;
-        aborts_if string::length(symbol) > MAX_COIN_SYMBOL_LENGTH;
+        include InitializeInternalSchema<CoinType> {
+            name: name.bytes,
+            symbol: symbol.bytes
+        };
+        modifies global<CoinInfo<CoinType>>(account_addr);
+        ensures exists<CoinInfo<CoinType>>(account_addr);
+        ensures result_1 == BurnCapability<CoinType> {};
+        ensures result_2 == FreezeCapability<CoinType> {};
+        ensures result_3 == MintCapability<CoinType> {};
     }
 
     // `account` must be `@aptos_framework`.
@@ -418,6 +670,8 @@ spec aptos_framework::coin {
         monitor_supply: bool
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         use aptos_framework::aggregator_factory;
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         let addr = signer::address_of(account);
         aborts_if addr != @aptos_framework;
         aborts_if monitor_supply
@@ -426,7 +680,11 @@ spec aptos_framework::coin {
             name: name.bytes,
             symbol: symbol.bytes
         };
+        modifies global<CoinInfo<CoinType>>(addr);
         ensures exists<CoinInfo<CoinType>>(addr);
+        ensures result_1 == BurnCapability<CoinType> {};
+        ensures result_2 == FreezeCapability<CoinType> {};
+        ensures result_3 == MintCapability<CoinType> {};
     }
 
     /// Make sure `name` and `symbol` are legal length.
@@ -435,8 +693,11 @@ spec aptos_framework::coin {
         account: signer;
         name: vector<u8>;
         symbol: vector<u8>;
+        decimals: u8;
+        aborts_if decimals > MAX_DECIMALS;
         let account_addr = signer::address_of(account);
         let coin_address = type_info::type_of<CoinType>().account_address;
+        aborts_if !type_info::spec_is_struct<CoinType>();
         aborts_if coin_address != account_addr;
         aborts_if exists<CoinInfo<CoinType>>(account_addr);
         aborts_if len(name) > MAX_COIN_NAME_LENGTH;
@@ -483,66 +744,56 @@ spec aptos_framework::coin {
 
     spec merge<CoinType>(dst_coin: &mut Coin<CoinType>, source_coin: Coin<CoinType>) {
         pragma opaque;
+        pragma aborts_if_is_partial = false;
         aborts_if dst_coin.value + source_coin.value > MAX_U64;
         /// [high-level-req-3]
         ensures dst_coin.value == old(dst_coin.value) + source_coin.value;
         ensures supply<CoinType> == old(supply<CoinType>);
     }
 
-    /// An account can only be registered once.
-    /// Updating `Account.guid_creation_num` will not overflow.
+    /// Registering only requires `CoinType` to be initialized and changes nothing.
     spec register<CoinType>(account: &signer) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        // let account_addr = signer::address_of(account);
-        // let acc = global<account::Account>(account_addr);
-        // aborts_if !exists<CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        // aborts_if !exists<CoinStore<CoinType>>(account_addr) && acc.guid_creation_num + 2 > MAX_U64;
-        // aborts_if !exists<CoinStore<CoinType>>(account_addr) && !exists<account::Account>(account_addr);
-        // aborts_if !exists<CoinStore<CoinType>>(account_addr) && !type_info::spec_is_struct<CoinType>();
-        // ensures exists<CoinStore<CoinType>>(account_addr);
+        pragma aborts_if_is_partial = false;
+        /// [high-level-req-5]
+        include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
-    /// `from` and `to` account not frozen.
-    /// `from` and `to` not the same address.
-    /// `from` account sufficient balance.
+    /// Moves `amount` between the paired primary stores of `from` and `to`.
     spec transfer<CoinType>(from: &signer, to: address, amount: u64) {
-        // TODO(fa_migration)
-        pragma verify = false;
-        let account_addr_from = signer::address_of(from);
-        let coin_store_from = global<CoinStore<CoinType>>(account_addr_from);
-        let post coin_store_post_from = global<CoinStore<CoinType>>(account_addr_from);
-        let coin_store_to = global<CoinStore<CoinType>>(to);
-        let post coin_store_post_to = global<CoinStore<CoinType>>(to);
-
-        /// [high-level-req-6.5]
-        aborts_if !exists<CoinStore<CoinType>>(account_addr_from);
-        aborts_if !exists<CoinStore<CoinType>>(to);
+        // Partial: the abort conditions of creating the pairing or the stores, unburning, the ownership check and
+        // the dispatch hooks are not specified.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let from_store = spec_paired_store_address(signer::address_of(from), paired);
+        let to_store = spec_paired_store_address(to, paired);
+        // The withdrawn asset is deposited into the primary store of its own metadata.
+        let both = spec_has_paired_store(signer::address_of(from), paired) && spec_has_paired_store(to, paired)
+            && global<fungible_asset::FungibleStore>(from_store).metadata == option::borrow(paired);
+        let plain = both && primary_fungible_store::spec_is_plain_transfer(from_store, to_store);
+        aborts_if !exists<CoinConversionMap>(@aptos_framework);
         /// [high-level-req-8.2]
-        aborts_if coin_store_from.frozen;
-        aborts_if coin_store_to.frozen;
-        aborts_if coin_store_from.coin.value < amount;
-
-        ensures account_addr_from != to ==>
-            coin_store_post_from.coin.value == coin_store_from.coin.value - amount;
-        ensures account_addr_from != to ==>
-            coin_store_post_to.coin.value == coin_store_to.coin.value + amount;
-        ensures account_addr_from == to ==>
-            coin_store_post_from.coin.value == coin_store_from.coin.value;
+        aborts_if spec_has_paired_store(signer::address_of(from), paired)
+            && global<fungible_asset::FungibleStore>(from_store).frozen;
+        aborts_if both && fungible_asset::spec_store_no_withdraw_hook(from_store)
+            && global<fungible_asset::FungibleStore>(to_store).frozen;
+        aborts_if plain && fungible_asset::spec_balance(from_store) < amount;
+        include primary_fungible_store::PlainTransferBalances { from: from_store, to: to_store, amount, plain };
     }
 
-    /// Account is not frozen and sufficient balance.
+    /// Withdraws from the paired primary store of the signer, which must not be frozen and hold enough balance.
     spec withdraw<CoinType>(account: &signer, amount: u64): Coin<CoinType> {
-        // TODO(fa_migration)
-        pragma verify = false;
-        include WithdrawAbortsIf<CoinType>;
-        modifies global<CoinStore<CoinType>>(account_addr);
+        // Partial: the abort conditions of creating the pairing or the store, unburning, the ownership check, a
+        // withdraw hook and the supply updates are not specified.
         let account_addr = signer::address_of(account);
-        let coin_store = global<CoinStore<CoinType>>(account_addr);
-        let balance = coin_store.coin.value;
-        let post coin_post = global<CoinStore<CoinType>>(account_addr).coin.value;
-        ensures coin_post == balance - amount;
-        ensures result == Coin<CoinType> { value: amount };
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        let store_addr = spec_paired_store_address(account_addr, paired);
+        let existing = spec_has_paired_store(account_addr, paired);
+        let plain = existing && fungible_asset::spec_store_no_withdraw_hook(store_addr);
+        aborts_if !exists<CoinConversionMap>(@aptos_framework);
+        /// [high-level-req-8.1]
+        aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
+        aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
+        ensures plain ==> result.value == amount
+            && fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
     }
 
     spec schema WithdrawAbortsIf<CoinType> {
@@ -551,9 +802,7 @@ spec aptos_framework::coin {
         let account_addr = signer::address_of(account);
         let coin_store = global<CoinStore<CoinType>>(account_addr);
         let balance = coin_store.coin.value;
-        /// [high-level-req-6.6]
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
-        /// [high-level-req-8.1]
         aborts_if coin_store.frozen;
         aborts_if balance < amount;
     }

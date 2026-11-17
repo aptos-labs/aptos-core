@@ -4241,10 +4241,7 @@ impl<'env> ModuleEnv<'env> {
         }
         // global specs
         let global_invariants = self.env.get_global_invariants_by_module(self.get_id());
-        if !global_invariants.is_empty() {
-            return true;
-        }
-        false
+        !global_invariants.is_empty()
     }
 
     fn match_module_name(&self, module_name: &str) -> bool {

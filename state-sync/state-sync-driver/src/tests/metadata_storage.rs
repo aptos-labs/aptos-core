@@ -105,6 +105,7 @@ fn test_snapshot_kinds_keep_independent_progress() {
         SnapshotKind::HOT_STATE,
         SnapshotKind::POSITION,
         SnapshotKind::ORDER,
+        SnapshotKind::COLLATERAL,
     ];
     let tmp_dir = TempPath::new();
     let metadata_storage = PersistentMetadataStorage::new(tmp_dir.path());

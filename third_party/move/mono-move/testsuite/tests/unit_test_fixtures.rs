@@ -97,10 +97,10 @@ fn unsupported_test_fails_the_run_unless_allowed() {
     let (ok, output) = run("gaps", Backends::Single(&mono), false);
     assert!(!ok, "{output}");
     assert!(
-        output.contains("UNSUPPORTED") && output.contains("gaps::prints"),
+        output.contains("UNSUPPORTED") && output.contains("gaps::creates_aggregator_v1"),
         "{output}"
     );
-    assert!(output.contains("native_print"), "{output}");
+    assert!(output.contains("new_aggregator"), "{output}");
 
     let (ok, output) = run("gaps", Backends::Single(&mono), true);
     assert!(ok, "{output}");

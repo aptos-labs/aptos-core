@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true, features = ["testing"] }
 clap = { workspace = true }
 move-model = { workspace = true }
 move-package = { workspace = true }
@@ -26,5 +25,6 @@ move-vm-runtime = { workspace = true }
 
 [dev-dependencies]
 aptos-framework = { workspace = true, features = ["testing"] }
+aptos-vm = { workspace = true, features = ["testing"] }
 mono-move-unit-test-backend = { workspace = true, features = ["testing"] }
 tempfile = { workspace = true }

@@ -1,0 +1,61 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_contract_target.move:34:5: error: the continuation after `native_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:35:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:34:5: error: verex verification failed: the automatic verification of `over_native` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify over_native by lean =>
+    verex_obligations
+    verex_on
+    | after_native_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_contract_target.move:39:5: error: the continuation after `unverified_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:40:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:39:5: error: verex verification failed: the automatic verification of `over_unverified` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify over_unverified by lean =>
+    verex_obligations
+    verex_on
+    | after_unverified_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_contract_target.move:50:5: error: the continuation after `native_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:51:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:50:5: error: verex verification failed: the automatic verification of `native_from_factory` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify native_from_factory by lean =>
+    verex_obligations
+    verex_on
+    | after_native_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_contract_target.move:55:5: error: the continuation after `unverified_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:56:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:55:5: error: verex verification failed: the automatic verification of `unverified_from_factory` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify unverified_from_factory by lean =>
+    verex_obligations
+    verex_on
+    | after_unverified_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_contract_target.move:61:5: error: the continuation after `native_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:62:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:61:5: error: verex verification failed: the automatic verification of `native_in_body` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify native_in_body by lean =>
+    verex_obligations
+    verex_on
+    | after_native_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_contract_target.move:66:5: error: the continuation after `unverified_writer` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:67:9: error: the specification clause `ensures global<S>(@0x42).v == old(global<S>(@0x42).v)` is not established
+tests/sources/functional/closures/fun_param_frame_contract_target.move:66:5: error: verex verification failed: the automatic verification of `unverified_in_body` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_contract_target.proof.lean`:
+  verify unverified_in_body by lean =>
+    verex_obligations
+    verex_on
+    | after_unverified_writer => verex_prepare; sorry
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

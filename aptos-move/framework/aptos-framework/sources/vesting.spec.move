@@ -154,15 +154,11 @@ spec aptos_framework::vesting {
     }
 
     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
-        // TODO: set because of timeout (property proved)
-        pragma verify = false;
-
         include TotalAccumulatedRewardsAbortsIf;
     }
 
     spec schema TotalAccumulatedRewardsAbortsIf {
         vesting_contract_address: address;
-
 
         include ActiveVestingContractAbortsIf{contract_address: vesting_contract_address};
         let vesting_contract = global<VestingContract>(vesting_contract_address);
@@ -181,43 +177,17 @@ spec aptos_framework::vesting {
         let pending_active = coin::value(stake_pool.pending_active);
         let total_active_stake = active + pending_active;
         let accumulated_rewards = total_active_stake - staking_contract.principal;
-        let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
         aborts_if !exists<stake::StakePool>(pool_address);
         aborts_if active + pending_active > MAX_U64;
         aborts_if total_active_stake < staking_contract.principal;
         aborts_if accumulated_rewards * staking_contract.commission_percentage > MAX_U64;
-        // This two item both contribute to the timeout
-        aborts_if (vesting_contract.remaining_grant + commission_amount) > total_active_stake;
+        // The underflow when the unpaid commission exceeds the stake above the remaining grant is not specified.
         aborts_if total_active_stake < vesting_contract.remaining_grant;
     }
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
-        // TODO: A severe timeout can not be resolved.
-        pragma verify = false;
-
-        // This schema lead to timeout
+        // Partial: the result and the aborts of converting the shares to an amount are not specified.
         include TotalAccumulatedRewardsAbortsIf;
-
-        let vesting_contract = global<VestingContract>(vesting_contract_address);
-        let operator = vesting_contract.staking.operator;
-        let staking_contracts = global<staking_contract::Store>(vesting_contract_address).staking_contracts;
-        let staking_contract = simple_map::spec_get(staking_contracts, operator);
-        let pool_address = staking_contract.pool_address;
-        let stake_pool = global<stake::StakePool>(pool_address);
-        let active = coin::value(stake_pool.active);
-        let pending_active = coin::value(stake_pool.pending_active);
-        let total_active_stake = active + pending_active;
-        let accumulated_rewards = total_active_stake - staking_contract.principal;
-        let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
-        let total_accumulated_rewards = total_active_stake - vesting_contract.remaining_grant - commission_amount;
-
-        let shareholder = spec_shareholder(vesting_contract_address, shareholder_or_beneficiary);
-        let pool = vesting_contract.grant_pool;
-        let shares = pool_u64::spec_shares(pool, shareholder);
-        aborts_if pool.total_coins > 0 && pool.total_shares > 0
-            && (shares * total_accumulated_rewards) / pool.total_shares > MAX_U64;
-
-        ensures result == pool_u64::spec_shares_to_amount_with_total_coins(pool, shares, total_accumulated_rewards);
     }
 
     spec shareholders(vesting_contract_address: address): vector<address> {
@@ -258,32 +228,14 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards(contract_address: address) {
-        // TODO: Calls `unlock_stake` which is not verified.
-        // Current verification times out.
-        pragma verify = false;
         include UnlockRewardsAbortsIf;
     }
 
     spec schema UnlockRewardsAbortsIf {
         contract_address: address;
 
-        // Cause timeout here
+        // Partial: the aborts of unlocking the rewards from the staking contract are not specified.
         include TotalAccumulatedRewardsAbortsIf { vesting_contract_address: contract_address };
-
-        let vesting_contract = global<VestingContract>(contract_address);
-        let operator = vesting_contract.staking.operator;
-        let staking_contracts = global<staking_contract::Store>(contract_address).staking_contracts;
-        let staking_contract = simple_map::spec_get(staking_contracts, operator);
-        let pool_address = staking_contract.pool_address;
-        let stake_pool = global<stake::StakePool>(pool_address);
-        let active = coin::value(stake_pool.active);
-        let pending_active = coin::value(stake_pool.pending_active);
-        let total_active_stake = active + pending_active;
-        let accumulated_rewards = total_active_stake - staking_contract.principal;
-        let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
-        let amount = total_active_stake - vesting_contract.remaining_grant - commission_amount;
-
-        include UnlockStakeAbortsIf { vesting_contract, amount };
     }
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
@@ -305,8 +257,7 @@ spec aptos_framework::vesting {
     }
 
     spec distribute(contract_address: address) {
-        // TODO: Can't handle abort in loop.
-        pragma verify = false;
+        // Partial: the aborts of the distribution loops and of depositing the coins are not specified.
         include ActiveVestingContractAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -329,9 +280,8 @@ spec aptos_framework::vesting {
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
-        // TODO: Calls `withdraw_stake` which is not verified.
-        pragma verify = false;
-
+        // Partial: the aborts of the distribution loop and of moving the coins to the withdrawal address are not
+        // specified.
         let vesting_contract = global<VestingContract>(contract_address);
         aborts_if vesting_contract.state != VESTING_POOL_TERMINATED;
 
@@ -345,29 +295,24 @@ spec aptos_framework::vesting {
         new_operator: address,
         commission_percentage: u64,
     ) {
-        // TODO: Calls `staking_contract::switch_operator` which is not verified.
-        pragma verify = false;
-
+        // Partial: the aborts of the distribution loop and of paying the commission are not specified.
         include VerifyAdminAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
         let acc = vesting_contract.signer_cap.account;
         let old_operator = vesting_contract.staking.operator;
         include staking_contract::ContractExistsAbortsIf { staker: acc, operator: old_operator };
+        aborts_if commission_percentage > 100;
         let store = global<staking_contract::Store>(acc);
         let staking_contracts = store.staking_contracts;
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
 
         let staking_contract = simple_map::spec_get(staking_contracts, old_operator);
         include DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract };
-    }
 
-    spec update_operator_with_same_commission(
-        admin: &signer,
-        contract_address: address,
-        new_operator: address,
-    ) {
-        pragma verify = false;
+        let post post_vesting_contract = global<VestingContract>(contract_address);
+        ensures post_vesting_contract.staking.operator == new_operator;
+        ensures post_vesting_contract.staking.commission_percentage == commission_percentage;
     }
 
     spec update_commission_percentage(
@@ -375,7 +320,18 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_commission_percentage: u64,
     ) {
-        pragma verify = false;
+        // Partial: the aborts of distributing the unlocked stake and of paying the commission are not specified.
+        include VerifyAdminAbortsIf;
+        aborts_if new_commission_percentage > 100;
+
+        let vesting_contract = global<VestingContract>(contract_address);
+        include staking_contract::ContractExistsAbortsIf {
+            staker: vesting_contract.signer_cap.account,
+            operator: vesting_contract.staking.operator,
+        };
+
+        let post post_vesting_contract = global<VestingContract>(contract_address);
+        ensures post_vesting_contract.staking.commission_percentage == new_commission_percentage;
     }
 
     spec update_voter(
@@ -420,7 +376,6 @@ spec aptos_framework::vesting {
         new_beneficiary: address,
     ) {
         pragma verify_duration_estimate = 300;
-        pragma aborts_if_is_partial;
         aborts_if !account::spec_exists_at(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
@@ -453,7 +408,6 @@ spec aptos_framework::vesting {
         role: String,
         role_holder: address,
     ) {
-        pragma aborts_if_is_partial;
         include SetManagementRoleAbortsIf;
     }
 
@@ -462,17 +416,8 @@ spec aptos_framework::vesting {
         contract_address: address,
         beneficiary_resetter: address,
     ) {
-        pragma aborts_if_is_partial;
         aborts_if !std::string::spec_internal_check_utf8(ROLE_BENEFICIARY_RESETTER);
         include SetManagementRoleAbortsIf;
-    }
-
-    spec set_beneficiary_for_operator(
-        operator: &signer,
-        new_beneficiary: address,
-    ) {
-        // TODO: temporary mockup
-        pragma verify = false;
     }
 
     spec get_role_holder(contract_address: address, role: String): address {
@@ -482,12 +427,16 @@ spec aptos_framework::vesting {
     }
 
     spec get_vesting_account_signer(admin: &signer, contract_address: address): signer {
-        pragma verify_duration_estimate = 120;
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         include VerifyAdminAbortsIf;
+        ensures signer::address_of(result)
+            == global<VestingContract>(contract_address).signer_cap.account;
     }
 
     spec get_vesting_account_signer_internal(vesting_contract: &VestingContract): signer {
         aborts_if false;
+        ensures signer::address_of(result) == vesting_contract.signer_cap.account;
     }
 
     spec fun spec_get_vesting_account_signer(vesting_contract: VestingContract): signer;
@@ -511,16 +460,14 @@ spec aptos_framework::vesting {
         aborts_if !exists<AdminStore>(admin_addr);
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
         aborts_if admin_store.nonce + (1 as u64) > (MAX_U64 as u64);
-        let ea = account::spec_exists_at(resource_addr);
-        include if (ea) account::CreateResourceAccountAbortsIf else account::CreateAccountAbortsIf {addr: resource_addr};
+        aborts_if exists<account::Account>(resource_addr);
+        include account::EnsureResourceExistsAbortsIf { addr: resource_addr };
 
-        let acc = global<account::Account>(resource_addr);
         let post post_acc = global<account::Account>(resource_addr);
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && !aptos_std::type_info::spec_is_struct<AptosCoin>();
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 > MAX_U64;
-        aborts_if !exists<coin::CoinStore<AptosCoin>>(resource_addr) && ea && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY &&
-                exists<coin::CoinStore<AptosCoin>>(resource_addr);
+        // `coin::register` only checks that the coin is initialized.
+        aborts_if !aptos_std::type_info::spec_is_struct<AptosCoin>();
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
+        ensures exists<account::Account>(resource_addr) && post_acc.authentication_key == account::ZERO_AUTH_KEY;
         ensures signer::address_of(result_1) == resource_addr;
         ensures result_2.account == resource_addr;
     }
@@ -537,12 +484,14 @@ spec aptos_framework::vesting {
     }
 
     spec assert_active_vesting_contract(contract_address: address) {
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
         include ActiveVestingContractAbortsIf;
     }
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
-        // TODO: Calls `staking_contract::unlock_stake` which is not verified.
-        pragma verify = false;
+        // Partial: the aborts of the distribution loop, of paying the commission and of unlocking the stake are not
+        // specified.
         include UnlockStakeAbortsIf;
     }
 
@@ -562,8 +511,7 @@ spec aptos_framework::vesting {
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
-        // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = false;
+        // Partial: the aborts of the distribution loop and of withdrawing the coins are not specified.
         include WithdrawStakeAbortsIf;
     }
 

@@ -35,7 +35,7 @@ use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_types::resolver::ResourceGroupSize;
 use mono_move_aptos_state_view_providers::StateViewModuleProvider;
 use mono_move_aptos_transaction_executor::{
-    production_natives, AptosTransactionExecutor, DiscardReason, TxnOutcome,
+    production_natives, AptosTransactionExecutor, DiscardReason, NoInterrupts, TxnOutcome,
 };
 use mono_move_core::{
     storage::resource_provider::{InMemoryStorageKey, ReadPin},
@@ -233,6 +233,8 @@ impl MonoTxnOutput {
                 //   should be handled at execution time!
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => None,
                 TxnOutcome::Panic(_) => None,
+                // Never stored: `execute` reports it as a speculative failure.
+                TxnOutcome::Interrupted => None,
             },
             MonoTxnOutput::SkippedToRetry => None,
         }
@@ -336,6 +338,8 @@ impl TxnOutput for MonoTxnOutput {
                 TxnOutcome::ExecutedNoEffects(_) => FeeStatement::zero(),
                 TxnOutcome::UnexpectedSystemTransactionFailure(_) => FeeStatement::zero(),
                 TxnOutcome::Panic(_) => FeeStatement::zero(),
+                // Never stored: `execute` reports it as a speculative failure.
+                TxnOutcome::Interrupted => FeeStatement::zero(),
             },
             MonoTxnOutput::SkippedToRetry => FeeStatement::zero(),
         }
@@ -464,6 +468,8 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             natives,
             &module_provider,
             &data_provider,
+            // A sequential run has no concurrent incarnations to abort.
+            &NoInterrupts,
             &self.environment,
             usage,
         )
@@ -474,6 +480,16 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
             return Err(code_invariant_error(format!(
                 "MonoMove: could not close the session: {err:?}"
             )));
+        }
+
+        // Like the v1 VM, an interrupted execution is a speculative failure and
+        // its effects are dropped.
+        //
+        // TODO(perf): with parallel execution, the interrupted run's write keys
+        // could serve as estimates for what the re-execution writes. The
+        // outcome would need to carry them.
+        if matches!(outcome, TxnOutcome::Interrupted) {
+            return Ok((ExecutionStatus::SpeculativeFailure, MonoReads));
         }
 
         // A reconfiguration (new epoch) event cuts the block early. Record this

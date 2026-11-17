@@ -18,7 +18,9 @@ use anyhow::{anyhow, Context, Result};
 pub use helpers::get_additional_binaries_dir;
 pub use movefmt::get_movefmt_path;
 pub use notice::UpdateCheck;
-use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
+use self_update::{update::ReleaseUpdate, version::bump_is_greater, VersionStatus};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 pub use tool::UpdateTool;
 
 /// Things that implement this trait are able to update a binary.
@@ -53,9 +55,18 @@ trait BinaryUpdater {
             .update()
             .map_err(|e| anyhow!("Failed to update {}: {:#}", self.pretty_name(), e))?;
 
+        // self_update keeps the file mode stored in the release archive, which may
+        // not include the executable bit.
+        #[cfg(unix)]
+        {
+            let install_path = updater.bin_install_path();
+            std::fs::set_permissions(install_path, std::fs::Permissions::from_mode(0o755))
+                .with_context(|| format!("Failed to make {} executable", install_path.display()))?;
+        }
+
         let message = match result {
-            Status::UpToDate(_) => unreachable!("We should have caught this already"),
-            Status::Updated(_) => match info.current_version {
+            VersionStatus::UpToDate(_) => unreachable!("We should have caught this already"),
+            VersionStatus::Updated(_) => match info.current_version {
                 Some(current_version) => format!(
                     "Successfully updated {} from v{} to v{}",
                     self.pretty_name(),
@@ -69,6 +80,15 @@ trait BinaryUpdater {
                         info.target_version
                     )
                 },
+            },
+            // `VersionStatus` is `#[non_exhaustive]`, so a catch-all arm is required.
+            status => {
+                return Err(anyhow!(
+                    "Unexpected status updating {}: {}",
+                    self.pretty_name(),
+                    status
+                )
+                .into())
             },
         };
 

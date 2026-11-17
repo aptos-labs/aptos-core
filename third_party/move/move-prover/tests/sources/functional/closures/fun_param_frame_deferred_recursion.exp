@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `g` may modify: `fun_param_frame_deferred_recursion::call_g` declares no `modifies_of` for it, and the argument is not a closure with a known footprint built at this call site
+   ┌─ tests/sources/functional/closures/fun_param_frame_deferred_recursion.move:35:13
+   │
+35 │             call_g(back, n - 1)
+   │             ^^^^^^^^^^^^^^^^^^^

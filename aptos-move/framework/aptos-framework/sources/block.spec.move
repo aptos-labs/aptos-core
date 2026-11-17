@@ -97,11 +97,6 @@ spec aptos_framework::block {
         pragma verify = false;
     }
 
-    spec block_epilogue {
-        // Defer until stake::record_fee has an opaque spec.
-        pragma verify = false;
-    }
-
     spec emit_genesis_block_event {
         use aptos_framework::chain_status;
 

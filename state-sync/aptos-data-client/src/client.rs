@@ -1049,7 +1049,7 @@ impl AptosDataClientInterface for AptosDataClient {
                 self.create_and_send_storage_request(request_timeout_ms, data_request)
                     .await
             },
-            StateKind::Position | StateKind::Order => {
+            StateKind::Position | StateKind::Order | StateKind::Collateral => {
                 let data_request =
                     DataRequest::GetNumberOfStatesAtVersionV2(NumberOfStatesRequestV2 {
                         version,
@@ -1082,7 +1082,7 @@ impl AptosDataClientInterface for AptosDataClient {
                 self.create_and_send_storage_request(request_timeout_ms, data_request)
                     .await
             },
-            StateKind::Position | StateKind::Order => {
+            StateKind::Position | StateKind::Order | StateKind::Collateral => {
                 let data_request =
                     DataRequest::GetStateValuesWithProofV2(StateValuesWithProofRequestV2 {
                         version,

@@ -40,12 +40,14 @@ mod pruner;
 mod sharded_db_layout;
 mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
+pub mod trading_native_reader;
 
 #[cfg(test)]
 mod native_storage_tests;
 
 pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
 pub use native_state_store::{AccountKey, PositionBase, PositionKey, PositionOverlay};
+pub use trading_native_reader::{TradingNativeReader, TradingNativeView};
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;

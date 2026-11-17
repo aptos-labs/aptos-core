@@ -102,6 +102,10 @@ impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
 
 pub trait DbStateViewAtVersion {
     fn state_view_at_version(&self, version: Option<Version>) -> StateViewResult<DbStateView>;
+
+    /// Like `state_view_at_version`, but `version` must be a block end (state checkpoint), which
+    /// allows cheaper reads.
+    fn state_view_at_checkpoint(&self, version: Option<Version>) -> StateViewResult<DbStateView>;
 }
 
 impl DbStateViewAtVersion for Arc<dyn DbReader> {
@@ -109,7 +113,16 @@ impl DbStateViewAtVersion for Arc<dyn DbReader> {
         Ok(DbStateView {
             db: self.clone(),
             version,
-            at_checkpoint: false,
+            at_checkpoint: version.is_some_and(|v| self.is_known_state_checkpoint(v)),
+            maybe_verify_against_state_root_hash: None,
+        })
+    }
+
+    fn state_view_at_checkpoint(&self, version: Option<Version>) -> StateViewResult<DbStateView> {
+        Ok(DbStateView {
+            db: Arc::clone(self),
+            version,
+            at_checkpoint: true,
             maybe_verify_against_state_root_hash: None,
         })
     }

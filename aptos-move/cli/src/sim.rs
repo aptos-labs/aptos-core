@@ -49,7 +49,8 @@ impl CliCommand<()> for Init {
                     Some(txn_id) => txn_id,
                     None => {
                         let client = Client::builder(network.to_base_url()?).build();
-                        client.get_ledger_information().await?.inner().version
+                        // Fork from the state right after the latest txn.
+                        client.get_ledger_information().await?.inner().version + 1
                     },
                 };
                 let base_url = network.to_base_url()?;

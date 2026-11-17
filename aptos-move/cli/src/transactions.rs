@@ -402,9 +402,10 @@ impl TxnOptions {
         let hash = transaction.committed_hash();
 
         let debugger = env.create_move_debugger(client)?;
+        let next_version = version + 1;
         let (vm_status, vm_output) = execute(
             &*debugger,
-            version,
+            next_version,
             transaction,
             hash,
             PersistedAuxiliaryInfo::None,
@@ -432,7 +433,7 @@ impl TxnOptions {
             changes: None,
         };
         if show_details {
-            let state_view = debugger.state_view_at_version(version);
+            let state_view = debugger.state_view_at_version(next_version);
             let transaction_output = local_materialize_output(vm_output)?;
             summary.events = Some(local_contract_events_to_json(
                 &state_view,

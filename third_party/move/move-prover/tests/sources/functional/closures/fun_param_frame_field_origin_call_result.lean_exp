@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:13:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:47:5: error: the precondition of `call_h` at call 1 is not established
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:47:5: error: the precondition of `call_h` at call 1 is not established
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:53:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:47:5: error: verex verification failed: the automatic verification of `client_captured` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_call_result.proof.lean`:
+  verify client_captured by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | requires_of_call_h_at_call_1 => verex_prepare; sorry
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:13:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:62:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:57:5: error: verex verification failed: the automatic verification of `client_direct` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_call_result.proof.lean`:
+  verify client_direct by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant => verex_prepare; sorry
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:70:16: error: the assertion `global<S>(@0x42).v == v0` does not hold
+tests/sources/functional/closures/fun_param_frame_field_origin_call_result.move:66:5: error: verex verification failed: the automatic verification of `client_kept` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_call_result.proof.lean`:
+  verify client_kept by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

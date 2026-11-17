@@ -138,11 +138,7 @@ impl ConfigOptimizer for IndexerGrpcConfig {
     ) -> Result<bool, Error> {
         let indexer_config = &mut node_config.indexer_grpc;
         // If the indexer is not enabled, there's nothing to do
-        if !indexer_config.enabled {
-            return Ok(false);
-        }
-
-        Ok(true)
+        Ok(indexer_config.enabled)
     }
 }
 
