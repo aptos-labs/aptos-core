@@ -67,7 +67,7 @@ case "$CMD" in
 
         # Merge the raw profile data
         # Note: A relatively up-to-date version of llvm is required.
-        #       (Rust 1.99 uses llvm-23)
+        #       (Rust 1.100 uses llvm-23)
         #
         #       Follow the instructions here to install:
         #         - https://apt.llvm.org/

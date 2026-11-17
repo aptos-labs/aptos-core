@@ -1,6 +1,8 @@
 [alias]
 xclippy = [
   "clippy",
+  "--config",
+  "build.warnings='deny'",
   "--workspace",
   "--all-targets",
   "--",
