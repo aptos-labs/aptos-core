@@ -257,12 +257,6 @@ pub trait DbReader: Send + Sync {
         /// Returns the latest state checkpoint version if any.
         fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>>;
 
-        /// Returns the latest state snapshot strictly before `next_version` if any.
-        fn get_state_snapshot_before(
-            &self,
-            next_version: Version,
-        ) -> Result<Option<(Version, HashValue)>>;
-
         /// Returns the list of summaries of transactions committed by an account.
         /// Each transaction summary contains the sender address, transaction hash, version, replay protector
         /// of the committed transaction.
