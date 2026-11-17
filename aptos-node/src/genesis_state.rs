@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
-use aptos_storage_interface::{DbReader, Result as DbResult};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, Result as DbResult};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -49,6 +49,16 @@ impl GenesisStateReader {
             })
             .collect();
         Ok(Self { values })
+    }
+}
+
+impl CheckpointStateReader for GenesisStateReader {
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> DbResult<Option<(Version, StateValue)>> {
+        self.get_state_value_with_version_by_version(state_key, version)
     }
 }
 

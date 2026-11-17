@@ -3,7 +3,7 @@
 
 //! This module provides mock dbreader for tests.
 
-use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
+use crate::{errors::AptosDbError, CheckpointStateReader, DbReader, DbWriter, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -21,16 +21,6 @@ impl DbReader for MockDbReaderWriter {
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
         Ok(Some(1))
-    }
-
-    fn get_state_proof_by_version_ext(
-        &self,
-        _key_hash: &HashValue,
-        _version: Version,
-        _root_depth: usize,
-        _use_hot_state: bool,
-    ) -> Result<SparseMerkleProofExt> {
-        Ok(SparseMerkleProofExt::new(None, vec![]))
     }
 
     fn get_state_value_by_version(
@@ -56,6 +46,26 @@ impl DbReader for MockDbReaderWriter {
         Ok(self
             .get_state_value_by_version(state_key, version)?
             .map(|value| (version, value)))
+    }
+}
+
+impl CheckpointStateReader for MockDbReaderWriter {
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get_state_value_with_version_by_version(state_key, version)
+    }
+
+    fn get_state_proof_by_version_ext(
+        &self,
+        _key_hash: &HashValue,
+        _version: Version,
+        _root_depth: usize,
+        _use_hot_state: bool,
+    ) -> Result<SparseMerkleProofExt> {
+        Ok(SparseMerkleProofExt::new(None, vec![]))
     }
 }
 
