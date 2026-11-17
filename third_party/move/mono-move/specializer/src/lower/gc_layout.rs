@@ -7,7 +7,7 @@ use super::{context::LoweringContext, LoweringError};
 use crate::stackless_exec_ir::FunctionIR;
 use mono_move_core::{
     types::{view_type, InternedType, Type},
-    FrameOffset, LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult,
+    FrameOffset, LayoutProvider, VMInternalError, VMResult,
 };
 
 /// GC-relevant frame metadata derived for a single function.
@@ -132,53 +132,15 @@ pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> V
             let id = layouts
                 .layout_id(ty)
                 .ok_or(LoweringError::LayoutNotPopulated)?;
-            layout_pointer_offsets(layouts, id)?
+            layouts
+                .pointer_offsets(id)
+                .ok_or(LoweringError::LayoutIdUnresolved)?
         },
 
         Type::TypeParam { .. } => {
             return Err(VMInternalError::new(
                 LoweringError::TypeParamReachedGcLayout,
             ));
-        },
-    };
-    Ok(offsets)
-}
-
-/// Heap-pointer byte offsets within a value of the given published layout,
-/// relative to the value's start. Pointer positions are a property of the
-/// layout: a reference, vector, function, or (frozen) enum slot holds a pointer
-/// at relative offset 0; a struct recurses through its fields' child layouts;
-/// scalars hold none.
-///
-/// TODO(metering): rewrite without recursion or add a depth/visited bound.
-fn layout_pointer_offsets(layouts: &dyn LayoutProvider, id: LayoutId) -> VMResult<Vec<u32>> {
-    let layout = layouts
-        .layout(id)
-        .ok_or(LoweringError::LayoutIdUnresolved)?;
-    let offsets = match &layout.kind {
-        LayoutKind::Bool
-        | LayoutKind::UnsignedInt
-        | LayoutKind::SignedInt
-        | LayoutKind::Address
-        | LayoutKind::Signer => vec![],
-        LayoutKind::Ref
-        | LayoutKind::Vector { .. }
-        | LayoutKind::FrozenEnum { .. }
-        | LayoutKind::Function => vec![0],
-        LayoutKind::Struct { fields } => {
-            let mut out = vec![];
-            for field in fields.iter() {
-                for rel in layout_pointer_offsets(layouts, field.id)? {
-                    let abs = field.offset.checked_add(rel).ok_or(
-                        LoweringError::GcFieldOffsetOverflow {
-                            field_offset: field.offset,
-                            inner_offset: rel,
-                        },
-                    )?;
-                    out.push(abs);
-                }
-            }
-            out
         },
     };
     Ok(offsets)

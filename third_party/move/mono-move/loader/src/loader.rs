@@ -580,6 +580,25 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }));
             },
         };
+        let expected = module
+            .ir()
+            .module
+            .function_handle_at(func_ir.handle_idx)
+            .type_parameters
+            .len();
+        let got = view_type_list(ty_args).len();
+        if expected != got {
+            let id = self.guard.arena_ref_for_module_id(module.id());
+            return Err(VMInternalError::new(
+                LoaderError::TypeArgumentCountMismatch {
+                    address: *id.address(),
+                    module: id.name().to_string(),
+                    name: view_name(func_name).to_string(),
+                    expected,
+                    got,
+                },
+            ));
+        }
         // TODO(metering): the lowering work, including micro-op verification
         // below, needs to be charged deterministically.
         let mut loading_ctx = LoweringContext::new(self, read_set);
@@ -1098,6 +1117,10 @@ impl LayoutProvider for LoweringContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.loader.guard.layout_id(ty)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.loader.guard.interner()
+    }
 }
 
 impl SpecializerContext for LoweringContext<'_, '_, '_> {
@@ -1170,6 +1193,16 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader
             .guard
             .publish_captured_data_descriptor(values_size, pointer_offsets)
+    }
+
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId {
+        self.loader
+            .guard
+            .publish_captured_values_layout(captured, layout)
     }
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {

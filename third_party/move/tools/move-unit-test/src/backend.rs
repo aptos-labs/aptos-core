@@ -68,6 +68,11 @@ pub enum TestExecution {
     BackendError {
         message: String,
     },
+    /// The backend ran the test, and its outcome differs from the reference
+    /// VM's by an agreed design choice, so it is not judged.
+    Diverged {
+        reason: String,
+    },
 }
 
 #[derive(Debug)]
