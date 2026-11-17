@@ -59,6 +59,7 @@ impl AptosDB {
         state_store_mode: StateStoreMode,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
+        squash_state_kv_writes_per_block: bool,
     ) -> Self {
         let ledger_db = Arc::new(ledger_db);
         let hot_state_merkle_db = Arc::new(hot_state_merkle_db);
@@ -85,6 +86,7 @@ impl AptosDB {
                 .skip_usage(true)
                 .maybe_internal_indexer_db(internal_indexer_db.clone())
                 .hot_state_config(hot_state_config)
+                .squash_state_kv_writes_per_block(squash_state_kv_writes_per_block)
                 .build(),
         );
 
@@ -193,6 +195,7 @@ impl AptosDB {
             state_store_mode,
             internal_indexer_db,
             hot_state_config,
+            rocksdb_configs.squash_state_kv_writes_per_block,
         );
 
         if enable_trading_native {
