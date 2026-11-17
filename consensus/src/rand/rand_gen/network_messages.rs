@@ -6,7 +6,7 @@ use crate::{
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
         AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig, RandShare,
-        RequestShare, TAugmentedData, TShare,
+        RequestCertifiedAugData, RequestShare, TAugmentedData, TShare,
     },
 };
 use anyhow::{bail, ensure};
@@ -28,6 +28,11 @@ pub enum RandMessage<S, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
+    // NOTE: new variants must be appended at the end. BCS encodes the variant index, so
+    // inserting one would silently re-index every later variant for nodes running an older
+    // binary. Appending keeps old nodes decoding existing variants correctly and failing
+    // (and dropping) only the ones they do not know.
+    RequestCertifiedAugData(RequestCertifiedAugData),
 }
 
 impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
@@ -45,6 +50,9 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
             },
+            // Nothing to authenticate: the response is a `CertifiedAugData`, which carries its
+            // own 2f+1 multi-signature and is verified on the way back in.
+            RandMessage::RequestCertifiedAugData(_) => Ok(()),
             _ => bail!("[RandMessage] unexpected message type"),
         }
     }
@@ -61,6 +69,7 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
             RandMessage::AugDataSignature(signature) => signature.epoch(),
             RandMessage::CertifiedAugData(certified_aug_data) => certified_aug_data.epoch(),
             RandMessage::CertifiedAugDataAck(ack) => ack.epoch(),
+            RandMessage::RequestCertifiedAugData(request) => request.epoch(),
         }
     }
 
@@ -120,22 +129,31 @@ pub struct RpcRequest<S, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rand::rand_gen::types::{MockAugData, MockShare, RandConfig, RandShare};
+    use crate::rand::rand_gen::{
+        rand_manager::Receiver,
+        reliable_broadcast_state::CertifiedAugDataRecoveryState,
+        types::{MockAugData, MockShare, RandConfig, RandShare},
+    };
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, Uniform};
     use aptos_dkg::{
         pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
+    use aptos_reliable_broadcast::BroadcastStatus;
     use aptos_types::{
+        aggregate_signature::{AggregateSignature, PartialSignatures},
         dkg::{real_dkg::maybe_dk_from_bls_sk, DKGSessionMetadata, DKGTrait, DefaultDKG},
         epoch_state::EpochState,
         on_chain_config::OnChainRandomnessConfig,
         randomness::{RandKeys, RandMetadata, WvufPP, WVUF},
+        validator_signer::ValidatorSigner,
         validator_verifier::{
             ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
         },
     };
+    use futures::{FutureExt, StreamExt};
+    use futures_channel::mpsc::unbounded;
     use rand::thread_rng;
     use std::{str::FromStr, sync::Arc};
 
@@ -143,6 +161,7 @@ mod tests {
         authors: Vec<Author>,
         epoch_state: Arc<EpochState>,
         rand_config: RandConfig,
+        private_keys: Vec<bls12381::PrivateKey>,
     }
 
     fn build_test_context(weights: Vec<u64>, my_index: usize) -> TestContext {
@@ -228,6 +247,7 @@ mod tests {
             authors,
             epoch_state,
             rand_config,
+            private_keys,
         }
     }
 
@@ -272,5 +292,154 @@ mod tests {
 
         let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, author);
         assert!(result.is_ok());
+    }
+
+    // Recovery of a peer's certified aug data on demand. The request is answered with the
+    // responder's own `CertifiedAugData`, which `CertifiedAugDataRecoveryState` validates before
+    // handing it to the RandManager.
+
+    /// Certify an aug data for `author` in `epoch` the way the proactive broadcast does: every
+    /// validator signs it and the signatures are aggregated.
+    fn certify_aug_data_for_epoch(
+        ctx: &TestContext,
+        epoch: u64,
+        author: Author,
+    ) -> CertifiedAugData<MockAugData> {
+        let aug_data = AugData::new(epoch, author, MockAugData);
+        let mut partial = PartialSignatures::empty();
+        for (idx, sk) in ctx.private_keys.iter().enumerate() {
+            let signer = ValidatorSigner::new(ctx.authors[idx], Arc::new(sk.clone()));
+            partial.add_signature(ctx.authors[idx], signer.sign(&aug_data).unwrap());
+        }
+        let signatures = ctx
+            .epoch_state
+            .verifier
+            .aggregate_signatures(partial.signatures_iter())
+            .unwrap();
+        CertifiedAugData::new(aug_data, signatures)
+    }
+
+    fn certify_aug_data(ctx: &TestContext, author: Author) -> CertifiedAugData<MockAugData> {
+        certify_aug_data_for_epoch(ctx, ctx.epoch_state.epoch, author)
+    }
+
+    /// Wraps the recovery state to pin the `TShare` type of the messages it broadcasts, which the
+    /// `BroadcastStatus` impl leaves free (the reliable broadcast normally pins it).
+    struct MockRecovery {
+        state: Arc<CertifiedAugDataRecoveryState<MockAugData>>,
+    }
+
+    impl MockRecovery {
+        fn add(
+            &self,
+            peer: Author,
+            certified: CertifiedAugData<MockAugData>,
+        ) -> anyhow::Result<Option<()>> {
+            <Arc<CertifiedAugDataRecoveryState<MockAugData>> as BroadcastStatus<
+                RandMessage<MockShare, MockAugData>,
+                RandMessage<MockShare, MockAugData>,
+            >>::add(&self.state, peer, certified)
+        }
+    }
+
+    fn recovery_state(
+        ctx: &TestContext,
+        peer: Author,
+    ) -> (
+        MockRecovery,
+        Receiver<(Author, CertifiedAugData<MockAugData>)>,
+    ) {
+        let (tx, rx) = unbounded();
+        let state = CertifiedAugDataRecoveryState::new(
+            ctx.epoch_state.clone(),
+            [peer].into_iter().collect(),
+            tx,
+        );
+        (MockRecovery { state }, rx)
+    }
+
+    #[test]
+    fn test_request_certified_aug_data_verify_and_epoch() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let msg = RandMessage::<MockShare, MockAugData>::RequestCertifiedAugData(
+            RequestCertifiedAugData::new(ctx.epoch_state.epoch),
+        );
+
+        // A request carries nothing to authenticate: the response is a `CertifiedAugData`, which
+        // brings its own 2f+1 multi-signature and is verified when it comes back.
+        assert!(msg
+            .verify(&ctx.epoch_state, &ctx.rand_config, ctx.authors[1])
+            .is_ok());
+        // The epoch routes the message to the RandManager of the epoch it belongs to.
+        assert_eq!(msg.epoch(), ctx.epoch_state.epoch);
+    }
+
+    #[test]
+    fn test_cert_recovery_accepts_the_requested_peers_cert() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+        let (state, mut rx) = recovery_state(&ctx, peer);
+        let epoch = ctx.epoch_state.epoch;
+
+        // `Ok(Some(()))` tells the reliable broadcast to stop polling this peer.
+        assert!(state
+            .add(peer, certify_aug_data(&ctx, peer))
+            .unwrap()
+            .is_some());
+
+        // The accepted cert is handed to the RandManager main loop, which persists it.
+        let (author, recovered) = rx
+            .next()
+            .now_or_never()
+            .flatten()
+            .expect("cert should be forwarded");
+        assert_eq!(author, peer);
+        assert_eq!(recovered.author(), &peer);
+        assert_eq!(recovered.epoch(), epoch);
+        // A second response would find nothing left to wait for.
+        assert!(rx.next().now_or_never().flatten().is_none());
+    }
+
+    #[test]
+    fn test_cert_recovery_rejects_a_cert_for_another_author() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+        let (state, mut rx) = recovery_state(&ctx, peer);
+
+        // Properly certified, but for a different validator: the responder is not answering the
+        // question, so the reliable broadcast must keep retrying it.
+        assert!(state
+            .add(peer, certify_aug_data(&ctx, ctx.authors[2]))
+            .is_err());
+        assert!(rx.next().now_or_never().flatten().is_none());
+    }
+
+    #[test]
+    fn test_cert_recovery_rejects_a_cert_from_another_epoch() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+        let (state, mut rx) = recovery_state(&ctx, peer);
+
+        // Validly signed by the current validator set, but for a previous epoch. The set is often
+        // unchanged across an epoch boundary, so the aggregate signature still verifies -- and
+        // caching that delta would give us the wrong apk for this peer for the rest of this epoch.
+        // This response never passes through `RandMessage::verify`, which is where the proactive
+        // path checks the epoch, so the recovery state has to check it itself.
+        let stale = certify_aug_data_for_epoch(&ctx, ctx.epoch_state.epoch - 1, peer);
+        assert!(state.add(peer, stale).is_err());
+        assert!(rx.next().now_or_never().flatten().is_none());
+    }
+
+    #[test]
+    fn test_cert_recovery_rejects_a_cert_without_quorum() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+        let (state, mut rx) = recovery_state(&ctx, peer);
+        let aug_data = AugData::new(ctx.epoch_state.epoch, peer, MockAugData);
+
+        // Right author, but no 2f+1 multi-signature behind it.
+        let certified = CertifiedAugData::new(aug_data, AggregateSignature::empty());
+        assert!(state.add(peer, certified).is_err());
+        assert!(rx.next().now_or_never().flatten().is_none());
     }
 }

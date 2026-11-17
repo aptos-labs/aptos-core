@@ -12,10 +12,14 @@ use crate::{
         network_messages::{RandMessage, RpcRequest},
         rand_store::{AggregationResult, RandCheckFuture, RandStore},
         reliable_broadcast_state::{
-            AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
+            AugDataCertBuilder, CertifiedAugDataAckState, CertifiedAugDataRecoveryState,
+            ShareAggregateState,
         },
         storage::interface::RandStorage,
-        types::{RandConfig, RequestShare, TAugmentedData, TShare},
+        types::{
+            CertifiedAugData, RandConfig, RequestCertifiedAugData, RequestShare, TAugmentedData,
+            TShare,
+        },
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -42,7 +46,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -67,6 +71,19 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // sender for aggregation results, shared with rand_store and skip listeners
     decision_tx: Sender<AggregationResult>,
+
+    // On-demand recovery of peers' certified aug data, for a node that lost its RandDB mid-epoch:
+    // the proactive broadcast for this epoch already completed, so nothing re-pushes what was lost.
+    // `missing_apk_*` carries "this author's share is not verifiable yet" from the share ingress
+    // paths; `cert_recovery_*` carries back the certs that passed verification.
+    missing_apk_tx: Sender<Author>,
+    missing_apk_rx: Receiver<Author>,
+    cert_recovery_tx: Sender<(Author, CertifiedAugData<D>)>,
+    cert_recovery_rx: Receiver<(Author, CertifiedAugData<D>)>,
+    // authors with a recovery request in flight, so repeated misses do not spawn duplicate tasks
+    cert_recovery_inflight: HashSet<Author>,
+    // dropped with this RandManager, i.e. at epoch change, to abandon in-flight recovery requests
+    cert_recovery_guards: Vec<DropGuard>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -95,6 +112,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             bounded_executor,
         ));
         let (decision_tx, decision_rx) = unbounded();
+        let (missing_apk_tx, missing_apk_rx) = unbounded();
+        let (cert_recovery_tx, cert_recovery_rx) = unbounded();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
             author,
@@ -119,6 +138,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             decision_tx,
+
+            missing_apk_tx,
+            missing_apk_rx,
+            cert_recovery_tx,
+            cert_recovery_rx,
+            cert_recovery_inflight: HashSet::new(),
+            cert_recovery_guards: vec![],
         }
     }
 
@@ -299,6 +325,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             self.rand_store.clone(),
             metadata.clone(),
             self.config.clone(),
+            self.missing_apk_tx.clone(),
         ));
         let epoch_state = self.epoch_state.clone();
         let round = metadata.round;
@@ -333,6 +360,41 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
+    }
+
+    /// Ask `author` for its own certified aug data, and keep asking until it answers with one that
+    /// passes verification.
+    ///
+    /// Recovery path for a node that lost its RandDB mid-epoch. The proactive `CertifiedAugData`
+    /// broadcast stops once every validator has acked, and this node's previous instance already
+    /// acked before it restarted, so no peer will re-push the certs that were lost. Without them no
+    /// peer apk can be derived, which means no share is verifiable and no randomness can be
+    /// aggregated for the remainder of the epoch.
+    fn request_certified_aug_data(&mut self, author: Author) {
+        if author == self.author || !self.cert_recovery_inflight.insert(author) {
+            return;
+        }
+        let rb = self.reliable_broadcast.clone();
+        let state = CertifiedAugDataRecoveryState::new(
+            self.epoch_state.clone(),
+            [author].into_iter().collect(),
+            self.cert_recovery_tx.clone(),
+        );
+        let epoch = self.epoch_state.epoch;
+        let task = async move {
+            let request = RequestCertifiedAugData::new(epoch);
+            if let Err(e) = rb.multicast(request, state, vec![author]).await {
+                warn!(
+                    epoch = epoch,
+                    "[RandManager] Failed to recover certified aug data from {}: {}", author, e
+                );
+            }
+        };
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        tokio::spawn(Abortable::new(task, abort_registration));
+        // Held by this RandManager so an unfinished request is abandoned at epoch change instead of
+        // retrying validators that no longer serve this epoch.
+        self.cert_recovery_guards.push(DropGuard::new(abort_handle));
     }
 
     async fn broadcast_aug_data(&mut self) -> DropGuard {
@@ -459,6 +521,11 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
+                            // A share from an author whose certified aug data we lack never reaches
+                            // this arm: `RandMessage::verify` runs `optimistic_verify`, which needs
+                            // the apk on both of its branches, so `verification_task` drops the
+                            // message before the main loop sees it. Recovery is therefore triggered
+                            // from `ShareAggregateState::add`, on the `RequestShare` pull path.
                             if share.author() != &sender {
                                 warn!(
                                     "[RandManager] Share author {:?} does not match sender {:?}, dropping",
@@ -495,7 +562,40 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
                             }
                         }
+                        RandMessage::RequestCertifiedAugData(_) => {
+                            match self.aug_data_store.get_my_certified_aug_data() {
+                                Some(certified_data) => self.process_response(
+                                    protocol,
+                                    response_sender,
+                                    RandMessage::CertifiedAugData(certified_data),
+                                ),
+                                // Nothing to serve yet. `response_sender` is dropped at the end of
+                                // this arm, which fails the requester's RPC so that its reliable
+                                // broadcast retries us with backoff.
+                                None => debug!(
+                                    "[RandManager] No certified aug data to serve to {}",
+                                    sender
+                                ),
+                            }
+                        }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
+                    }
+                }
+                Some(author) = self.missing_apk_rx.next() => {
+                    self.request_certified_aug_data(author);
+                }
+                Some((author, certified_data)) = self.cert_recovery_rx.next() => {
+                    self.cert_recovery_inflight.remove(&author);
+                    match self.aug_data_store.add_certified_aug_data(certified_data) {
+                        // The ack belongs to the proactive broadcast, which this exchange is not
+                        // part of, so there is nobody to hand it to.
+                        Ok(_ack) => info!(
+                            "[RandManager] Recovered certified aug data for {}", author
+                        ),
+                        Err(e) => error!(
+                            "[RandManager] Failed to persist recovered certified aug data for {}: {}",
+                            author, e
+                        ),
                     }
                 }
                 _ = interval.tick().fuse() => {
