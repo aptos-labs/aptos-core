@@ -228,17 +228,6 @@ impl Deref for StateStore {
 // upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
 // ref: https://github.com/rust-lang/rust/issues/65991
 impl DbReader for StateDb {
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.state_merkle_db
-            .get_state_snapshot_version_before(next_version)?
-            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
-            .transpose()
-    }
-
     // Only checkpoint reads: a single seek in state KV is only guaranteed to be exact at a block
     // end. Reads at any version go through `AptosDB`.
     fn get_state_value_at_checkpoint(
@@ -317,6 +306,17 @@ impl DbReader for StateDb {
         Ok((value, proof))
     }
 
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    fn get_state_snapshot_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.state_merkle_db
+            .get_state_snapshot_version_before(next_version)?
+            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
+            .transpose()
+    }
+
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(match self.ledger_db.metadata_db().get_usage(version) {
@@ -327,75 +327,6 @@ impl DbReader for StateDb {
                 },
             })
         })
-    }
-}
-
-impl DbReader for StateStore {
-    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
-        Ok(self.live()?.persisted_state.get_state())
-    }
-
-    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
-        Ok(self.live()?.persisted_state.get_state_summary())
-    }
-
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.deref().get_state_snapshot_before(next_version)
-    }
-
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        self.deref()
-            .get_state_value_at_checkpoint(state_key, version)
-    }
-
-    fn get_state_value_with_version_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        self.deref()
-            .get_state_value_with_version_at_checkpoint(state_key, version)
-    }
-
-    /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version_ext(
-        &self,
-        key_hash: &HashValue,
-        version: Version,
-        root_depth: usize,
-        use_hot_state: bool,
-    ) -> Result<SparseMerkleProofExt> {
-        self.deref()
-            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
-    }
-
-    /// Get the state value with proof extension given the state key and version
-    fn get_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
-    }
-
-    fn get_hot_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
     }
 }
 
@@ -1027,6 +958,75 @@ impl LiveState {
     #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
     pub fn persisted_state(&self) -> &PersistedState {
         &self.persisted_state
+    }
+}
+
+impl DbReader for StateStore {
+    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
+        Ok(self.live()?.persisted_state.get_state())
+    }
+
+    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        Ok(self.live()?.persisted_state.get_state_summary())
+    }
+
+    /// Returns the latest state snapshot strictly before `next_version` if any.
+    fn get_state_snapshot_before(
+        &self,
+        next_version: Version,
+    ) -> Result<Option<(Version, HashValue)>> {
+        self.deref().get_state_snapshot_before(next_version)
+    }
+
+    fn get_state_value_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        self.deref()
+            .get_state_value_at_checkpoint(state_key, version)
+    }
+
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.deref()
+            .get_state_value_with_version_at_checkpoint(state_key, version)
+    }
+
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version_ext(
+        &self,
+        key_hash: &HashValue,
+        version: Version,
+        root_depth: usize,
+        use_hot_state: bool,
+    ) -> Result<SparseMerkleProofExt> {
+        self.deref()
+            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
+    }
+
+    /// Get the state value with proof extension given the state key and version
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        self.deref()
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+    }
+
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        self.deref()
+            .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
     }
 }
 
