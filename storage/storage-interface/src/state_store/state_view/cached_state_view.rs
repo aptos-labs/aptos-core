@@ -12,7 +12,7 @@ use crate::{
             hot_state_view::{EmptyHotState, HotStateView},
         },
     },
-    DbReader,
+    CheckpointStateReader, DbReader,
 };
 use anyhow::Result;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
@@ -109,7 +109,7 @@ pub struct CachedStateView {
 
     /// Persisted base state. To be fetched if a key isn't in either `speculative` or `hot_state`.
     /// `self.speculative.base_version()` is targeted in db fetches.
-    cold: Arc<dyn DbReader>,
+    cold: Arc<dyn CheckpointStateReader>,
 
     /// State values (with update versions) read across the lifetime of the state view.
     memorized: ShardedStateCache,
@@ -138,7 +138,7 @@ impl CachedStateView {
 
     pub fn new_impl(
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
+        reader: Arc<dyn CheckpointStateReader>,
         hot_state: Arc<dyn HotStateView>,
         persisted_state: State,
         state: State,
@@ -148,7 +148,7 @@ impl CachedStateView {
 
     pub fn new_with_config(
         id: StateViewId,
-        reader: Arc<dyn DbReader>,
+        reader: Arc<dyn CheckpointStateReader>,
         hot_state: Arc<dyn HotStateView>,
         persisted_state: State,
         state: State,
@@ -166,7 +166,7 @@ impl CachedStateView {
 
     pub fn new_dummy(state: &State) -> Self {
         struct DummyDbReader;
-        impl DbReader for DummyDbReader {}
+        impl CheckpointStateReader for DummyDbReader {}
 
         Self::new_impl(
             StateViewId::Miscellaneous,
