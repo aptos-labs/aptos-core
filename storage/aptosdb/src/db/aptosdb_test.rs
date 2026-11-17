@@ -10,6 +10,7 @@ use crate::{
         },
         AptosDB,
     },
+    get_restore_handler::GetRestoreHandler,
     pruner::{LedgerPrunerManager, PrunerManager, StateMerkle, StateMerklePrunerManager},
     schema::{
         epoch_by_version::EpochByVersionSchema,
@@ -37,7 +38,9 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StaleStateValueByKeyHashIndex, StateValue},
         NUM_STATE_SHARDS,
     },
     transaction::{
@@ -50,7 +53,7 @@ use aptos_types::{
 };
 use proptest::{collection::vec, option, prelude::*, sample::Index};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -416,6 +419,47 @@ fn state_kv_blocks(
     (keys, blocks)
 }
 
+/// Large enough that nothing is pruned until `prune_state_kv_test_db` asks for it.
+const STATE_KV_TEST_PRUNE_WINDOW: Version = 1_000_000;
+
+fn open_state_kv_test_db(db_dir: &TempPath, squash_state_kv_writes_per_block: bool) -> AptosDB {
+    AptosDB::open(
+        StorageDirPaths::from_path(db_dir.path()),
+        /*readonly=*/ false,
+        PrunerConfig {
+            ledger_pruner_config: LedgerPrunerConfig {
+                enable: true,
+                prune_window: STATE_KV_TEST_PRUNE_WINDOW,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+            ..NO_OP_STORAGE_PRUNER_CONFIG
+        },
+        RocksdbConfigs {
+            squash_state_kv_writes_per_block,
+            ..Default::default()
+        },
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None,
+        HotStateConfig::default(),
+    )
+    .expect("Unable to open AptosDB")
+}
+
+/// Prunes the ledger and state KV so that `prune_version` is the min readable version.
+fn prune_state_kv_test_db(db: &AptosDB, prune_version: Version) {
+    let latest_version = prune_version + STATE_KV_TEST_PRUNE_WINDOW;
+    db.ledger_pruner
+        .wake_and_wait_pruner(latest_version)
+        .unwrap();
+    db.state_store
+        .state_pruner
+        .state_kv_pruner
+        .wake_and_wait_pruner(latest_version)
+        .unwrap();
+}
+
 /// Commits `blocks` starting at `first_version`, `blocks_per_chunk` blocks at a time, and returns
 /// the last version of each chunk.
 fn commit_blocks(
@@ -457,6 +501,73 @@ fn check_usage_at_block_ends(db: &AptosDB, txns: &[TransactionToCommit]) {
     }
 }
 
+type StateKvRows = BTreeMap<(HashValue, Version), Option<StateValue>>;
+/// `(stale_since_version, version, key_hash)`
+type StaleStateValueIndices = BTreeSet<(Version, Version, HashValue)>;
+
+/// The state KV contents expected after committing `txns` to an empty DB.
+fn expected_state_kv(
+    txns: &[TransactionToCommit],
+    squash_state_kv_writes_per_block: bool,
+) -> (StateKvRows, StaleStateValueIndices) {
+    let mut rows = BTreeMap::new();
+    let mut seen = HashSet::new();
+    for (version, txn) in txns.iter().enumerate().rev() {
+        if txn.has_state_checkpoint_hash() {
+            seen.clear();
+        }
+        for (key, write_op) in txn.write_set().write_op_iter() {
+            if seen.insert(key) || !squash_state_kv_writes_per_block {
+                rows.insert(
+                    (key.hash(), version as Version),
+                    write_op.as_state_value_opt().cloned(),
+                );
+            }
+        }
+    }
+
+    let mut indices = BTreeSet::new();
+    // The previous row's key hash, and its version if it's not a tombstone.
+    let mut prev_row = None;
+    for (&(key_hash, version), value) in &rows {
+        let prev_version = match prev_row {
+            Some((prev_key_hash, Some(prev_version))) if prev_key_hash == key_hash => prev_version,
+            _ => StaleStateValueByKeyHashIndex::NO_PREV_VERSION,
+        };
+        indices.insert((version, prev_version, key_hash));
+        if value.is_none() {
+            indices.insert((version, version, key_hash));
+        }
+        prev_row = Some((key_hash, value.is_some().then_some(version)));
+    }
+    (rows, indices)
+}
+
+fn state_kv_contents(db: &AptosDB) -> (StateKvRows, StaleStateValueIndices) {
+    let mut rows = BTreeMap::new();
+    let mut indices = BTreeSet::new();
+    for shard_id in 0..NUM_STATE_SHARDS {
+        let shard = db.state_kv_db.db_shard(shard_id);
+        let mut iter = shard.iter::<StateValueByKeyHashSchema>().unwrap();
+        iter.seek_to_first();
+        for item in iter {
+            let (key, value) = item.unwrap();
+            rows.insert(key, value);
+        }
+        let mut iter = shard.iter::<StaleStateValueIndexByKeyHashSchema>().unwrap();
+        iter.seek_to_first();
+        for item in iter {
+            let (index, ()) = item.unwrap();
+            indices.insert((
+                index.stale_since_version,
+                index.version,
+                index.state_key_hash,
+            ));
+        }
+    }
+    (rows, indices)
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
 
@@ -464,6 +575,9 @@ proptest! {
     fn test_get_state_value_mid_block(
         blocks in arb_state_kv_blocks(),
         blocks_per_chunk in 1..=3usize,
+        squash in any::<bool>(),
+        restart_index in any::<Index>(),
+        truncate_index in any::<Index>(),
         prune_index in any::<Index>(),
     ) {
         let (keys, blocks) = state_kv_blocks(blocks);
@@ -473,35 +587,51 @@ proptest! {
             block_starts.extend(std::iter::repeat_n(block_starts.len() as Version, block.len()));
         }
 
+        // Flipping the flag on restart leaves blocks of both layouts.
         let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
-        commit_blocks(&db, &blocks, 0, blocks_per_chunk);
+        let num_txns_before = |num_blocks: usize| -> Version {
+            blocks[..num_blocks].iter().map(Vec::len).sum::<usize>() as Version
+        };
+        let restart_block = restart_index.index(blocks.len() + 1);
+        let mut chunk_ends = commit_blocks(
+            &open_state_kv_test_db(&tmp_dir, squash),
+            &blocks[..restart_block],
+            0,
+            blocks_per_chunk,
+        );
+        let db = open_state_kv_test_db(&tmp_dir, !squash);
+        chunk_ends.extend(commit_blocks(
+            &db,
+            &blocks[restart_block..],
+            num_txns_before(restart_block),
+            blocks_per_chunk,
+        ));
         check_state_reads(&db, &txns, &keys, &block_starts, 0);
+        drop(db);
 
-        // Drop rows as if state KV kept only the last write to a key in each block.
-        let mut seen = HashSet::new();
-        for (version, txn) in txns.iter().enumerate().rev() {
-            if txn.has_state_checkpoint_hash() {
-                seen.clear();
-            }
-            for (key, _) in txn.write_set().write_op_iter() {
-                if !seen.insert(key) {
-                    db.state_kv_db
-                        .db_shard(key.get_shard_id())
-                        .delete::<StateValueByKeyHashSchema>(&(key.hash(), version as Version))
-                        .unwrap();
-                }
-            }
-        }
+        // Truncate to a block end, possibly in the middle of a chunk, and commit the rest again
+        // with the flag flipped back. Truncation needs a state snapshot at or before the target,
+        // and the first one is at the end of the first chunk.
+        let min_blocks_kept = (1..=blocks.len())
+            .find(|num_blocks| num_txns_before(*num_blocks) == chunk_ends[0] + 1)
+            .unwrap();
+        let num_blocks_kept =
+            min_blocks_kept + truncate_index.index(blocks.len() - min_blocks_kept + 1);
+        let target_version = num_txns_before(num_blocks_kept) - 1;
+        AptosDB::truncate_to_version(&StorageDirPaths::from_path(tmp_dir.path()), target_version)
+            .unwrap();
+        let db = open_state_kv_test_db(&tmp_dir, squash);
+        prop_assert_eq!(db.expect_synced_version(), target_version);
+        commit_blocks(
+            &db,
+            &blocks[num_blocks_kept..],
+            target_version + 1,
+            blocks_per_chunk,
+        );
         check_state_reads(&db, &txns, &keys, &block_starts, 0);
 
         let prune_version = prune_index.index(txns.len()) as Version;
-        db.ledger_pruner.save_min_readable_version(prune_version).unwrap();
-        db.state_store
-            .state_pruner
-            .state_kv_pruner
-            .save_min_readable_version(prune_version)
-            .unwrap();
+        prune_state_kv_test_db(&db, prune_version);
         check_state_reads(&db, &txns, &keys, &block_starts, prune_version);
     }
 
@@ -509,12 +639,13 @@ proptest! {
     fn test_usage_at_block_ends(
         blocks in arb_state_kv_blocks(),
         blocks_per_chunk in 1..=3usize,
+        squash in any::<bool>(),
         truncate_index in any::<Index>(),
     ) {
         let (_keys, blocks) = state_kv_blocks(blocks);
         let txns = blocks.concat();
         let tmp_dir = TempPath::new();
-        let db = AptosDB::new_for_test(&tmp_dir);
+        let db = open_state_kv_test_db(&tmp_dir, squash);
         let chunk_ends = commit_blocks(&db, &blocks, 0, blocks_per_chunk);
         check_usage_at_block_ends(&db, &txns);
         drop(db);
@@ -533,7 +664,7 @@ proptest! {
         let target_version = num_txns_before(num_blocks_kept) - 1;
         AptosDB::truncate_to_version(&StorageDirPaths::from_path(tmp_dir.path()), target_version)
             .unwrap();
-        let db = AptosDB::new_for_test(&tmp_dir);
+        let db = open_state_kv_test_db(&tmp_dir, squash);
         prop_assert_eq!(db.expect_synced_version(), target_version);
         commit_blocks(
             &db,
@@ -542,6 +673,63 @@ proptest! {
             blocks_per_chunk,
         );
         check_usage_at_block_ends(&db, &txns);
+    }
+
+    #[test]
+    fn test_state_kv_contents(
+        blocks in arb_state_kv_blocks(),
+        blocks_per_chunk in 2..=3usize,
+    ) {
+        let (_keys, blocks) = state_kv_blocks(blocks);
+        let txns = blocks.concat();
+        for squash in [false, true] {
+            let expected = expected_state_kv(&txns, squash);
+            // Rows and stale indices don't depend on how blocks are grouped into chunks.
+            for blocks_per_chunk in [1, blocks_per_chunk] {
+                let tmp_dir = TempPath::new();
+                let db = open_state_kv_test_db(&tmp_dir, squash);
+                commit_blocks(&db, &blocks, 0, blocks_per_chunk);
+                prop_assert_eq!(&state_kv_contents(&db), &expected);
+            }
+
+            // Restore's KV replay writes the same.
+            let tmp_dir = TempPath::new();
+            let db = Arc::new(
+                AptosDB::open_kv_only(
+                    StorageDirPaths::from_path(tmp_dir.path()),
+                    /*readonly=*/ false,
+                    NO_OP_STORAGE_PRUNER_CONFIG,
+                    RocksdbConfigs {
+                        squash_state_kv_writes_per_block: squash,
+                        ..Default::default()
+                    },
+                    BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+                    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                    None,
+                )
+                .unwrap(),
+            );
+            let restore_handler = db.get_restore_handler();
+            let mut version = 0;
+            for chunk in blocks.chunks(blocks_per_chunk) {
+                let chunk = chunk.concat();
+                restore_handler
+                    .save_transactions_and_replay_kv(
+                        version,
+                        &chunk.iter().map(|txn| txn.transaction().clone()).collect::<Vec<_>>(),
+                        &vec![PersistedAuxiliaryInfo::None; chunk.len()],
+                        &chunk
+                            .iter()
+                            .map(|txn| txn.transaction_info().clone())
+                            .collect::<Vec<_>>(),
+                        &chunk.iter().map(|txn| txn.events().to_vec()).collect::<Vec<_>>(),
+                        chunk.iter().map(|txn| txn.write_set().clone()).collect(),
+                    )
+                    .unwrap();
+                version += chunk.len() as Version;
+            }
+            prop_assert_eq!(&state_kv_contents(&db), &expected);
+        }
     }
 }
 
