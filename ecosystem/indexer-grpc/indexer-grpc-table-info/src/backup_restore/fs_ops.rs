@@ -247,12 +247,8 @@ mod tests {
             }
         }
 
-        // Check if db2 has more elements than db1
-        if iter2.next().is_some() {
-            return Ok(false);
-        }
-
-        Ok(true) // Databases are identical
+        // Identical only if db2 has no more elements than db1
+        Ok(iter2.next().is_none())
     }
 
     fn open_db_with_column_families(

@@ -282,8 +282,8 @@ mod tests {
 
         assert_eq!(shares.len(), 3);
         assert!(!shares.contains_key(&ctx.authors[3]));
-        for i in 0..3 {
-            assert!(shares.contains_key(&ctx.authors[i]));
+        for author in ctx.authors.iter().take(3) {
+            assert!(shares.contains_key(author));
         }
         assert!(verifier.pessimistic_set.contains(&ctx.authors[3]));
         assert!(!verifier.pessimistic_set.contains(&ctx.authors[0]));

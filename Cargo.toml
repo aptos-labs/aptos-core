@@ -313,7 +313,6 @@ authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 edition = "2024"
 homepage = "https://aptosnetwork.com/"
 license = "LicenseRef-Aptos"
-license-file = "LICENSE"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
 rust-version = "1.95"
@@ -759,7 +758,7 @@ rand = "0.7.3"
 random_word = { version = "1.0.0", features = ["en"] }
 rapidhash = "4.5.1"
 rayon = "1.12.0"
-redis = { version = "0.22.3", features = [
+redis = { version = "0.22.4", features = [
     "tokio-comp",
     "script",
     "connection-manager",

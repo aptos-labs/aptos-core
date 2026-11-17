@@ -1664,9 +1664,9 @@ mod tests {
         assert!(scheduler.txn_statuses.get_status(3).is_stalled());
         assert_ok_eq!(scheduler.txn_statuses.remove_stall(3), true);
 
-        for i in 0..3 {
+        for marker in scheduler.committed_marker.iter().take(3) {
             assert_eq!(
-                scheduler.committed_marker[i].load(Ordering::Relaxed),
+                marker.load(Ordering::Relaxed),
                 CommitMarkerFlag::NotCommitted as u8
             );
         }

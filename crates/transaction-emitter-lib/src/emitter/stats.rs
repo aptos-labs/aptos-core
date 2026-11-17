@@ -176,8 +176,8 @@ impl AtomicHistogramAccumulator {
 
     pub fn snapshot(&self) -> AtomicHistogramSnapshot {
         let mut buf = Vec::with_capacity(self.capacity);
-        for i in 0..self.capacity {
-            buf.push(self.buckets[i].load(Ordering::Relaxed));
+        for bucket in &self.buckets {
+            buf.push(bucket.load(Ordering::Relaxed));
         }
         AtomicHistogramSnapshot {
             capacity: self.capacity,

@@ -58,14 +58,9 @@ fn should_warn_unused_struct(struct_env: &StructEnv) -> bool {
             .any(|&s| attr.name() == env.symbol_pool().make(s))
     };
 
-    if struct_env.get_visibility() != Visibility::Private
-        || struct_env.is_ghost_memory()
-        || struct_env.is_test_or_verify_only()
-        || struct_env.has_attribute(is_suppression_attr)
-        || !struct_env.get_users().is_empty()
-    {
-        return false;
-    }
-
-    true
+    struct_env.get_visibility() == Visibility::Private
+        && !struct_env.is_ghost_memory()
+        && !struct_env.is_test_or_verify_only()
+        && !struct_env.has_attribute(is_suppression_attr)
+        && struct_env.get_users().is_empty()
 }
