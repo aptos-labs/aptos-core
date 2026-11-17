@@ -20,7 +20,7 @@ use legacy_move_compiler::{
 use move_binary_format::{
     compatibility::Compatibility,
     errors,
-    errors::{PartialVMResult, VMError, VMResult},
+    errors::{PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
     CompiledModule,
 };
@@ -34,10 +34,11 @@ use move_command_line_common::{
 };
 use move_core_types::{
     account_address::AccountAddress,
+    effects::{ChangeSet, Op},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{serialize_values, MoveTypeLayout, MoveValue},
-    vm_status::StatusType,
+    value::{serialize_values, MoveFieldLayout, MoveStructLayout, MoveTypeLayout, MoveValue},
+    vm_status::{StatusCode, StatusType},
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -60,16 +61,19 @@ use move_vm_test_utils::{
     InMemoryStorage,
 };
 use move_vm_types::{
+    gas::GasMeter,
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
+    pop_arg,
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
-    values::{Struct, Value},
+    values::{Reference, Struct, Value},
 };
 use once_cell::sync::Lazy;
 use smallvec::smallvec;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
+    fmt::Write,
     iter::Iterator,
     path::Path,
     sync::Arc,
@@ -122,6 +126,10 @@ pub struct AdapterExecuteArgs {
     #[clap(long)]
     /// Displays the trace collected during execution.
     pub display_trace: bool,
+    /// Sets MonoMove's heap capacity in bytes to test garbage collection under allocation
+    /// pressure. V1 ignores this option.
+    #[clap(long)]
+    pub heap_size: Option<usize>,
 }
 
 fn move_test_debug() -> bool {
@@ -234,7 +242,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let (result, trace) = self.execute_entrypoint(
+        let (result, trace, effects) = self.execute_entrypoint(
             EntryPoint::Script {
                 script_bytes: &script_bytes,
             },
@@ -246,13 +254,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 
         let trace_str =
             trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests()));
-        match result {
+        let output = match result {
             Ok(_) => trace_str,
             Err(err) => {
                 let err_str = Some(format!("Error: {}", script_execution_error(&err, verbose)));
                 merge_output(trace_str, err_str)
             },
-        }
+        };
+        append_line(output, effects)
     }
 
     fn call_function(
@@ -278,17 +287,31 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let (result, trace) = self.execute_entrypoint(
+        let (result, trace, effects) = self.execute_entrypoint(
             EntryPoint::Function { module, function },
             &type_args,
             args,
             gas_budget,
             &code_storage,
         );
+        if let (true, Ok(values)) = (self.run_config.check_serde_round_trip, &result) {
+            let function_extension = code_storage.as_function_value_extension();
+            for (bytes, layout) in &values.return_values {
+                check_serde_round_trip(&function_extension, bytes, layout, "a return value");
+            }
+            for (_, bytes, layout) in &values.mutable_reference_outputs {
+                check_serde_round_trip(
+                    &function_extension,
+                    bytes,
+                    layout,
+                    "a mutable reference output",
+                );
+            }
+        }
 
         let trace_str =
             trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests()));
-        match result {
+        let output = match result {
             Ok(return_values) => {
                 let rendered_return_value = self.display_return_values(return_values);
                 merge_output(trace_str, rendered_return_value)
@@ -300,7 +323,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 ));
                 merge_output(trace_str, err_str)
             },
-        }
+        };
+        append_line(output, effects)
     }
 
     fn view_data(
@@ -434,6 +458,8 @@ pub fn serialize_script(storage: &InMemoryStorage, script: &CompiledScript) -> R
 }
 
 impl SimpleVMTestAdapter<'_> {
+    /// Executes `entry_point` and commits its writes on success. Also returns the effects report
+    /// when [`TestRunConfig::report_effects`] is set.
     fn execute_entrypoint(
         &mut self,
         entry_point: EntryPoint,
@@ -441,19 +467,24 @@ impl SimpleVMTestAdapter<'_> {
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
         code_storage: &impl CodeStorage,
-    ) -> (VMResult<SerializedReturnValues>, Option<Trace>) {
+    ) -> (
+        VMResult<SerializedReturnValues>,
+        Option<Trace>,
+        Option<String>,
+    ) {
         let mut gas_meter = get_gas_status(
             &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
             gas_budget,
         )
         .unwrap();
+        let initial_balance = gas_meter.balance_internal();
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
         let mut data_cache = TransactionDataCache::empty();
 
-        let (return_values, trace) = dispatch_loader!(code_storage, loader, {
+        let (result, trace) = dispatch_loader!(code_storage, loader, {
             let legacy_loader_config = LegacyLoaderConfig::unmetered();
             let result = match entry_point {
                 EntryPoint::Script { script_bytes } => loader.load_script(
@@ -474,7 +505,7 @@ impl SimpleVMTestAdapter<'_> {
             };
             let function = match result {
                 Ok(function) => function,
-                Err(err) => return (Err(err), None),
+                Err(err) => return (Err(err), None, None),
             };
 
             let mut data_cache =
@@ -505,10 +536,7 @@ impl SimpleVMTestAdapter<'_> {
                         );
                     }
                 }
-                match replay_result.and(result) {
-                    Ok(return_values) => (return_values, Some(trace)),
-                    Err(err) => return (Err(err), Some(trace)),
-                }
+                (replay_result.and(result), Some(trace))
             } else {
                 let result = MoveVM::execute_loaded_function(
                     function,
@@ -519,18 +547,162 @@ impl SimpleVMTestAdapter<'_> {
                     &mut extensions,
                     &loader,
                 );
-                match result {
-                    Ok(return_values) => (return_values, None),
-                    Err(err) => return (Err(err), None),
-                }
+                (result, None)
             }
         });
 
-        let change_set = data_cache
-            .into_effects(code_storage)
+        let mut report = self.run_config.report_effects.then(|| {
+            let gas_used = initial_balance
+                .checked_sub(gas_meter.balance_internal())
+                .expect("gas balance never grows");
+            vec![format!("gas used: {}", u64::from(gas_used))]
+        });
+        if result.is_ok() {
+            let change_set = if self.run_config.check_serde_round_trip {
+                let function_extension = code_storage.as_function_value_extension();
+                // Use the same serialization settings as `into_effects` before checking the bytes.
+                data_cache.into_custom_effects(&|value, layout, _| {
+                    let bytes = serde_context(&function_extension)
+                        .serialize(&value, &layout)?
+                        .ok_or_else(|| {
+                            PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                                .with_message("Error when serializing resource.")
+                        })?;
+                    check_serde_round_trip(
+                        &function_extension,
+                        &bytes,
+                        &layout,
+                        "a resource write",
+                    );
+                    Ok(Bytes::from(bytes))
+                })
+            } else {
+                data_cache.into_effects(code_storage)
+            }
             .expect("Producing a change set always succeeds");
-        self.storage.apply(change_set).unwrap();
-        (Ok(return_values), trace)
+            if let Some(lines) = report.as_mut() {
+                lines.extend(render_writes(&change_set));
+            }
+            self.storage.apply(change_set).unwrap();
+        }
+        (result, trace, report.map(|lines| lines.join("\n")))
+    }
+}
+
+/// Checks that deserializing and reserializing `bytes` with `layout` preserves the bytes.
+/// Checks both the VM and move-core-types, skipping the latter for layouts containing signers.
+/// Panics on failure, using `what` to identify the value.
+fn check_serde_round_trip(
+    function_extension: &dyn FunctionValueExtension,
+    bytes: &[u8],
+    layout: &MoveTypeLayout,
+    what: &str,
+) {
+    let Some(value) = serde_context(function_extension).deserialize(bytes, layout) else {
+        serde_round_trip_failure(what, "the VM cannot deserialize them", layout, bytes);
+    };
+    if !matches!(serde_context(function_extension).serialize(&value, layout), Ok(Some(reserialized)) if reserialized == bytes)
+    {
+        serde_round_trip_failure(what, "the VM reserializes them differently", layout, bytes);
+    }
+    if mentions_signer(layout) {
+        return;
+    }
+    let move_value = MoveValue::simple_deserialize(bytes, layout).unwrap_or_else(|err| {
+        serde_round_trip_failure(
+            what,
+            &format!("move-core-types cannot deserialize them: {err}"),
+            layout,
+            bytes,
+        )
+    });
+    if move_value.simple_serialize().as_deref() != Some(bytes) {
+        serde_round_trip_failure(
+            what,
+            "move-core-types reserializes them differently",
+            layout,
+            bytes,
+        );
+    }
+}
+
+/// Whether a value of `layout` can hold a signer.
+fn mentions_signer(layout: &MoveTypeLayout) -> bool {
+    let any_field =
+        |fields: &[MoveFieldLayout]| fields.iter().any(|field| mentions_signer(&field.layout));
+    match layout {
+        MoveTypeLayout::Signer => true,
+        MoveTypeLayout::Vector(inner) | MoveTypeLayout::Native(_, inner) => mentions_signer(inner),
+        MoveTypeLayout::Struct(struct_layout) => match struct_layout.as_ref() {
+            MoveStructLayout::Runtime(fields) => fields.iter().any(mentions_signer),
+            MoveStructLayout::RuntimeVariants(variants) => {
+                variants.iter().flatten().any(mentions_signer)
+            },
+            MoveStructLayout::WithFields(fields) | MoveStructLayout::WithTypes { fields, .. } => {
+                any_field(fields)
+            },
+            MoveStructLayout::WithVariants { variants, .. } => {
+                variants.iter().any(|variant| any_field(&variant.fields))
+            },
+        },
+        MoveTypeLayout::Bool
+        | MoveTypeLayout::U8
+        | MoveTypeLayout::U16
+        | MoveTypeLayout::U32
+        | MoveTypeLayout::U64
+        | MoveTypeLayout::U128
+        | MoveTypeLayout::U256
+        | MoveTypeLayout::I8
+        | MoveTypeLayout::I16
+        | MoveTypeLayout::I32
+        | MoveTypeLayout::I64
+        | MoveTypeLayout::I128
+        | MoveTypeLayout::I256
+        | MoveTypeLayout::Address
+        | MoveTypeLayout::Function => false,
+    }
+}
+
+/// The VM's value serializer and deserializer, configured as `into_effects` configures it.
+fn serde_context(function_extension: &dyn FunctionValueExtension) -> ValueSerDeContext<'_> {
+    ValueSerDeContext::new(function_extension.max_value_nest_depth())
+        .with_func_args_deserialization(function_extension)
+}
+
+fn serde_round_trip_failure(what: &str, problem: &str, layout: &MoveTypeLayout, bytes: &[u8]) -> ! {
+    let hex = hex(bytes);
+    panic!("serde round trip of {what} failed: {problem}\nlayout: {layout:?}\nbytes: {hex}");
+}
+
+fn hex(bytes: &[u8]) -> String {
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(hex, "{byte:02x}").expect("writing to a String succeeds");
+    }
+    hex
+}
+
+/// Renders each resource write in `change_set` as a line of the effects report.
+pub fn render_writes(change_set: &ChangeSet) -> impl Iterator<Item = String> + '_ {
+    change_set.resources().map(|(addr, tag, op)| {
+        let (kind, value) = match op {
+            Op::New(bytes) => ("new", hex(bytes)),
+            Op::Modify(bytes) => ("modify", hex(bytes)),
+            Op::Delete => ("delete", String::new()),
+        };
+        format!(
+            "write {kind} {} {} {value}",
+            addr.to_hex_literal(),
+            tag.to_canonical_string(),
+        )
+    })
+}
+
+/// Appends `line` to `output` on a new line.
+pub fn append_line(output: Option<String>, line: Option<String>) -> Option<String> {
+    match (output, line) {
+        (Some(output), Some(line)) => Some(format!("{output}\n{line}")),
+        (output, line) => output.or(line),
     }
 }
 
@@ -551,18 +723,31 @@ fn native_compare(
     Ok(NativeResult::ok(0.into(), smallvec![result]))
 }
 
-/// Creates the test runtime environment with stdlib natives and `cmp::compare`.
+fn native_swap(
+    _context: &mut NativeContext,
+    ty_args: &[Type],
+    mut arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert_eq!(ty_args.len(), 1);
+    debug_assert_eq!(arguments.len(), 2);
+
+    let right = pop_arg!(arguments, Reference);
+    let left = pop_arg!(arguments, Reference);
+    left.swap_values(right)?;
+    Ok(NativeResult::ok(0.into(), smallvec![]))
+}
+
+/// Creates the test runtime environment with stdlib natives, `cmp::compare` and `mem::swap`.
 pub fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
     let mut natives = move_stdlib::natives::all_natives(
         STD_ADDR,
         // TODO: come up with a suitable gas schedule
         move_stdlib::natives::GasParameters::zeros(),
     );
-    natives.extend(make_table_from_iter(STD_ADDR, [(
-        "cmp",
-        "compare",
-        Arc::new(native_compare) as NativeFunction,
-    )]));
+    natives.extend(make_table_from_iter(STD_ADDR, [
+        ("cmp", "compare", Arc::new(native_compare) as NativeFunction),
+        ("mem", "swap", Arc::new(native_swap) as NativeFunction),
+    ]));
     RuntimeEnvironment::new_with_config(natives, vm_config)
 }
 
@@ -671,12 +856,12 @@ impl PrecompiledFilesModules {
 
 static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| {
     let mut sources = move_stdlib::move_stdlib_files();
-    sources.push(
+    sources.extend(["src/cmp.move", "src/mem.move"].map(|file| {
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/cmp.move")
+            .join(file)
             .to_string_lossy()
-            .into_owned(),
-    );
+            .into_owned()
+    }));
     let options = move_compiler_v2::Options {
         sources: sources.clone(),
         sources_deps: vec![],
@@ -705,6 +890,12 @@ pub struct TestRunConfig {
     pub cross_compilation_targets: BTreeSet<CrossCompileTarget>,
     /// If enabled, records execution trace (disabling runtime type checks).
     pub tracing: bool,
+    /// Reports committed resource writes with gas used for V1 execution or GC count for MonoMove.
+    pub report_effects: bool,
+    /// Checks V1 resource writes, return values, and mutable reference outputs for byte-preserving
+    /// serialization round trips. Checks both the VM and move-core-types, skipping move-core-types
+    /// for layouts containing signers. Panics on failure; MonoMove ignores this option.
+    pub check_serde_round_trip: bool,
 }
 
 /// A cross-compile target. A new transactional test source file
@@ -748,6 +939,8 @@ impl TestRunConfig {
             echo: true,
             cross_compilation_targets: BTreeSet::new(),
             tracing: false,
+            report_effects: false,
+            check_serde_round_trip: false,
         }
     }
 
@@ -796,6 +989,20 @@ impl TestRunConfig {
     pub fn with_runtime_ref_checks(self) -> Self {
         Self {
             vm_config: self.vm_config.set_paranoid_ref_checks(true),
+            ..self
+        }
+    }
+
+    pub fn with_effects_report(self) -> Self {
+        Self {
+            report_effects: true,
+            ..self
+        }
+    }
+
+    pub fn with_serde_round_trip(self) -> Self {
+        Self {
+            check_serde_round_trip: true,
             ..self
         }
     }
