@@ -778,12 +778,10 @@ where
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
             let mut leaf = None;
-            for i in 0..16 {
-                if let Some(ref child_info) = self.partial_nodes[0].children[i] {
-                    num_children += 1;
-                    if let ChildInfo::Leaf(node) = child_info {
-                        leaf = Some(node.clone());
-                    }
+            for child_info in self.partial_nodes[0].children.iter().flatten() {
+                num_children += 1;
+                if let ChildInfo::Leaf(node) = child_info {
+                    leaf = Some(node.clone());
                 }
             }
 

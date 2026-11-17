@@ -180,10 +180,8 @@ impl ShardedJmtMerkleDb {
             batches_for_shards.len() == NUM_STATE_SHARDS,
             "Shard count mismatch."
         );
-        let mut batches = batches_for_shards.into_iter();
-        for shard_id in 0..NUM_STATE_SHARDS {
-            let batch = batches.next().unwrap();
-            self.shards[shard_id].write_schemas(batch)?;
+        for (shard, batch) in self.shards.iter().zip(batches_for_shards) {
+            shard.write_schemas(batch)?;
         }
         self.metadata_db.write_schemas(top_level_batch)
     }

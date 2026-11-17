@@ -1,6 +1,9 @@
 [alias]
 xclippy = [
   "clippy",
+  # Also deny Cargo's own lints (e.g. unused dependencies), which `-Dwarnings` doesn't reach.
+  "--config",
+  "build.warnings='deny'",
   "--workspace",
   "--all-targets",
   "--",
