@@ -1,0 +1,16 @@
+---
+remote_endpoint: ~
+name: "v1.50-enable-function-value-features"
+proposals:
+  - name: step_1_enable_function_value_features
+    metadata:
+      title: "Enable function reflection, function value dispatch, lazy module initialization, and function type ability checks"
+      description: "Enables ENABLE_FUNCTION_REFLECTION (105), FUNCTION_VALUE_DISPATCH (125), LAZY_MODULE_INITIALIZATION (127), and CHECK_FUNCTION_TYPE_ABILITIES (129)."
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - enable_function_reflection
+            - function_value_dispatch
+            - lazy_module_initialization
+            - check_function_type_abilities
