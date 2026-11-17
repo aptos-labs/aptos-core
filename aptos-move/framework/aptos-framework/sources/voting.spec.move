@@ -70,6 +70,8 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
         use aptos_framework::chain_status;
+        pragma opaque;
+        pragma aborts_if_is_partial = false;
 
         requires chain_status::is_operating();
         include CreateProposalAbortsIfAndEnsures<ProposalType>{is_multi_step_proposal: false};
@@ -352,7 +354,6 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 {
-
         use aptos_framework::chain_status;
 
         pragma addition_overflow_unchecked;

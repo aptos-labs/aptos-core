@@ -45,6 +45,8 @@ spec aptos_framework::config_buffer {
 
     spec extract_v2<T: store>(): T {
         use aptos_std::from_bcs;
+        pragma opaque;
+        include OtherPendingConfigsUnchanged<T, T>;
         aborts_if !exists<PendingConfigs>(@aptos_framework);
         include ExtractAbortsIf<T>;
         modifies global<PendingConfigs>(@aptos_framework);
@@ -83,7 +85,7 @@ spec aptos_framework::config_buffer {
         };
     }
 
-    spec schema OnNewEpochApply<T> {
+    spec schema OnNewEpochApplyBase<T> {
         use aptos_std::from_bcs;
         use aptos_std::simple_map;
         use aptos_std::type_info;
@@ -103,6 +105,32 @@ spec aptos_framework::config_buffer {
         let extracted = from_bcs::deserialize<T>(
             simple_map::spec_get(pending_configs.configs, key).data);
         ensures had ==> global<T>(@aptos_framework) == extracted;
+        ensures had ==> !simple_map::spec_contains_key(
+            global<PendingConfigs>(@aptos_framework).configs, key);
+        ensures !had ==> exists<T>(@aptos_framework) == old(exists<T>(@aptos_framework));
+        ensures !had && old(exists<T>(@aptos_framework)) ==>
+            global<T>(@aptos_framework) == old(global<T>(@aptos_framework));
+    }
+
+    spec schema OnNewEpochApply<T> {
+        include OnNewEpochApplyBase<T>;
+        include OtherPendingConfigsUnchanged<T, T>;
+    }
+
+    /// Only the buffer entries for `T1` and `T2` can change.
+    spec schema OtherPendingConfigsUnchanged<T1, T2> {
+        let frame_key1 = type_info::type_name<T1>();
+        let frame_key2 = type_info::type_name<T2>();
+        let frame_pre = global<PendingConfigs>(@aptos_framework).configs;
+        let post frame_post = global<PendingConfigs>(@aptos_framework).configs;
+        ensures exists<PendingConfigs>(@aptos_framework)
+            == old(exists<PendingConfigs>(@aptos_framework));
+        ensures forall k: String where k != frame_key1 && k != frame_key2:
+            simple_map::spec_contains_key(frame_post, k)
+                == simple_map::spec_contains_key(frame_pre, k);
+        ensures forall k: String where k != frame_key1 && k != frame_key2
+            && simple_map::spec_contains_key(frame_pre, k):
+            simple_map::spec_get(frame_post, k) == simple_map::spec_get(frame_pre, k);
     }
 
     spec schema SetForNextEpoch<T: drop + store> {

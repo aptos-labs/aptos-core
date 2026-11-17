@@ -5,14 +5,14 @@ spec aptos_framework::staking_contract {
     /// Criticality: Medium
     /// Implementation: The create_staking_contract_with_coins function ensures that the staker account has a Store
     /// structure assigned.
-    /// Enforcement: Formally verified via [high-level-req-1](CreateStakingContractWithCoinsAbortsifAndEnsures).
+    /// Enforcement: Formally verified via [high-level-req-1](create_staking_contract).
     ///
     /// No.: 2
     /// Requirement: A staking contract is created and stored in a mapping within the Store resource.
     /// Criticality: High
     /// Implementation: The create_staking_contract_with_coins function adds the newly created StakingContract to the
     /// staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.
-    /// Enforcement: Formally verified via [high-level-req-2](CreateStakingContractWithCoinsAbortsifAndEnsures).
+    /// Enforcement: Audited that the new staking contract is stored in the staking_contracts map under the operator.
     ///
     /// No.: 3
     /// Requirement: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional
@@ -77,6 +77,7 @@ spec aptos_framework::staking_contract {
     }
 
     spec stake_pool_address(staker: address, operator: address): address {
+        pragma opaque;
         include ContractExistsAbortsIf;
         let staking_contracts = global<Store>(staker).staking_contracts;
         ensures result
@@ -86,6 +87,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec last_recorded_principal(staker: address, operator: address): u64 {
+        pragma opaque;
         include ContractExistsAbortsIf;
         let staking_contracts = global<Store>(staker).staking_contracts;
         ensures result == simple_map::spec_get(staking_contracts, operator).principal;
@@ -93,6 +95,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec commission_percentage(staker: address, operator: address): u64 {
+        pragma opaque;
         include ContractExistsAbortsIf;
         let staking_contracts = global<Store>(staker).staking_contracts;
         ensures result
@@ -101,6 +104,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec staking_contract_amounts(staker: address, operator: address): (u64, u64, u64) {
+        pragma opaque;
         let staking_contracts = global<Store>(staker).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
 
@@ -122,6 +126,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec pending_distribution_counts(staker: address, operator: address): u64 {
+        pragma opaque;
         include ContractExistsAbortsIf;
 
         let staking_contracts = global<Store>(staker).staking_contracts;
@@ -147,7 +152,13 @@ spec aptos_framework::staking_contract {
         }
     }
 
-    /// Account is not frozen and sufficient to withdraw.
+    spec fun spec_beneficiary_for_operator(operator: address): address {
+        if (exists<BeneficiaryForOperator>(operator)) {
+            global<BeneficiaryForOperator>(operator).beneficiary_for_operator
+        } else { operator }
+    }
+
+    /// The staker's paired store holds enough to withdraw.
     spec create_staking_contract(
         staker: &signer,
         operator: address,
@@ -156,11 +167,18 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>
     ) {
+        use aptos_framework::fungible_asset;
+        // Partial: only the withdrawal from a paired store without a withdraw hook is specified, as in
+        // `coin::withdraw`; the aborts of creating the contract are not specified.
         pragma aborts_if_is_partial;
-        pragma verify_duration_estimate = 120;
         include PreconditionsInCreateContract;
-        include WithdrawAbortsIf<AptosCoin> { account: staker };
-        include CreateStakingContractWithCoinsAbortsIfAndEnsures;
+        let staker_address = signer::address_of(staker);
+        let store_addr = stake::spec_apt_paired_store_address(staker_address);
+        let plain = stake::spec_has_apt_paired_store(staker_address)
+            && fungible_asset::spec_store_no_withdraw_hook(store_addr);
+        aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
+        /// [high-level-req-1]
+        ensures exists<Store>(staker_address);
     }
 
     /// The amount should be at least the min_stake_required, so the stake pool will be eligible to join the validator set.
@@ -175,7 +193,6 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>
     ): address {
         pragma opaque;
-        pragma verify_duration_estimate = 120;
         pragma aborts_if_is_partial;
         include PreconditionsInCreateContract;
         ensures exists<stake::ValidatorSet>(@aptos_framework);
@@ -191,13 +208,15 @@ spec aptos_framework::staking_contract {
         // ensures result == resource_addr;
     }
 
-    /// Account is not frozen and sufficient to withdraw.
+    /// The staker's paired store holds enough to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO(fa_migration)
+        use aptos_framework::fungible_asset;
         use aptos_framework::reconfiguration_state;
-        pragma verify_duration_estimate = 600;
-        // TODO: this function times out
+        // Partial: the balance abort is only stated for a paired store without a withdraw hook, as in
+        // `coin::withdraw`; the other aborts of the withdrawal and the aborts and effects of adding the coins to the
+        // stake pool are not specified.
+        pragma aborts_if_is_partial;
         include stake::ResourceRequirement;
         aborts_if reconfiguration_state::spec_is_in_progress();
 
@@ -206,14 +225,10 @@ spec aptos_framework::staking_contract {
         let store = global<Store>(staker_address);
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
 
-        include WithdrawAbortsIf<AptosCoin> { account: staker };
-        let balance = global<coin::CoinStore<AptosCoin>>(staker_address).coin.value;
-        let post post_coin = global<coin::CoinStore<AptosCoin>>(staker_address).coin.value;
-        ensures post_coin == balance - amount;
-
-        // postconditions stake::add_stake_with_cap()
-        let owner_cap = staking_contract.owner_cap;
-        include stake::AddStakeWithCapAbortsIfAndEnsures { owner_cap };
+        let store_addr = stake::spec_apt_paired_store_address(staker_address);
+        let plain = stake::spec_has_apt_paired_store(staker_address)
+            && fungible_asset::spec_store_no_withdraw_hook(store_addr);
+        aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
 
         let post post_store = global<Store>(staker_address);
         let post post_staking_contract = simple_map::spec_get(
@@ -254,22 +269,21 @@ spec aptos_framework::staking_contract {
     }
 
     spec update_commision(staker: &signer, operator: address, new_commission_percentage: u64) {
-        // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
-        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
-        pragma verify = false;
+        // Partial: the aborts of distributing the unlocked stake and of paying the commission are not specified.
+        pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         aborts_if new_commission_percentage > 100;
         include ContractExistsAbortsIf { staker: staker_address };
     }
 
-    /// Only staker or operator can call this.
+    /// Only staker, operator or the operator's beneficiary can call this.
     spec request_commission(account: &signer, staker: address, operator: address) {
-        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
-        pragma verify = false;
+        // Partial: the aborts of distributing the unlocked stake and of paying the commission are not specified.
+        pragma aborts_if_is_partial;
         let account_addr = signer::address_of(account);
+        aborts_if account_addr != staker && account_addr != operator
+            && account_addr != spec_beneficiary_for_operator(operator);
         include ContractExistsAbortsIf { staker };
-        aborts_if account_addr != staker && account_addr != operator;
     }
 
     spec request_commission_internal(
@@ -283,21 +297,21 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec unlock_rewards(staker: &signer, operator: address) {
-        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        // TODO: Set because of timeout (estimate unknown).
-        pragma verify = false;
+        // Partial: the aborts of unlocking the rewards are not specified.
+        pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         let staking_contracts = global<Store>(staker_address).staking_contracts;
         let staking_contract = simple_map::spec_get(staking_contracts, operator);
         include ContractExistsAbortsIf { staker: staker_address };
+        include GetStakingContractAmountsAbortsIf;
     }
 
+    /// Unless the amount is zero, the staking_contract must exist for the staker/operator pair.
     spec unlock_stake(staker: &signer, operator: address, amount: u64) {
-        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        // TODO: Set because of timeout (estimate unknown).
-        pragma verify = false;
+        // Partial: the aborts of distributing, paying the commission and unlocking the stake are not specified.
+        pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
-        include ContractExistsAbortsIf { staker: staker_address };
+        include amount != 0 ==> ContractExistsAbortsIf { staker: staker_address };
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -317,28 +331,32 @@ spec aptos_framework::staking_contract {
         new_operator: address,
         new_commission_percentage: u64
     ) {
-        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        // TODO: Set because of timeout (estimate unknown).
-        pragma verify = false;
+        // Partial: the aborts of distributing the unlocked stake, paying the commission and moving the contract are
+        // not specified.
+        pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf { staker: staker_address, operator: old_operator };
+        aborts_if new_commission_percentage > 100;
         let store = global<Store>(staker_address);
         let staking_contracts = store.staking_contracts;
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
     }
 
+    /// Requires the operator beneficiary change feature.
     spec set_beneficiary_for_operator(operator: &signer, new_beneficiary: address) {
-        // TODO: temporary mockup
-        pragma verify = false;
+        aborts_if !features::spec_is_enabled(features::OPERATOR_BENEFICIARY_CHANGE);
+        ensures global<BeneficiaryForOperator>(signer::address_of(operator)).beneficiary_for_operator
+            == new_beneficiary;
     }
 
-    spec beneficiary_for_operator(operator: address): address {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
+    /// Staking_contract exists the stacker/operator pair.
     spec pending_attribution_snapshot(staker: address, operator: address, account: address): u64 {
-        pragma verify = false;
+        include ContractExistsAbortsIf;
+        let pool = simple_map::spec_get(global<Store>(staker).staking_contracts, operator).distribution_pool;
+        let shares = pool_u64::spec_shares(pool, account);
+        aborts_if pool.total_coins > 0 && pool.total_shares > 0
+            && shares * pool.total_coins / pool.total_shares > MAX_U64;
+        ensures result == pool_u64::spec_shares_to_amount_with_total_coins(pool, shares, pool.total_coins);
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -377,14 +395,27 @@ spec aptos_framework::staking_contract {
         recipient: address,
         coins_amount: u64,
     ) {
-        // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        pragma verify = false;
+        // Partial: the aborts of the share-pool updates are not specified.
+        pragma aborts_if_is_partial;
+        let pool_address = staking_contract.pool_address;
+        aborts_if !exists<stake::StakePool>(pool_address);
+        // Only the distribution pool changes.
+        ensures staking_contract.principal == old(staking_contract).principal;
+        ensures staking_contract.pool_address == old(staking_contract).pool_address;
+        ensures staking_contract.owner_cap == old(staking_contract).owner_cap;
+        ensures staking_contract.signer_cap == old(staking_contract).signer_cap;
+        ensures staking_contract.commission_percentage
+            == old(staking_contract).commission_percentage;
+        /// The pool is revalued to the pending_inactive stake, then `recipient` buys in with `coins_amount`.
+        ensures staking_contract.distribution_pool.total_coins
+            == global<stake::StakePool>(pool_address).pending_inactive.value + coins_amount;
     }
 
     /// The StakePool exists under the pool_address of StakingContract.
     spec get_staking_contract_amounts_internal(staking_contract: &StakingContract): (
         u64, u64, u64
     ) {
+        pragma opaque;
         include GetStakingContractAmountsAbortsIf;
 
         let pool_address = staking_contract.pool_address;
@@ -451,6 +482,7 @@ spec aptos_framework::staking_contract {
         // TODO: complex aborts conditions in the cycle.
         // pragma verify = false;
         pragma aborts_if_is_partial;
+        ensures distribution_pool.total_coins == updated_total_coins;
     }
 
     /// The Account exists under the staker.
@@ -573,11 +605,12 @@ spec aptos_framework::staking_contract {
 
         let staker_address = signer::address_of(staker);
         let account = global<account::Account>(staker_address);
+        // Creating the `Store` allocates nine event handles on the staker account.
+        include !exists<Store>(staker_address) ==>
+            account::NewEventHandleAbortsIf { account: staker };
         aborts_if !exists<Store>(staker_address)
-            && !exists<account::Account>(staker_address);
-        aborts_if !exists<Store>(staker_address)
+            && exists<account::Account>(staker_address)
             && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        /// [high-level-req-1]
         ensures exists<Store>(staker_address);
 
         let store = global<Store>(staker_address);
@@ -620,14 +653,8 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>;
 
         // postconditions account::create_resource_account()
-        let acc = global<account::Account>(resource_addr);
-        aborts_if exists<account::Account>(resource_addr)
-            && (
-                std::option::is_some(acc.signer_capability_offer.for)
-                    || acc.sequence_number != (0 as u64)
-            );
-        aborts_if !exists<account::Account>(resource_addr)
-            && len(bcs::to_bytes(resource_addr)) != 32;
+        aborts_if exists<account::Account>(resource_addr);
+        include account::EnsureResourceExistsAbortsIf { addr: resource_addr };
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
 
         // postconditions stake::initialize_stake_owner()
@@ -637,8 +664,5 @@ spec aptos_framework::staking_contract {
             && !contains(allowed.accounts, resource_addr);
         aborts_if exists<stake::StakePool>(resource_addr);
         aborts_if exists<stake::OwnerCapability>(resource_addr);
-        // 12 is the times that calls 'events::guids'
-        aborts_if exists<account::Account>(resource_addr)
-            && acc.guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
 }

@@ -1730,6 +1730,9 @@ module aptos_framework::stake {
                 new_active_validators.push_back(new_validator_info);
                 new_total_power +=(new_voting_power as u128);
                 is_liveness_fallback = true;
+            } spec {
+                invariant forall i in 0..len(new_active_validators):
+                    new_active_validators[i].config.validator_index == i;
             };
         };
 

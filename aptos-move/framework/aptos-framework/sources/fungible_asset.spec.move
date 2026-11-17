@@ -134,6 +134,9 @@ spec aptos_framework::fungible_asset {
     ///
     spec module {
         pragma verify = true;
+        /// Once a store has a concurrent balance, its plain balance stays zero.
+        invariant forall addr: address where exists<ConcurrentFungibleBalance>(addr) && exists<FungibleStore>(addr):
+            global<FungibleStore>(addr).balance == 0;
     }
 
     spec store_exists(store: address): bool {
@@ -197,11 +200,16 @@ spec aptos_framework::fungible_asset {
     }
 
     spec create_store<T: key>(constructor_ref: &ConstructorRef, metadata: Object<T>): Object<FungibleStore> {
-        pragma aborts_if_is_partial;
         let addr = constructor_ref.self;
         /// [high-level-req-8]
         aborts_if exists<FungibleStore>(addr);
+        aborts_if !exists<object::ObjectCore>(addr);
+        aborts_if !exists<object::ObjectCore>(metadata.inner) || !exists<Metadata>(metadata.inner);
+        aborts_if exists<Untransferable>(metadata.inner) && exists<object::Untransferable>(addr);
+        aborts_if features::spec_is_enabled(features::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+            && exists<ConcurrentFungibleBalance>(addr);
         ensures exists<FungibleStore>(addr);
+        ensures global<FungibleStore>(addr).metadata.inner == metadata.inner;
         /// [high-level-req-9]
         ensures global<FungibleStore>(addr).balance == 0;
         ensures global<FungibleStore>(addr).frozen == false;
@@ -209,8 +217,8 @@ spec aptos_framework::fungible_asset {
     }
 
     spec remove_store(delete_ref: &DeleteRef) {
-        pragma aborts_if_is_partial;
         let addr = delete_ref.self;
+        aborts_if !exists<object::ObjectCore>(addr);
         aborts_if !exists<FungibleStore>(addr);
         /// [high-level-req-10]
         aborts_if global<FungibleStore>(addr).balance != 0;
@@ -218,10 +226,12 @@ spec aptos_framework::fungible_asset {
         aborts_if exists<ConcurrentFungibleBalance>(addr)
             && aggregator_v2::spec_get_value(global<ConcurrentFungibleBalance>(addr).balance) != 0;
         ensures !exists<FungibleStore>(addr);
+        ensures !exists<ConcurrentFungibleBalance>(addr);
     }
 
     spec extract(self: &mut FungibleAsset, amount: u64): FungibleAsset {
         /// [high-level-req-14]
+        pragma opaque;
         aborts_if self.amount < amount;
         ensures self.amount == old(self).amount - amount;
         ensures self.metadata == old(self).metadata;
@@ -231,6 +241,7 @@ spec aptos_framework::fungible_asset {
 
     spec merge(self: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
         /// [high-level-req-15]
+        pragma opaque;
         aborts_if src_fungible_asset.metadata != self.metadata;
         aborts_if self.amount + src_fungible_asset.amount > MAX_U64;
         /// [high-level-req-16]
@@ -252,13 +263,26 @@ spec aptos_framework::fungible_asset {
         icon_uri: String,
         project_uri: String,
     ): Object<Metadata> {
-        pragma aborts_if_is_partial;
+        let addr = constructor_ref.self;
+        let concurrent = features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_ASSETS);
+        let post supply = global<ConcurrentSupply>(addr).current;
+        aborts_if constructor_ref.can_delete;
         /// [high-level-req-1]
         aborts_if std::string::length(name) > MAX_NAME_LENGTH;
         aborts_if std::string::length(symbol) > MAX_SYMBOL_LENGTH;
         aborts_if decimals > MAX_DECIMALS;
         aborts_if std::string::length(icon_uri) > MAX_URI_LENGTH;
         aborts_if std::string::length(project_uri) > MAX_URI_LENGTH;
+        aborts_if exists<Metadata>(addr);
+        aborts_if concurrent && exists<ConcurrentSupply>(addr);
+        aborts_if !concurrent && exists<Supply>(addr);
+        aborts_if !exists<object::ObjectCore>(addr);
+        ensures global<Metadata>(addr) == Metadata { name, symbol, decimals, icon_uri, project_uri };
+        ensures concurrent ==> aggregator_v2::spec_get_value(supply) == 0;
+        ensures concurrent ==> aggregator_v2::spec_get_max_value(supply)
+            == if (option::is_some(maximum_supply)) { option::borrow(maximum_supply) } else { MAX_U128 };
+        ensures !concurrent ==> global<Supply>(addr) == Supply { current: 0, maximum: maximum_supply };
+        ensures result.inner == addr;
     }
 
     spec amount(self: &FungibleAsset): u64 {
@@ -303,19 +327,264 @@ spec aptos_framework::fungible_asset {
         ensures result == self.metadata;
     }
 
-    spec unchecked_withdraw {
+    /// The balance of the store at `addr`: kept in `FungibleStore`, or in `ConcurrentFungibleBalance` once the
+    /// store has been upgraded.
+    spec fun spec_balance(addr: address): u64 {
+        if (spec_is_concurrent_balance(addr)) {
+            aggregator_v2::spec_get_value(global<ConcurrentFungibleBalance>(addr).balance)
+        } else {
+            global<FungibleStore>(addr).balance
+        }
+    }
+
+    spec fun spec_is_concurrent_balance(addr: address): bool {
+        global<FungibleStore>(addr).balance == 0 && exists<ConcurrentFungibleBalance>(addr)
+    }
+
+    /// The current supply of the asset at `addr`: kept in `ConcurrentSupply` if present, else in `Supply`.
+    spec fun spec_supply(addr: address): u128 {
+        if (exists<ConcurrentSupply>(addr)) {
+            aggregator_v2::spec_get_value(global<ConcurrentSupply>(addr).current)
+        } else {
+            global<Supply>(addr).current
+        }
+    }
+
+    /// A store keeps its metadata and frozen flag, and whether its balance is concurrent.
+    spec schema StoreBalanceFrame {
+        store_addr: address;
         modifies global<FungibleStore>(store_addr);
         modifies global<ConcurrentFungibleBalance>(store_addr);
+        ensures exists<FungibleStore>(store_addr);
+        ensures global<FungibleStore>(store_addr).metadata == old(global<FungibleStore>(store_addr).metadata);
+        ensures global<FungibleStore>(store_addr).frozen == old(global<FungibleStore>(store_addr).frozen);
+        ensures exists<ConcurrentFungibleBalance>(store_addr) == old(exists<ConcurrentFungibleBalance>(store_addr));
+        ensures spec_is_concurrent_balance(store_addr) == old(spec_is_concurrent_balance(store_addr));
+        ensures exists<ConcurrentFungibleBalance>(store_addr) ==>
+            aggregator_v2::spec_get_max_value(global<ConcurrentFungibleBalance>(store_addr).balance)
+                == aggregator_v2::spec_get_max_value(old(global<ConcurrentFungibleBalance>(store_addr).balance));
     }
 
-    spec deposit {
-        modifies global<FungibleStore>(object::object_address(store));
-        modifies global<ConcurrentFungibleBalance>(object::object_address(store));
+    spec schema UncheckedDeposit {
+        store_addr: address;
+        fa: FungibleAsset;
+        let store = global<FungibleStore>(store_addr);
+        let concurrent = global<ConcurrentFungibleBalance>(store_addr).balance;
+        aborts_if !exists<FungibleStore>(store_addr);
+        aborts_if fa.metadata != store.metadata;
+        aborts_if fa.amount != 0 && spec_is_concurrent_balance(store_addr)
+            && aggregator_v2::spec_get_value(concurrent) + fa.amount > aggregator_v2::spec_get_max_value(concurrent);
+        aborts_if fa.amount != 0 && !spec_is_concurrent_balance(store_addr) && store.balance + fa.amount > MAX_U64;
+        include StoreBalanceFrame;
+        ensures spec_balance(store_addr) == old(spec_balance(store_addr)) + fa.amount;
     }
 
-    spec unchecked_deposit {
-        modifies global<FungibleStore>(store_addr);
-        modifies global<ConcurrentFungibleBalance>(store_addr);
+    spec schema UncheckedWithdraw {
+        store_addr: address;
+        amount: u64;
+        result: FungibleAsset;
+        aborts_if !exists<FungibleStore>(store_addr);
+        aborts_if spec_balance(store_addr) < amount;
+        include StoreBalanceFrame;
+        ensures spec_balance(store_addr) == old(spec_balance(store_addr)) - amount;
+        ensures result == FungibleAsset { metadata: old(global<FungibleStore>(store_addr).metadata), amount };
     }
 
+    spec unchecked_deposit(store_addr: address, fa: FungibleAsset) {
+        pragma opaque;
+        include UncheckedDeposit;
+    }
+
+    spec unchecked_withdraw(store_addr: address, amount: u64): FungibleAsset {
+        pragma opaque;
+        include UncheckedWithdraw;
+    }
+
+    spec increase_supply<T: key>(metadata: &Object<T>, amount: u64) {
+        pragma opaque;
+        let metadata_addr = metadata.inner;
+        let supply = global<Supply>(metadata_addr);
+        let concurrent = global<ConcurrentSupply>(metadata_addr).current;
+        modifies global<Supply>(metadata_addr);
+        modifies global<ConcurrentSupply>(metadata_addr);
+        aborts_if amount != 0 && !exists<ConcurrentSupply>(metadata_addr) && !exists<Supply>(metadata_addr);
+        aborts_if amount != 0 && exists<ConcurrentSupply>(metadata_addr)
+            && aggregator_v2::spec_get_value(concurrent) + amount > aggregator_v2::spec_get_max_value(concurrent);
+        aborts_if amount != 0 && !exists<ConcurrentSupply>(metadata_addr) && option::is_some(supply.maximum)
+            && supply.current + amount > option::borrow(supply.maximum);
+        aborts_if amount != 0 && !exists<ConcurrentSupply>(metadata_addr) && supply.current + amount > MAX_U128;
+        include SupplyFrame { metadata_addr };
+        ensures amount != 0 ==> spec_supply(metadata_addr) == old(spec_supply(metadata_addr)) + amount;
+    }
+
+    spec decrease_supply<T: key>(metadata: &Object<T>, amount: u64) {
+        pragma opaque;
+        let metadata_addr = metadata.inner;
+        modifies global<Supply>(metadata_addr);
+        modifies global<ConcurrentSupply>(metadata_addr);
+        aborts_if amount != 0 && !exists<ConcurrentSupply>(metadata_addr) && !exists<Supply>(metadata_addr);
+        aborts_if amount != 0 && spec_supply(metadata_addr) < amount;
+        include SupplyFrame { metadata_addr };
+        ensures amount != 0 ==> spec_supply(metadata_addr) == old(spec_supply(metadata_addr)) - amount;
+    }
+
+    /// Minting and burning change only the current supply.
+    spec schema SupplyFrame {
+        metadata_addr: address;
+        amount: u64;
+        ensures exists<Supply>(metadata_addr) == old(exists<Supply>(metadata_addr));
+        ensures exists<ConcurrentSupply>(metadata_addr) == old(exists<ConcurrentSupply>(metadata_addr));
+        ensures exists<Supply>(metadata_addr) ==>
+            global<Supply>(metadata_addr).maximum == old(global<Supply>(metadata_addr).maximum);
+        ensures amount == 0 ==> global<Supply>(metadata_addr) == old(global<Supply>(metadata_addr));
+        ensures amount == 0 ==> global<ConcurrentSupply>(metadata_addr) == old(global<ConcurrentSupply>(metadata_addr));
+        ensures exists<ConcurrentSupply>(metadata_addr) ==>
+            aggregator_v2::spec_get_max_value(global<ConcurrentSupply>(metadata_addr).current)
+                == aggregator_v2::spec_get_max_value(old(global<ConcurrentSupply>(metadata_addr).current));
+        ensures exists<ConcurrentSupply>(metadata_addr) ==>
+            global<Supply>(metadata_addr) == old(global<Supply>(metadata_addr));
+    }
+
+    spec supply<T: key>(metadata: Object<T>): Option<u128> {
+        pragma opaque;
+        let addr = metadata.inner;
+        aborts_if addr != @aptos_fungible_asset && exists<DeriveSupply>(addr);
+        ensures result == if (exists<ConcurrentSupply>(addr) || exists<Supply>(addr)) {
+            option::spec_some(spec_supply(addr))
+        } else {
+            option::spec_none()
+        };
+    }
+
+    /// Replaces the `Supply` with a `ConcurrentSupply` of the same current value and bound.
+    spec upgrade_to_concurrent(ref: &ExtendRef) {
+        pragma opaque;
+        let addr = ref.self;
+        let supply = global<Supply>(addr);
+        modifies global<Supply>(addr);
+        modifies global<ConcurrentSupply>(addr);
+        aborts_if !features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_ASSETS);
+        aborts_if !exists<Supply>(addr);
+        aborts_if exists<ConcurrentSupply>(addr);
+        aborts_if option::is_some(supply.maximum) && supply.current > option::borrow(supply.maximum);
+        ensures !exists<Supply>(addr) && exists<ConcurrentSupply>(addr);
+        ensures spec_supply(addr) == supply.current;
+        ensures aggregator_v2::spec_get_max_value(global<ConcurrentSupply>(addr).current)
+            == if (option::is_some(supply.maximum)) { option::borrow(supply.maximum) } else { MAX_U128 };
+    }
+
+    /// Moves the store balance into a `ConcurrentFungibleBalance`, preserving it.
+    spec upgrade_store_to_concurrent<T: key>(owner: &signer, store: Object<T>) {
+        // Partial: the abort conditions of the ownership check are not specified.
+        pragma aborts_if_is_partial;
+        let addr = store.inner;
+        let upgrading = !exists<ConcurrentFungibleBalance>(addr);
+        aborts_if upgrading && !exists<FungibleStore>(addr);
+        aborts_if upgrading && global<FungibleStore>(addr).frozen;
+        aborts_if upgrading && !features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_BALANCE);
+        ensures exists<ConcurrentFungibleBalance>(addr);
+        ensures spec_balance(addr) == old(spec_balance(addr));
+    }
+
+    spec mutate_metadata(
+        self: &MutateMetadataRef,
+        name: Option<String>,
+        symbol: Option<String>,
+        decimals: Option<u8>,
+        icon_uri: Option<String>,
+        project_uri: Option<String>
+    ) {
+        pragma opaque;
+        let addr = self.metadata.inner;
+        let pre = global<Metadata>(addr);
+        let post post_metadata = global<Metadata>(addr);
+        modifies global<Metadata>(addr);
+        aborts_if !exists<Metadata>(addr);
+        aborts_if option::is_some(name) && string::length(option::borrow(name)) > MAX_NAME_LENGTH;
+        aborts_if option::is_some(symbol) && string::length(option::borrow(symbol)) > MAX_SYMBOL_LENGTH;
+        aborts_if option::is_some(decimals) && option::borrow(decimals) > MAX_DECIMALS;
+        aborts_if option::is_some(icon_uri) && string::length(option::borrow(icon_uri)) > MAX_URI_LENGTH;
+        aborts_if option::is_some(project_uri) && string::length(option::borrow(project_uri)) > MAX_URI_LENGTH;
+        ensures post_metadata == Metadata {
+            name: option::get_with_default(name, pre.name),
+            symbol: option::get_with_default(symbol, pre.symbol),
+            decimals: option::get_with_default(decimals, pre.decimals),
+            icon_uri: option::get_with_default(icon_uri, pre.icon_uri),
+            project_uri: option::get_with_default(project_uri, pre.project_uri),
+        };
+    }
+
+    /// Mirrors `has_balance_dispatch_function`, which is false for APT without looking up its function store.
+    spec fun spec_has_balance_dispatch_function(metadata: Object<Metadata>): bool {
+        metadata.inner != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata.inner)
+            && option::is_some(global<DispatchFunctionStore>(metadata.inner).derived_balance_function)
+    }
+
+    /// Mirrors `has_deposit_dispatch_function`, which is false for APT without looking up its function store.
+    spec fun spec_has_deposit_dispatch_function(metadata: Object<Metadata>): bool {
+        metadata.inner != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata.inner)
+            && option::is_some(global<DispatchFunctionStore>(metadata.inner).deposit_function)
+    }
+
+    /// Mirrors `has_withdraw_dispatch_function`, which is false for APT without looking up its function store.
+    spec fun spec_has_withdraw_dispatch_function(metadata: Object<Metadata>): bool {
+        metadata.inner != @aptos_fungible_asset && exists<DispatchFunctionStore>(metadata.inner)
+            && option::is_some(global<DispatchFunctionStore>(metadata.inner).withdraw_function)
+    }
+
+    /// The asset of the store at `store_addr` has a derived-balance hook (dispatchable path, no APT short-circuit).
+    spec fun spec_store_has_balance_hook(store_addr: address): bool {
+        let m = global<FungibleStore>(store_addr).metadata.inner;
+        exists<DispatchFunctionStore>(m) && option::is_some(global<DispatchFunctionStore>(m).derived_balance_function)
+    }
+
+    /// The asset of the store at `store_addr` has no deposit hook (dispatchable path, no APT short-circuit).
+    spec fun spec_store_no_deposit_hook(store_addr: address): bool {
+        let m = global<FungibleStore>(store_addr).metadata.inner;
+        !exists<DispatchFunctionStore>(m) || option::is_none(global<DispatchFunctionStore>(m).deposit_function)
+    }
+
+    /// The asset of the store at `store_addr` has no withdraw hook (dispatchable path, no APT short-circuit).
+    spec fun spec_store_no_withdraw_hook(store_addr: address): bool {
+        let m = global<FungibleStore>(store_addr).metadata.inner;
+        !exists<DispatchFunctionStore>(m) || option::is_none(global<DispatchFunctionStore>(m).withdraw_function)
+    }
+
+    spec balance<T: key>(store: Object<T>): u64 {
+        pragma opaque;
+        let addr = store.inner;
+        aborts_if exists<FungibleStore>(addr)
+            && spec_has_balance_dispatch_function(global<FungibleStore>(addr).metadata);
+        ensures result == if (exists<FungibleStore>(addr)) { spec_balance(addr) } else { 0 };
+    }
+
+    /// The store at `store_addr` holds at least `amount`; a missing store counts as an empty one.
+    spec fun spec_is_address_balance_at_least(store_addr: address, amount: u64): bool {
+        if (exists<FungibleStore>(store_addr)) { spec_balance(store_addr) >= amount } else { amount == 0 }
+    }
+
+    spec is_address_balance_at_least(store_addr: address, amount: u64): bool {
+        pragma opaque;
+        aborts_if false;
+        ensures result == spec_is_address_balance_at_least(store_addr, amount);
+    }
+
+    /// Anyone can deposit an asset of the store's type into an unfrozen store.
+    spec deposit<T: key>(store: Object<T>, fa: FungibleAsset) {
+        pragma opaque;
+        let fa_store = global<FungibleStore>(store.inner);
+        aborts_if spec_has_deposit_dispatch_function(fa_store.metadata);
+        aborts_if fa_store.frozen;
+        include UncheckedDeposit { store_addr: store.inner };
+    }
+
+    /// The owner of an unfrozen store can withdraw up to its balance.
+    spec withdraw<T: key>(owner: &signer, store: Object<T>, amount: u64): FungibleAsset {
+        // Partial: the abort conditions of the ownership check are not specified.
+        pragma aborts_if_is_partial;
+        let fa_store = global<FungibleStore>(store.inner);
+        aborts_if spec_has_withdraw_dispatch_function(fa_store.metadata);
+        aborts_if fa_store.frozen;
+        include UncheckedWithdraw { store_addr: store.inner };
+    }
 }

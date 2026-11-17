@@ -24,6 +24,7 @@ spec aptos_framework::chunky_dkg {
     }
 
     spec last_completed_session(): Option<ChunkyDKGSessionState> {
+        pragma opaque;
         aborts_if false;
         ensures result == if (exists<ChunkyDKGState>(@aptos_framework)) {
             global<ChunkyDKGState>(@aptos_framework).last_completed
@@ -33,6 +34,7 @@ spec aptos_framework::chunky_dkg {
     }
 
     spec is_session_started(epoch: u64): bool {
+        pragma opaque;
         aborts_if false;
         ensures result == spec_is_session_started(epoch);
     }
@@ -59,15 +61,29 @@ spec aptos_framework::chunky_dkg {
 
     spec try_clear_incomplete_session(fx: &signer) {
         use std::signer;
+        pragma opaque;
         let addr = signer::address_of(fx);
         aborts_if addr != @aptos_framework;
+        modifies global<ChunkyDKGState>(@aptos_framework);
+        ensures exists<ChunkyDKGState>(@aptos_framework) == old(exists<ChunkyDKGState>(@aptos_framework));
+        ensures exists<ChunkyDKGState>(@aptos_framework) ==>
+            option::is_none(global<ChunkyDKGState>(@aptos_framework).in_progress)
+            && global<ChunkyDKGState>(@aptos_framework).last_completed
+                == old(global<ChunkyDKGState>(@aptos_framework).last_completed);
     }
 
     spec incomplete_session(): Option<ChunkyDKGSessionState> {
+        pragma opaque;
         aborts_if false;
+        ensures result == if (exists<ChunkyDKGState>(@aptos_framework)) {
+            global<ChunkyDKGState>(@aptos_framework).in_progress
+        } else {
+            option::spec_none()
+        };
     }
 
     spec session_dealer_epoch(session: &ChunkyDKGSessionState): u64 {
         aborts_if false;
+        ensures result == session.metadata.dealer_epoch;
     }
 }

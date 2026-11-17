@@ -295,10 +295,29 @@ spec aptos_framework::multisig_account {
         let timelock_enabled = features::spec_multisig_timelock_enabled();
         // Feature flag must be enabled.
         aborts_if !features::spec_multisig_timelock_enabled();
-        // Must be a multisig account.
-        aborts_if !exists<MultisigAccount>(multisig_address);
         // Timelock must be enabled
         ensures timelock_enabled;
+        include UpsertTimelockAbortsIfAndEnsures;
+        // Frame condition: the MultisigAccount resource itself is not mutated. This pins the
+        // invariant that upsert_timelock cannot perturb owners, num_signatures_required, the
+        // transaction queue, metadata, or any event handles.
+        ensures global<MultisigAccount>(multisig_address) == old(global<MultisigAccount>(multisig_address));
+    }
+
+    spec upsert_timelock_internal(multisig_account: &signer, timelock_period: u64, override_threshold: Option<u64>) {
+        use std::signer;
+        pragma opaque;
+        let multisig_address = signer::address_of(multisig_account);
+        include UpsertTimelockAbortsIfAndEnsures;
+        modifies global<MultisigAccountTimeLock>(multisig_address);
+    }
+
+    spec schema UpsertTimelockAbortsIfAndEnsures {
+        multisig_address: address;
+        timelock_period: u64;
+        override_threshold: Option<u64>;
+        // Must be a multisig account.
+        aborts_if !exists<MultisigAccount>(multisig_address);
         // Timelock period must be within valid range.
         aborts_if timelock_period < MIN_TIMELOCK_PERIOD || timelock_period > MAX_TIMELOCK_PERIOD;
         // Override threshold must be > num_signatures_required (if provided).
@@ -312,10 +331,6 @@ spec aptos_framework::multisig_account {
         // The stored values match the provided values.
         ensures global<MultisigAccountTimeLock>(multisig_address).timelock_period == timelock_period;
         ensures global<MultisigAccountTimeLock>(multisig_address).override_threshold == override_threshold;
-        // Frame condition: the MultisigAccount resource itself is not mutated. This pins the
-        // invariant that upsert_timelock cannot perturb owners, num_signatures_required, the
-        // transaction queue, metadata, or any event handles.
-        ensures global<MultisigAccount>(multisig_address) == old(global<MultisigAccount>(multisig_address));
     }
 
     spec create_with_owners_and_timelock(
@@ -359,6 +374,66 @@ spec aptos_framework::multisig_account {
         ensures !exists<MultisigAccountTimeLock>(multisig_address);
         // Frame condition: the MultisigAccount resource itself is not mutated.
         ensures global<MultisigAccount>(multisig_address) == old(global<MultisigAccount>(multisig_address));
+    }
+
+    ////////////////////////// Creation function specs ///////////////////////////////
+
+    spec schema CreateMultisigAccountAbortsIfAndEnsures {
+        multisig_address: address;
+        owners: vector<address>;
+        num_signatures_required: u64;
+        aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
+        aborts_if exists<MultisigAccount>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures exists<MultisigAccount>(multisig_address);
+        ensures multisig.owners == owners;
+        ensures multisig.num_signatures_required == num_signatures_required;
+    }
+
+    spec create_with_existing_account(
+        multisig_address: address,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        create_multisig_account_signed_message: vector<u8>,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        // Transaction-context and signature-verification aborts are not specified.
+        pragma aborts_if_is_partial;
+        include CreateMultisigAccountAbortsIfAndEnsures;
+    }
+
+    spec create_with_existing_account_and_revoke_auth_key(
+        multisig_address: address,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        account_scheme: u8,
+        account_public_key: vector<u8>,
+        create_multisig_account_signed_message: vector<u8>,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        // Transaction-context and signature-verification aborts and the auth-key revocation
+        // are not specified.
+        pragma aborts_if_is_partial;
+        include CreateMultisigAccountAbortsIfAndEnsures;
+    }
+
+    spec create_with_existing_account_and_revoke_auth_key_call(
+        multisig_account: &signer,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values:vector<vector<u8>>,
+    ) {
+        use std::signer;
+        // Owner validation, metadata and account-resource aborts and the auth-key revocation are
+        // not specified.
+        pragma aborts_if_is_partial;
+        let multisig_address = signer::address_of(multisig_account);
+        include CreateMultisigAccountAbortsIfAndEnsures;
     }
 
     ////////////////////////// Core entry function specs ///////////////////////////////
@@ -448,6 +523,45 @@ spec aptos_framework::multisig_account {
         // The pending transaction must exist at the next sequence number
         // (assert_transaction_exists).
         aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
+    }
+
+    spec successful_transaction_execution_cleanup(
+        executor: address,
+        multisig_account: address,
+        transaction_payload: vector<u8>,
+    ) {
+        // Vote-counting arithmetic aborts are not specified.
+        pragma aborts_if_is_partial;
+        include TransactionExecutionCleanup;
+    }
+
+    spec failed_transaction_execution_cleanup(
+        executor: address,
+        multisig_account: address,
+        transaction_payload: vector<u8>,
+        execution_error: ExecutionError,
+    ) {
+        // Vote-counting arithmetic aborts are not specified.
+        pragma aborts_if_is_partial;
+        include TransactionExecutionCleanup;
+    }
+
+    /// The next pending transaction is removed from the queue and marked as resolved; the owner
+    /// set and signature threshold are unchanged.
+    spec schema TransactionExecutionCleanup {
+        multisig_account: address;
+        let pre = global<MultisigAccount>(multisig_account);
+        let post post_r = global<MultisigAccount>(multisig_account);
+        let sequence_number = pre.last_executed_sequence_number + 1;
+        aborts_if !exists<MultisigAccount>(multisig_account);
+        aborts_if sequence_number > MAX_U64;
+        aborts_if sequence_number >= pre.next_sequence_number;
+        aborts_if !table::spec_contains(pre.transactions, sequence_number);
+        ensures post_r.last_executed_sequence_number == sequence_number;
+        ensures !table::spec_contains(post_r.transactions, sequence_number);
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
     }
 
     ////////////////////////// Internal function specs ///////////////////////////////

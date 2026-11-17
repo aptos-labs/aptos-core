@@ -116,9 +116,12 @@ spec aptos_framework::optional_aggregator {
             (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value));
     }
 
+    /// Only a parallelizable aggregator can be switched; the value and limit are preserved.
     spec switch(optional_aggregator: &mut OptionalAggregator) {
-        //aborts_if true;
-        pragma verify = false;
+        aborts_if !is_parallelizable(optional_aggregator);
+        ensures !is_parallelizable(optional_aggregator);
+        ensures optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator));
+        ensures optional_aggregator_limit(optional_aggregator) == optional_aggregator_limit(old(optional_aggregator));
     }
 
     spec sub_integer(integer: &mut Integer, value: u128) {

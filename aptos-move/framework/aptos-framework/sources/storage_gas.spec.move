@@ -80,6 +80,7 @@ spec aptos_framework::storage_gas {
     }
 
     spec new_point(x: u64, y: u64): Point {
+        pragma opaque;
         aborts_if x > BASIS_POINT_DENOMINATION || y > BASIS_POINT_DENOMINATION;
 
         ensures result.x == x;
@@ -88,6 +89,7 @@ spec aptos_framework::storage_gas {
 
     /// A non decreasing curve must ensure that next is greater than cur.
     spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
+        pragma opaque;
         include NewGasCurveAbortsIf;
         include ValidatePointsAbortsIf;
         /// [high-level-req-3]
@@ -99,6 +101,7 @@ spec aptos_framework::storage_gas {
     }
 
     spec new_usage_gas_config(target_usage: u64, read_curve: GasCurve, create_curve: GasCurve, write_curve: GasCurve): UsageGasConfig {
+        pragma opaque;
         aborts_if target_usage == 0;
         aborts_if target_usage > MAX_U64 / BASIS_POINT_DENOMINATION;
         /// [high-level-req-4]
@@ -111,6 +114,7 @@ spec aptos_framework::storage_gas {
     }
 
     spec new_storage_gas_config(item_config: UsageGasConfig, byte_config: UsageGasConfig): StorageGasConfig {
+        pragma opaque;
         aborts_if false;
 
         ensures result.item_config == item_config;
@@ -119,8 +123,12 @@ spec aptos_framework::storage_gas {
 
     /// Signer address must be @aptos_framework and StorageGasConfig exists.
     spec set_config(aptos_framework: &signer, config: StorageGasConfig) {
+        pragma opaque;
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
+        modifies global<StorageGasConfig>(@aptos_framework);
+        ensures exists<StorageGasConfig>(@aptos_framework);
+        ensures global<StorageGasConfig>(@aptos_framework) == config;
     }
 
     /// Signer address must be @aptos_framework.
@@ -161,10 +169,13 @@ spec aptos_framework::storage_gas {
     /// Address @aptos_framework must exist StorageGasConfig and StorageGas and StateStorageUsage.
     spec on_reconfig {
         use aptos_framework::chain_status;
+        pragma opaque;
         requires chain_status::is_operating();
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
         aborts_if !exists<StorageGas>(@aptos_framework);
         aborts_if !exists<state_storage::StateStorageUsage>(@aptos_framework);
+        modifies global<StorageGas>(@aptos_framework);
+        ensures exists<StorageGas>(@aptos_framework);
     }
 
 
