@@ -25,8 +25,7 @@ pub struct LeakedBoxPtr<T>(NonNull<T>);
 impl<T> LeakedBoxPtr<T> {
     /// Leaks the box and returns a stable pointer.
     pub fn from_box(boxed: Box<T>) -> Self {
-        // SAFETY: Box::into_raw always returns a non-null pointer.
-        Self(unsafe { NonNull::new_unchecked(Box::into_raw(boxed)) })
+        Self(Box::into_non_null(boxed))
     }
 
     /// Returns the underlying non-null pointer.

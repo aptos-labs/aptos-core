@@ -315,7 +315,7 @@ homepage = "https://aptosnetwork.com/"
 license = "LicenseRef-Aptos"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.95"
+rust-version = "1.100"
 
 [workspace.dependencies]
 # Internal crate dependencies.
