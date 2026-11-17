@@ -8,12 +8,13 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::{
     block_info::BlockInfo,
+    consensus_signature::ConsensusSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::ValidatorVerifier,
 };
@@ -258,7 +259,7 @@ impl BufferItem {
         }
     }
 
-    pub fn advance_to_signed(self, author: Author, signature: bls12381::Signature) -> Self {
+    pub fn advance_to_signed(self, author: Author, signature: ConsensusSignature) -> Self {
         match self {
             Self::Executed(executed_item) => {
                 let ExecutedItem {
@@ -702,12 +703,12 @@ mod test {
         commit_votes[3] = CommitVote::new_with_signature(
             validator_signers[3].author(),
             ledger_info.clone(),
-            bls12381::Signature::dummy_signature(),
+            ConsensusSignature::dummy_signature(),
         );
         commit_votes[5] = CommitVote::new_with_signature(
             validator_signers[5].author(),
             ledger_info.clone(),
-            bls12381::Signature::dummy_signature(),
+            ConsensusSignature::dummy_signature(),
         );
 
         let mut partial_signatures = BTreeMap::new();

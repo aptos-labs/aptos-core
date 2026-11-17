@@ -18,9 +18,10 @@ use aptos_consensus_types::{
     },
     vote::Vote,
 };
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
+    consensus_signature::ConsensusSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures, SignatureAggregator},
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
@@ -79,7 +80,7 @@ impl TwoChainTimeoutVotes {
         &mut self,
         author: Author,
         timeout: TwoChainTimeout,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
         reason: RoundTimeoutReason,
     ) {
         self.partial_2chain_tc.add(author, timeout, signature);
@@ -564,9 +565,10 @@ mod tests {
     use aptos_consensus_types::{
         block::block_test_utils::certificate_for_genesis, vote::Vote, vote_data::VoteData,
     };
-    use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+    use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_types::{
-        aggregate_signature::PartialSignatures, block_info::BlockInfo, ledger_info::LedgerInfo,
+        aggregate_signature::PartialSignatures, block_info::BlockInfo,
+        consensus_signature::ConsensusSignature, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
     };
     use itertools::Itertools;
@@ -692,7 +694,7 @@ mod tests {
             vote_data.clone(),
             signers[2].author(),
             li.clone(),
-            bls12381::Signature::dummy_signature(),
+            ConsensusSignature::dummy_signature(),
         );
 
         let vote_3 = Vote::new(

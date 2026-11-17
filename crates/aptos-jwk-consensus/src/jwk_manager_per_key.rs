@@ -14,11 +14,12 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{bls12381::PrivateKey, SigningKey};
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
+    consensus_signature,
     epoch_state::EpochState,
     jwks::{
         jwk::JWK, AllProvidersJWKs, Issuer, KeyLevelUpdate, OIDCProvider, ObservedJWKs,
@@ -196,9 +197,7 @@ impl KeyLevelConsensusManager {
         let issuer_level_repr = update
             .try_as_issuer_level_repr()
             .context("initiate_key_level_consensus failed at repr conversion")?;
-        let signature = self
-            .consensus_key
-            .sign(&issuer_level_repr)
+        let signature = consensus_signature::sign(&self.consensus_key, &issuer_level_repr)
             .context("crypto material error occurred during signing")?;
 
         let update_translated = update

@@ -20,7 +20,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue, SigningKey, Uniform};
+use aptos_crypto::{hash::CryptoHash, HashValue, Uniform};
 use aptos_dkg::pvss::{
     traits::{transcript::Aggregatable, Transcript},
     Player,
@@ -29,6 +29,7 @@ use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_types::{
+    consensus_signature::{self, ConsensusSignature},
     dkg::{
         chunky_dkg::{
             AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript,
@@ -978,7 +979,7 @@ impl ChunkyDKGManager {
         req: &ChunkyDKGSubtranscriptSignatureRequest,
         dkg_config: &ChunkyDKGSession,
         ssk: &Arc<DealerPrivateKey>,
-    ) -> Result<(AggregatedSubtranscript, bls12381::Signature)> {
+    ) -> Result<(AggregatedSubtranscript, ConsensusSignature)> {
         let dealer_epoch = req.dealer_epoch;
         let dealer_bitmask = req.dealer_bitmask.clone();
         let subtranscript_hash = req.subtranscript_hash;
@@ -997,8 +998,7 @@ impl ChunkyDKGManager {
                 recomputed.hash() == subtranscript_hash,
                 "subtranscript hash mismatch in validation request"
             );
-            let sig = ssk
-                .sign(&recomputed)
+            let sig = consensus_signature::sign(&ssk, &recomputed)
                 .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
             Ok((recomputed, sig))
         })
@@ -1021,9 +1021,9 @@ impl ChunkyDKGManager {
     ) -> Result<DKGMessage> {
         // Fast path: local aggregated transcript matches — sign and return immediately.
         if local_aggregated_transcript.hash() == req.subtranscript_hash {
-            let signature = ssk
-                .sign(local_aggregated_transcript.as_ref())
-                .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
+            let signature =
+                consensus_signature::sign(&ssk, local_aggregated_transcript.as_ref())
+                    .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
             return Ok(DKGMessage::SubtranscriptSignatureResponse(
                 ChunkyDKGSubtranscriptSignatureResponse::new(
                     req.dealer_epoch,

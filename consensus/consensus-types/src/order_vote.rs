@@ -3,9 +3,10 @@
 
 use crate::common::Author;
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, HashValue};
+use aptos_crypto::HashValue;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
+    consensus_signature::ConsensusSignature,
     ledger_info::{LedgerInfo, SignatureWithStatus},
     validator_verifier::ValidatorVerifier,
 };
@@ -45,7 +46,7 @@ impl OrderVote {
     pub fn new_with_signature(
         author: Author,
         ledger_info: LedgerInfo,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) -> Self {
         Self {
             author,

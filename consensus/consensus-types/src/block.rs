@@ -10,13 +10,14 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
+    consensus_signature::ConsensusSignature,
     decryption::{BlockTxnDecryptionKey, DecryptionPayload},
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
@@ -53,7 +54,7 @@ pub struct Block {
     block_data: BlockData,
     /// Signature that the hash of this block has been authored by the owner of the private key,
     /// this is only set within Proposal blocks
-    signature: Option<bls12381::Signature>,
+    signature: Option<ConsensusSignature>,
 }
 
 impl fmt::Debug for Block {
@@ -198,7 +199,7 @@ impl Block {
         self.block_data.round()
     }
 
-    pub fn signature(&self) -> Option<&bls12381::Signature> {
+    pub fn signature(&self) -> Option<&ConsensusSignature> {
         self.signature.as_ref()
     }
 
@@ -260,7 +261,7 @@ impl Block {
     pub fn new_for_testing(
         id: HashValue,
         block_data: BlockData,
-        signature: Option<bls12381::Signature>,
+        signature: Option<ConsensusSignature>,
     ) -> Self {
         Block {
             id,
@@ -370,7 +371,7 @@ impl Block {
 
     pub fn new_proposal_from_block_data_and_signature(
         block_data: BlockData,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) -> Self {
         Block {
             id: block_data.hash(),
@@ -670,7 +671,7 @@ impl<'de> Deserialize<'de> for Block {
         #[serde(rename = "Block")]
         struct BlockWithoutId {
             block_data: BlockData,
-            signature: Option<bls12381::Signature>,
+            signature: Option<ConsensusSignature>,
         }
 
         let BlockWithoutId {

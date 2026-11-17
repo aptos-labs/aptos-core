@@ -47,6 +47,9 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_large" => {
             realistic_env_max_load_test(duration, test_cmd, 20, 10, 0)
         },
+        "realistic_env_max_load_50_validators" => {
+            realistic_env_max_load_50_validators_test(duration)
+        },
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
         "realistic_env_orderbook_workload_sweep" => realistic_env_orderbook_workload_sweep_bench(),
@@ -516,6 +519,63 @@ pub(crate) fn realistic_env_max_load_test(
         .with_validator_resource_override(resource_override)
         .with_fullnode_resource_override(resource_override)
         .with_num_pfns(num_pfns)
+}
+
+/// Max load on 50 validators. Use it to compare two builds, for example a default build
+/// and a `pq-consensus` build. The success criteria are loose: this test measures, it
+/// does not gate.
+///
+/// Randomness, Chunky DKG, and encrypted transactions are off, so that the consensus
+/// signatures are the only change between the two builds.
+pub(crate) fn realistic_env_max_load_50_validators_test(duration: Duration) -> ForgeConfig {
+    let num_validators = 50;
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 19000,
+                })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(100),
+        }))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_disabled())
+                    .expect("must serialize");
+            helm_values["chain"]["chunky_dkg_config_override"] =
+                serde_yaml::to_value(OnChainChunkyDKGConfig::default_disabled())
+                    .expect("must serialize");
+            let mut features = Features::default();
+            features.disable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
+        }))
+        // Higher gas-fee traffic at a constant rate. Its latency is the headline latency.
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(
+            SuccessCriteria::new(100)
+                .add_no_restarts()
+                .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+                .add_chain_progress(StateProgressThreshold {
+                    max_non_epoch_no_progress_secs: 30.0,
+                    max_epoch_no_progress_secs: 30.0,
+                    max_non_epoch_round_gap: 8,
+                    max_epoch_round_gap: 8,
+                }),
+        )
 }
 
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {

@@ -26,6 +26,10 @@ fuzzing = [
     "move-core-types/fuzzing",
     "arbitrary",
 ]
+# EXPERIMENT ONLY. Validators sign consensus messages with ML-DSA-65 instead of BLS12-381.
+# The ML-DSA keys are derived from public data, so a network built with this feature has
+# no security. Use it only to measure performance.
+pq-consensus = ["dep:libcrux-ml-dsa"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -60,6 +64,7 @@ hashbrown = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }
+libcrux-ml-dsa = { workspace = true, optional = true }
 lru = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

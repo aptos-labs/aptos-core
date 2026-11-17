@@ -14,7 +14,6 @@ use anyhow::{bail, ensure};
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
-    bls12381::Signature,
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
 };
@@ -25,6 +24,7 @@ use aptos_logger::debug;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
+    consensus_signature::ConsensusSignature as Signature,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,

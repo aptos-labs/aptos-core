@@ -3,9 +3,11 @@
 
 use crate::pipeline::pipeline_phase::StatelessPipeline;
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
-use aptos_crypto::bls12381;
 use aptos_safety_rules::Error;
-use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
+use aptos_types::{
+    consensus_signature::ConsensusSignature,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+};
 use async_trait::async_trait;
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -44,11 +46,11 @@ pub trait CommitSignerProvider: Send + Sync {
         &self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error>;
+    ) -> Result<ConsensusSignature, Error>;
 }
 
 pub struct SigningResponse {
-    pub signature_result: Result<bls12381::Signature, Error>,
+    pub signature_result: Result<ConsensusSignature, Error>,
     pub commit_ledger_info: LedgerInfo,
 }
 

@@ -423,7 +423,7 @@ impl BatchStore {
             Ok(SignedBatchInfo::new_with_signature(
                 batch_info.clone(),
                 self.validator_signer.author(),
-                aptos_crypto::bls12381::Signature::dummy_signature(),
+                aptos_types::consensus_signature::ConsensusSignature::dummy_signature(),
             ))
         });
         SignedBatchInfo::new(batch_info, &self.validator_signer)

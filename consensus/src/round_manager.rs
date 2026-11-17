@@ -1519,12 +1519,12 @@ impl RoundManager {
             .context("[RoundManager] Process proposal")?;
 
         fail_point!("consensus::create_invalid_vote", |_| {
-            use aptos_crypto::bls12381;
+            use aptos_types::consensus_signature::ConsensusSignature;
             let faulty_vote = Vote::new_with_signature(
                 vote.vote_data().clone(),
                 vote.author(),
                 vote.ledger_info().clone(),
-                bls12381::Signature::dummy_signature(),
+                ConsensusSignature::dummy_signature(),
             );
             Ok(faulty_vote)
         });
@@ -1788,11 +1788,11 @@ impl RoundManager {
         ))?;
 
         fail_point!("consensus::create_invalid_order_vote", |_| {
-            use aptos_crypto::bls12381;
+            use aptos_types::consensus_signature::ConsensusSignature;
             let faulty_order_vote = OrderVote::new_with_signature(
                 order_vote.author(),
                 order_vote.ledger_info().clone(),
-                bls12381::Signature::dummy_signature(),
+                ConsensusSignature::dummy_signature(),
             );
             Ok(faulty_order_vote)
         });

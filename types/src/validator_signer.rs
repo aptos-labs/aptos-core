@@ -1,10 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::account_address::AccountAddress;
+#[cfg(feature = "pq-consensus")]
+use crate::consensus_signature::ml_dsa::MlDsaSigningKey;
+use crate::{account_address::AccountAddress, consensus_signature::ConsensusSignature};
+#[cfg(not(feature = "pq-consensus"))]
+use aptos_crypto::SigningKey;
 use aptos_crypto::{
-    bls12381, hash::CryptoHash, test_utils::TEST_SEED, CryptoMaterialError, PrivateKey, SigningKey,
-    Uniform,
+    bls12381, hash::CryptoHash, test_utils::TEST_SEED, CryptoMaterialError, PrivateKey, Uniform,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use serde::ser::Serialize;
@@ -18,12 +21,16 @@ use std::{convert::TryFrom, sync::Arc};
 pub struct ValidatorSigner {
     author: AccountAddress,
     private_key: Arc<bls12381::PrivateKey>,
+    #[cfg(feature = "pq-consensus")]
+    pq_signing_key: Arc<MlDsaSigningKey>,
 }
 
 impl ValidatorSigner {
     pub fn new(author: AccountAddress, private_key: Arc<bls12381::PrivateKey>) -> Self {
         ValidatorSigner {
             author,
+            #[cfg(feature = "pq-consensus")]
+            pq_signing_key: Arc::new(MlDsaSigningKey::derive(&private_key.public_key())),
             private_key,
         }
     }
@@ -32,8 +39,15 @@ impl ValidatorSigner {
     pub fn sign<T: Serialize + CryptoHash>(
         &self,
         message: &T,
-    ) -> Result<bls12381::Signature, CryptoMaterialError> {
-        self.private_key.sign(message)
+    ) -> Result<ConsensusSignature, CryptoMaterialError> {
+        #[cfg(not(feature = "pq-consensus"))]
+        {
+            self.private_key.sign(message)
+        }
+        #[cfg(feature = "pq-consensus")]
+        {
+            self.pq_signing_key.sign(message)
+        }
     }
 
     /// Returns the author associated with this signer.

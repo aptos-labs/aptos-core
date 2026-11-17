@@ -272,8 +272,7 @@ pub mod fuzzing {
         block_data::BlockData, order_vote::OrderVote, order_vote_proposal::OrderVoteProposal,
         timeout_2chain::TwoChainTimeout, vote::Vote, vote_proposal::VoteProposal,
     };
-    use aptos_crypto::bls12381;
-    use aptos_types::epoch_change::EpochChangeProof;
+    use aptos_types::{consensus_signature::ConsensusSignature, epoch_change::EpochChangeProof};
 
     pub fn fuzz_initialize(proof: EpochChangeProof) -> Result<(), Error> {
         let mut safety_rules = test_utils::test_safety_rules_uninitialized();
@@ -308,14 +307,14 @@ pub mod fuzzing {
         }
     }
 
-    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+    pub fn fuzz_sign_proposal(block_data: &BlockData) -> Result<ConsensusSignature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_proposal(block_data)
     }
 
     pub fn fuzz_sign_timeout_with_qc(
         timeout: TwoChainTimeout,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         let mut safety_rules = test_utils::test_safety_rules();
         safety_rules.sign_timeout_with_qc(&timeout, None)
     }

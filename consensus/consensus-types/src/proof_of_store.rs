@@ -3,11 +3,11 @@
 
 use crate::{payload::TDataInfo, utils::PayloadTxnsSize};
 use anyhow::{bail, ensure, Context};
-use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError, HashValue};
+use aptos_crypto::{hash::CryptoHash, CryptoMaterialError, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    aggregate_signature::AggregateSignature, ledger_info::SignatureWithStatus,
-    quorum_store::BatchId, validator_signer::ValidatorSigner,
+    aggregate_signature::AggregateSignature, consensus_signature::ConsensusSignature,
+    ledger_info::SignatureWithStatus, quorum_store::BatchId, validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier, PeerId,
 };
 use mini_moka::sync::Cache;
@@ -499,7 +499,7 @@ where
     pub fn new_with_signature(
         batch_info: T,
         signer: PeerId,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) -> Self {
         Self {
             info: batch_info,
@@ -510,7 +510,7 @@ where
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy(batch_info: T, signer: PeerId) -> Self {
-        Self::new_with_signature(batch_info, signer, bls12381::Signature::dummy_signature())
+        Self::new_with_signature(batch_info, signer, ConsensusSignature::dummy_signature())
     }
 
     pub fn signer(&self) -> PeerId {

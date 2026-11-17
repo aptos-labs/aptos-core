@@ -3,12 +3,13 @@
 
 use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
-use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_crypto::CryptoMaterialError;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::{AggregateSignature, PartialSignatures},
     block_info::Round,
+    consensus_signature::ConsensusSignature,
     validator_signer::ValidatorSigner,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
@@ -59,7 +60,7 @@ impl TwoChainTimeout {
     pub fn sign(
         &self,
         signer: &ValidatorSigner,
-    ) -> Result<bls12381::Signature, CryptoMaterialError> {
+    ) -> Result<ConsensusSignature, CryptoMaterialError> {
         signer.sign(&self.signing_format())
     }
 
@@ -239,12 +240,7 @@ impl TwoChainTimeoutWithPartialSignatures {
     }
 
     /// Add a new timeout message from author, the timeout should already be verified in upper layer.
-    pub fn add(
-        &mut self,
-        author: Author,
-        timeout: TwoChainTimeout,
-        signature: bls12381::Signature,
-    ) {
+    pub fn add(&mut self, author: Author, timeout: TwoChainTimeout, signature: ConsensusSignature) {
         debug_assert_eq!(
             self.timeout.epoch(),
             timeout.epoch(),
@@ -286,11 +282,11 @@ impl TwoChainTimeoutWithPartialSignatures {
 /// timeout aggregation.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartialSignaturesWithRound {
-    signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>,
+    signatures: BTreeMap<AccountAddress, (Round, ConsensusSignature)>,
 }
 
 impl PartialSignaturesWithRound {
-    pub fn new(signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>) -> Self {
+    pub fn new(signatures: BTreeMap<AccountAddress, (Round, ConsensusSignature)>) -> Self {
         Self { signatures }
     }
 
@@ -298,7 +294,7 @@ impl PartialSignaturesWithRound {
         Self::new(BTreeMap::new())
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, (Round, bls12381::Signature)> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, (Round, ConsensusSignature)> {
         &self.signatures
     }
 
@@ -307,7 +303,7 @@ impl PartialSignaturesWithRound {
         &mut self,
         validator: AccountAddress,
         round: Round,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) {
         self.signatures.insert(validator, (round, signature));
     }
@@ -321,7 +317,7 @@ impl PartialSignaturesWithRound {
         &mut self,
         validator: AccountAddress,
         round: Round,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) {
         self.signatures
             .entry(validator)
@@ -402,7 +398,7 @@ mod tests {
         quorum_cert::QuorumCert,
         timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures},
     };
-    use aptos_crypto::bls12381;
+    use aptos_types::consensus_signature::ConsensusSignature;
 
     #[test]
     fn test_2chain_timeout_certificate() {
@@ -470,7 +466,7 @@ mod tests {
         invalid_timeout_cert.signatures.replace_signature(
             signers[0].author(),
             0,
-            bls12381::Signature::dummy_signature(),
+            ConsensusSignature::dummy_signature(),
         );
 
         let invalid_tc_with_sig = invalid_timeout_cert

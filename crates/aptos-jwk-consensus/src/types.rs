@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use aptos_crypto::bls12381::Signature;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_reliable_broadcast::RBMessage;
 use aptos_types::{
     account_address::AccountAddress,
+    consensus_signature::ConsensusSignature as Signature,
     jwks::{Issuer, KeyLevelUpdate, ProviderJWKs, QuorumCertifiedUpdate, KID},
 };
 use aptos_validator_transaction_pool::TxnGuard;

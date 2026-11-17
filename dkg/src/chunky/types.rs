@@ -97,14 +97,14 @@ pub struct AggregatedSubtranscriptWithHashes {
 pub struct ChunkyDKGSubtranscriptSignatureResponse {
     pub dealer_epoch: u64,
     pub subtranscript_hash: HashValue,
-    pub signature: aptos_crypto::bls12381::Signature,
+    pub signature: aptos_types::consensus_signature::ConsensusSignature,
 }
 
 impl ChunkyDKGSubtranscriptSignatureResponse {
     pub fn new(
         dealer_epoch: u64,
         subtranscript_hash: HashValue,
-        signature: aptos_crypto::bls12381::Signature,
+        signature: aptos_types::consensus_signature::ConsensusSignature,
     ) -> Self {
         Self {
             dealer_epoch,

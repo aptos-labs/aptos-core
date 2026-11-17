@@ -701,6 +701,7 @@ jsonwebtoken = "8.1"
 jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
+libcrux-ml-dsa = "0.0.11"
 libfuzzer-sys = "0.4.6"
 libsecp256k1 = "0.7.0"
 libtest-mimic = "0.5.2"
@@ -1005,6 +1006,17 @@ opt-level = "z"
 lto = "thin"
 strip = true
 codegen-units = 1
+
+# Unoptimized ML-DSA is about 50x slower. Debug builds with the `pq-consensus` feature
+# then miss consensus round timeouts.
+[profile.dev.package.libcrux-ml-dsa]
+opt-level = 3
+
+[profile.dev.package.libcrux-sha3]
+opt-level = 3
+
+[profile.dev.package.libcrux-intrinsics]
+opt-level = 3
 
 [profile.ci]
 inherits = "release"

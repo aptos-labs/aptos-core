@@ -13,6 +13,7 @@ use crate::{
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
+    consensus_signature::{self, ConsensusSignature},
     contract_event::ContractEvent,
     dkg::{DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
@@ -676,8 +677,9 @@ prop_compose! {
         ledger_info in Just(ledger_info),
         account_keypair in ed25519::keypair_strategy(),
         consensus_keypair in bls12381_keys::keypair_strategy(),
-    ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
-        let signature = consensus_keypair.private_key.sign(&ledger_info).unwrap();
+    ) -> (AccountAddress, ValidatorConsensusInfo,  ConsensusSignature) {
+        let signature =
+            consensus_signature::sign(&consensus_keypair.private_key, &ledger_info).unwrap();
         let address = account_address::from_public_key(&account_keypair.public_key);
         (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }

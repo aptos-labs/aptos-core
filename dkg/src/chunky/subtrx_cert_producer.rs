@@ -11,12 +11,14 @@ use crate::{
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue, Signature as _};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
 use aptos_types::{
-    dkg::chunky_dkg::AggregatedSubtranscript, epoch_state::EpochState,
+    consensus_signature::{self, ConsensusSignature as Signature},
+    dkg::chunky_dkg::AggregatedSubtranscript,
+    epoch_state::EpochState,
     validator_verifier::VerifyError,
 };
 use futures::future::AbortHandle;
@@ -173,8 +175,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
             .get_public_key(&sender)
             .ok_or_else(|| anyhow!("peer public key not found"))?;
 
-        signature
-            .verify(&self.aggregated_subtranscript, &peer_pk)
+        consensus_signature::verify(&peer_pk, &self.aggregated_subtranscript, &signature)
             .context("subtranscript validation signature verification failed")?;
 
         // All checks passed. Adding signature.

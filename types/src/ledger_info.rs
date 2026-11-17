@@ -6,14 +6,13 @@ use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress,
     block_info::{BlockInfo, Round},
+    consensus_signature::{ConsensusSignature, LazyConsensusSignature},
     epoch_state::EpochState,
-    lazy_bls::LazyBlsSignature,
     on_chain_config::ValidatorSet,
     transaction::Version,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use aptos_crypto::{
-    bls12381,
     hash::{CryptoHash, HashValue},
     CryptoMaterialError,
 };
@@ -355,11 +354,11 @@ impl LedgerInfoWithVerifiedSignatures {
         self.partial_sigs.remove_signature(validator);
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: ConsensusSignature) {
         self.partial_sigs.add_signature(validator, signature);
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, ConsensusSignature> {
         self.partial_sigs.signatures()
     }
 
@@ -398,7 +397,7 @@ impl LedgerInfoWithVerifiedSignatures {
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq, Eq)]
 pub struct SignatureWithStatus {
-    signature: LazyBlsSignature,
+    signature: LazyConsensusSignature,
     #[derivative(PartialEq = "ignore")]
     // false if the signature not verified.
     // true if the signature is verified.
@@ -412,20 +411,20 @@ impl SignatureWithStatus {
 
     /// The signature in its lazy, still-compressed form. Callers that only need
     /// the raw bytes can use this without paying for decompression.
-    pub fn lazy_signature(&self) -> &LazyBlsSignature {
+    pub fn lazy_signature(&self) -> &LazyConsensusSignature {
         &self.signature
     }
 
     /// Decompress the signature into a `bls12381::Signature`, performing the
     /// deferred G2-point decompression. Call this only after cheaper structural
     /// checks have passed.
-    pub fn decompressed_signature(&self) -> Result<bls12381::Signature, CryptoMaterialError> {
+    pub fn decompressed_signature(&self) -> Result<ConsensusSignature, CryptoMaterialError> {
         self.signature.decompress()
     }
 
-    pub fn from(signature: bls12381::Signature) -> Self {
+    pub fn from(signature: ConsensusSignature) -> Self {
         Self {
-            signature: LazyBlsSignature::from_signature(&signature),
+            signature: LazyConsensusSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -433,7 +432,7 @@ impl SignatureWithStatus {
     /// Build directly from a (possibly invalid) lazy signature. Used by tests to
     /// inject a signature whose bytes don't decompress to a valid curve point.
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn new_for_test(signature: LazyBlsSignature) -> Self {
+    pub fn new_for_test(signature: LazyConsensusSignature) -> Self {
         Self {
             signature,
             verification_status: Arc::new(AtomicBool::new(false)),
@@ -460,7 +459,7 @@ impl<'de> Deserialize<'de> for SignatureWithStatus {
         D: serde::Deserializer<'de>,
     {
         // Decodes the compressed bytes WITHOUT decompressing the G2 point.
-        let signature = LazyBlsSignature::deserialize(deserializer)?;
+        let signature = LazyConsensusSignature::deserialize(deserializer)?;
         Ok(SignatureWithStatus {
             signature,
             verification_status: Arc::new(AtomicBool::new(false)),
@@ -627,7 +626,7 @@ impl Arbitrary for LedgerInfoWithV0 {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        let dummy_signature = bls12381::Signature::dummy_signature();
+        let dummy_signature = ConsensusSignature::dummy_signature();
         (any::<LedgerInfo>(), (1usize..100))
             .prop_map(move |(ledger_info, num_validators)| {
                 let (signers, verifier) = random_validator_verifier(num_validators, None, true);
@@ -655,13 +654,13 @@ mod tests {
     // Write a test case to serialize and deserialize SignatureWithStatus
     #[test]
     fn test_signature_with_status_bcs() {
-        let signature = bls12381::Signature::dummy_signature();
+        let signature = ConsensusSignature::dummy_signature();
         let signature_with_status_1 = SignatureWithStatus {
-            signature: LazyBlsSignature::from_signature(&signature),
+            signature: LazyConsensusSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(true)),
         };
         let signature_with_status_2 = SignatureWithStatus {
-            signature: LazyBlsSignature::from_signature(&signature),
+            signature: LazyConsensusSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(false)),
         };
         let serialized_signature_with_status_1 =
@@ -684,13 +683,13 @@ mod tests {
 
     #[test]
     fn test_signature_with_status_serde() {
-        let signature = bls12381::Signature::dummy_signature();
+        let signature = ConsensusSignature::dummy_signature();
         let signature_with_status_1 = SignatureWithStatus {
-            signature: LazyBlsSignature::from_signature(&signature),
+            signature: LazyConsensusSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(true)),
         };
         let signature_with_status_2 = SignatureWithStatus {
-            signature: LazyBlsSignature::from_signature(&signature),
+            signature: LazyConsensusSignature::from_signature(&signature),
             verification_status: Arc::new(AtomicBool::new(false)),
         };
         let serialized_signature_with_status_1 =
@@ -717,11 +716,12 @@ mod tests {
     /// `decompressed_signature()` is explicitly called. This is the property
     /// that lets callers reject oversized/malformed messages on cheap
     /// structural checks before paying per-signature decompression cost.
+    #[cfg(not(feature = "pq-consensus"))]
     #[test]
     fn deserialize_defers_decompression() {
         // 0xff.. is not a valid compressed G2 point (its flag bits are
         // inconsistent), so decompression must fail — but decoding must not.
-        let garbage = serde_bytes::ByteBuf::from(vec![0xFFu8; bls12381::Signature::LENGTH]);
+        let garbage = serde_bytes::ByteBuf::from(vec![0xFFu8; ConsensusSignature::LENGTH]);
         let bytes = bcs::to_bytes(&garbage).unwrap();
         let sig_with_status: SignatureWithStatus =
             bcs::from_bytes(&bytes).expect("lazy deserialization must not decompress");
@@ -860,7 +860,7 @@ mod tests {
 
         signature_aggregator.add_signature(
             validator_signers[4].author(),
-            &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
+            &SignatureWithStatus::from(ConsensusSignature::dummy_signature()),
         );
 
         assert_eq!(signature_aggregator.all_voters().count(), 5);
@@ -917,7 +917,7 @@ mod tests {
 
         signature_aggregator.add_signature(
             validator_signers[6].author(),
-            &SignatureWithStatus::from(bls12381::Signature::dummy_signature()),
+            &SignatureWithStatus::from(ConsensusSignature::dummy_signature()),
         );
 
         assert_eq!(signature_aggregator.all_voters().count(), 6);
@@ -975,9 +975,11 @@ mod tests {
         }
 
         // One Byzantine signature whose 96 bytes are not a valid G2 point.
-        let poison = SignatureWithStatus::new_for_test(LazyBlsSignature::from_raw_bytes_for_test(
-            [0xFFu8; bls12381::Signature::LENGTH],
-        ));
+        let poison = SignatureWithStatus::new_for_test(
+            LazyConsensusSignature::from_raw_bytes_for_test([0xFFu8; ConsensusSignature::LENGTH]),
+        );
+        // An ML-DSA signature has no decompression step. The poison is only invalid.
+        #[cfg(not(feature = "pq-consensus"))]
         assert!(poison.decompressed_signature().is_err());
         signature_aggregator.add_signature(validator_signers[5].author(), &poison);
 

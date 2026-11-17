@@ -1,32 +1,56 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+#[cfg(feature = "pq-consensus")]
+use crate::consensus_signature::{ml_dsa::MlDsaVerificationKey, ConsensusMultiSignature};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress, aggregate_signature::AggregateSignature,
-    ledger_info::SignatureWithStatus, on_chain_config::ValidatorSet,
+    consensus_signature::ConsensusSignature, ledger_info::SignatureWithStatus,
+    on_chain_config::ValidatorSet,
 };
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
+#[cfg(feature = "pq-consensus")]
+use aptos_crypto::traits::signing_message;
+#[cfg(not(feature = "pq-consensus"))]
+use aptos_crypto::{bls12381, Signature, VerifyingKey};
 use aptos_crypto::{
-    bls12381,
     bls12381::{bls12381_keys, PublicKey},
     hash::CryptoHash,
-    Signature, VerifyingKey,
 };
 use dashmap::DashSet;
 use derivative::Derivative;
 use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+#[cfg(feature = "pq-consensus")]
+use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
+#[cfg(feature = "pq-consensus")]
+use std::sync::OnceLock;
 use std::{
     collections::{BTreeMap, HashMap},
     fmt,
 };
 use thiserror::Error;
+
+#[cfg(feature = "pq-consensus")]
+const PQ_MIN_SIGNATURES_PER_TASK: usize = 4;
+
+/// A certificate has one ML-DSA signature per signer, and they verify in parallel.
+/// A dedicated pool keeps this verification out of the queue of the global rayon pool,
+/// which other components share.
+#[cfg(feature = "pq-consensus")]
+static PQ_VERIFICATION_POOL: once_cell::sync::Lazy<rayon::ThreadPool> =
+    once_cell::sync::Lazy::new(|| {
+        rayon::ThreadPoolBuilder::new()
+            .thread_name(|index| format!("pq-sig-verify-{}", index))
+            .build()
+            .expect("failed to build the ML-DSA verification thread pool")
+    });
 
 /// Errors possible during signature verification.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -158,6 +182,12 @@ pub struct ValidatorVerifier {
     #[serde(skip)]
     #[derivative(PartialEq = "ignore")]
     optimistic_sig_verification: bool,
+    /// The ML-DSA verification key of each validator, in the order of `validator_infos`.
+    /// Each key is derived on first use.
+    #[cfg(feature = "pq-consensus")]
+    #[serde(skip)]
+    #[derivative(PartialEq = "ignore")]
+    pq_verification_keys: Vec<OnceLock<MlDsaVerificationKey>>,
 }
 
 /// Reconstruct fields from the raw data upon deserialization.
@@ -192,6 +222,8 @@ impl ValidatorVerifier {
             .map(|(index, info)| (info.address, index))
             .collect();
         Self {
+            #[cfg(feature = "pq-consensus")]
+            pq_verification_keys: validator_infos.iter().map(|_| OnceLock::new()).collect(),
             validator_infos,
             quorum_voting_power,
             total_voting_power,
@@ -256,14 +288,75 @@ impl ValidatorVerifier {
         &self,
         author: AccountAddress,
         message: &T,
-        signature: &bls12381::Signature,
+        signature: &ConsensusSignature,
     ) -> std::result::Result<(), VerifyError> {
-        match self.get_public_key(&author) {
-            Some(public_key) => public_key
-                .verify_struct_signature(message, signature)
-                .map_err(|_| VerifyError::InvalidMultiSignature),
-            None => Err(VerifyError::UnknownAuthor),
+        #[cfg(not(feature = "pq-consensus"))]
+        {
+            match self.get_public_key(&author) {
+                Some(public_key) => public_key
+                    .verify_struct_signature(message, signature)
+                    .map_err(|_| VerifyError::InvalidMultiSignature),
+                None => Err(VerifyError::UnknownAuthor),
+            }
         }
+        #[cfg(feature = "pq-consensus")]
+        {
+            self.address_to_validator_index
+                .get(&author)
+                .and_then(|index| self.pq_verification_key(*index))
+                .ok_or(VerifyError::UnknownAuthor)?
+                .verify(message, signature)
+                .map_err(|_| VerifyError::InvalidMultiSignature)
+        }
+    }
+
+    #[cfg(feature = "pq-consensus")]
+    fn pq_verification_key(&self, index: usize) -> Option<&MlDsaVerificationKey> {
+        let validator = self.validator_infos.get(index)?;
+        let key = self.pq_verification_keys.get(index)?;
+        Some(key.get_or_init(|| MlDsaVerificationKey::derive(validator.public_key())))
+    }
+
+    /// Verifies each signature of `aggregated_signature` against the bytes that
+    /// `message_bytes` returns for its position among the signers.
+    #[cfg(feature = "pq-consensus")]
+    fn pq_verify_each<'a>(
+        &self,
+        aggregated_signature: &AggregateSignature,
+        message_bytes: impl Fn(usize) -> &'a [u8] + Sync,
+    ) -> bool {
+        let Some(multi_signature) = aggregated_signature.sig() else {
+            return false;
+        };
+        let signatures = multi_signature.signatures();
+        let indices = aggregated_signature
+            .get_signers_bitvec()
+            .iter_ones()
+            .collect_vec();
+        if indices.len() != signatures.len() {
+            return false;
+        }
+        let verify_one = |position: usize, index: usize, signature: &ConsensusSignature| {
+            self.pq_verification_key(index).is_some_and(|key| {
+                key.verify_signing_message(message_bytes(position), signature)
+                    .is_ok()
+            })
+        };
+        if signatures.len() < PQ_MIN_SIGNATURES_PER_TASK {
+            return indices
+                .iter()
+                .zip(signatures)
+                .enumerate()
+                .all(|(position, (index, signature))| verify_one(position, *index, signature));
+        }
+        PQ_VERIFICATION_POOL.install(|| {
+            indices
+                .par_iter()
+                .zip(signatures.par_iter())
+                .enumerate()
+                .with_min_len(PQ_MIN_SIGNATURES_PER_TASK)
+                .all(|(position, (index, signature))| verify_one(position, *index, signature))
+        })
     }
 
     pub fn optimistic_verify<T: Serialize + CryptoHash>(
@@ -323,7 +416,7 @@ impl ValidatorVerifier {
     // list of pub keys used in signature aggregation.
     pub fn aggregate_signatures<'a>(
         &self,
-        signatures: impl Iterator<Item = (&'a AccountAddress, &'a bls12381::Signature)>,
+        signatures: impl Iterator<Item = (&'a AccountAddress, &'a ConsensusSignature)>,
     ) -> Result<AggregateSignature, VerifyError> {
         let mut sigs = vec![];
         let mut masks = BitVec::with_num_bits(self.len() as u16);
@@ -333,11 +426,19 @@ impl ValidatorVerifier {
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
             masks.set(index as u16);
-            sigs.push(sig.clone());
+            sigs.push((index, sig.clone()));
         }
+        #[cfg(not(feature = "pq-consensus"))]
         // Perform an optimistic aggregation of the signatures without verification.
-        let aggregated_sig = bls12381::Signature::aggregate(sigs)
-            .map_err(|_| VerifyError::FailedToAggregateSignature)?;
+        let aggregated_sig =
+            bls12381::Signature::aggregate(sigs.into_iter().map(|(_, sig)| sig).collect())
+                .map_err(|_| VerifyError::FailedToAggregateSignature)?;
+        #[cfg(feature = "pq-consensus")]
+        // ML-DSA has no aggregation. Keep each signature, in the order of the bitmask.
+        let aggregated_sig = {
+            sigs.sort_by_key(|(index, _)| *index);
+            ConsensusMultiSignature::new(sigs.into_iter().map(|(_, sig)| sig).collect())
+        };
 
         Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
     }
@@ -378,20 +479,35 @@ impl ValidatorVerifier {
                 return Ok(());
             }
         }
-        // Verify empty multi signature. Decompression of the G2 point is
-        // deferred to here, after the cheap structural checks above.
-        let multi_sig = multi_signature
-            .decompressed_sig()
-            .map_err(|_| VerifyError::InvalidMultiSignature)?
-            .ok_or(VerifyError::EmptySignature)?;
-        // Verify the optimistically aggregated signature.
-        let aggregated_key =
-            PublicKey::aggregate(pub_keys).map_err(|_| VerifyError::FailedToAggregatePubKey)?;
+        #[cfg(not(feature = "pq-consensus"))]
+        {
+            // Verify empty multi signature. Decompression of the G2 point is
+            // deferred to here, after the cheap structural checks above.
+            let multi_sig = multi_signature
+                .decompressed_sig()
+                .map_err(|_| VerifyError::InvalidMultiSignature)?
+                .ok_or(VerifyError::EmptySignature)?;
+            // Verify the optimistically aggregated signature.
+            let aggregated_key =
+                PublicKey::aggregate(pub_keys).map_err(|_| VerifyError::FailedToAggregatePubKey)?;
 
-        multi_sig
-            .verify(message, &aggregated_key)
-            .map_err(|_| VerifyError::InvalidMultiSignature)?;
-        Ok(())
+            multi_sig
+                .verify(message, &aggregated_key)
+                .map_err(|_| VerifyError::InvalidMultiSignature)?;
+            Ok(())
+        }
+        #[cfg(feature = "pq-consensus")]
+        {
+            if multi_signature.sig().is_none() {
+                return Err(VerifyError::EmptySignature);
+            }
+            let bytes = signing_message(message).map_err(|_| VerifyError::InvalidMultiSignature)?;
+            if self.pq_verify_each(multi_signature, |_| bytes.as_slice()) {
+                Ok(())
+            } else {
+                Err(VerifyError::InvalidMultiSignature)
+            }
+        }
     }
 
     pub fn verify_aggregate_signatures<T: CryptoHash + Serialize>(
@@ -413,17 +529,39 @@ impl ValidatorVerifier {
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter(), true)?;
-        // Verify empty aggregated signature. Decompression of the G2 point is
-        // deferred to here, after the cheap structural checks above.
-        let aggregated_sig = aggregated_signature
-            .decompressed_sig()
-            .map_err(|_| VerifyError::InvalidAggregatedSignature)?
-            .ok_or(VerifyError::EmptySignature)?;
+        #[cfg(not(feature = "pq-consensus"))]
+        {
+            // Verify empty aggregated signature. Decompression of the G2 point is
+            // deferred to here, after the cheap structural checks above.
+            let aggregated_sig = aggregated_signature
+                .decompressed_sig()
+                .map_err(|_| VerifyError::InvalidAggregatedSignature)?
+                .ok_or(VerifyError::EmptySignature)?;
 
-        aggregated_sig
-            .verify_aggregate(messages, &pub_keys)
-            .map_err(|_| VerifyError::InvalidAggregatedSignature)?;
-        Ok(())
+            aggregated_sig
+                .verify_aggregate(messages, &pub_keys)
+                .map_err(|_| VerifyError::InvalidAggregatedSignature)?;
+            Ok(())
+        }
+        #[cfg(feature = "pq-consensus")]
+        {
+            if aggregated_signature.sig().is_none() {
+                return Err(VerifyError::EmptySignature);
+            }
+            if messages.len() != authors.len() {
+                return Err(VerifyError::InvalidAggregatedSignature);
+            }
+            let bytes = messages
+                .iter()
+                .map(|message| signing_message(*message))
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(|_| VerifyError::InvalidAggregatedSignature)?;
+            if self.pq_verify_each(aggregated_signature, |position| bytes[position].as_slice()) {
+                Ok(())
+            } else {
+                Err(VerifyError::InvalidAggregatedSignature)
+            }
+        }
     }
 
     /// Ensure there are not more than the maximum expected voters (all possible signatures).
@@ -1067,6 +1205,101 @@ mod tests {
         assert_eq!(
             validator_verifier.aggregate_signatures(partial_signature.signatures_iter()),
             Err(VerifyError::UnknownAuthor)
+        );
+    }
+
+    #[cfg(feature = "pq-consensus")]
+    fn pq_signatures(aggregated_signature: &AggregateSignature) -> Vec<ConsensusSignature> {
+        aggregated_signature
+            .sig()
+            .as_ref()
+            .unwrap()
+            .signatures()
+            .to_vec()
+    }
+
+    /// A certificate holds one ML-DSA signature per signer, in bitmask order. Every
+    /// signature must verify against the validator at its position.
+    #[cfg(feature = "pq-consensus")]
+    #[test]
+    fn test_pq_multi_signatures() {
+        // Random addresses, so the address order differs from the validator index order.
+        let (validator_signers, validator_verifier) = random_validator_verifier(7, None, false);
+        let message = TestAptosCrypto("Hello, World".to_string());
+        let mut partial_signature = PartialSignatures::empty();
+        for validator in validator_signers.iter().take(5) {
+            partial_signature.add_signature(validator.author(), validator.sign(&message).unwrap());
+        }
+        let aggregated_signature = validator_verifier
+            .aggregate_signatures(partial_signature.signatures_iter())
+            .unwrap();
+        let bitmask = aggregated_signature.get_signers_bitvec().clone();
+        let signatures = pq_signatures(&aggregated_signature);
+        assert_eq!(signatures.len(), 5);
+        assert_eq!(
+            validator_verifier.verify_multi_signatures(&message, &aggregated_signature),
+            Ok(())
+        );
+        assert_eq!(
+            validator_verifier.verify_multi_signatures(
+                &TestAptosCrypto("Goodbye".to_string()),
+                &aggregated_signature
+            ),
+            Err(VerifyError::InvalidMultiSignature)
+        );
+
+        let mut swapped = signatures.clone();
+        swapped.swap(0, 1);
+        let mut truncated = signatures.clone();
+        truncated.pop();
+        let mut replaced = signatures;
+        replaced[2] = validator_signers[6].sign(&message).unwrap();
+        for bad_signatures in [swapped, truncated, replaced] {
+            assert_eq!(
+                validator_verifier.verify_multi_signatures(
+                    &message,
+                    &AggregateSignature::new(
+                        bitmask.clone(),
+                        Some(ConsensusMultiSignature::new(bad_signatures))
+                    )
+                ),
+                Err(VerifyError::InvalidMultiSignature)
+            );
+        }
+    }
+
+    /// A timeout certificate holds signatures on different messages, one per signer.
+    #[cfg(feature = "pq-consensus")]
+    #[test]
+    fn test_pq_aggregate_signatures() {
+        let (validator_signers, validator_verifier) = random_validator_verifier(4, None, true);
+        // With pseudo random addresses, the address order is the validator index order.
+        let messages = (0..3)
+            .map(|i| TestAptosCrypto(format!("message {i}")))
+            .collect_vec();
+        let mut partial_signature = PartialSignatures::empty();
+        for (validator, message) in validator_signers.iter().zip(messages.iter()) {
+            partial_signature.add_signature(validator.author(), validator.sign(message).unwrap());
+        }
+        let aggregated_signature = validator_verifier
+            .aggregate_signatures(partial_signature.signatures_iter())
+            .unwrap();
+        let message_refs = messages.iter().collect_vec();
+        assert_eq!(
+            validator_verifier.verify_aggregate_signatures(&message_refs, &aggregated_signature),
+            Ok(())
+        );
+
+        let mut wrong_order = message_refs.clone();
+        wrong_order.swap(0, 1);
+        assert_eq!(
+            validator_verifier.verify_aggregate_signatures(&wrong_order, &aggregated_signature),
+            Err(VerifyError::InvalidAggregatedSignature)
+        );
+        assert_eq!(
+            validator_verifier
+                .verify_aggregate_signatures(&message_refs[..2], &aggregated_signature),
+            Err(VerifyError::InvalidAggregatedSignature)
         );
     }
 }

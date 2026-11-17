@@ -14,10 +14,11 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{bls12381::PrivateKey, SigningKey};
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::{debug, error, info, warn};
 use aptos_types::{
     account_address::AccountAddress,
+    consensus_signature,
     epoch_state::EpochState,
     jwks::{
         jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, OIDCProvider, ObservedJWKs,
@@ -199,9 +200,7 @@ impl IssuerLevelConsensusManager {
                 version: state.on_chain_version() + 1,
                 jwks,
             };
-            let signature = self
-                .consensus_key
-                .sign(&observed)
+            let signature = consensus_signature::sign(&self.consensus_key, &observed)
                 .context("process_new_observation failed with signing error")?;
             let abort_handle = self
                 .update_certifier

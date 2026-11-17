@@ -5,9 +5,10 @@ use crate::{
     common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeout, vote_data::VoteData,
 };
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, hash::CryptoHash, CryptoMaterialError};
+use aptos_crypto::{hash::CryptoHash, CryptoMaterialError};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
+    consensus_signature::ConsensusSignature,
     ledger_info::{LedgerInfo, SignatureWithStatus},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -30,7 +31,7 @@ pub struct Vote {
     /// Signature on the LedgerInfo along with a status on whether the signature is verified.
     signature: SignatureWithStatus,
     /// The 2-chain timeout and corresponding signature.
-    two_chain_timeout: Option<(TwoChainTimeout, bls12381::Signature)>,
+    two_chain_timeout: Option<(TwoChainTimeout, ConsensusSignature)>,
 }
 
 // this is required by structured log
@@ -77,7 +78,7 @@ impl Vote {
         vote_data: VoteData,
         author: Author,
         ledger_info: LedgerInfo,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) -> Self {
         Self {
             vote_data,
@@ -89,7 +90,7 @@ impl Vote {
     }
 
     /// Add the 2-chain timeout and signature in the vote.
-    pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: bls12381::Signature) {
+    pub fn add_2chain_timeout(&mut self, timeout: TwoChainTimeout, signature: ConsensusSignature) {
         self.two_chain_timeout = Some((timeout, signature));
     }
 
@@ -131,7 +132,7 @@ impl Vote {
     }
 
     /// Return the two chain timeout vote and signature.
-    pub fn two_chain_timeout(&self) -> Option<&(TwoChainTimeout, bls12381::Signature)> {
+    pub fn two_chain_timeout(&self) -> Option<&(TwoChainTimeout, ConsensusSignature)> {
         self.two_chain_timeout.as_ref()
     }
 

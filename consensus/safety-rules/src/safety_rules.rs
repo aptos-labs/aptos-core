@@ -21,9 +21,10 @@ use aptos_consensus_types::{
     vote_data::VoteData,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::{bls12381, hash::CryptoHash};
+use aptos_crypto::hash::CryptoHash;
 use aptos_logger::prelude::*;
 use aptos_types::{
+    consensus_signature::ConsensusSignature,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -113,7 +114,7 @@ impl SafetyRules {
     pub(crate) fn sign<T: Serialize + CryptoHash>(
         &self,
         message: &T,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         let signer = self.signer()?;
         signer
             .sign(message)
@@ -346,7 +347,7 @@ impl SafetyRules {
     fn guarded_sign_proposal(
         &mut self,
         block_data: &BlockData,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         self.signer()?;
         self.verify_author(block_data.author())?;
 
@@ -373,7 +374,7 @@ impl SafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         self.signer()?;
 
         let old_ledger_info = ledger_info.ledger_info();
@@ -429,7 +430,7 @@ impl TSafetyRules for SafetyRules {
         run_and_log(cb, |log| log, LogEntry::Initialize)
     }
 
-    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<bls12381::Signature, Error> {
+    fn sign_proposal(&mut self, block_data: &BlockData) -> Result<ConsensusSignature, Error> {
         let round = block_data.round();
         let cb = || self.guarded_sign_proposal(block_data);
         run_and_log(cb, |log| log.round(round), LogEntry::SignProposal)
@@ -439,7 +440,7 @@ impl TSafetyRules for SafetyRules {
         &mut self,
         timeout: &TwoChainTimeout,
         timeout_cert: Option<&TwoChainTimeoutCertificate>,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         let cb = || self.guarded_sign_timeout_with_qc(timeout, timeout_cert);
         run_and_log(
             cb,
@@ -474,7 +475,7 @@ impl TSafetyRules for SafetyRules {
         &mut self,
         ledger_info: LedgerInfoWithSignatures,
         new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error> {
+    ) -> Result<ConsensusSignature, Error> {
         let cb = || self.guarded_sign_commit_vote(ledger_info, new_ledger_info);
         run_and_log(cb, |log| log, LogEntry::SignCommitVote)
     }

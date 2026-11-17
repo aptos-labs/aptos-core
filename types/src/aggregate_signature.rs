@@ -1,9 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::lazy_bls::LazyBlsSignature;
+use crate::consensus_signature::{
+    ConsensusMultiSignature, ConsensusSignature, LazyConsensusMultiSignature,
+};
 use aptos_bitvec::BitVec;
-use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_crypto::CryptoMaterialError;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -23,19 +25,19 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregateSignature {
     validator_bitmask: BitVec,
-    sig: Option<LazyBlsSignature>,
+    sig: Option<LazyConsensusMultiSignature>,
 }
 
 impl AggregateSignature {
     pub fn new(
         validator_bitmask: BitVec,
-        aggregated_signature: Option<bls12381::Signature>,
+        aggregated_signature: Option<ConsensusMultiSignature>,
     ) -> Self {
         Self {
             validator_bitmask,
             sig: aggregated_signature
                 .as_ref()
-                .map(LazyBlsSignature::from_signature),
+                .map(LazyConsensusMultiSignature::from_signature),
         }
     }
 
@@ -74,7 +76,7 @@ impl AggregateSignature {
     /// The aggregated signature in its lazy, still-compressed form. Callers that
     /// only need the raw bytes (e.g. API hex export) can use this without paying
     /// for decompression.
-    pub fn sig(&self) -> &Option<LazyBlsSignature> {
+    pub fn sig(&self) -> &Option<LazyConsensusMultiSignature> {
         &self.sig
     }
 
@@ -82,7 +84,7 @@ impl AggregateSignature {
     /// performing the deferred G2-point decompression. Returns `Ok(None)` if no
     /// signature is present. This is the verification entry point — call it only
     /// after cheaper structural checks (bitmask, voting power) have passed.
-    pub fn decompressed_sig(&self) -> Result<Option<bls12381::Signature>, CryptoMaterialError> {
+    pub fn decompressed_sig(&self) -> Result<Option<ConsensusMultiSignature>, CryptoMaterialError> {
         self.sig.as_ref().map(|s| s.decompress()).transpose()
     }
 }
@@ -91,11 +93,11 @@ impl AggregateSignature {
 /// from different validators. It is only kept in memory and never sent through the network.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct PartialSignatures {
-    signatures: BTreeMap<AccountAddress, bls12381::Signature>,
+    signatures: BTreeMap<AccountAddress, ConsensusSignature>,
 }
 
 impl PartialSignatures {
-    pub fn new(signatures: BTreeMap<AccountAddress, bls12381::Signature>) -> Self {
+    pub fn new(signatures: BTreeMap<AccountAddress, ConsensusSignature>) -> Self {
         Self { signatures }
     }
 
@@ -107,23 +109,23 @@ impl PartialSignatures {
         self.signatures.is_empty()
     }
 
-    pub fn remove_signature(&mut self, validator: AccountAddress) -> Option<bls12381::Signature> {
+    pub fn remove_signature(&mut self, validator: AccountAddress) -> Option<ConsensusSignature> {
         self.signatures.remove(&validator)
     }
 
-    pub fn add_signature(&mut self, validator: AccountAddress, signature: bls12381::Signature) {
+    pub fn add_signature(&mut self, validator: AccountAddress, signature: ConsensusSignature) {
         self.signatures.insert(validator, signature);
     }
 
-    pub fn unpack(self) -> BTreeMap<AccountAddress, bls12381::Signature> {
+    pub fn unpack(self) -> BTreeMap<AccountAddress, ConsensusSignature> {
         self.signatures
     }
 
-    pub fn signatures_iter(&self) -> impl Iterator<Item = (&AccountAddress, &bls12381::Signature)> {
+    pub fn signatures_iter(&self) -> impl Iterator<Item = (&AccountAddress, &ConsensusSignature)> {
         self.signatures.iter()
     }
 
-    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, ConsensusSignature> {
         &self.signatures
     }
 

@@ -33,6 +33,8 @@ failpoints = [
     "aptos-config/failpoints",
     "aptos-network/failpoints",
 ]
+# EXPERIMENT ONLY. See the `pq-consensus` feature of `aptos-types`.
+pq-consensus = ["aptos-types/pq-consensus"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
 

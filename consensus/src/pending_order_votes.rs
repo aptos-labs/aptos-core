@@ -183,9 +183,10 @@ impl PendingOrderVotes {
 mod tests {
     use super::{OrderVoteReceptionResult, OrderVoteStatus, PendingOrderVotes};
     use aptos_consensus_types::{order_vote::OrderVote, quorum_cert::QuorumCert};
-    use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
+    use aptos_crypto::{hash::CryptoHash, HashValue};
     use aptos_types::{
-        aggregate_signature::PartialSignatures, block_info::BlockInfo, ledger_info::LedgerInfo,
+        aggregate_signature::PartialSignatures, block_info::BlockInfo,
+        consensus_signature::ConsensusSignature, ledger_info::LedgerInfo,
         validator_verifier::random_validator_verifier,
     };
 
@@ -311,7 +312,7 @@ mod tests {
         let vote_2 = OrderVote::new_with_signature(
             signers[2].author(),
             li.clone(),
-            bls12381::Signature::dummy_signature(),
+            ConsensusSignature::dummy_signature(),
         );
 
         let vote_3 = OrderVote::new_with_signature(

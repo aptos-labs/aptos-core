@@ -3,10 +3,11 @@
 
 use crate::common::{Author, Round};
 use anyhow::{ensure, Context};
-use aptos_crypto::{bls12381, CryptoMaterialError};
+use aptos_crypto::CryptoMaterialError;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
     block_info::BlockInfo,
+    consensus_signature::ConsensusSignature,
     ledger_info::{LedgerInfo, SignatureWithStatus},
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -59,7 +60,7 @@ impl CommitVote {
     pub fn new_with_signature(
         author: Author,
         ledger_info: LedgerInfo,
-        signature: bls12381::Signature,
+        signature: ConsensusSignature,
     ) -> Self {
         Self {
             author,
@@ -79,7 +80,7 @@ impl CommitVote {
     }
 
     /// Return the (decompressed) signature of the vote.
-    pub fn decompressed_signature(&self) -> Result<bls12381::Signature, CryptoMaterialError> {
+    pub fn decompressed_signature(&self) -> Result<ConsensusSignature, CryptoMaterialError> {
         self.signature.decompressed_signature()
     }
 

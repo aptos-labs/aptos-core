@@ -687,7 +687,7 @@ impl BufferManager {
             CommitMessage::Vote(CommitVote::new_with_signature(
                 commit_vote.author(),
                 commit_vote.ledger_info().clone(),
-                aptos_crypto::bls12381::Signature::dummy_signature(),
+                aptos_types::consensus_signature::ConsensusSignature::dummy_signature(),
             ))
         });
         CommitMessage::Vote(commit_vote)
