@@ -1,0 +1,23 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/regression/ghost_init_generic_cast.move:37:9
+   │
+37 │         ensures result.size == 3;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/ghost_init_generic_cast.move:33: make_two_wrong
+   =         result = <redacted>
+   =     at tests/sources/regression/ghost_init_generic_cast.move:36: make_two_wrong (spec)
+   =     at tests/sources/regression/ghost_init_generic_cast.move:37: make_two_wrong (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/regression/ghost_init_generic_cast.move:46:9
+   │
+46 │         ensures Bag<u8> { items: v }.size == len(v) + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/regression/ghost_init_generic_cast.move:43: id_wrong
+   =         v = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/regression/ghost_init_generic_cast.move:45: id_wrong (spec)
+   =     at tests/sources/regression/ghost_init_generic_cast.move:46: id_wrong (spec)
