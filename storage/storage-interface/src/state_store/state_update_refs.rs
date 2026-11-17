@@ -129,7 +129,7 @@ pub struct StateUpdateRefs<'kv> {
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
-    pub(crate) fn all_checkpoint_versions(&self) -> &[Version] {
+    pub fn all_checkpoint_versions(&self) -> &[Version] {
         &self.all_checkpoint_versions
     }
 
