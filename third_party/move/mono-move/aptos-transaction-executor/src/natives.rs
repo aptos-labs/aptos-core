@@ -22,6 +22,10 @@ static PRODUCTION_NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(||
 
 /// The native extensions every transaction kind runs with, around its own
 /// transaction-context extension.
+///
+/// Registration order is the order every whole-collection walk (GC root
+/// relocation, checkpoint, rollback) visits the extensions, so it is part of
+/// the deterministic execution contract: only append new extensions.
 pub(crate) fn extensions_with(
     txn_context: TransactionContextExtension,
     usage: StateStorageUsage,
