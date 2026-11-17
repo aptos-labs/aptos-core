@@ -1,0 +1,18 @@
+processed 6 tasks
+task 0 lines 1-39:  publish [module 0xc0ffee::m {]
+task 1 lines 41-41:  run 0xc0ffee::m::move_range_between
+return values: [1, 5], [10, 2, 3, 4, 20]
+task 2 lines 43-43:  run 0xc0ffee::m::move_range_out_of_bounds
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(1),
+    location: 0x1::vector,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(10), 0)],
+}
+task 3 lines 45-45:  run 0xc0ffee::m::swap_and_replace
+return values: 7, 1, 2
+task 4 lines 47-47:  run 0xc0ffee::m::serialized_size_matches
+return values: true
+task 5 lines 49-49:  run 0xc0ffee::m::compare_orders
+return values: true, false

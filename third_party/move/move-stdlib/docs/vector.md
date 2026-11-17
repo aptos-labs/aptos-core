@@ -36,6 +36,7 @@ the return on investment didn't seem worth it for these simple functions.
 -  [Function `fold`](#0x1_vector_fold)
 -  [Function `map`](#0x1_vector_map)
 -  [Function `filter`](#0x1_vector_filter)
+-  [Function `move_range`](#0x1_vector_move_range)
 -  [Module Specification](#@Module_Specification_1)
     -  [Helper Functions](#@Helper_Functions_2)
 
@@ -773,6 +774,41 @@ Filter the vector using the boolean function, removing all elements for which <c
     });
     result
 }
+</code></pre>
+
+
+
+</details>
+
+## Function `move_range` <a id="0x1_vector_move_range"></a>
+
+Moves range of elements <code>[removal_position, removal_position + length)</code> from vector <code>from</code>,
+to vector <code><b>to</b></code>, inserting them starting at the <code>insert_position</code>.
+In the <code>from</code> vector, elements after the selected range are moved left to fill the hole
+(i.e. range is removed, while the order of the rest of the elements is kept)
+In the <code><b>to</b></code> vector, elements after the <code>insert_position</code> are moved to the right to make
+space for new elements (i.e. range is inserted, while the order of the rest of the
+elements is kept).
+Move prevents from having two mutable references to the same value, so <code>from</code> and <code><b>to</b></code>
+vectors are always distinct.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, removal_position: u64, length: u64, <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;, insert_position: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_move_range">move_range</a>&lt;T&gt;(
+    from: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;,
+    removal_position: u64,
+    length: u64,
+    <b>to</b>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;T&gt;,
+    insert_position: u64
+);
 </code></pre>
 
 
