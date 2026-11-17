@@ -76,7 +76,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::bls12381::PrivateKey;
+use aptos_crypto::{bls12381::PrivateKey, hash::HashValue};
 use aptos_dkg::{
     pvss::{traits::TranscriptCore, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -126,7 +126,7 @@ use futures::{
 };
 use itertools::Itertools;
 use mini_moka::sync::Cache;
-use rand::{prelude::StdRng, thread_rng, SeedableRng};
+use rand::{prelude::StdRng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -1228,8 +1228,26 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch = new_epoch_state.epoch,
                 "Generating a new augmented key"
             );
-            let mut rng =
-                StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+            // Derive the augmentation seed deterministically from the DKG secret share, so that
+            // the augmented key pair can be regenerated after a RandDB loss. Without this, a node
+            // that loses its RandDB mid-epoch draws a fresh augmentation, broadcasts a delta that
+            // differs from the one already certified for it, gets rejected as equivocating, and
+            // never recovers its own CertifiedAugData -- so it stops contributing shares.
+            //
+            // The seed is domain-separated and bound to (epoch, DKG session), so different epochs
+            // and different sessions yield different augmentations. `sk.main` is itself
+            // recoverable from the on-chain transcript plus the consensus key, which is what makes
+            // the augmented key pair reconstructible without the RandDB.
+            const AUG_KEY_SEED_DOMAIN_SEPARATOR: &str = "APTOS_RANDOMNESS_AUG_KEY_SEED_V1";
+            let seed_bytes = bcs::to_bytes(&(
+                AUG_KEY_SEED_DOMAIN_SEPARATOR,
+                &sk.main,
+                new_epoch,
+                &dkg_session.metadata,
+            ))
+            .map_err(NoRandomnessReason::AugKeySeedSerializationError)?;
+            let seed = *HashValue::sha3_256_of(&seed_bytes).as_ref();
+            let mut rng = StdRng::from_seed(seed);
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
             self.rand_storage
                 .save_key_pair_bytes(
@@ -2306,7 +2324,7 @@ pub enum NoRandomnessReason {
     ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
     TranscriptDeserializationError(bcs::Error),
     SecretShareDecryptionFailed(anyhow::Error),
-    RngCreationError(rand::Error),
+    AugKeySeedSerializationError(bcs::Error),
     RandDbNotAvailable(anyhow::Error),
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),
