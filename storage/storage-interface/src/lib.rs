@@ -83,10 +83,90 @@ macro_rules! delegate_read {
     };
 }
 
+/// Reads of state at block ends (state checkpoints), including proofs. A subset of `DbReader`
+/// that the state store can serve alone, since it doesn't need the ledger to find the block
+/// containing a version.
+pub trait CheckpointStateReader: Send + Sync {
+    /// Like `DbReader::get_state_value_by_version`, but `version` must be a block end (state
+    /// checkpoint), which avoids looking up the block containing `version`.
+    fn get_state_value_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        Ok(self
+            .get_state_value_with_version_at_checkpoint(state_key, version)?
+            .map(|(_, value)| value))
+    }
+
+    /// Like `DbReader::get_state_value_with_version_by_version`, but `version` must be a block
+    /// end (state checkpoint), which avoids looking up the block containing `version`.
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        _state_key: &StateKey,
+        _version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        unimplemented!()
+    }
+
+    /// Returns the proof of the given state key and version.
+    fn get_state_proof_by_version_ext(
+        &self,
+        _key_hash: &HashValue,
+        _version: Version,
+        _root_depth: usize,
+        _use_hot_state: bool,
+    ) -> Result<SparseMerkleProofExt> {
+        unimplemented!()
+    }
+
+    /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
+    /// Merkle tree root with a sparse merkle proof proving state tree root.
+    /// See [AptosDB::get_account_state_with_proof_by_version].
+    ///
+    /// [AptosDB::get_account_state_with_proof_by_version]:
+    /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
+    ///
+    /// This is used by aptos core (executor) internally.
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        _key_hash: HashValue,
+        _version: Version,
+        _root_depth: usize,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        unimplemented!()
+    }
+
+    /// Returns the live `HotStateValue` at `version` together with a proof against the hot
+    /// state root. `None` means the key was never hot, or was evicted at or before `version`.
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        _key_hash: HashValue,
+        _version: Version,
+        _root_depth: usize,
+    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        unimplemented!()
+    }
+
+    fn get_state_value_with_proof_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+        // TODO(HotState): check all callers and possibly query hot state first
+        self.get_state_value_with_proof_by_version_ext(
+            *state_key.crypto_hash_ref(),
+            version,
+            /* root_depth = */ 0,
+        )
+        .map(|(value, proof_ext)| (value, proof_ext.into()))
+    }
+}
+
 /// Trait that is implemented by a DB that supports certain public (to client) read APIs
 /// expected of an Aptos DB
 #[allow(unused_variables)]
-pub trait DbReader: Send + Sync {
+pub trait DbReader: CheckpointStateReader {
     fn get_read_delegatee(&self) -> &dyn DbReader {
         unimplemented!("Implement desired method or get_delegatee().");
     }
@@ -313,39 +393,6 @@ pub trait DbReader: Send + Sync {
             version: Version,
         ) -> Result<Option<(Version, StateValue)>>;
 
-        /// Returns the proof of the given state key and version.
-        fn get_state_proof_by_version_ext(
-            &self,
-            key_hash: &HashValue,
-            version: Version,
-            root_depth: usize,
-            use_hot_state: bool,
-        ) -> Result<SparseMerkleProofExt>;
-
-        /// Gets a state value by state key along with the proof, out of the ledger state indicated by the state
-        /// Merkle tree root with a sparse merkle proof proving state tree root.
-        /// See [AptosDB::get_account_state_with_proof_by_version].
-        ///
-        /// [AptosDB::get_account_state_with_proof_by_version]:
-        /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
-        ///
-        /// This is used by aptos core (executor) internally.
-        fn get_state_value_with_proof_by_version_ext(
-            &self,
-            key_hash: HashValue,
-            version: Version,
-            root_depth: usize,
-        ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
-
-        /// Returns the live `HotStateValue` at `version` together with a proof against the hot
-        /// state root. `None` means the key was never hot, or was evicted at or before `version`.
-        fn get_hot_state_value_with_proof_by_version_ext(
-            &self,
-            key_hash: HashValue,
-            version: Version,
-            root_depth: usize,
-        ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)>;
-
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
         fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
@@ -568,40 +615,6 @@ pub trait DbReader: Send + Sync {
     /// unknown (e.g. pruned), which only makes the caller take the slower exact reads.
     fn is_known_state_checkpoint(&self, version: Version) -> bool {
         false
-    }
-
-    /// Like `get_state_value_by_version`, but `version` must be a block end (state checkpoint),
-    /// which avoids looking up the block containing `version`.
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        self.get_state_value_by_version(state_key, version)
-    }
-
-    /// Like `get_state_value_with_version_by_version`, but `version` must be a block end (state
-    /// checkpoint), which avoids looking up the block containing `version`.
-    fn get_state_value_with_version_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        self.get_state_value_with_version_by_version(state_key, version)
-    }
-
-    fn get_state_value_with_proof_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        // TODO(HotState): check all callers and possibly query hot state first
-        self.get_state_value_with_proof_by_version_ext(
-            *state_key.crypto_hash_ref(),
-            version,
-            /* root_depth = */ 0,
-        )
-        .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     fn ensure_synced_version(&self) -> Result<Version> {

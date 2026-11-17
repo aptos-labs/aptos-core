@@ -6,7 +6,9 @@ use anyhow::Result;
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_storage_interface::{chunk_to_commit::ChunkToCommit, DbReader, DbReaderWriter, DbWriter};
+use aptos_storage_interface::{
+    chunk_to_commit::ChunkToCommit, CheckpointStateReader, DbReader, DbReaderWriter, DbWriter,
+};
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
@@ -88,6 +90,8 @@ impl VMBlockExecutor for FakeVM {
 
 /// A fake database implementing DbReader and DbWriter
 pub struct FakeDb;
+
+impl CheckpointStateReader for FakeDb {}
 
 impl DbReader for FakeDb {
     fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version> {
