@@ -6,12 +6,12 @@ VerexE2ETests/Check/Calls/AggregatorModel.lean:153:7: error: verex verification 
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-VerexE2ETests/Check/Calls/AggregatorModel.lean:158:7: error: the continuation after `0x1::aggregator_v2::create_aggregator` is not established
+VerexE2ETests/Check/Calls/AggregatorModel.lean:158:7: error: the continuation after call 1 of `0x1::aggregator_v2::create_aggregator` is not established
 VerexE2ETests/Check/Calls/AggregatorModel.lean:158:7: error: verex verification failed: the automatic verification of `wrong_abort` failed; provide a proof in the module:
   verify wrong_abort by lean =>
     verex_obligations
     verex_on
-    | after_create_aggregator => verex_prepare; sorry
+    | after_call_1_of_create_aggregator => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Calls/AggregatorModel.lean:166:4: error: the specification clause `ensures result` is not established

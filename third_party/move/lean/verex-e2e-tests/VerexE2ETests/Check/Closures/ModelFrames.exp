@@ -1,8 +1,8 @@
-VerexE2ETests/Check/Closures/ModelFrames.lean:78:7: error: the precondition of `apply_once` is not established
+VerexE2ETests/Check/Closures/ModelFrames.lean:78:7: error: the precondition of `apply_once` at call 1 is not established
 VerexE2ETests/Check/Closures/ModelFrames.lean:78:7: error: verex verification failed: the automatic verification of `writing_caller` failed; provide a proof in the module:
   verify writing_caller by lean =>
     verex_obligations
     verex_on
-    | requires_of_apply_once => verex_prepare; sorry
+    | requires_of_apply_once_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

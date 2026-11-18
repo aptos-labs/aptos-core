@@ -11,12 +11,12 @@ VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:68:58: error: `at_para
 VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:73:56: error: `second_apart` calls `shape_call_lib::second` at `{u32} {Bool}`, which matches no contract of it; its shapes are `{A} {A}`
 VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:77:61: error: `second_parameters` calls `shape_call_lib::second` at `{T} {U}`, which matches no contract of it; its shapes are `{A} {A}`
 VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:82:7: error: `apart`: the contracts at two shapes apart only in a pointer-width integer differ: the verifier's types do not tell those apart, so they must state one contract
-VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:40:4: error: the precondition `requires _2 < 10` of `shape_call_lib::index.at_0` does not hold at this call
+VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:40:4: error: the precondition `requires _2 < 10` of `shape_call_lib::index.at_0` does not hold at call 1
 VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:88:7: error: verex verification failed: the automatic verification of `position_too_far` failed; provide a proof in the module:
   verify position_too_far by lean =>
     verex_obligations
     verex_on
-    | requires_1_of_index_at_0 => verex_prepare; sorry
+    | requires_1_of_index_at_0_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 VerexE2ETests/Check/Generics/ShapeContractCallErrors.lean:93:4: error: `other_output` calls `shape_call_lib::index` at `{u32} {usize} {Bool} {Bool}`, which matches no contract of it; its shapes are `{T} {usize} {A} {T}`
