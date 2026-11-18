@@ -1013,6 +1013,7 @@ impl StateStore {
         self.put_state_updates(
             &new_state,
             &state_update_refs.per_version,
+            state_update_refs.all_checkpoint_versions(),
             &reads,
             ledger_batch,
             sharded_state_kv_batches,
@@ -1045,10 +1046,12 @@ impl StateStore {
                 self.state_db.clone(),
             )?;
 
+        // Restore takes the checkpoints from transaction infos, so they're the block ends.
         self.put_stats_and_indices(
             &base,
             &new_state,
             &state_update_refs.per_version,
+            state_update_refs.all_checkpoint_versions(),
             &reads,
             ledger_batch,
             sharded_state_kv_batches,
@@ -1056,10 +1059,12 @@ impl StateStore {
         self.put_state_values(&state_update_refs.per_version, sharded_state_kv_batches)
     }
 
+    /// `block_ends` must be the versions whose transaction infos have a state checkpoint hash.
     pub fn put_state_updates(
         &self,
         state: &LedgerState,
         state_update_refs: &PerVersionStateUpdateRefs,
+        block_ends: &[Version],
         state_reads: &ShardedStateCache,
         ledger_batch: &mut SchemaBatch,
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
@@ -1071,6 +1076,7 @@ impl StateStore {
             &current_state,
             state,
             state_update_refs,
+            block_ends,
             state_reads,
             ledger_batch,
             sharded_state_kv_batches,
@@ -1205,11 +1211,15 @@ impl StateStore {
     /// exists, a stale index of that old value will be added. Otherwise, it's a no-op. Because
     /// non-existence means either the key never shows up or it got deleted. Neither case needs
     /// extra stale index as 1 cover the latter case.
+    ///
+    /// Usage is written at each of `block_ends` and at the last version, since a truncation target
+    /// can be any block end.
     pub fn put_stats_and_indices(
         &self,
         current_state: &State,
         latest_state: &LedgerState,
         state_update_refs: &PerVersionStateUpdateRefs,
+        block_ends: &[Version],
         // TODO(grao): Restructure this function.
         state_reads: &ShardedStateCache,
         batch: &mut SchemaBatch,
@@ -1217,8 +1227,21 @@ impl StateStore {
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices"]);
 
-        Self::put_stale_state_value_index(
+        let usage_versions: Vec<_> = state_update_refs
+            .num_versions
+            .checked_sub(1)
+            .map(|i| state_update_refs.first_version + i as Version)
+            .map_or(vec![], |last_version| {
+                block_ends
+                    .iter()
+                    .copied()
+                    .filter(|version| *version < last_version)
+                    .chain(std::iter::once(last_version))
+                    .collect()
+            });
+        let usage_deltas = Self::put_stale_state_value_index(
             state_update_refs,
+            &usage_versions,
             sharded_state_kv_batches,
             state_reads,
             latest_state.usage().is_untracked() || current_state.version().is_none(), // ignore_state_cache_miss
@@ -1227,7 +1250,33 @@ impl StateStore {
         {
             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stats_and_indices__put_usage"]);
             if latest_state.next_version() > current_state.next_version() {
-                Self::put_usage(latest_state.last_checkpoint(), batch)?;
+                let last_checkpoint = latest_state.last_checkpoint();
+                let usages: Vec<_> = usage_deltas
+                    .into_iter()
+                    .map(|(items_delta, bytes_delta)| {
+                        StateStorageUsage::new(
+                            (current_state.usage().items() as i64 + items_delta) as usize,
+                            (current_state.usage().bytes() as i64 + bytes_delta) as usize,
+                        )
+                    })
+                    .collect();
+                if let Some((last_usage, earlier_usages)) = usages.split_last()
+                    && !earlier_usages.is_empty()
+                {
+                    // Usage at earlier block ends is only computed here, so make sure it's done
+                    // the same way as for the last checkpoint.
+                    ensure!(
+                        *last_usage == last_checkpoint.usage(),
+                        "Usage at version {:?} computed from updates ({last_usage:?}) differs from \
+                        the state ({:?}).",
+                        last_checkpoint.version(),
+                        last_checkpoint.usage(),
+                    );
+                    for (version, usage) in usage_versions.iter().zip(earlier_usages) {
+                        batch.put::<VersionDataSchema>(version, &(*usage).into())?;
+                    }
+                }
+                Self::put_usage(last_checkpoint, batch)?;
             }
             STATE_ITEMS.set(latest_state.usage().items() as i64);
             TOTAL_STATE_BYTES.set(latest_state.usage().bytes() as i64);
@@ -1236,45 +1285,63 @@ impl StateStore {
         Ok(())
     }
 
+    /// Also returns the `(items, bytes)` usage deltas since the first version, at each of
+    /// `usage_versions`, which are ascending.
     fn put_stale_state_value_index(
         state_update_refs: &PerVersionStateUpdateRefs,
+        usage_versions: &[Version],
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
         sharded_state_cache: &ShardedStateCache,
         ignore_state_cache_miss: bool,
-    ) {
+    ) -> Vec<(i64, i64)> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_stale_kv_index"]);
 
         // calculate total state size in bytes
-        sharded_state_cache
+        let usage_deltas_per_shard: Vec<_> = sharded_state_cache
             .shards
             .par_iter()
             .zip_eq(state_update_refs.shards.par_iter())
             .zip_eq(sharded_state_kv_batches.par_iter_mut())
             .enumerate()
-            .for_each(|(shard_id, ((cache, updates), batch))| {
+            .map(|(shard_id, ((cache, updates), batch))| {
                 Self::put_stale_state_value_index_for_shard(
                     shard_id,
                     state_update_refs.first_version,
                     state_update_refs.num_versions,
+                    usage_versions,
                     cache,
                     updates,
                     batch,
                     ignore_state_cache_miss,
-                );
+                )
             })
+            .collect();
+        (0..usage_versions.len())
+            .map(|i| {
+                usage_deltas_per_shard
+                    .iter()
+                    .fold((0, 0), |(items, bytes), deltas| {
+                        (items + deltas[i].0, bytes + deltas[i].1)
+                    })
+            })
+            .collect()
     }
 
     fn put_stale_state_value_index_for_shard<'kv>(
         shard_id: usize,
         first_version: Version,
         num_versions: usize,
+        usage_versions: &[Version],
         cache: &StateCacheShard,
         updates: &[(&'kv StateKey, StateUpdateRef<'kv>)],
         batch: &mut NativeBatch,
         ignore_state_cache_miss: bool,
-    ) {
+    ) -> Vec<(i64, i64)> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("put_stale_kv_index__{shard_id}")]);
 
+        let mut usage_deltas = Vec::with_capacity(usage_versions.len());
+        let mut usage_versions = usage_versions.iter().peekable();
+        let (mut items_delta, mut bytes_delta) = (0, 0);
         let mut iter = updates.iter();
         for version in first_version..first_version + num_versions as Version {
             let ver_iter = iter
@@ -1307,7 +1374,18 @@ impl StateStore {
                         StateSlot::new((*key).clone(), StateSlotKind::ColdVacant)
                     });
 
+                let key_size = key.size() as i64;
+                if let Some(value) = update_to_cold
+                    .state_op
+                    .expect_as_write_op()
+                    .as_state_value_opt()
+                {
+                    items_delta += 1;
+                    bytes_delta += key_size + value.size() as i64;
+                }
                 let old_version = if old_entry.is_occupied() {
+                    items_delta -= 1;
+                    bytes_delta -= key_size + old_entry.size() as i64;
                     // The value at the old version can be pruned once the pruning window hits
                     // this `version`.
                     old_entry.expect_value_version()
@@ -1318,7 +1396,11 @@ impl StateStore {
                 };
                 Self::put_state_kv_index(batch, version, old_version, key);
             }
+            if usage_versions.next_if_eq(&&version).is_some() {
+                usage_deltas.push((items_delta, bytes_delta));
+            }
         }
+        usage_deltas
     }
 
     fn put_state_kv_index(
