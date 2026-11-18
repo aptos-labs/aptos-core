@@ -1304,47 +1304,79 @@ private partial def varIndex? (x : Lean.Expr) : Option Nat :=
     (varIndex? x.appArg!.consumeMData).map (· + 1)
   else none
 
+/-- Whether `τ` is a slice-borrow owner type (`.array`, `.vector`, or
+`.sliceRef`) whose single carrier (`SpecArray`, `SpecVector`, `SpecSliceRef`) is
+never `Prod`, whereas `borrowArraySliceAt`, `borrowVectorSliceAt`, and
+`reborrowSliceAt` at `Proj.nil` mark a `(sliceRef, owner)` `Prod` pair. -/
+private def isSliceSourceNTy (τ : Lean.Expr) : MetaM Bool := do
+  let τ ← whnfD τ
+  return τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.array 2 ||
+    τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.vector 1 ||
+    τ.isAppOfArity ``VerexIR.Proofs.Denote.NTy.sliceRef 1
+
 /-- A borrow's prophecy mark (`Prophecy x path value`): the declaration index
 of the borrowed local where the borrow takes it whole, a reference's
-referent included, and the value. -/
-def prophecyMark? (type : Lean.Expr) : Option (Option Nat × Lean.Expr) := do
+referent included, whether the mark is at `Proj.deref Proj.nil`, the owner's
+`NTy`, the mark's payload type parameter `α`, and the value. -/
+def prophecyMark? (type : Lean.Expr) :
+    Option (Option (Nat × Bool × Lean.Expr × Lean.Expr) × Lean.Expr) := do
   guard (type.isAppOf ``VerexIR.Proofs.Denote.Prophecy)
   let arguments := type.getAppArgs
-  guard (arguments.size ≥ 3)
+  guard (arguments.size ≥ 7)
+  let payloadTy := arguments[arguments.size - 7]!.consumeMData
+  let ownerTy := arguments[arguments.size - 5]!.consumeMData
   let path := arguments[arguments.size - 2]!.consumeMData
   let nil (path : Lean.Expr) := path.consumeMData.isAppOfArity ``VerexIR.Proofs.Denote.Proj.nil 1
-  let whole := nil path ||
-    (path.isAppOfArity ``VerexIR.Proofs.Denote.Proj.deref 3 && nil path.appArg!)
-  some (if whole then varIndex? arguments[arguments.size - 3]!.consumeMData else none,
+  let derefNil := path.isAppOfArity ``VerexIR.Proofs.Denote.Proj.deref 3 && nil path.appArg!
+  let whole := nil path || derefNil
+  some (if whole then
+      (varIndex? arguments[arguments.size - 3]!.consumeMData).map
+        (·, derefNil, ownerTy, payloadTy)
+    else none,
     arguments[arguments.size - 1]!)
 
 /-- Consume a borrow's prophecy mark the goal holds as `mark`: in a step
 proof, a borrow of a whole local `x` binds the prophecy as the value written
 back, `x'` (`ScopeEntry`); any other mark is dropped. -/
 def consumeProphecy (goal : MVarId) (mark : FVarId) : MetaM MVarId := do
-  let some (index?, value) ← goal.withContext do
+  let some (whole?, value) ← goal.withContext do
       return prophecyMark? (← instantiateMVars (← mark.getType))
     | return goal
   let goal ← goal.clear mark
   let some (names, _) ← scopeTable? | return goal
-  let some index := index? | return goal
+  let some (index, derefNil, ownerTy, payloadTy) := whole? | return goal
   let some name := (← (← targetState).scopeLocals.get)[index]? | return goal
-  -- The mark is the pair of the component's prophecy and the owner's
-  -- (`borrowPlace`, `doc/designs/data-invariants.md`): the
-  -- component keeps the name a step proof writes, `x'`, and the owner's
-  -- value is named after it.
+  -- A borrow through a reference (`Proj.deref Proj.nil`), a whole-local slice
+  -- borrow/reborrow (`borrowArraySliceAt`, `borrowVectorSliceAt`,
+  -- `reborrowSliceAt` at `Proj.nil`), or the expanded whole-local pair rule
+  -- (`Term.denote_borrowPlace_nil_expanded`, `α = τ.carrier × τ.carrier`) marks
+  -- the pair of the referent's prophecy and the owner's (`borrowPlace`,
+  -- `doc/designs/data-invariants.md`): the referent keeps the name a step
+  -- proof writes, `x'`, and the owner's value is named after it. A whole-local
+  -- place borrow (`Term.borrowPlace` at `Proj.nil`) marks the single value
+  -- written back, even when `ownerTy` is a struct, tuple, or reference whose
+  -- carrier unfolds to `Prod`.
+  let paired ← goal.withContext do
+    let type ← whnfD (← inferType value)
+    if !type.isAppOfArity ``Prod 2 then return false
+    if derefNil then return true
+    if ← isSliceSourceNTy ownerTy then return true
+    if payloadTy.isAppOfArity ``Prod 2 then
+      let fstTy := payloadTy.getArg! 0
+      if fstTy == payloadTy.getArg! 1 then
+        let ownerCarrier ← mkAppM ``NTy.carrier #[ownerTy]
+        return ← isDefEq fstTy ownerCarrier
+    return false
   let written := name ++ "'"
   let owner := name ++ "_owner"
-  let pair? ← goal.withContext do
-    let type ← instantiateMVars (← inferType value)
-    if (← whnfD type).isAppOfArity ``Prod 2 then
-      return some (← mkAppM ``Prod.fst #[value], ← mkAppM ``Prod.snd #[value])
-    return none
-  let entries := match pair? with
-    | some (component, held) =>
-        (if names.contains written then #[(written, component)] else #[]) ++
+  let entries ← if paired then
+      goal.withContext do
+        let component ← mkAppM ``Prod.fst #[value]
+        let held ← mkAppM ``Prod.snd #[value]
+        return (if names.contains written then #[(written, component)] else #[]) ++
           (if names.contains owner then #[(owner, held)] else #[])
-    | none => if names.contains written then #[(written, value)] else #[]
+    else
+      pure (if names.contains written then #[(written, value)] else #[])
   if entries.isEmpty then return goal
   addScopeEntries goal entries
 
