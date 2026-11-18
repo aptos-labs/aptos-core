@@ -19,7 +19,7 @@ pub(super) fn type_of<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> Ty<'tcx> {
 /// that nests itself with a new argument at each level
 /// (`struct Node<T> { next: *const Node<(T,)> }`) never ends otherwise.
 const MAX_DEPTH: usize = 64;
-const MAX_TYPES: usize = 1000;
+const MAX_TYPES: usize = 10_000;
 
 /// The walk of a type hit [`MAX_DEPTH`] or [`MAX_TYPES`]. The caller must
 /// assume the worst about the type.
