@@ -25,14 +25,14 @@ tests/sources/functional/ghost_field_intrinsic_map_ops.move:127:5: error: verex 
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: the continuation after `append_disjoint` is not established
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: the continuation after call 1 of `append_disjoint` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:156:9: error: the specification clause `aborts_if ∃ (k : u64),
         spec_contains::<u64, u64>(m, k) && spec_contains::<u64, u64>(other, k)` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:155:5: error: verex verification failed: the automatic verification of `app_disjoint` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
   verify app_disjoint by lean =>
     verex_obligations
     verex_on
-    | after_append_disjoint => verex_prepare; sorry
+    | after_call_1_of_append_disjoint => verex_prepare; sorry
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
@@ -51,11 +51,11 @@ tests/sources/functional/ghost_field_intrinsic_map_ops.move:165:5: error: verex 
     | ensures_4 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: the continuation after `replace_key_inplace` is not established
+tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: the continuation after call 1 of `replace_key_inplace` is not established
 tests/sources/functional/ghost_field_intrinsic_map_ops.move:179:5: error: verex verification failed: the automatic verification of `rk` failed; provide a proof in `tests/sources/functional/ghost_field_intrinsic_map_ops.proof.lean`:
   verify rk by lean =>
     verex_obligations
     verex_on
-    | after_replace_key_inplace => verex_prepare; sorry
+    | after_call_1_of_replace_key_inplace => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
