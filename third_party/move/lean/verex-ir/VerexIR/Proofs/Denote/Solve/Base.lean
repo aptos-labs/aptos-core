@@ -10814,7 +10814,8 @@ elab_rules : tactic
   let next ← goal.withContext do
     let call ← `(tactic| simp only [vir_denote_norm])
     let (ctx, simprocs, _) ← rulesSimpContext call activeReads
-    simpGoalRecorded (← targetState).readForms goal ctx simprocs Simp.dischargeDefault? false
+    simpGoalRecorded (← targetState).readForms goal ctx simprocs
+      (contextDischarge (← getLCtx) (← IO.mkRef {})) false
       targets scope (resultsNormal := true)
   match next with
   | none => replaceMainGoal []
