@@ -16,6 +16,10 @@ namespace VerexIR.Proofs.Denote
 
 open Lean Meta
 
+-- A declared type's kind is quoted with it (`quoteNativeCore`).
+deriving instance ToExpr for View
+deriving instance ToExpr for NominalKind
+
 private def nominalUnitOption : Name := `_verexNominalUnit
 private def syntheticNativeTypesOption : Name := `_verexSyntheticNativeTypes
 
@@ -204,9 +208,9 @@ private partial def quoteNativeCore (parameter : Nat → MetaM Lean.Expr)
   | .ghost element => return mkApp (mkConst ``NTy.ghost) (← quoteNativeCore parameter false ancestors element)
   | .observed referent =>
       return mkApp (mkConst ``NTy.observed) (← quoteNativeCore parameter false ancestors referent)
-  | .nominal source arguments productive =>
+  | .nominal source arguments kind =>
       return mkApp3 (mkConst ``NTy.nominal) (quoteSource source)
-        (← quoteNativeRowCore parameter ancestors arguments) (toExpr productive)
+        (← quoteNativeRowCore parameter ancestors arguments) (toExpr kind)
   | .function parameters shared results =>
       return mkApp3 (mkConst ``NTy.function)
         (← quoteNativeRowCore parameter ancestors parameters) (quoteSharing shared)

@@ -15,8 +15,9 @@ theorem NTy.carrier_withOwn (base : Carriers)
     @NTy.carrier { base with own } type = @NTy.carrier base type
   | .unit | .bool | .int _ _ | .num | .address | .signer | .string
   | .bytes | .char | .param _ | .function _ _ _ => rfl
-  | .nominal source arguments productive =>
-      congrArg (base.nominals.nominal source productive) (NRow.sorts_withOwn base own arguments)
+  | .nominal source arguments kind =>
+      congrArg (base.nominals.nominal source kind (@Carriers.frameFunctions base arguments))
+        (NRow.sorts_withOwn base own arguments)
   | .tuple elements | .struct _ _ elements => HList.carrier_withOwn base own elements
   | .enum _ _ names rows _ => variantCarrier.carrier_withOwn base own names rows
   | .slice element | .vector element =>

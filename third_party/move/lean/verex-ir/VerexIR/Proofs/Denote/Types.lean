@@ -32,6 +32,25 @@ namespace VerexIR.Proofs.Denote
 
 open VerexIR.SemanticOperations
 
+/-- Whether a declared type's values are held as owned or behind a shared
+view of the references in them. -/
+inductive View where
+  | owned
+  | shared
+  deriving DecidableEq, Repr, Inhabited
+
+/-- What a declared type states of its declaration beside the handle: whether
+the declaration has values, which of its type arguments its inhabitant needs a
+value of, the view its values are held at, and whether its layout is clean: it
+holds no function type and no reference, so that a shared view of a value is
+the value at the views of its arguments. -/
+structure NominalKind where
+  productive : Bool
+  demands : List Nat
+  view : View
+  clean : Bool
+  deriving DecidableEq, Repr, Inhabited
+
 /-- Which positions of a function type are shared references, each the
 value it observes natively: its parameters and its results. -/
 structure Sharing where
@@ -93,10 +112,10 @@ inductive NTy where
   strips the mark wherever a parameter stands for a type. -/
   | observed (referent : NTy)
   /-- A nominal whose declaration reaches itself, at its type arguments: no row of it is
-  written here, as `NTy` has no binder. `productive` says whether the unit's declaration has
-  values at inhabited arguments; the typed values of `.nominal` are read at the unit's
+  written here, as `NTy` has no binder. `kind` says whether the unit's declaration has
+  values, and at which of its arguments' values; the typed values of `.nominal` are read at the unit's
   productivity (`doc/designs/rust-verification.md`, "Inhabitants"). -/
-  | nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
+  | nominal (source : StructHandle) (arguments : NRow) (kind : NominalKind)
 
 /-- A row of types: tuple elements, declared fields, or the locals of a body. -/
 inductive NRow where
@@ -350,7 +369,7 @@ mutual
   | .param index => (θ.getD index (.param index)).unmark
   | .function parameters shared results =>
       .function (NRow.subst θ parameters) shared (NRow.subst θ results)
-  | .nominal source arguments productive => .nominal source (NRow.subst θ arguments) productive
+  | .nominal source arguments kind => .nominal source (NRow.subst θ arguments) kind
   | .observed referent => .observed (referent.subst θ)
   | τ => τ
 
@@ -391,8 +410,8 @@ def NTy.substWith (types : Nat → NTy) : NTy → NTy
   | .param index => (types index).unmark
   | .function parameters shared results =>
       .function (NRow.substWith types parameters) shared (NRow.substWith types results)
-  | .nominal source arguments productive =>
-      .nominal source (NRow.substWith types arguments) productive
+  | .nominal source arguments kind =>
+      .nominal source (NRow.substWith types arguments) kind
   | .observed referent => .observed (referent.substWith types)
 
 def NRow.substWith (types : Nat → NTy) : NRow → NRow
@@ -451,7 +470,7 @@ theorem NTy.substWith_unmarked_congr {left right : Nat → NTy}
   | .function parameters shared results => by
       simp only [NTy.substWith, NRow.substWith_unmarked_congr agree parameters,
         NRow.substWith_unmarked_congr agree results]
-  | .nominal source arguments productive => by
+  | .nominal source arguments kind => by
       simp only [NTy.substWith, NRow.substWith_unmarked_congr agree arguments]
 
 theorem NRow.substWith_unmarked_congr {left right : Nat → NTy}
@@ -584,7 +603,7 @@ theorem NTy.substWith_congr {allowed : Nat → Bool} {left right : Nat → NTy}
       simp only [NTy.substWith, NRow.substWith_congr agree parameters mentioned.1,
         NRow.substWith_congr agree results mentioned.2,
         Sharing.atWith_congr agree mentioned.1 mentioned.2]
-  | .nominal source arguments productive, mentioned => by
+  | .nominal source arguments kind, mentioned => by
       simp only [NTy.paramsAll] at mentioned
       simp only [NTy.substWith, NRow.substWith_congr agree arguments mentioned]
 
@@ -619,7 +638,7 @@ def NTy.inhabitable : NTy → Bool
   -- alone does not provide.
   | .function _ _ _ => false
   -- A nominal's values are read at the unit's productivity, which its flag states.
-  | .nominal _ arguments productive => productive && arguments.inhabitable
+  | .nominal _ arguments kind => kind.productive && arguments.inhabitableAt kind.demands 0
   | .array element length => decide (length < 2 ^ 64) && element.inhabitable
   | .observed referent => referent.inhabitable
   | .unit | .bool | .num | .address | .signer | .string | .bytes | .char | .slice _ | .vector _ | .table _ _
@@ -628,6 +647,13 @@ def NTy.inhabitable : NTy → Bool
 def NRow.inhabitable : NRow → Bool
   | .nil => true
   | .cons τ rest => τ.inhabitable && rest.inhabitable
+
+/-- Whether the entries of a row at the demanded positions have values,
+counting positions from `index`. -/
+def NRow.inhabitableAt (demands : List Nat) : Nat → NRow → Bool
+  | _, .nil => true
+  | index, .cons τ rest =>
+      (!demands.contains index || τ.inhabitable) && rest.inhabitableAt demands (index + 1)
 
 def NRows.firstInhabitable : List String → NRows → Bool
   | _ :: _, .cons fields _ => fields.inhabitable
@@ -753,7 +779,7 @@ mutual
 /-- Whether every declaration a type mentions, at any depth — in a nominal's
 type arguments, a struct's or a variant's rows, a function's rows — is one a
 unit's nominal carriers support (`NominalCarriers.supports`). -/
-def NTy.supported (supports : StructHandle → Bool → Bool) : NTy → Bool
+def NTy.supported (supports : StructHandle → NominalKind → Bool) : NTy → Bool
   | .tuple elements => NRow.supported supports elements
   | .struct _ arguments fields =>
       NRow.supported supports arguments && NRow.supported supports fields
@@ -769,16 +795,16 @@ def NTy.supported (supports : StructHandle → Bool → Bool) : NTy → Bool
   | .observed referent => NTy.supported supports referent
   | .function parameters _ results =>
       NRow.supported supports parameters && NRow.supported supports results
-  | .nominal source arguments productive =>
-      supports source productive && NRow.supported supports arguments
+  | .nominal source arguments kind =>
+      supports source kind && NRow.supported supports arguments
   | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
   | .param _ => true
 
-def NRow.supported (supports : StructHandle → Bool → Bool) : NRow → Bool
+def NRow.supported (supports : StructHandle → NominalKind → Bool) : NRow → Bool
   | .nil => true
   | .cons τ rest => NTy.supported supports τ && NRow.supported supports rest
 
-def NRows.supported (supports : StructHandle → Bool → Bool) : NRows → Bool
+def NRows.supported (supports : StructHandle → NominalKind → Bool) : NRows → Bool
   | .nil => true
   | .cons fields rest => NRow.supported supports fields && NRows.supported supports rest
 end
@@ -863,7 +889,7 @@ theorem option_map_eq_some {α β : Type} {f : α → β} {x : Option α} {y : �
   cases x <;> simp
 
 section Supported
-variable (supports : StructHandle → Bool → Bool)
+variable (supports : StructHandle → NominalKind → Bool)
 
 @[simp] theorem NTy.supported_unmark : (τ : NTy) →
     NTy.supported supports τ.unmark = NTy.supported supports τ
@@ -1170,7 +1196,7 @@ def structNTyFuel (types : TypeLookup) (unit : ValidatedUnit) :
 end
 
 section SupportedTables
-variable (supports : StructHandle → Bool → Bool)
+variable (supports : StructHandle → NominalKind → Bool)
 
 set_option maxHeartbeats 1000000 in
 mutual
@@ -1877,9 +1903,9 @@ def NTy.witnessAt (unit : ValidatedUnit) : Nat → NTy → Option RuntimeValue
   | fuel, .observed referent => NTy.witnessAt unit fuel referent
   | _, .param _ => some .unit
   | _, .function _ _ _ => none
-  | _, .nominal _ _ false => none
-  | 0, .nominal _ _ true => none
-  | fuel + 1, .nominal source arguments true =>
+  | _, .nominal _ _ ⟨false, _, _, _⟩ => none
+  | 0, .nominal _ _ ⟨true, _, _, _⟩ => none
+  | fuel + 1, .nominal source arguments ⟨true, _, _, _⟩ =>
       match NTy.nominalBody? unit source arguments with
       | some body => NTy.witnessAt unit fuel body
       | none => none
@@ -1912,7 +1938,7 @@ def productiveWitness? (unit : ValidatedUnit) (source : StructHandle) (arguments
   | some body => NTy.witnessAt unit (typeFuel unit) body
   | none => none
 
-/-- The value a nominal flagged productive admits whatever its rows say: its witness, which
+/-- The value a nominal flagged kind admits whatever its rows say: its witness, which
 its rows admit when the flag is the unit's productivity, or `.unit` for a flag no typed type
 carries (`doc/designs/rust-verification.md`, "Inhabitants"). -/
 def witnessOrUnit (unit : ValidatedUnit) (source : StructHandle) (arguments : NRow) : RuntimeValue :=
@@ -1979,14 +2005,14 @@ def NTy.admits (unit : ValidatedUnit) : NTy → RuntimeValue → Bool
             supplied == parameters && closureShared unit function mask == shared &&
               returned == results && NRow.admits unit captured captures.toList
         | none => false
-  | .nominal source arguments productive, .nominal actual variant values =>
+  | .nominal source arguments kind, .nominal actual variant values =>
       (plain? (.nominal actual variant values) && actual == source &&
         match NTy.nominalRow? variant (NTy.nominalBody? unit source arguments) with
         | some row => NRow.admits unit row values.toList
         | none => false) ||
-      (productive && RuntimeValue.nominal actual variant values == witnessOrUnit unit source arguments)
-  | .nominal source arguments productive, value =>
-      productive && value == witnessOrUnit unit source arguments
+      (kind.productive && RuntimeValue.nominal actual variant values == witnessOrUnit unit source arguments)
+  | .nominal source arguments kind, value =>
+      kind.productive && value == witnessOrUnit unit source arguments
   | _, _ => false
 -- A marked entry is read at its referent, the value unchanged, so the type
 -- orders the recursion after the value.
@@ -2037,6 +2063,124 @@ termination_by values => sizeOf values
 end
 
 end NativeTypes
+
+
+/-!
+# A declaration's reading of its parameters at an argument row
+
+What a declaration reads its parameter as at a row of type arguments (`slot`),
+the commutation of that reading and of a family's substitution with a
+substitution of type arguments, and the function sorts a declaration's values
+are taken at: a carrier per function type of the declaration's own types.
+-/
+
+namespace NominalBasis
+
+open VerexIR
+
+/-! ## Substitution and rows -/
+
+/-- Dropping a mark commutes with a substitution. -/
+theorem subst_unmark (θ : NRow) : (τ : NTy) → (τ.unmark).subst θ = (τ.subst θ).unmark
+  | .observed referent => subst_unmark θ referent
+  | .param index => (NTy.unmark_unmark (θ.getD index (.param index))).symm
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char
+  | .tuple _ | .struct _ _ _ | .enum _ _ _ _ _ | .slice _ | .vector _ | .array _ _
+  | .table _ _ | .ghost _ | .ref _ | .sliceRef _ | .function _ _ _ | .nominal _ _ _ => rfl
+
+/-- A substituted row's entry, or the unit type beyond the row, is the
+substituted entry. -/
+theorem getD_unit_subst (θ : NRow) : (row : NRow) → (index : Nat) →
+    (NRow.subst θ row).getD index .unit = (row.getD index .unit).subst θ
+  | .nil, _ => rfl
+  | .cons _ _, 0 => rfl
+  | .cons _ rest, index + 1 => getD_unit_subst θ rest index
+
+mutual
+/-- A substitution after a family's substitution is the family's substitution
+by the substituted readings. -/
+theorem subst_substWith (θ : NRow) (types : Nat → NTy) : (τ : NTy) →
+    (τ.substWith types).subst θ = τ.substWith (fun index => (types index).subst θ)
+  | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char => rfl
+  | .param index => subst_unmark θ (types index)
+  | .tuple elements => congrArg NTy.tuple (rowSubst_substWith θ types elements)
+  | .struct source arguments fields => by
+      simp only [NTy.substWith, NTy.subst, rowSubst_substWith θ types arguments,
+        rowSubst_substWith θ types fields]
+  | .enum source arguments names rows distinct => by
+      simp only [NTy.substWith, NTy.subst, rowSubst_substWith θ types arguments,
+        rowsSubst_substWith θ types rows]
+  | .slice element => congrArg NTy.slice (subst_substWith θ types element)
+  | .vector element => congrArg NTy.vector (subst_substWith θ types element)
+  | .array element length => congrArg (NTy.array · length) (subst_substWith θ types element)
+  | .table key value => by
+      simp only [NTy.substWith, NTy.subst, subst_substWith θ types key,
+        subst_substWith θ types value]
+  | .ghost slot => congrArg NTy.ghost (subst_substWith θ types slot)
+  | .sliceRef referent => congrArg NTy.sliceRef (subst_substWith θ types referent)
+  | .ref referent => congrArg NTy.ref (subst_substWith θ types referent)
+  | .observed referent => congrArg NTy.observed (subst_substWith θ types referent)
+  | .function parameters shared results => by
+      simp only [NTy.substWith, NTy.subst, rowSubst_substWith θ types parameters,
+        rowSubst_substWith θ types results]
+  | .nominal source arguments kind => by
+      simp only [NTy.substWith, NTy.subst, rowSubst_substWith θ types arguments]
+
+theorem rowSubst_substWith (θ : NRow) (types : Nat → NTy) : (row : NRow) →
+    NRow.subst θ (row.substWith types) = row.substWith (fun index => (types index).subst θ)
+  | .nil => rfl
+  | .cons τ rest => by
+      simp only [NRow.substWith, NRow.subst, subst_substWith θ types τ,
+        rowSubst_substWith θ types rest]
+
+theorem rowsSubst_substWith (θ : NRow) (types : Nat → NTy) : (rows : NRows) →
+    NRows.subst θ (rows.substWith types) = rows.substWith (fun index => (types index).subst θ)
+  | .nil => rfl
+  | .cons fields rest => by
+      simp only [NRows.substWith, NRows.subst, rowSubst_substWith θ types fields,
+        rowsSubst_substWith θ types rest]
+end
+
+/-- What a declaration reads its parameter `index` as at an argument row: the
+row's entry, the unit type beyond the row. -/
+@[reducible] def slot (arguments : NRow) (index : Nat) : NTy := arguments.getD index .unit
+
+/-- The type a declaration's parameter stands for at an argument row. -/
+@[reducible] def slotType (arguments : NRow) (index : Nat) : NTy := (slot arguments index).unmark
+
+/-- The readings of a substituted row are the substituted readings. -/
+theorem slot_subst (θ arguments : NRow) :
+    slot (NRow.subst θ arguments) = fun index => (slot arguments index).subst θ :=
+  funext fun index => getD_unit_subst θ arguments index
+
+/-- The type a parameter stands for at a substituted row is the substituted
+type. -/
+theorem slotType_subst (θ arguments : NRow) (index : Nat) :
+    slotType (NRow.subst θ arguments) index = (slotType arguments index).subst θ := by
+  show ((NRow.subst θ arguments).getD index .unit).unmark = _
+  rw [getD_unit_subst]
+  exact (subst_unmark θ _).symm
+
+end NominalBasis
+
+
+
+/-- The values of the function types a declaration's values are taken at, by
+parameter row, sharing and result row of the declaration's own types. -/
+abbrev FunctionSorts : Type 1 := NRow → Sharing → NRow → Type
+
+/-- A value of each type argument a declaration's inhabitant needs one of:
+the dictionary it reads, counting positions from `index`. -/
+def DemandedValues (demands : List Nat) : Nat → List Type → Type
+  | _, [] => Unit
+  | index, sort :: rest =>
+      (bif demands.contains index then sort else Unit) × DemandedValues demands (index + 1) rest
+
+/-- An entry of the dictionary: a value where the position is demanded. -/
+def DemandedValues.entry : (demanded : Bool) → {sort : Type} → (demanded = true → sort) →
+    (bif demanded then sort else Unit)
+  | true, _, value => value rfl
+  | false, _, _ => ()
 
 /-- The typed values of a type's values (`NTy.read`): their type, the read
 of a native value, the runtime value of a typed value and the typed value a
@@ -2497,6 +2641,40 @@ theorem SortCodecs.plain_encoders : {sorts : List Type} → (codecs : SortCodecs
   | [], _, _ => trivial
   | _ :: _, codecs, plain => ⟨plain.1, SortCodecs.plain_encoders codecs.2 plain.2⟩
 
+/-- A map of each argument type to another's, position by position: what the
+action of a clean declaration's generated type on its sorts reads
+(`NominalFunctor.nominalMap`). Two lists of different lengths have none. -/
+def SortMaps : List Type → List Type → Type
+  | [], [] => Unit
+  | sort :: rest, sort' :: rest' => (sort → sort') × SortMaps rest rest'
+  | [], _ :: _ => Empty
+  | _ :: _, [] => Empty
+
+/-- The identity at every position. -/
+def SortMaps.identity : (sorts : List Type) → SortMaps sorts sorts
+  | [] => ()
+  | _ :: rest => (id, SortMaps.identity rest)
+
+/-- The composition, position by position. -/
+def SortMaps.comp : {first second third : List Type} → SortMaps first second →
+    SortMaps second third → SortMaps first third
+  | [], [], [], _, _ => ()
+  | _ :: _, _ :: _, _ :: _, before, after =>
+      (fun value => after.1 (before.1 value), SortMaps.comp before.2 after.2)
+  | [], _ :: _, _, before, _ => before.elim
+  | _ :: _, [], _, before, _ => before.elim
+  | [], [], _ :: _, _, after => after.elim
+  | _ :: _, _ :: _, [], _, after => after.elim
+
+/-- The encoders of the mapped argument types read through the maps. -/
+def SortEncoders.comap : {sorts sorts' : List Type} → SortMaps sorts sorts' →
+    SortEncoders sorts' → SortEncoders sorts
+  | [], [], _, _ => ()
+  | _ :: _, _ :: _, maps, encoders =>
+      (fun value => encoders.1 (maps.1 value), SortEncoders.comap maps.2 encoders.2)
+  | [], _ :: _, maps, _ => maps.elim
+  | _ :: _, [], maps, _ => maps.elim
+
 /-- A decidable equality of each plain argument type, which a nominal's
 equality reads (`NominalFunctor.nominalDecEq`). -/
 def SortDecEqs : List Type → Type
@@ -2535,6 +2713,168 @@ def SortEquals.Agrees : {sorts : List Type} → SortEncoders sorts → SortEqual
         SortEquals.Agrees encoders.2 equals.2
 
 
+
+/-! ## The dictionaries of function sorts -/
+
+/-- An encoder of each function sort, which a declaration's encoder reads. -/
+def FunctionEncoders (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    functions parameters shared results → RuntimeValue
+
+/-- A decoder of each function sort, which a declaration's decoder reads. -/
+def FunctionDecoders (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    RuntimeValue → Option (functions parameters shared results)
+
+/-- Every function sort's decoder inverts its encoder. -/
+def FunctionDecoders.Inverts {functions : FunctionSorts} (encoders : FunctionEncoders functions)
+    (decoders : FunctionDecoders functions) : Prop :=
+  ∀ parameters shared results value,
+    decoders parameters shared results (encoders parameters shared results value) = some value
+
+/-- Every function sort's decoder answers only where its encoder produced the
+raw value. -/
+def FunctionDecoders.Tight {functions : FunctionSorts} (encoders : FunctionEncoders functions)
+    (decoders : FunctionDecoders functions) : Prop :=
+  ∀ parameters shared results raw value,
+    decoders parameters shared results raw = some value →
+      encoders parameters shared results value = raw
+
+/-- Every function sort's encodings are loan-free. -/
+def FunctionEncoders.Plain {functions : FunctionSorts} (encoders : FunctionEncoders functions) :
+    Prop :=
+  ∀ parameters shared results value,
+    SemanticOperations.Plain (encoders parameters shared results value)
+
+/-- Every function sort's decoder inverts its encoder below a bound. -/
+def FunctionDecoders.InvertsBelow (bound : Nat) {functions : FunctionSorts}
+    (encoders : FunctionEncoders functions) (decoders : FunctionDecoders functions) : Prop :=
+  ∀ parameters shared results value,
+    sizeOf (encoders parameters shared results value) < bound →
+      decoders parameters shared results (encoders parameters shared results value) = some value
+
+/-- Two dictionaries of function decoders, of any two families of function
+sorts, agree below a bound on whether they decode. -/
+def FunctionDecoders.SomeAgreeBelow (bound : Nat) {functions functions' : FunctionSorts}
+    (decoders : FunctionDecoders functions) (others : FunctionDecoders functions') : Prop :=
+  ∀ parameters shared results raw, sizeOf raw < bound →
+    (decoders parameters shared results raw).isSome = (others parameters shared results raw).isSome
+
+/-- Two dictionaries of function decoders agree below a bound. -/
+def FunctionDecoders.AgreeBelow (bound : Nat) {functions : FunctionSorts}
+    (decoders others : FunctionDecoders functions) : Prop :=
+  ∀ parameters shared results raw, sizeOf raw < bound →
+    decoders parameters shared results raw = others parameters shared results raw
+
+/-- Every function sort's decoder answers only where its encoder produced the
+raw value, below a bound. -/
+def FunctionDecoders.TightBelow (bound : Nat) {functions : FunctionSorts}
+    (encoders : FunctionEncoders functions) (decoders : FunctionDecoders functions) : Prop :=
+  ∀ parameters shared results raw value, sizeOf raw < bound →
+    decoders parameters shared results raw = some value →
+      encoders parameters shared results value = raw
+
+/-- An unconditional inversion holds below every bound. -/
+theorem FunctionDecoders.invertsBelow (bound : Nat) {functions : FunctionSorts}
+    (encoders : FunctionEncoders functions) (decoders : FunctionDecoders functions)
+    (inverts : FunctionDecoders.Inverts encoders decoders) :
+    FunctionDecoders.InvertsBelow bound encoders decoders :=
+  fun parameters shared results value _ => inverts parameters shared results value
+
+/-- An unconditional tightness holds below every bound. -/
+theorem FunctionDecoders.tightBelow (bound : Nat) {functions : FunctionSorts}
+    (encoders : FunctionEncoders functions) (decoders : FunctionDecoders functions)
+    (tight : FunctionDecoders.Tight encoders decoders) :
+    FunctionDecoders.TightBelow bound encoders decoders :=
+  fun parameters shared results raw value _ => tight parameters shared results raw value
+
+/-- A decidable equality of each function sort. -/
+def FunctionDecEqs (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    DecidableEq (functions parameters shared results)
+
+/-- An order of each function sort, at a rank fixed outside. -/
+def FunctionOrderings (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    functions parameters shared results → functions parameters shared results → Ordering
+
+/-- Every function sort's order is the runtime order of its encodings. -/
+def FunctionOrderings.Agrees (rank : ValueRanks) {functions : FunctionSorts}
+    (encoders : FunctionEncoders functions) (orderings : FunctionOrderings functions) : Prop :=
+  ∀ parameters shared results left right,
+    RuntimeValue.order rank (encoders parameters shared results left)
+        (encoders parameters shared results right) =
+      orderings parameters shared results left right
+
+/-- A ghost-insensitive equality of each function sort. -/
+def FunctionEquals (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    functions parameters shared results → functions parameters shared results → Bool
+
+/-- Every function sort's equality compares the erasures of its encodings. -/
+def FunctionEquals.Agrees {functions : FunctionSorts} (encoders : FunctionEncoders functions)
+    (equals : FunctionEquals functions) : Prop :=
+  ∀ parameters shared results left right,
+    equals parameters shared results left right =
+      decide ((encoders parameters shared results left).eraseGhosts =
+        (encoders parameters shared results right).eraseGhosts)
+
+/-- The dictionaries a family's function values give: the encoders, decoders,
+equalities, orders and ghost-insensitive equalities of the function sorts a
+dictionary of typed function values carries. -/
+def FunctionEncoders.of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionEncoders functions :=
+  fun parameters shared results => (typed parameters shared results).codec.encode
+
+def FunctionDecoders.of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionDecoders functions :=
+  fun parameters shared results => (typed parameters shared results).codec.decode?
+
+def FunctionDecEqs.of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionDecEqs functions :=
+  fun parameters shared results => (typed parameters shared results).decEq
+
+def FunctionOrderings.of (rank : ValueRanks) {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionOrderings functions :=
+  fun parameters shared results => (typed parameters shared results).order rank
+
+def FunctionEquals.of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionEquals functions :=
+  fun parameters shared results => (typed parameters shared results).erasures.same
+
+theorem FunctionDecoders.inverts_of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionDecoders.Inverts (FunctionEncoders.of typed) (FunctionDecoders.of typed) :=
+  fun parameters shared results value => (typed parameters shared results).codec.decode_encode value
+
+theorem FunctionDecoders.tight_of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionDecoders.Tight (FunctionEncoders.of typed) (FunctionDecoders.of typed) :=
+  fun parameters shared results raw value decoded =>
+    (typed parameters shared results).tight raw value decoded
+
+theorem FunctionEncoders.plain_of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionEncoders.Plain (FunctionEncoders.of typed) :=
+  fun parameters shared results value => (typed parameters shared results).plain value
+
+theorem FunctionOrderings.agrees_of (rank : ValueRanks) {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionOrderings.Agrees rank (FunctionEncoders.of typed) (FunctionOrderings.of rank typed) :=
+  fun parameters shared results left right =>
+    (typed parameters shared results).orders.order_encode rank left right
+
+theorem FunctionEquals.agrees_of {functions : FunctionSorts}
+    (typed : ∀ parameters shared results, TypedFunctions (functions parameters shared results)) :
+    FunctionEquals.Agrees (FunctionEncoders.of typed) (FunctionEquals.of typed) :=
+  fun parameters shared results left right =>
+    (typed parameters shared results).erasures.same_eq left right
+
 mutual
 /-- Whether a literal can have a type: a scalar, or a tuple or a vector of
 literal types. A literal's value is read at the ground family, which has
@@ -2572,78 +2912,132 @@ field of this type, so that the family's constructor literal, which a reduction
 of any term over it exposes, carries one argument for the nominal layer rather
 than one per operation and law. -/
 structure NominalFunctor where
-  nominal : StructHandle → Bool → List Type → Type
-  nominalEncode : (source : StructHandle) → (productive : Bool) → (sorts : List Type) →
-    SortEncoders sorts → nominal source productive sorts → RuntimeValue
-  nominalDecode? : (source : StructHandle) → (productive : Bool) → (sorts : List Type) →
-    SortDecoders sorts → RuntimeValue → Option (nominal source productive sorts)
-  /-- A value's encoding decodes back where the arguments' decoders invert
-  below the encoding's size. -/
-  nominalDecode_encode : ∀ source productive sorts encoders decoders
-      (value : nominal source productive sorts),
-    SortDecoders.InvertsBelow (sizeOf (nominalEncode source productive sorts encoders value))
+  nominal : StructHandle → NominalKind → FunctionSorts → List Type → Type
+  nominalEncode : (source : StructHandle) → (kind : NominalKind) → (functions : FunctionSorts) →
+    FunctionEncoders functions → (sorts : List Type) → SortEncoders sorts →
+    nominal source kind functions sorts → RuntimeValue
+  nominalDecode? : (source : StructHandle) → (kind : NominalKind) → (functions : FunctionSorts) →
+    FunctionDecoders functions → (sorts : List Type) → SortDecoders sorts →
+    RuntimeValue → Option (nominal source kind functions sorts)
+  /-- A value's encoding decodes back where the arguments' and the function
+  sorts' decoders invert below the encoding's size. -/
+  nominalDecode_encode : ∀ source kind functions functionEncoders functionDecoders sorts
+      encoders decoders (value : nominal source kind functions sorts),
+    FunctionDecoders.InvertsBelow
+        (sizeOf (nominalEncode source kind functions functionEncoders sorts encoders value))
+        functionEncoders functionDecoders →
+    SortDecoders.InvertsBelow
+        (sizeOf (nominalEncode source kind functions functionEncoders sorts encoders value))
         encoders decoders →
-      nominalDecode? source productive sorts decoders
-        (nominalEncode source productive sorts encoders value) = some value
-  /-- Whether a raw value decodes depends on the arguments' decoders only on
-  strict subvalues, and only on whether they decode. -/
-  nominalDecode?_isSome_congr : ∀ source productive {sorts sorts'}
+      nominalDecode? source kind functions functionDecoders sorts decoders
+        (nominalEncode source kind functions functionEncoders sorts encoders value) = some value
+  /-- Whether a raw value decodes depends on the arguments' and the function
+  sorts' decoders only on strict subvalues, and only on whether they decode. -/
+  nominalDecode?_isSome_congr : ∀ source kind {functions functions'}
+      (functionDecoders : FunctionDecoders functions)
+      (functionOthers : FunctionDecoders functions') {sorts sorts'}
       (decoders : SortDecoders sorts) (others : SortDecoders sorts') raw,
+    FunctionDecoders.SomeAgreeBelow (sizeOf raw) functionDecoders functionOthers →
     SortDecoders.SomeAgreeBelow (sizeOf raw) decoders others →
-      (nominalDecode? source productive sorts decoders raw).isSome =
-        (nominalDecode? source productive sorts' others raw).isSome
-  /-- What a raw value decodes to depends on the arguments' decoders only on
-  strict subvalues. -/
-  nominalDecode?_congr : ∀ source productive sorts (decoders others : SortDecoders sorts) raw,
+      (nominalDecode? source kind functions functionDecoders sorts decoders raw).isSome =
+        (nominalDecode? source kind functions' functionOthers sorts' others raw).isSome
+  /-- What a raw value decodes to depends on the arguments' and the function
+  sorts' decoders only on strict subvalues. -/
+  nominalDecode?_congr : ∀ source kind functions
+      (functionDecoders functionOthers : FunctionDecoders functions) sorts
+      (decoders others : SortDecoders sorts) raw,
+    FunctionDecoders.AgreeBelow (sizeOf raw) functionDecoders functionOthers →
     SortDecoders.AgreeBelow (sizeOf raw) decoders others →
-      nominalDecode? source productive sorts decoders raw =
-        nominalDecode? source productive sorts others raw
-  /-- A decoded value encodes back to the raw value where the arguments'
-  decoders are tight below the raw value's size. -/
-  nominalEncode_of_decode? : ∀ source productive sorts encoders decoders raw value,
+      nominalDecode? source kind functions functionDecoders sorts decoders raw =
+        nominalDecode? source kind functions functionOthers sorts others raw
+  /-- A decoded value encodes back to the raw value where the arguments' and
+  the function sorts' decoders are tight below the raw value's size. -/
+  nominalEncode_of_decode? : ∀ source kind functions functionEncoders functionDecoders sorts
+      encoders decoders raw value,
+    FunctionDecoders.TightBelow (sizeOf raw) functionEncoders functionDecoders →
     SortDecoders.TightBelow (sizeOf raw) encoders decoders →
-    nominalDecode? source productive sorts decoders raw = some value →
-      nominalEncode source productive sorts encoders value = raw
-  /-- A value's encoding is loan-free where the arguments' encodings are. -/
-  nominalEncode_plain : ∀ source productive sorts encoders,
-    SortEncoders.Plain encoders → ∀ value,
-      Plain (nominalEncode source productive sorts encoders value)
-  /-- An inhabitant at `productive = true` from a value of each argument. -/
-  nominalInhabitant : ∀ source sorts, SortValues sorts → nominal source true sorts
+    nominalDecode? source kind functions functionDecoders sorts decoders raw = some value →
+      nominalEncode source kind functions functionEncoders sorts encoders value = raw
+  /-- A value's encoding is loan-free where the arguments' and the function
+  sorts' encodings are. -/
+  nominalEncode_plain : ∀ source kind functions functionEncoders sorts encoders,
+    FunctionEncoders.Plain functionEncoders → SortEncoders.Plain encoders → ∀ value,
+      Plain (nominalEncode source kind functions functionEncoders sorts encoders value)
+  /-- An inhabitant of a productive declaration from a value of each argument
+  its kind demands. -/
+  nominalInhabitant : ∀ source kind functions sorts, kind.productive = true →
+    DemandedValues kind.demands 0 sorts → nominal source kind functions sorts
   /-- A declaration one of whose values encodes as `.unit` has no other value:
   the fallback `NTy.readBack` returns at `.unit` then agrees with `.unit`'s
   decoding (`NTy.readBack_unit`).  A declaration whose values are runtime
   nominals never encodes as `.unit`; the one-point functor's only value does,
   and is unique. -/
-  nominalEncode_unit : ∀ source productive sorts encoders
-      (value other : nominal source productive sorts),
-    nominalEncode source productive sorts encoders value = .unit → other = value
+  nominalEncode_unit : ∀ source kind functions functionEncoders sorts encoders
+      (value other : nominal source kind functions sorts),
+    nominalEncode source kind functions functionEncoders sorts encoders value = .unit →
+      other = value
   /-- The equality of a nominal's values, on the native values. -/
-  nominalDecEq : ∀ source productive sorts, SortDecEqs sorts →
-    DecidableEq (nominal source productive sorts)
+  nominalDecEq : ∀ source kind functions, FunctionDecEqs functions → ∀ sorts, SortDecEqs sorts →
+    DecidableEq (nominal source kind functions sorts)
   /-- The order of a nominal's values, on the native values. -/
-  nominalOrder : (rank : ValueRanks) → (source : StructHandle) → (productive : Bool) →
-    (sorts : List Type) → SortOrderings sorts → nominal source productive sorts →
-    nominal source productive sorts → Ordering
+  nominalOrder : (rank : ValueRanks) → (source : StructHandle) → (kind : NominalKind) →
+    (functions : FunctionSorts) → FunctionOrderings functions →
+    (sorts : List Type) → SortOrderings sorts → nominal source kind functions sorts →
+    nominal source kind functions sorts → Ordering
   /-- The order agrees with the runtime order of the encodings, as
   `NTy.order_codec` states of a struct. -/
-  nominalOrder_encode : ∀ rank source productive sorts (encoders : SortEncoders sorts) orderings,
+  nominalOrder_encode : ∀ rank source kind functions
+      (functionEncoders : FunctionEncoders functions) functionOrderings sorts
+      (encoders : SortEncoders sorts) orderings,
+    FunctionOrderings.Agrees rank functionEncoders functionOrderings →
     SortOrderings.Agrees rank encoders orderings → ∀ left right,
-      RuntimeValue.order rank (nominalEncode source productive sorts encoders left)
-          (nominalEncode source productive sorts encoders right) =
-        nominalOrder rank source productive sorts orderings left right
+      RuntimeValue.order rank
+          (nominalEncode source kind functions functionEncoders sorts encoders left)
+          (nominalEncode source kind functions functionEncoders sorts encoders right) =
+        nominalOrder rank source kind functions functionOrderings sorts orderings left right
   /-- The ghost-insensitive equality of a nominal's values, at the flag that
   says whether a handle-backed field compares (`NTy.equal`). -/
-  nominalEqual : (handles : Bool) → (source : StructHandle) → (productive : Bool) →
-    (sorts : List Type) → SortEquals sorts → nominal source productive sorts →
-    nominal source productive sorts → Bool
+  nominalEqual : (handles : Bool) → (source : StructHandle) → (kind : NominalKind) →
+    (functions : FunctionSorts) → FunctionEquals functions →
+    (sorts : List Type) → SortEquals sorts → nominal source kind functions sorts →
+    nominal source kind functions sorts → Bool
   /-- Without handles the equality compares the erasures of the encodings, as
   `NTy.equal_codec` states of a struct at that flag. -/
-  nominalEqual_encode : ∀ source productive sorts (encoders : SortEncoders sorts) equals,
+  nominalEqual_encode : ∀ source kind functions (functionEncoders : FunctionEncoders functions)
+      functionEquals sorts (encoders : SortEncoders sorts) equals,
+    FunctionEquals.Agrees functionEncoders functionEquals →
     SortEquals.Agrees encoders equals → ∀ left right,
-      nominalEqual false source productive sorts equals left right =
-        decide ((nominalEncode source productive sorts encoders left).eraseGhosts =
-          (nominalEncode source productive sorts encoders right).eraseGhosts)
+      nominalEqual false source kind functions functionEquals sorts equals left right =
+        decide
+          ((nominalEncode source kind functions functionEncoders sorts encoders left).eraseGhosts =
+            (nominalEncode source kind functions functionEncoders sorts encoders right).eraseGhosts)
+  /-- The action of a clean declaration's generated type on its sorts: a
+  value at the mapped values of its arguments, at any function sorts, which a
+  clean layout does not read. -/
+  nominalMap : ∀ source kind, kind.clean = true → ∀ functions functions' sorts sorts',
+    SortMaps sorts sorts' → nominal source kind functions sorts →
+      nominal source kind functions' sorts'
+  /-- The action at the identities is the identity. -/
+  nominalMap_id : ∀ source kind clean functions sorts value,
+    nominalMap source kind clean functions functions sorts sorts (SortMaps.identity sorts) value =
+      value
+  /-- The action composes. -/
+  nominalMap_comp : ∀ source kind clean functions functions' functions'' sorts sorts' sorts''
+      (before : SortMaps sorts sorts') (after : SortMaps sorts' sorts'') value,
+    nominalMap source kind clean functions' functions'' sorts' sorts'' after
+        (nominalMap source kind clean functions functions' sorts sorts' before value) =
+      nominalMap source kind clean functions functions'' sorts sorts''
+        (SortMaps.comp before after) value
+  /-- A mapped value's encoding is the value's at the encoders read through
+  the maps, whatever the function sorts' encoders. -/
+  nominalEncode_map : ∀ source kind clean functions functions'
+      (functionEncoders : FunctionEncoders functions)
+      (functionEncoders' : FunctionEncoders functions') sorts sorts'
+      (maps : SortMaps sorts sorts') (encoders' : SortEncoders sorts') value,
+    nominalEncode source kind functions' functionEncoders' sorts' encoders'
+        (nominalMap source kind clean functions functions' sorts sorts' maps value) =
+      nominalEncode source kind functions functionEncoders sorts
+        (SortEncoders.comap maps encoders') value
 /-- The carriers of a generic function's type parameters: per index an
 inhabited type, a tight codec whose encodings are loan-free, decidable
 equality, and the propositional validity predicate (`holds`) for parameter
@@ -2682,42 +3076,75 @@ class Carriers where
   declaration without one (`NTy.deepHolds`, `NTy.Holds`,
   `doc/designs/data-invariants.md`). -/
   own : StructHandle → NRow → RuntimeValue → Prop := fun _ _ _ => True
-/-- The codec of a nominal's values at a dictionary of the arguments' codecs:
-the functor's encoder and decoder, which invert where the arguments' do. -/
-def Carriers.nominalCodec [Carriers] (source : StructHandle) (productive : Bool)
+/-- The dictionary of typed function values a family's function sorts carry
+(`Carriers.functions`), at any family of function sorts. -/
+abbrev FunctionDictionary (functions : FunctionSorts) : Type :=
+  (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+    TypedFunctions (functions parameters shared results)
+
+/-- The codec of a nominal's values at a dictionary of the function sorts'
+typed values and one of the arguments' codecs: the functor's encoder and
+decoder, which invert where those do. -/
+def Carriers.nominalCodec [Carriers] (source : StructHandle) (kind : NominalKind)
+    (functions : FunctionSorts) (typed : FunctionDictionary functions)
     (sorts : List Type) (codecs : SortCodecs sorts) :
-    Codec (Carriers.nominals.nominal source productive sorts) RuntimeValue where
-  encode := Carriers.nominals.nominalEncode source productive sorts codecs.encoders
-  decode? := Carriers.nominals.nominalDecode? source productive sorts codecs.decoders
+    Codec (Carriers.nominals.nominal source kind functions sorts) RuntimeValue where
+  encode := Carriers.nominals.nominalEncode source kind functions (FunctionEncoders.of typed)
+    sorts codecs.encoders
+  decode? := Carriers.nominals.nominalDecode? source kind functions (FunctionDecoders.of typed)
+    sorts codecs.decoders
   decode_encode := fun value =>
-    Carriers.nominals.nominalDecode_encode source productive sorts codecs.encoders codecs.decoders value
+    Carriers.nominals.nominalDecode_encode source kind functions (FunctionEncoders.of typed)
+      (FunctionDecoders.of typed) sorts codecs.encoders codecs.decoders value
+      (FunctionDecoders.invertsBelow _ _ _ (FunctionDecoders.inverts_of typed))
       (SortDecoders.invertsBelow _ codecs.encoders codecs.decoders codecs.inverts)
 
 /-- A nominal's codec is tight where the arguments' are. -/
-theorem Carriers.nominalCodec_tight [Carriers] (source : StructHandle) (productive : Bool)
+theorem Carriers.nominalCodec_tight [Carriers] (source : StructHandle) (kind : NominalKind)
+    (functions : FunctionSorts) (typed : FunctionDictionary functions)
     (sorts : List Type) (codecs : SortCodecs sorts) (tight : codecs.Tight) :
-    (Carriers.nominalCodec source productive sorts codecs).Tight :=
+    (Carriers.nominalCodec source kind functions typed sorts codecs).Tight :=
   fun raw value decoded =>
-    Carriers.nominals.nominalEncode_of_decode? source productive sorts codecs.encoders codecs.decoders raw
-      value
+    Carriers.nominals.nominalEncode_of_decode? source kind functions (FunctionEncoders.of typed)
+      (FunctionDecoders.of typed) sorts codecs.encoders codecs.decoders raw value
+      (FunctionDecoders.tightBelow _ _ _ (FunctionDecoders.tight_of typed))
       (SortDecoders.tightBelow _ codecs.encoders codecs.decoders (codecs.tight_decoders tight))
       decoded
 
 /-- A nominal's encodings are loan-free where the arguments' are. -/
-theorem Carriers.nominalCodec_plain [Carriers] (source : StructHandle) (productive : Bool)
+theorem Carriers.nominalCodec_plain [Carriers] (source : StructHandle) (kind : NominalKind)
+    (functions : FunctionSorts) (typed : FunctionDictionary functions)
     (sorts : List Type) (codecs : SortCodecs sorts) (plain : codecs.Plain)
-    (value : Carriers.nominals.nominal source productive sorts) :
-    Plain ((Carriers.nominalCodec source productive sorts codecs).encode value) :=
-  Carriers.nominals.nominalEncode_plain source productive sorts codecs.encoders
-    (codecs.plain_encoders plain) value
+    (value : Carriers.nominals.nominal source kind functions sorts) :
+    Plain ((Carriers.nominalCodec source kind functions typed sorts codecs).encode value) :=
+  Carriers.nominals.nominalEncode_plain source kind functions (FunctionEncoders.of typed) sorts
+    codecs.encoders (FunctionEncoders.plain_of typed) (codecs.plain_encoders plain) value
 
 /-- A nominal one of whose values encodes as `.unit` has no other value. -/
-theorem Carriers.nominalCodec_unit [Carriers] (source : StructHandle) (productive : Bool)
+theorem Carriers.nominalCodec_unit [Carriers] (source : StructHandle) (kind : NominalKind)
+    (functions : FunctionSorts) (typed : FunctionDictionary functions)
     (sorts : List Type) (codecs : SortCodecs sorts)
-    (value other : Carriers.nominals.nominal source productive sorts)
-    (encoded : (Carriers.nominalCodec source productive sorts codecs).encode value = .unit) :
+    (value other : Carriers.nominals.nominal source kind functions sorts)
+    (encoded : (Carriers.nominalCodec source kind functions typed sorts codecs).encode value =
+      .unit) :
     other = value :=
-  Carriers.nominals.nominalEncode_unit source productive sorts codecs.encoders value other encoded
+  Carriers.nominals.nominalEncode_unit source kind functions (FunctionEncoders.of typed) sorts
+    codecs.encoders value other encoded
+/-- The function sorts of a declaration at an argument row: the family's
+function values at the function types the declaration's types read as there. -/
+@[reducible] def Carriers.frameFunctions [Carriers] (arguments : NRow) : FunctionSorts :=
+  fun parameters shared results =>
+    Carriers.functionCarrier (parameters.substWith (NominalBasis.slot arguments)) shared
+      (results.substWith (NominalBasis.slot arguments))
+
+/-- The typed function values of a declaration's function sorts at an argument
+row: the family's. -/
+@[reducible] def Carriers.frameTyped [Carriers] (arguments : NRow) :
+    FunctionDictionary (Carriers.frameFunctions arguments) :=
+  fun parameters shared results =>
+    Carriers.functions (parameters.substWith (NominalBasis.slot arguments)) shared
+      (results.substWith (NominalBasis.slot arguments))
+
 instance [Θ : Carriers] (index : Nat) : Inhabited (Carriers.carrier index) := Θ.inhabited index
 
 /-- A type parameter's order compares equal only equal values: its codec's
@@ -2734,29 +3161,33 @@ instance [Θ : Carriers] {index : Nat} {rank : ValueRanks} :
     exact (Carriers.codec index).encode_injective (RuntimeValue.eq_of_order same)
 
 /-- The one-point functor: every declaration has the single value at
-`productive = true` and none otherwise, encoded as `.unit`.  The functor of a
+a productive kind and none otherwise, encoded as `.unit`.  The functor of a
 family that carries no declaration natively.  Not reducible: a family names it,
 and a reduction of the family stops at the name. -/
 def NominalFunctor.point : NominalFunctor where
-  nominal := fun _ productive _ => PLift (productive = true)
-  nominalEncode := fun _ _ _ _ _ => .unit
-  nominalDecode? := fun _ productive _ _ raw =>
+  nominal := fun _ kind _ _ => PLift (kind.productive = true)
+  nominalEncode := fun _ _ _ _ _ _ _ => .unit
+  nominalDecode? := fun _ kind _ _ _ _ raw =>
     match raw with
-    | .unit => if proved : productive = true then Option.some ⟨proved⟩ else Option.none
+    | .unit => if proved : kind.productive = true then Option.some ⟨proved⟩ else Option.none
     | _ => Option.none
-  nominalDecode_encode := fun _ _ _ _ _ value _ => by simp only [dif_pos value.down]
-  nominalDecode?_isSome_congr := fun _ _ _ _ _ _ _ _ => rfl
-  nominalDecode?_congr := fun _ _ _ _ _ _ _ => rfl
-  nominalEncode_of_decode? := fun _ productive _ _ _ raw value _ decoded => by
+  nominalDecode_encode := fun _ _ _ _ _ _ _ _ value _ _ => by simp only [dif_pos value.down]
+  nominalDecode?_isSome_congr := fun _ _ _ _ _ _ _ _ _ _ _ _ _ => rfl
+  nominalDecode?_congr := fun _ _ _ _ _ _ _ _ _ _ _ => rfl
+  nominalEncode_of_decode? := fun _ kind _ _ _ _ _ _ raw value _ _ decoded => by
     cases raw <;> first | rfl | (simp at decoded)
-  nominalEncode_plain := fun _ _ _ _ _ _ => .unit
-  nominalInhabitant := fun _ _ _ => ⟨rfl⟩
-  nominalEncode_unit := fun _ _ _ _ value other _ => by cases value; cases other; rfl
-  nominalDecEq := fun _ _ _ _ left right => isTrue (by cases left; cases right; rfl)
-  nominalOrder := fun _ _ _ _ _ _ _ => .eq
-  nominalOrder_encode := fun _ _ _ _ _ _ _ _ _ => RuntimeValue.order_unit _
-  nominalEqual := fun _ _ _ _ _ _ _ => true
-  nominalEqual_encode := fun _ _ _ _ _ _ _ _ => by simp
+  nominalEncode_plain := fun _ _ _ _ _ _ _ _ _ => .unit
+  nominalInhabitant := fun _ _ _ _ productive _ => ⟨productive⟩
+  nominalEncode_unit := fun _ _ _ _ _ _ value other _ => by cases value; cases other; rfl
+  nominalDecEq := fun _ _ _ _ _ _ left right => isTrue (by cases left; cases right; rfl)
+  nominalOrder := fun _ _ _ _ _ _ _ _ _ => .eq
+  nominalOrder_encode := fun _ _ _ _ _ _ _ _ _ _ _ _ _ => RuntimeValue.order_unit _
+  nominalEqual := fun _ _ _ _ _ _ _ _ _ => true
+  nominalEqual_encode := fun _ _ _ _ _ _ _ _ _ _ _ _ => by simp
+  nominalMap := fun _ _ _ _ _ _ _ _ value => value
+  nominalMap_id := fun _ _ _ _ _ _ => rfl
+  nominalMap_comp := fun _ _ _ _ _ _ _ _ _ _ _ _ => rfl
+  nominalEncode_map := fun _ _ _ _ _ _ _ _ _ _ _ _ => rfl
 
 /-- The family of literals, which never have a type parameter's or a
 function's type. -/
@@ -2808,6 +3239,17 @@ def SortEncoders.AdmitsBelow (unit : Validation.ValidatedUnit) (bound : Nat) :
         SortEncoders.AdmitsBelow unit bound rest encoders.2
   | _, _, _ => False
 
+/-- Each function sort of a declaration at an argument row is carried at an
+encoder whose encodings below a bound are ones the unit types at the function
+type the declaration's type reads as there. -/
+def FunctionEncoders.AdmitsBelow (unit : Validation.ValidatedUnit) (bound : Nat)
+    (arguments : NRow) {functions : FunctionSorts} (encoders : FunctionEncoders functions) : Prop :=
+  ∀ parameters shared results value, sizeOf (encoders parameters shared results value) < bound →
+    NTy.admits unit
+      (.function (parameters.substWith (NominalBasis.slot arguments)) shared
+        (results.substWith (NominalBasis.slot arguments)))
+      (encoders parameters shared results value) = true
+
 /-- Each of a declaration's type arguments is carried at a codec whose
 encodings are ones the unit types at that argument's type. -/
 def SortCodecs.Admits (unit : Validation.ValidatedUnit) :
@@ -2838,7 +3280,7 @@ declared where the unit is registered: the runtime family reads it as it reads
 class NominalCarriers (unit : Validation.ValidatedUnit) extends NominalFunctor where
   /-- The declarations, at their productivity flag, whose values this instance
   carries natively. -/
-  supports : StructHandle → Bool → Bool
+  supports : StructHandle → NominalKind → Bool
   /-- Every nominal in a type the unit's tables denote, at supported type
   arguments, is one this instance supports. -/
   covers : ∀ env fuel namespaceId typeId τ, NRow.supported supports env = true →
@@ -2846,14 +3288,19 @@ class NominalCarriers (unit : Validation.ValidatedUnit) extends NominalFunctor w
       NTy.supported supports τ = true
   /-- A value's encoding is one the unit types at the nominal, where the
   arguments' encodings are typed at the argument row. -/
-  admits : ∀ source productive arguments sorts (encoders : SortEncoders sorts) value,
-    supports source productive = true →
+  admits : ∀ source kind arguments functions (functionEncoders : FunctionEncoders functions) sorts
+      (encoders : SortEncoders sorts) value,
+    supports source kind = true →
+    FunctionEncoders.AdmitsBelow unit
+        (sizeOf (nominalEncode source kind functions functionEncoders sorts encoders value))
+        arguments functionEncoders →
     SortEncoders.AdmitsBelow unit
-        (sizeOf (nominalEncode source productive sorts encoders value)) arguments encoders →
-      NTy.admits unit (NTy.nominal source arguments productive)
-        (nominalEncode source productive sorts encoders value) = true
+        (sizeOf (nominalEncode source kind functions functionEncoders sorts encoders value))
+        arguments encoders →
+      NTy.admits unit (NTy.nominal source arguments kind)
+        (nominalEncode source kind functions functionEncoders sorts encoders value) = true
 /-- The instance of a unit that supports no declaration: the one point at
-`productive = true`, encoded as `.unit`, whose invariants are its
+a productive kind, encoded as `.unit`, whose invariants are its
 declaration's of `.unit`.  A definition, not an instance: a unit's instance is
 declared with the unit.  Not reducible: a term names it, and a reduction of
 the unit's carriers stops at the name. -/
@@ -2864,7 +3311,7 @@ def NominalCarriers.none (unit : Validation.ValidatedUnit) :
   covers := fun env fuel namespaceId typeId τ held read =>
     supported_ntyOfFuel (fun _ _ => false) (unitTypes unit) unit fuel env held namespaceId typeId
       τ read
-  admits := fun _ _ _ _ _ _ supported _ => absurd supported (by simp)
+  admits := fun _ _ _ _ _ _ _ _ supported _ _ => absurd supported (by simp)
 
 /-- A unit's function values: a carrier per function type and its interface
 (`TypedFunctions`). One instance per unit, declared where the unit is
@@ -2910,10 +3357,10 @@ the unit. -/
 
 /-- What a recursive nominal admits holds no loan. -/
 theorem NTy.loanFree_of_admits_nominal {unit : Validation.ValidatedUnit} {source : StructHandle}
-    {arguments : NRow} {productive : Bool} {value : RuntimeValue}
-    (admitted : NTy.admits unit (NTy.nominal source arguments productive) value = true) :
+    {arguments : NRow} {kind : NominalKind} {value : RuntimeValue}
+    (admitted : NTy.admits unit (NTy.nominal source arguments kind) value = true) :
     Plain value := by
-  have point : productive = true ∧ value = witnessOrUnit unit source arguments →
+  have point : kind.productive = true ∧ value = witnessOrUnit unit source arguments →
       Plain value := fun held => held.2 ▸ witnessOrUnit_plain unit source arguments
   cases value <;> first
     | (simp only [NTy.admits, Bool.and_eq_true, beq_iff_eq] at admitted; exact point admitted)
@@ -3014,22 +3461,23 @@ theorem NRow.supported_closureRowsIn?_captured {function : FunctionHandle} {mask
 
 end SupportedClosures
 
-/-- A nominal flagged productive admits its witness. -/
+/-- A nominal of a productive kind admits its witness. -/
 theorem NTy.admits_witnessOrUnit (unit : Validation.ValidatedUnit) (source : StructHandle)
-    (arguments : NRow) :
-    NTy.admits unit (.nominal source arguments true) (witnessOrUnit unit source arguments) = true := by
+    (arguments : NRow) (kind : NominalKind) (productive : kind.productive = true) :
+    NTy.admits unit (.nominal source arguments kind) (witnessOrUnit unit source arguments) = true := by
   have point : ∀ value, value = witnessOrUnit unit source arguments →
-      NTy.admits unit (.nominal source arguments true) value = true := by
+      NTy.admits unit (.nominal source arguments kind) value = true := by
     intro value same
-    cases value <;> rw [NTy.admits] <;> simp [← same]
+    cases value <;> rw [NTy.admits] <;> simp [← same, productive]
   exact point _ rfl
 
 /-- The only `.unit` a nominal admits is its witness. -/
 theorem NTy.witnessOrUnit_of_admits_unit {unit : Validation.ValidatedUnit} {source : StructHandle}
-    {arguments : NRow} (admitted : NTy.admits unit (.nominal source arguments true) .unit = true) :
+    {arguments : NRow} {kind : NominalKind}
+    (admitted : NTy.admits unit (.nominal source arguments kind) .unit = true) :
     witnessOrUnit unit source arguments = .unit := by
-  simp only [NTy.admits, Bool.true_and, beq_iff_eq] at admitted
-  exact admitted.symm
+  simp only [NTy.admits, Bool.and_eq_true, beq_iff_eq] at admitted
+  exact admitted.2.symm
 open Classical in
 /-- The family of the public theorem: every type parameter carried as a
 loan-free runtime value, and the unit's function values. -/
@@ -3198,8 +3646,8 @@ are homogeneous pairs of current and prophecy values. -/
   | .ref referent => referent.carrier × referent.carrier
   | .param index => Carriers.carrier index
   | .function parameters shared results => Carriers.functionCarrier parameters shared results
-  | .nominal source arguments productive =>
-      Carriers.nominals.nominal source productive (NRow.sorts arguments)
+  | .nominal source arguments kind =>
+      Carriers.nominals.nominal source kind (Carriers.frameFunctions arguments) (NRow.sorts arguments)
   | .observed referent => referent.carrier
 termination_by structural τ => τ
 
@@ -3338,8 +3786,9 @@ def NTy.decEq : (τ : NTy) → DecidableEq τ.carrier
   | .ref referent => @instDecidableEqProd _ _ referent.decEq referent.decEq
   | .param index => Carriers.decEq index
   | .function parameters shared results => (Carriers.functions parameters shared results).decEq
-  | .nominal source arguments productive =>
-      Carriers.nominals.nominalDecEq source productive (NRow.sorts arguments)
+  | .nominal source arguments kind =>
+      Carriers.nominals.nominalDecEq source kind (Carriers.frameFunctions arguments)
+        (FunctionDecEqs.of (Carriers.frameTyped arguments)) (NRow.sorts arguments)
         (NRow.sortDecEqs arguments)
   | .observed referent => referent.decEq
 
@@ -3462,8 +3911,9 @@ def NTy.codec : (τ : NTy) → Codec τ.carrier RuntimeValue
   | .ref referent => Codec.prophecyPair referent.codec
   | .param index => Carriers.codec index
   | .function parameters shared results => (Carriers.functions parameters shared results).codec
-  | .nominal source arguments productive =>
-      Carriers.nominalCodec source productive (NRow.sorts arguments) (NRow.sortCodecs arguments)
+  | .nominal source arguments kind =>
+      Carriers.nominalCodec source kind (Carriers.frameFunctions arguments)
+        (Carriers.frameTyped arguments) (NRow.sorts arguments) (NRow.sortCodecs arguments)
   | .observed referent => referent.codec
 
 /-- The codec of a row of values. -/
@@ -3489,12 +3939,12 @@ def NTy.encode (τ : NTy) (value : τ.carrier) : RuntimeValue := τ.codec.encode
 parameter validity predicate (`Carriers.holds`): two families that differ only
 in `own` or `holds` give a type the exact same carrier and codec by `rfl`. -/
 example (base : Carriers) (s : StructHandle) :
-    let τ : NTy := .struct s (.cons (.param 0) .nil) (.cons (.param 0) (.cons (.nominal s (.cons (.param 0) .nil) true) .nil))
+    let τ : NTy := .struct s (.cons (.param 0) .nil) (.cons (.param 0) (.cons (.nominal s (.cons (.param 0) .nil) ⟨true, [0], .owned, true⟩) .nil))
     @NTy.carrier { base with own := fun _ _ _ => True, holds := fun _ _ => True } τ =
       @NTy.carrier { base with own := fun _ _ _ => False, holds := fun _ _ => False } τ := rfl
 
 example (base : Carriers) (s : StructHandle) :
-    let τ : NTy := .struct s (.cons (.param 0) .nil) (.cons (.param 0) (.cons (.nominal s (.cons (.param 0) .nil) true) .nil))
+    let τ : NTy := .struct s (.cons (.param 0) .nil) (.cons (.param 0) (.cons (.nominal s (.cons (.param 0) .nil) ⟨true, [0], .owned, true⟩) .nil))
     @NTy.codec { base with own := fun _ _ _ => True, holds := fun _ _ => True } τ =
       @NTy.codec { base with own := fun _ _ _ => False, holds := fun _ _ => False } τ := rfl
 
@@ -3590,10 +4040,11 @@ end
     (value : (NTy.function parameters shared results).carrier) :
     NTy.encode (.function parameters shared results) value =
       ((Carriers.functions parameters shared results).closure value).encode := rfl
-@[simp] theorem NTy.encode_nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
-    (value : (NTy.nominal source arguments productive).carrier) :
-    NTy.encode (NTy.nominal source arguments productive) value =
-      Carriers.nominals.nominalEncode source productive (NRow.sorts arguments)
+@[simp] theorem NTy.encode_nominal (source : StructHandle) (arguments : NRow) (kind : NominalKind)
+    (value : (NTy.nominal source arguments kind).carrier) :
+    NTy.encode (NTy.nominal source arguments kind) value =
+      Carriers.nominals.nominalEncode source kind (Carriers.frameFunctions arguments)
+        (FunctionEncoders.of (Carriers.frameTyped arguments)) (NRow.sorts arguments)
         (NRow.sortCodecs arguments).encoders value := rfl
 
 /-- The storage key a native value keys memory by: an address or a signer by
@@ -3625,8 +4076,8 @@ def NTy.storageKey : (τ : NTy) → τ.carrier → StorageKey
   | .param index, value => (NTy.encode (.param index) value).storageKey
   | .function parameters shared results, value =>
       (NTy.encode (.function parameters shared results) value).storageKey
-  | .nominal source arguments productive, value =>
-      (NTy.encode (NTy.nominal source arguments productive) value).storageKey
+  | .nominal source arguments kind, value =>
+      (NTy.encode (NTy.nominal source arguments kind) value).storageKey
   | .observed referent, value => (NTy.encode (.observed referent) value).storageKey
 /-- A native value keys storage as its encoding does. -/
 theorem NTy.storageKey_encode (τ : NTy) (value : τ.carrier) :
@@ -3814,8 +4265,9 @@ def NTy.order (rank : ValueRanks) : (τ : NTy) → τ.carrier → τ.carrier →
   | .param index, left, right => (Carriers.orders index).order rank left right
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).orders.order rank left right
-  | .nominal source arguments productive, left, right =>
-      Carriers.nominals.nominalOrder rank source productive (NRow.sorts arguments)
+  | .nominal source arguments kind, left, right =>
+      Carriers.nominals.nominalOrder rank source kind (Carriers.frameFunctions arguments)
+        (FunctionOrderings.of rank (Carriers.frameTyped arguments)) (NRow.sorts arguments)
         (NRow.sortOrderings rank arguments) left right
 
 /-- The lexicographic order of two rows of one row type. -/
@@ -3933,11 +4385,13 @@ theorem NTy.order_codec (rank : ValueRanks) : (τ : NTy) → (left right : τ.ca
   | .param index, left, right => (Carriers.orders index).order_encode rank left right
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).orders.order_encode rank left right
-  | .nominal source arguments productive, left, right =>
-      Carriers.nominals.nominalOrder_encode rank source productive
+  | .nominal source arguments kind, left, right =>
+      Carriers.nominals.nominalOrder_encode rank source kind (Carriers.frameFunctions arguments)
+        (FunctionEncoders.of (Carriers.frameTyped arguments)) (FunctionOrderings.of rank (Carriers.frameTyped arguments))
         (NRow.sorts arguments)
         (NRow.sortCodecs arguments).encoders
         (NRow.sortOrderings rank arguments)
+        (FunctionOrderings.agrees_of rank (Carriers.frameTyped arguments))
         (NRow.sortOrderings_agree rank arguments) left right
 
 /-- Rows order as the lists of their encodings do. -/
@@ -4062,8 +4516,8 @@ theorem NTy.deepHolds_function (parameters : NRow) (shared : Sharing)
     (results : NRow) (value : (NTy.function parameters shared results).carrier) :
     NTy.deepHolds (.function parameters shared results) value = True := rfl
 theorem NTy.deepHolds_nominal (source : StructHandle) (arguments : NRow)
-    (productive : Bool) (value : (NTy.nominal source arguments productive).carrier) :
-    NTy.deepHolds (.nominal source arguments productive) value = True := rfl
+    (kind : NominalKind) (value : (NTy.nominal source arguments kind).carrier) :
+    NTy.deepHolds (.nominal source arguments kind) value = True := rfl
 theorem NTy.deepHolds_tuple (elements : NRow)
     (values : (NTy.tuple elements).carrier) :
     NTy.deepHolds (.tuple elements) values = HList.deepHolds elements values := rfl
@@ -4182,9 +4636,9 @@ theorem NTy.holds_char (value : (NTy.char).carrier) : NTy.Holds .char value = Tr
 theorem NTy.holds_function (parameters : NRow) (shared : Sharing) (results : NRow)
     (value : (NTy.function parameters shared results).carrier) :
     NTy.Holds (.function parameters shared results) value = True := eq_true ⟨trivial⟩
-theorem NTy.holds_nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
-    (value : (NTy.nominal source arguments productive).carrier) :
-    NTy.Holds (.nominal source arguments productive) value = True := eq_true ⟨trivial⟩
+theorem NTy.holds_nominal (source : StructHandle) (arguments : NRow) (kind : NominalKind)
+    (value : (NTy.nominal source arguments kind).carrier) :
+    NTy.Holds (.nominal source arguments kind) value = True := eq_true ⟨trivial⟩
 
 theorem NTy.holds_tuple (elements : NRow) (values : (NTy.tuple elements).carrier) :
     NTy.Holds (.tuple elements) values = HList.Holds elements values :=
@@ -4694,8 +5148,9 @@ def NTy.equal (handles : Bool) : (τ : NTy) → τ.carrier → τ.carrier → Bo
   | .param index, left, right => (Carriers.erasures index).same left right
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same left right
-  | .nominal source arguments productive, left, right =>
-      Carriers.nominals.nominalEqual handles source productive (NRow.sorts arguments)
+  | .nominal source arguments kind, left, right =>
+      Carriers.nominals.nominalEqual handles source kind (Carriers.frameFunctions arguments)
+        (FunctionEquals.of (Carriers.frameTyped arguments)) (NRow.sorts arguments)
         (NRow.sortEquals handles arguments) left right
   | .observed referent, left, right => NTy.equal handles referent left right
 
@@ -4815,10 +5270,10 @@ theorem NTy.equal_table (key value : NTy)
       decide ((Carriers.functions parameters shared results).erased left =
         (Carriers.functions parameters shared results).erased right) := rfl
 @[simp, vir_denote_norm] theorem NTy.equal_nominal (source : StructHandle) (arguments : NRow)
-    (productive : Bool) (left right : (NTy.nominal source arguments productive).carrier) :
-    NTy.equal handles (NTy.nominal source arguments productive) left right =
-      Carriers.nominals.nominalEqual handles source productive
-        (NRow.sorts arguments)
+    (kind : NominalKind) (left right : (NTy.nominal source arguments kind).carrier) :
+    NTy.equal handles (NTy.nominal source arguments kind) left right =
+      Carriers.nominals.nominalEqual handles source kind (Carriers.frameFunctions arguments)
+        (FunctionEquals.of (Carriers.frameTyped arguments)) (NRow.sorts arguments)
         (NRow.sortEquals handles arguments) left right := rfl
 /-- A type parameter's equality stays folded, at one flag: its values hold
 no handle. -/
@@ -4911,11 +5366,13 @@ theorem NTy.equal_codec : (τ : NTy) → (left right : τ.carrier) →
   | .param index, left, right => (Carriers.erasures index).same_eq left right
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same_eq left right
-  | .nominal source arguments productive, left, right =>
-      Carriers.nominals.nominalEqual_encode source productive
+  | .nominal source arguments kind, left, right =>
+      Carriers.nominals.nominalEqual_encode source kind (Carriers.frameFunctions arguments)
+        (FunctionEncoders.of (Carriers.frameTyped arguments)) (FunctionEquals.of (Carriers.frameTyped arguments))
         (NRow.sorts arguments)
         (NRow.sortCodecs arguments).encoders
         (NRow.sortEquals false arguments)
+        (FunctionEquals.agrees_of (Carriers.frameTyped arguments))
         (NRow.sortEquals_agrees arguments) left right
 
 /-- Rows compare without ghosts as the lists of their encodings do. -/
@@ -5032,8 +5489,8 @@ omit [Carriers] in
 
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NRow.ownsHandle_nominal (source : StructHandle) (arguments : NRow)
-    (productive : Bool) (rest : NRow) :
-    NRow.ownsHandle (.cons (NTy.nominal source arguments productive) rest) = false := rfl
+    (kind : NominalKind) (rest : NRow) :
+    NRow.ownsHandle (.cons (NTy.nominal source arguments kind) rest) = false := rfl
 
 omit [Carriers] in
 @[simp, vir_denote_norm] theorem NRow.ownsHandle_nil : NRow.ownsHandle .nil = false := rfl
@@ -5066,8 +5523,8 @@ dropped. -/
 omit [Carriers] in
 /-- A recursive nominal's identity is its runtime value with ghost contents dropped. -/
 @[simp] theorem NTy.identityRuntime_nominal (source : StructHandle) (arguments : NRow)
-    (productive : Bool) (value : RuntimeValue) :
-    NTy.identityRuntime (NTy.nominal source arguments productive) value = value.eraseGhosts := by
+    (kind : NominalKind) (value : RuntimeValue) :
+    NTy.identityRuntime (NTy.nominal source arguments kind) value = value.eraseGhosts := by
   cases value <;> rw [NTy.identityRuntime]
 
 omit [Carriers] in
@@ -5192,9 +5649,9 @@ def NTy.eqb : (τ : NTy) → τ.carrier → τ.carrier → Bool
   | .function parameters shared results, left, right =>
       (Carriers.functions parameters shared results).erasures.same left right
   | .observed referent, left, right => NTy.eqb referent left right
-  | .nominal source arguments productive, left, right =>
-      @decide (left = right) (Carriers.nominals.nominalDecEq source productive
-        (NRow.sorts arguments) (NRow.sortDecEqs arguments) left right)
+  | .nominal source arguments kind, left, right =>
+      @decide (left = right) (Carriers.nominals.nominalDecEq source kind (Carriers.frameFunctions arguments)
+        (FunctionDecEqs.of (Carriers.frameTyped arguments)) (NRow.sorts arguments) (NRow.sortDecEqs arguments) left right)
 
 /-- Structural equality of rows, component by component. -/
 def rowEqb : (row : NRow) → HList row → HList row → Bool
@@ -5299,11 +5756,11 @@ theorem NTy.beq_encode (τ : NTy) (scalar : τ.isScalar = true) (left right : τ
       decide ((Carriers.functions parameters shared results).erased left =
         (Carriers.functions parameters shared results).erased right) := rfl
 
-@[simp] theorem NTy.eqb_nominal (source : StructHandle) (arguments : NRow) (productive : Bool)
-    (left right : (NTy.nominal source arguments productive).carrier) :
-    NTy.eqb (NTy.nominal source arguments productive) left right =
-      @decide (left = right) (Carriers.nominals.nominalDecEq source productive
-        (NRow.sorts arguments) (NRow.sortDecEqs arguments) left right) := rfl
+@[simp] theorem NTy.eqb_nominal (source : StructHandle) (arguments : NRow) (kind : NominalKind)
+    (left right : (NTy.nominal source arguments kind).carrier) :
+    NTy.eqb (NTy.nominal source arguments kind) left right =
+      @decide (left = right) (Carriers.nominals.nominalDecEq source kind (Carriers.frameFunctions arguments)
+        (FunctionDecEqs.of (Carriers.frameTyped arguments)) (NRow.sorts arguments) (NRow.sortDecEqs arguments) left right) := rfl
 /-! ## Environments
 
 A function's locals are one heterogeneous row indexed by their declared
@@ -8022,8 +8479,9 @@ theorem NTy.codec_tight [Carriers] : (τ : NTy) → τ.codec.Tight
   | .ref referent => prophecyPair_tight (NTy.codec_tight referent)
   | .param index => Carriers.tight index
   | .function parameters shared results => (Carriers.functions parameters shared results).tight
-  | .nominal source arguments productive =>
-      Carriers.nominalCodec_tight source productive arguments.sorts
+  | .nominal source arguments kind =>
+      Carriers.nominalCodec_tight source kind (Carriers.frameFunctions arguments)
+        (Carriers.frameTyped arguments) arguments.sorts
         (NRow.sortCodecs arguments) (NRow.sortCodecs_tight arguments)
 
 theorem rowCodec_tight [Carriers] : (row : NRow) → (rowCodec row).Tight
@@ -8406,7 +8864,7 @@ theorem NTy.substWith_param : (τ : NTy) → τ.substWith (fun index => .param i
   | .function parameters shared results => by
       simp only [NTy.substWith, NRow.substWith_param parameters, NRow.substWith_param results,
         Sharing.atWith_unmarked NTy.isObserved_param]
-  | .nominal source arguments productive => by
+  | .nominal source arguments kind => by
       simp only [NTy.substWith, NRow.substWith_param arguments]
 
 /-- An argument read at the parameters is itself, its mark kept. -/
@@ -8501,7 +8959,7 @@ theorem NTy.substWith_paramFree (types : Nat → NTy) :
       simp only [NTy.substWith, NRow.substWith_paramFree types parameters free.1,
         NRow.substWith_paramFree types results free.2,
         Sharing.atWith_paramFree free.1 free.2]
-  | .nominal source arguments productive, free => by
+  | .nominal source arguments kind, free => by
       simp only [NTy.paramFree] at free
       simp only [NTy.substWith, NRow.substWith_paramFree types arguments free]
 
@@ -8584,8 +9042,9 @@ theorem NTy.encode_plain : (τ : NTy) → (value : τ.carrier) → Plain (τ.cod
   | .param index, value => Carriers.plain index value
   | .function parameters shared results, value =>
       (Carriers.functions parameters shared results).plain value
-  | .nominal source arguments productive, value =>
-      Carriers.nominalCodec_plain source productive arguments.sorts
+  | .nominal source arguments kind, value =>
+      Carriers.nominalCodec_plain source kind (Carriers.frameFunctions arguments)
+        (Carriers.frameTyped arguments) arguments.sorts
         (NRow.sortCodecs arguments) (NRow.sortCodecs_plain arguments) value
 
 theorem rowCodec_plain : (row : NRow) → (values : HList row) →
@@ -8721,11 +9180,14 @@ theorem NTy.admits_encode : (τ : NTy) → (value : @NTy.carrier (Carriers.runti
   | .observed _, _, _ => by simp only [NTy.admits]
   | .param _, _, _ => by simp [NTy.admits]
   | .function _ _ _, value, _ => FunctionCarriers.admits _ _ _ value
-  | .nominal source arguments productive, value, supported =>
-      NominalCarriers.admits source productive arguments
+  | .nominal source arguments kind, value, supported =>
+      NominalCarriers.admits source kind arguments
+        (@Carriers.frameFunctions (Carriers.runtime unit) arguments)
+        (FunctionEncoders.of (@Carriers.frameTyped (Carriers.runtime unit) arguments))
         (@NRow.sorts (Carriers.runtime unit) arguments)
         (@NRow.sortCodecs (Carriers.runtime unit) arguments).encoders value
         (and_left supported)
+        (fun _ _ _ function _ => FunctionCarriers.admits _ _ _ function)
         (SortCodecs.admitsBelow unit _ arguments
           (@NRow.sortCodecs (Carriers.runtime unit) arguments)
           (NRow.sortCodecs_admits arguments (and_right supported)))
@@ -8913,9 +9375,9 @@ theorem NTy.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
   | .param index, _ =>
       (NTy.inhabitable_unmark _).trans (NRow.getD_inhabitable θ fits index (.param index) rfl)
   | .function _ _ _, held => by simp [NTy.inhabitable] at held
-  | .nominal _ arguments _, held => by
+  | .nominal _ arguments kind, held => by
       simp only [NTy.subst, NTy.inhabitable, Bool.and_eq_true] at held ⊢
-      exact ⟨held.1, NRow.inhabitable_subst θ fits arguments held.2⟩
+      exact ⟨held.1, NRow.inhabitableAt_subst θ fits kind.demands arguments 0 held.2⟩
   | .array element _, held => by
       simp only [NTy.subst, NTy.inhabitable, Bool.and_eq_true] at held ⊢
       exact ⟨held.1, NTy.inhabitable_subst θ fits element held.2⟩
@@ -8929,6 +9391,15 @@ theorem NRow.inhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
   | .cons τ rest, held => by
       simp only [NRow.subst, NRow.inhabitable, Bool.and_eq_true] at held ⊢
       exact ⟨NTy.inhabitable_subst θ fits τ held.1, NRow.inhabitable_subst θ fits rest held.2⟩
+
+theorem NRow.inhabitableAt_subst (θ : NRow) (fits : θ.inhabitable = true) (demands : List Nat) :
+    (row : NRow) → (index : Nat) → row.inhabitableAt demands index = true →
+      (NRow.subst θ row).inhabitableAt demands index = true
+  | .nil, _, _ => rfl
+  | .cons τ rest, index, held => by
+      simp only [NRow.subst, NRow.inhabitableAt, Bool.and_eq_true, Bool.or_eq_true] at held ⊢
+      exact ⟨held.1.imp id (NTy.inhabitable_subst θ fits τ),
+        NRow.inhabitableAt_subst θ fits demands rest (index + 1) held.2⟩
 
 theorem NRows.firstInhabitable_subst (θ : NRow) (fits : θ.inhabitable = true) :
     (names : List String) → (rows : NRows) → NRows.firstInhabitable names rows = true →
@@ -8975,10 +9446,11 @@ def NTy.inhabitant : (τ : NTy) → τ.inhabitable = true → τ.carrier
       (value, value)
   | .param index, _ => (Carriers.inhabited index).default
   | .function _ _ _, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
-  | .nominal source arguments true, inhabitable =>
-      Carriers.nominals.nominalInhabitant source arguments.sorts
-        (NRow.sortValues arguments (by simpa [NTy.inhabitable] using inhabitable))
-  | .nominal _ _ false, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
+  | .nominal source arguments kind, inhabitable =>
+      have held : kind.productive = true ∧ arguments.inhabitableAt kind.demands 0 = true := by
+        simpa [NTy.inhabitable] using inhabitable
+      Carriers.nominals.nominalInhabitant source kind (Carriers.frameFunctions arguments)
+        arguments.sorts held.1 (NRow.demandedValues kind.demands arguments 0 held.2)
   | .observed referent, inhabitable => NTy.inhabitant referent inhabitable
 termination_by structural τ _ => τ
 
@@ -8996,13 +9468,16 @@ def variantCarrier.inhabitant : (names : List String) → (rows : NRows) →
   | _ :: _, .nil, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
 termination_by structural names rows _ => rows
 
-/-- A value of each of a declaration's type arguments (`NominalFunctor.nominalInhabitant`). -/
-def NRow.sortValues : (row : NRow) → row.inhabitable = true → SortValues row.sorts
-  | .nil, _ => ()
-  | .cons τ rest, inhabitable =>
-      (NTy.inhabitant τ (by simp_all [NRow.inhabitable]),
-        NRow.sortValues rest (by simp_all [NRow.inhabitable]))
-termination_by structural row _ => row
+/-- A value of each of a declaration's type arguments its kind demands
+(`NominalFunctor.nominalInhabitant`). -/
+def NRow.demandedValues (demands : List Nat) : (row : NRow) → (index : Nat) →
+    row.inhabitableAt demands index = true → DemandedValues demands index row.sorts
+  | .nil, _, _ => ()
+  | .cons τ rest, index, inhabitable =>
+      (DemandedValues.entry (demands.contains index) fun demanded =>
+          NTy.inhabitant τ (by simp_all [NRow.inhabitableAt]),
+        NRow.demandedValues demands rest (index + 1) (by simp_all [NRow.inhabitableAt]))
+termination_by structural row _ _ => row
 end
 
 /-- Every inhabitable type has a nonempty carrier (`NTy.inhabitant`). -/
@@ -9074,7 +9549,7 @@ def NTy.read : (τ : NTy) → τ.carrier → τ.readCarrier
   | .sliceRef referent, value => value
   | .ref referent, value => value
   | .function parameters shared results, value => value
-  | .nominal source arguments productive, value => value
+  | .nominal source arguments kind, value => value
 
 @[reducible] def NTy.readDecEq : (τ : NTy) → DecidableEq τ.readCarrier
   | .int _ _ => inferInstanceAs (DecidableEq Int)
@@ -9099,7 +9574,7 @@ def NTy.read : (τ : NTy) → τ.carrier → τ.readCarrier
   | .sliceRef referent => NTy.decEq (NTy.sliceRef referent)
   | .ref referent => NTy.decEq (NTy.ref referent)
   | .function parameters shared results => NTy.decEq (NTy.function parameters shared results)
-  | .nominal source arguments productive => NTy.decEq (NTy.nominal source arguments productive)
+  | .nominal source arguments kind => NTy.decEq (NTy.nominal source arguments kind)
 
 @[reducible] def NTy.readInhabited : (τ : NTy) → τ.inhabitable = true → Inhabited τ.readCarrier
   | .int _ _, _ => inferInstanceAs (Inhabited Int)
@@ -9124,7 +9599,7 @@ def NTy.read : (τ : NTy) → τ.carrier → τ.readCarrier
   | .sliceRef referent, inhabitable => nativeInhabited (NTy.sliceRef referent) (NTy.inhabitantOf (NTy.sliceRef referent) inhabitable)
   | .ref referent, inhabitable => nativeInhabited (NTy.ref referent) (NTy.inhabitantOf (NTy.ref referent) inhabitable)
   | .function parameters shared results, inhabitable => nativeInhabited (NTy.function parameters shared results) (NTy.inhabitantOf (NTy.function parameters shared results) inhabitable)
-  | .nominal source arguments productive, inhabitable => nativeInhabited (NTy.nominal source arguments productive) (NTy.inhabitantOf (NTy.nominal source arguments productive) inhabitable)
+  | .nominal source arguments kind, inhabitable => nativeInhabited (NTy.nominal source arguments kind) (NTy.inhabitantOf (NTy.nominal source arguments kind) inhabitable)
 
 /-- The runtime value of a typed value. -/
 def NTy.readWrite : (τ : NTy) → τ.readCarrier → RuntimeValue
@@ -9150,7 +9625,7 @@ def NTy.readWrite : (τ : NTy) → τ.readCarrier → RuntimeValue
   | .sliceRef referent => NTy.encode (NTy.sliceRef referent)
   | .ref referent => NTy.encode (NTy.ref referent)
   | .function parameters shared results => NTy.encode (NTy.function parameters shared results)
-  | .nominal source arguments productive => NTy.encode (NTy.nominal source arguments productive)
+  | .nominal source arguments kind => NTy.encode (NTy.nominal source arguments kind)
 
 /-- The typed value a runtime value reads back to. -/
 def NTy.readBack : (τ : NTy) → τ.inhabitable = true → RuntimeValue → τ.readCarrier
@@ -9194,8 +9669,8 @@ def NTy.readBack : (τ : NTy) → τ.inhabitable = true → RuntimeValue → τ.
       ((NTy.ref referent).codec.decode? raw).getD (nativeInhabited (NTy.ref referent) (NTy.inhabitantOf (NTy.ref referent) inhabitable)).default
   | .function parameters shared results, inhabitable => fun raw =>
       ((NTy.function parameters shared results).codec.decode? raw).getD (nativeInhabited (NTy.function parameters shared results) (NTy.inhabitantOf (NTy.function parameters shared results) inhabitable)).default
-  | .nominal source arguments productive, inhabitable => fun raw =>
-      ((NTy.nominal source arguments productive).codec.decode? raw).getD (nativeInhabited (NTy.nominal source arguments productive) (NTy.inhabitantOf (NTy.nominal source arguments productive) inhabitable)).default
+  | .nominal source arguments kind, inhabitable => fun raw =>
+      ((NTy.nominal source arguments kind).codec.decode? raw).getD (nativeInhabited (NTy.nominal source arguments kind) (NTy.inhabitantOf (NTy.nominal source arguments kind) inhabitable)).default
 
 theorem NTy.readBack_readWrite : (τ : NTy) → (inhabitable : τ.inhabitable = true) →
     (value : τ.readCarrier) → NTy.readBack τ inhabitable (NTy.readWrite τ value) = value
@@ -9221,23 +9696,24 @@ theorem NTy.readBack_readWrite : (τ : NTy) → (inhabitable : τ.inhabitable = 
   | .sliceRef referent, _, value => by simp only [NTy.readBack, NTy.readWrite, NTy.decode?_encode, Option.getD_some]
   | .ref referent, _, value => by simp only [NTy.readBack, NTy.readWrite, NTy.decode?_encode, Option.getD_some]
   | .function parameters shared results, _, value => by simp only [NTy.readBack, NTy.readWrite, NTy.decode?_encode, Option.getD_some]
-  | .nominal source arguments productive, _, value => by simp only [NTy.readBack, NTy.readWrite, NTy.decode?_encode, Option.getD_some]
+  | .nominal source arguments kind, _, value => by simp only [NTy.readBack, NTy.readWrite, NTy.decode?_encode, Option.getD_some]
 
 
 /-- `.unit` reads back as a nominal's inhabitant: it is what `.unit` decodes to, if anything. -/
-theorem NTy.readBack_unit_nominal {source : StructHandle} {arguments : NRow}
-    (inhabitable : (NTy.nominal source arguments true).inhabitable = true) :
-    (((NTy.nominal source arguments true).codec.decode? .unit).getD
-        (NTy.inhabitantOf (.nominal source arguments true) inhabitable)) =
-      NTy.inhabitantOf (.nominal source arguments true) inhabitable := by
-  cases decoded : (NTy.nominal source arguments true).codec.decode? .unit with
+theorem NTy.readBack_unit_nominal {source : StructHandle} {arguments : NRow} {kind : NominalKind}
+    (inhabitable : (NTy.nominal source arguments kind).inhabitable = true) :
+    (((NTy.nominal source arguments kind).codec.decode? .unit).getD
+        (NTy.inhabitantOf (.nominal source arguments kind) inhabitable)) =
+      NTy.inhabitantOf (.nominal source arguments kind) inhabitable := by
+  cases decoded : (NTy.nominal source arguments kind).codec.decode? .unit with
   | none => rfl
   | some value =>
-      have encoded := NTy.codec_tight (.nominal source arguments true) _ _ decoded
+      have encoded := NTy.codec_tight (.nominal source arguments kind) _ _ decoded
       simp only [Option.getD_some]
-      exact (Carriers.nominalCodec_unit source true arguments.sorts
+      exact (Carriers.nominalCodec_unit source kind (Carriers.frameFunctions arguments)
+        (Carriers.frameTyped arguments) arguments.sorts
         (NRow.sortCodecs arguments) value
-        (NTy.inhabitantOf (.nominal source arguments true) inhabitable) encoded).symm
+        (NTy.inhabitantOf (.nominal source arguments kind) inhabitable) encoded).symm
 
 theorem NTy.readBack_unit : (τ : NTy) → (inhabitable : τ.inhabitable = true) →
     NTy.readBack τ inhabitable .unit = (NTy.readInhabited τ inhabitable).default
@@ -9265,8 +9741,7 @@ theorem NTy.readBack_unit : (τ : NTy) → (inhabitable : τ.inhabitable = true)
   | .sliceRef _, _ => rfl
   | .ref _, _ => rfl
   | .function _ _ _, _ => rfl
-  | .nominal _ _ true, inhabitable => NTy.readBack_unit_nominal inhabitable
-  | .nominal _ _ false, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
+  | .nominal _ _ _, inhabitable => NTy.readBack_unit_nominal inhabitable
 theorem NTy.readWrite_read : (τ : NTy) → (value : τ.carrier) →
     NTy.readWrite τ (NTy.read τ value) = NTy.encode τ value
   | .int _ _, _ => rfl
@@ -9291,7 +9766,7 @@ theorem NTy.readWrite_read : (τ : NTy) → (value : τ.carrier) →
   | .sliceRef referent, _ => rfl
   | .ref referent, _ => rfl
   | .function parameters shared results, _ => rfl
-  | .nominal source arguments productive, _ => rfl
+  | .nominal source arguments kind, _ => rfl
 
 /-- The native value a typed value stands for: an integer cut to its type, a
 type parameter's as its family reads it back, any other as it is. -/
@@ -9407,7 +9882,7 @@ them, any other type's by the structural order (`NTy.keyOrder`). -/
   | .sliceRef referent => NTy.keyOrder rank (.sliceRef referent)
   | .ref referent => NTy.keyOrder rank (.ref referent)
   | .function parameters shared results => NTy.keyOrder rank (.function parameters shared results)
-  | .nominal source arguments productive => NTy.keyOrder rank (NTy.nominal source arguments productive)
+  | .nominal source arguments kind => NTy.keyOrder rank (NTy.nominal source arguments kind)
 
 /-- The order of two values' typed reads is the runtime order of their
 encodings: an integer's by its value, a type parameter's by its family's law
@@ -9442,8 +9917,8 @@ theorem NTy.readOrder_read (rank : ValueRanks) : (τ : NTy) → (left right : τ
   | .ref referent, left, right => (NTy.order_encode rank (.ref referent) left right).symm
   | .function parameters shared results, left, right =>
       (NTy.order_encode rank (.function parameters shared results) left right).symm
-  | .nominal source arguments productive, left, right =>
-      (NTy.order_encode rank (.nominal source arguments productive) left right).symm
+  | .nominal source arguments kind, left, right =>
+      (NTy.order_encode rank (.nominal source arguments kind) left right).symm
 
 /-- The order of two values' typed reads is the structural order of the
 values: the two coherence laws composed. An ordered map keyed through the
@@ -9537,16 +10012,75 @@ private theorem cons_type_congr {T T' : Type} {rest rest' : List Type}
   subst head; subst tail; rfl
 
 
-private theorem nominal_encode_cast [Carriers] {source : StructHandle} {productive : Bool}
+theorem nominal_type_congr {family : FunctionSorts → List Type → Type}
+    {functions functions' : FunctionSorts} {sorts sorts' : List Type}
+    (sameFunctions : functions = functions') (sameSorts : sorts = sorts') :
+    family functions sorts = family functions' sorts' := by
+  subst sameFunctions; subst sameSorts; rfl
+
+omit Θ in
+/-- The composition law of a declaration's function sorts: at the family type
+arguments induce they are the outer family's at the substituted row. -/
+theorem Carriers.frameFunctions_instantiate (θ : TypeArgs) (outer : Carriers) (arguments : NRow) :
+    @Carriers.frameFunctions (Carriers.instantiate θ outer) arguments =
+      @Carriers.frameFunctions outer (NRow.subst θ.1 arguments) := by
+  funext parameters shared results
+  show @Carriers.functionCarrier outer
+      (NRow.subst θ.1 (parameters.substWith (NominalBasis.slot arguments))) shared
+      (NRow.subst θ.1 (results.substWith (NominalBasis.slot arguments))) =
+    @Carriers.functionCarrier outer
+      (parameters.substWith (NominalBasis.slot (NRow.subst θ.1 arguments))) shared
+      (results.substWith (NominalBasis.slot (NRow.subst θ.1 arguments)))
+  rw [NominalBasis.rowSubst_substWith, NominalBasis.rowSubst_substWith, NominalBasis.slot_subst]
+
+omit Θ in
+/-- The typed function values of a family at two readings of the rows are the
+same where the readings are. -/
+theorem Carriers.functions_congr (outer : Carriers) (rows rows' : NRow → NRow)
+    (same : rows = rows') :
+    HEq (fun parameters shared results =>
+        @Carriers.functions outer (rows parameters) shared (rows results))
+      (fun parameters shared results =>
+        @Carriers.functions outer (rows' parameters) shared (rows' results)) := by
+  subst same
+  rfl
+
+omit Θ in
+/-- The composition law of the typed function values of a declaration's
+function sorts. -/
+theorem Carriers.frameTyped_instantiate (θ : TypeArgs) (outer : Carriers) (arguments : NRow) :
+    HEq (@Carriers.frameTyped (Carriers.instantiate θ outer) arguments)
+      (@Carriers.frameTyped outer (NRow.subst θ.1 arguments)) :=
+  Carriers.functions_congr outer
+    (fun row => NRow.subst θ.1 (row.substWith (NominalBasis.slot arguments)))
+    (fun row => row.substWith (NominalBasis.slot (NRow.subst θ.1 arguments)))
+    (funext fun row => by rw [NominalBasis.rowSubst_substWith, NominalBasis.slot_subst])
+
+private theorem nominal_encode_cast [Carriers] {source : StructHandle} {kind : NominalKind}
+    {functions functions' : FunctionSorts} (sameFunctions : functions = functions')
+    {typed : FunctionDictionary functions} {typed' : FunctionDictionary functions'}
+    (sameTyped : HEq typed typed')
     {sorts sorts' : List Type} (same : sorts = sorts')
     {codecs : SortCodecs sorts} {codecs' : SortCodecs sorts'} (sameCodecs : HEq codecs codecs')
-    (value : Carriers.nominals.nominal source productive sorts') :
-    (Carriers.nominalCodec source productive sorts codecs).encode
-        (cast (congrArg (Carriers.nominals.nominal source productive) same).symm value) =
-      (Carriers.nominalCodec source productive sorts' codecs').encode value := by
+    (value : Carriers.nominals.nominal source kind functions' sorts') :
+    (Carriers.nominalCodec source kind functions typed sorts codecs).encode
+        (cast (nominal_type_congr (family := Carriers.nominals.nominal source kind) sameFunctions same).symm value) =
+      (Carriers.nominalCodec source kind functions' typed' sorts' codecs').encode value := by
+  subst sameFunctions
   subst same
+  cases eq_of_heq sameTyped
   cases eq_of_heq sameCodecs
   rfl
+
+/-- An entry of the dictionary of demanded values at two equal sorts. -/
+theorem DemandedValues.entry_heq (demanded : Bool) {A B : Type} (same : A = B)
+    (left : demanded = true → A) (right : demanded = true → B)
+    (agree : ∀ proof, HEq (left proof) (right proof)) :
+    HEq (DemandedValues.entry demanded left) (DemandedValues.entry demanded right) := by
+  subst same
+  cases demanded
+  · rfl
+  · exact agree rfl
 
 private theorem prod_mk_heq {A A' B B' : Type} (ha : A = A') (hb : B = B') (a : A) (b : B)
     (p : A' × B') (first : HEq a p.1) (second : HEq b p.2) : HEq (a, b) p := by
@@ -9613,9 +10147,9 @@ theorem NTy.carrier_instantiate : (τ : NTy) →
     @NTy.carrier (Carriers.instantiate θ Θ) τ = @NTy.carrier Θ (τ.subst θ.1)
   | .unit | .bool | .int _ _ | .num | .address | .signer | .string | .bytes | .char | .param _
   | .function _ _ _ => rfl
-  | .nominal source arguments productive =>
-      congrArg (Carriers.nominals.nominal source productive)
-        (NRow.sorts_instantiate arguments)
+  | .nominal source arguments kind =>
+      nominal_type_congr (family := Carriers.nominals.nominal source kind)
+        (Carriers.frameFunctions_instantiate θ Θ arguments) (NRow.sorts_instantiate arguments)
   | .tuple elements => HList.carrier_instantiate elements
   | .struct _ _ fields => HList.carrier_instantiate fields
   | .enum _ _ names rows _ => variantCarrier.carrier_instantiate names rows
@@ -9689,8 +10223,9 @@ def NTy.toSkolem (θ : TypeArgs) : (τ : NTy) → (τ.subst θ.1).carrier →
   | .observed referent, value => NTy.toSkolem θ referent value
   | .param _, value => value
   | .function _ _ _, value => value
-  | .nominal source arguments productive, value =>
-      cast (congrArg (Carriers.nominals.nominal source productive)
+  | .nominal source arguments kind, value =>
+      cast (nominal_type_congr (family := Carriers.nominals.nominal source kind)
+        (Carriers.frameFunctions_instantiate θ Θ arguments)
         (NRow.sorts_instantiate θ arguments)).symm value
 
 def HList.toSkolem (θ : TypeArgs) : (row : NRow) → HList (NRow.subst θ.1 row) →
@@ -9741,8 +10276,9 @@ def NTy.ofSkolem (θ : TypeArgs) : (τ : NTy) →
   | .observed referent, value => NTy.ofSkolem θ referent value
   | .param _, value => value
   | .function _ _ _, value => value
-  | .nominal source arguments productive, value =>
-      cast (congrArg (Carriers.nominals.nominal source productive)
+  | .nominal source arguments kind, value =>
+      cast (nominal_type_congr (family := Carriers.nominals.nominal source kind)
+        (Carriers.frameFunctions_instantiate θ Θ arguments)
         (NRow.sorts_instantiate θ arguments)) value
 
 def HList.ofSkolem (θ : TypeArgs) : (row : NRow) →
@@ -10143,22 +10679,23 @@ theorem NTy.inhabitant_instantiate : (τ : NTy) → (inhabitable : τ.inhabitabl
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
   | .bytes, _ | .char, _ | .param _, _ => rfl
   | .function _ _ _, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
-  | .nominal _ _ false, inhabitable => absurd inhabitable (by simp [NTy.inhabitable])
-  | .nominal source arguments true, inhabitable => by
-      have argInhabitable : arguments.inhabitable = true := by
+  | .nominal source arguments kind, inhabitable => by
+      have held : kind.productive = true ∧ arguments.inhabitableAt kind.demands 0 = true := by
         simpa [NTy.inhabitable] using inhabitable
-      have substInhabitable : (NRow.subst θ.1 arguments).inhabitable = true :=
-        NRow.inhabitable_subst θ.1 θ.inhabitable arguments argInhabitable
-      have lhsHeq : ∀ (s1 s2 : List Type) (sameSorts : s1 = s2)
-          (v1 : SortValues s1) (v2 : SortValues s2) (sameValues : HEq v1 v2),
-          HEq (Carriers.nominals.nominalInhabitant source s1 v1)
-            (Carriers.nominals.nominalInhabitant source s2 v2) := by
-        intro s1 s2 sameSorts v1 v2 sameValues
+      have lhsHeq : ∀ (f1 f2 : FunctionSorts) (sameFunctions : f1 = f2)
+          (s1 s2 : List Type) (sameSorts : s1 = s2)
+          (v1 : DemandedValues kind.demands 0 s1) (v2 : DemandedValues kind.demands 0 s2)
+          (sameValues : HEq v1 v2),
+          HEq (Carriers.nominals.nominalInhabitant source kind f1 s1 held.1 v1)
+            (Carriers.nominals.nominalInhabitant source kind f2 s2 held.1 v2) := by
+        intro f1 f2 sameFunctions s1 s2 sameSorts v1 v2 sameValues
+        subst sameFunctions
         subst sameSorts
         cases eq_of_heq sameValues
         exact HEq.rfl
-      exact eq_of_heq ((lhsHeq _ _ (NRow.sorts_instantiate θ arguments) _ _
-        (NRow.sortValues_instantiate arguments argInhabitable)).trans (cast_heq _ _).symm)
+      exact eq_of_heq ((lhsHeq _ _ (Carriers.frameFunctions_instantiate θ Θ arguments) _ _
+        (NRow.sorts_instantiate θ arguments) _ _
+        (NRow.demandedValues_instantiate kind.demands arguments 0 held.2)).trans (cast_heq _ _).symm)
   | .tuple elements, inhabitable =>
       HList.inhabitant_instantiate elements (by simpa [NTy.inhabitable] using inhabitable)
   | .struct _ _ fields, inhabitable =>
@@ -10212,19 +10749,26 @@ theorem variantCarrier.inhabitant_instantiate : (names : List String) → (rows 
   | [], _, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
   | _ :: _, .nil, inhabitable => absurd inhabitable (by simp [NRows.firstInhabitable])
 
-theorem NRow.sortValues_instantiate : (row : NRow) → (inhabitable : row.inhabitable = true) →
-    HEq (@NRow.sortValues (Carriers.instantiate θ Θ) row inhabitable)
-      (@NRow.sortValues Θ (NRow.subst θ.1 row)
-        (NRow.inhabitable_subst θ.1 θ.inhabitable row inhabitable))
-  | .nil, _ => HEq.rfl
-  | .cons τ rest, inhabitable => by
-      have held : τ.inhabitable = true ∧ rest.inhabitable = true := by
-        simpa [NRow.inhabitable] using inhabitable
-      refine prod_mk_heq (NTy.carrier_instantiate θ τ)
-        (congrArg SortValues (NRow.sorts_instantiate θ rest)) _ _ _ ?_
-        (NRow.sortValues_instantiate rest held.2)
-      rw [NTy.inhabitant_instantiate τ held.1]
-      exact NTy.toSkolem_heq θ τ _
+theorem NRow.demandedValues_instantiate (demands : List Nat) : (row : NRow) → (index : Nat) →
+    (inhabitable : row.inhabitableAt demands index = true) →
+    HEq (@NRow.demandedValues (Carriers.instantiate θ Θ) demands row index inhabitable)
+      (@NRow.demandedValues Θ demands (NRow.subst θ.1 row) index
+        (NRow.inhabitableAt_subst θ.1 θ.inhabitable demands row index inhabitable))
+  | .nil, _, _ => HEq.rfl
+  | .cons τ rest, index, inhabitable => by
+      have tail : rest.inhabitableAt demands (index + 1) = true := by
+        simp_all [NRow.inhabitableAt]
+      have head : demands.contains index = true → τ.inhabitable = true := by
+        intro demanded
+        simp_all [NRow.inhabitableAt]
+      refine prod_mk_heq
+        (congrArg (fun sort => bif demands.contains index then sort else Unit)
+          (NTy.carrier_instantiate θ τ))
+        (congrArg (DemandedValues demands (index + 1)) (NRow.sorts_instantiate θ rest)) _ _ _ ?_
+        (NRow.demandedValues_instantiate demands rest (index + 1) tail)
+      exact DemandedValues.entry_heq _ (NTy.carrier_instantiate θ τ) _ _ fun demanded => by
+        rw [NTy.inhabitant_instantiate τ (head demanded)]
+        exact NTy.toSkolem_heq θ τ _
 end
 
 private theorem plainFallback_heq {A B : Type} (same : A = B) (ha : Nonempty A) (hb : Nonempty B) :
@@ -10274,8 +10818,9 @@ theorem NTy.encode_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.subst 
   | .char, _ => rfl
   | .param _, _ => rfl
   | .function _ _ _, _ => rfl
-  | .nominal source arguments productive, value =>
-      nominal_encode_cast (NRow.sorts_instantiate θ arguments)
+  | .nominal source arguments kind, value =>
+      nominal_encode_cast (Carriers.frameFunctions_instantiate θ Θ arguments)
+        (Carriers.frameTyped_instantiate θ Θ arguments) (NRow.sorts_instantiate θ arguments)
         (NRow.sortCodecs_instantiate θ arguments) value
   | .observed referent, value => NTy.encode_toSkolem θ referent value
   | .tuple elements, values => by
@@ -10842,7 +11387,7 @@ theorem NTy.substWith_subst (θ : NRow) (types : Nat → NTy) : (τ : NTy) →
   | .function parameters shared results => by
       simp only [NTy.subst, NTy.substWith, NRow.substWith_subst θ types parameters,
         NRow.substWith_subst θ types results, Sharing.atWith_subst]
-  | .nominal source arguments productive => by
+  | .nominal source arguments kind => by
       simp only [NTy.subst, NTy.substWith, NRow.substWith_subst θ types arguments]
 
 theorem NRow.substWith_subst (θ : NRow) (types : Nat → NTy) : (row : NRow) →
@@ -10884,9 +11429,9 @@ theorem NTy.inhabitable_substWith (f : Nat → NTy) (fits : ∀ index, (f index)
       exact NTy.inhabitable_substWith f fits referent held
   | .param index, _ => (NTy.inhabitable_unmark _).trans (fits index)
   | .function _ _ _, held => by simp [NTy.inhabitable] at held
-  | .nominal _ arguments _, held => by
+  | .nominal _ arguments kind, held => by
       simp only [NTy.substWith, NTy.inhabitable, Bool.and_eq_true] at held ⊢
-      exact ⟨held.1, NRow.inhabitable_substWith f fits arguments held.2⟩
+      exact ⟨held.1, NRow.inhabitableAt_substWith f fits kind.demands arguments 0 held.2⟩
   | .sliceRef _, _ => rfl
   | .slice _, _ => rfl
   | .vector _, _ => rfl
@@ -10910,6 +11455,16 @@ theorem NRow.inhabitable_substWith (f : Nat → NTy) (fits : ∀ index, (f index
   | .cons τ rest, held => by
       simp only [NRow.substWith, NRow.inhabitable, Bool.and_eq_true] at held ⊢
       exact ⟨NTy.inhabitable_substWith f fits τ held.1, NRow.inhabitable_substWith f fits rest held.2⟩
+
+theorem NRow.inhabitableAt_substWith (f : Nat → NTy)
+    (fits : ∀ index, (f index).inhabitable = true) (demands : List Nat) :
+    (row : NRow) → (index : Nat) → row.inhabitableAt demands index = true →
+      (NRow.substWith f row).inhabitableAt demands index = true
+  | .nil, _, _ => rfl
+  | .cons τ rest, index, held => by
+      simp only [NRow.substWith, NRow.inhabitableAt, Bool.and_eq_true, Bool.or_eq_true] at held ⊢
+      exact ⟨held.1.imp id (NTy.inhabitable_substWith f fits τ),
+        NRow.inhabitableAt_substWith f fits demands rest (index + 1) held.2⟩
 
 theorem NRows.firstInhabitable_substWith (f : Nat → NTy)
     (fits : ∀ index, (f index).inhabitable = true) :

@@ -2972,8 +2972,8 @@ noncomputable def NTy.lend : (τ : NTy) → Bool → τ.carrier → List Nat →
   | .param index, _, value, loans => some (NTy.encode (.param index) value, loans)
   | .function parameters shared results, _, value, loans =>
       some (NTy.encode (.function parameters shared results) value, loans)
-  | .nominal source arguments productive, _, value, loans =>
-      some (NTy.encode (.nominal source arguments productive) value, loans)
+  | .nominal source arguments kind, _, value, loans =>
+      some (NTy.encode (.nominal source arguments kind) value, loans)
   | .observed referent, _, value, loans => some (NTy.encode (.observed referent) value, loans)
 
 /-- The runtime values of a row lent under loans taken in order. -/

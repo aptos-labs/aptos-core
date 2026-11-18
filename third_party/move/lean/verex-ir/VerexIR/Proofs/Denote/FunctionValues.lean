@@ -21,11 +21,45 @@ is `@NTy.carrier (Carriers.runtime unit) τ` by definition, and the codecs
 are the base frame's at the instance's function arm, while parameterizing
 explicitly over the function arm avoids a typeclass cycle before
 `FunctionCarriers unit` is constructed.
+
+A declared type's values are taken at the function sorts the candidates give
+the declaration at its argument row (`frameFunctionsWith`), and its encoder
+and decoder read the candidates' dictionaries there (`frameEncodersWith`,
+`frameDecodersWith`). The functor's laws ask of those dictionaries what they
+ask of the arguments': each is discharged below the bound from the hypothesis
+the function arm of the same law uses.
 -/
 
 namespace VerexIR.Proofs.Denote
 
 open VerexIR.SemanticOperations
+
+/-- The function sorts of a declaration at an argument row, at candidate
+function values. -/
+@[reducible] def frameFunctionsWith (C : NRow → Sharing → NRow → Type) (arguments : NRow) :
+    FunctionSorts :=
+  fun parameters shared results =>
+    C (parameters.substWith (NominalBasis.slot arguments)) shared
+      (results.substWith (NominalBasis.slot arguments))
+
+/-- Their encoders, from a candidate encoder of closures. -/
+@[reducible] def frameEncodersWith {C : NRow → Sharing → NRow → Type}
+    (encode : (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+      C parameters shared results → ClosureValue) (arguments : NRow) :
+    FunctionEncoders (frameFunctionsWith C arguments) :=
+  fun parameters shared results function =>
+    (encode (parameters.substWith (NominalBasis.slot arguments)) shared
+      (results.substWith (NominalBasis.slot arguments)) function).encode
+
+/-- Their decoders, from a candidate decoder of closures. -/
+@[reducible] def frameDecodersWith {C : NRow → Sharing → NRow → Type}
+    (decode : (parameters : NRow) → (shared : Sharing) → (results : NRow) →
+      ClosureValue → Option (C parameters shared results)) (arguments : NRow) :
+    FunctionDecoders (frameFunctionsWith C arguments) :=
+  fun parameters shared results raw =>
+    (ClosureValue.decode? raw).bind
+      (decode (parameters.substWith (NominalBasis.slot arguments)) shared
+        (results.substWith (NominalBasis.slot arguments)))
 
 section Carriers
 
@@ -57,8 +91,9 @@ carried by `C`. -/
   | .ref referent => NTy.carrierWith referent × NTy.carrierWith referent
   | .param _ => PlainValue
   | .function parameters shared results => C parameters shared results
-  | .nominal source arguments productive =>
-      (NominalCarriers.toNominalFunctor unit).nominal source productive (NRow.sortsWith arguments)
+  | .nominal source arguments kind =>
+      (NominalCarriers.toNominalFunctor unit).nominal source kind (frameFunctionsWith C arguments)
+        (NRow.sortsWith arguments)
 
 /-- A row of values, as `HList` at the base frame. -/
 def HListWith : NRow → Type
@@ -119,10 +154,10 @@ def NTy.encodeWith : (τ : NTy) → τ.carrierWith unit C → RuntimeValue
   | .ref referent, value => .tuple #[NTy.encodeWith referent value.1, NTy.encodeWith referent value.2]
   | .param _, value => value.val
   | .function parameters shared results, value => (encode parameters shared results value).encode
-  | .nominal source arguments productive, value =>
+  | .nominal source arguments kind, value =>
       (NominalCarriers.toNominalFunctor unit).nominalEncode
-        source productive (NRow.sortsWith unit C arguments)
-        (NRow.encodersWith arguments) value
+        source kind (frameFunctionsWith C arguments) (frameEncodersWith encode arguments)
+        (NRow.sortsWith unit C arguments) (NRow.encodersWith arguments) value
 
 /-- The runtime values of a row's values. -/
 def NRow.encodeWith : (row : NRow) → HListWith unit C row → List RuntimeValue
@@ -221,10 +256,10 @@ def NTy.decodeWith : (τ : NTy) → RuntimeValue → Option (τ.carrierWith unit
   | .param _, raw => if plain : Plain raw then some ⟨raw, plain⟩ else none
   | .function parameters shared results, raw =>
       (ClosureValue.decode? raw).bind (decode parameters shared results)
-  | .nominal source arguments productive, raw =>
+  | .nominal source arguments kind, raw =>
       (NominalCarriers.toNominalFunctor unit).nominalDecode?
-        source productive (NRow.sortsWith unit C arguments)
-        (NRow.decodersWith arguments) raw
+        source kind (frameFunctionsWith C arguments) (frameDecodersWith decode arguments)
+        (NRow.sortsWith unit C arguments) (NRow.decodersWith arguments) raw
   | _, _ => none
 
 /-- The values of a row runtime values encode, in order. -/
@@ -534,10 +569,13 @@ theorem NTy.plain_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
   | .param _, value => value.property
   | .function parameters shared results, value =>
       .closure _ _ _ _ (encode parameters shared results value).plain
-  | .nominal source arguments productive, value =>
+  | .nominal source arguments kind, value =>
       (NominalCarriers.toNominalFunctor unit).nominalEncode_plain
-        source productive (NRow.sortsWith unit C arguments)
-        (NRow.encodersWith encode arguments) (NRow.plain_encodersWith arguments) value
+        source kind (frameFunctionsWith C arguments) (frameEncodersWith encode arguments)
+        (NRow.sortsWith unit C arguments) (NRow.encodersWith encode arguments)
+        (fun parameters shared results function =>
+          .closure _ _ _ _ (encode _ shared _ function).plain)
+        (NRow.plain_encodersWith arguments) value
 
 /-- Every argument's encoder of this interpretation encodes loan-free. -/
 theorem NRow.plain_encodersWith : (row : NRow) →
@@ -674,10 +712,17 @@ theorem NTy.decodeWith_encodeWith : (τ : NTy) → (value : τ.carrierWith unit 
       rw [show ClosureValue.decode? (encode parameters shared results value).encode =
           some (encode parameters shared results value) from Codec.closure.decode_encode _]
       exact round parameters shared results value small
-  | .nominal source arguments productive, value, small =>
+  | .nominal source arguments kind, value, small =>
       (NominalCarriers.toNominalFunctor unit).nominalDecode_encode
-        source productive (NRow.sortsWith unit C arguments)
+        source kind (frameFunctionsWith C arguments) (frameEncodersWith encode arguments)
+        (frameDecodersWith decode arguments) (NRow.sortsWith unit C arguments)
         (NRow.encodersWith encode arguments) (NRow.decodersWith unit decode arguments) value
+        (fun parameters shared results function inner => by
+          show (ClosureValue.decode? (encode _ shared _ function).encode).bind
+            (decode _ shared _) = some function
+          rw [show ClosureValue.decode? (encode _ shared _ function).encode =
+            some (encode _ shared _ function) from Codec.closure.decode_encode _]
+          exact round _ shared _ function (Nat.lt_trans inner small))
         (NRow.invertsBelowWith arguments _ small)
 
 /-- Every argument's decoder of this interpretation inverts its encoder below
@@ -909,10 +954,19 @@ theorem NTy.encodeWith_of_decodeWith : (τ : NTy) → (raw : RuntimeValue) → s
       rw [tight parameters shared results closure value
         (by rw [show closure.encode = raw from encoded]; exact small) typed]
       exact encoded
-  | .nominal source arguments productive, raw, small, value, decoded =>
+  | .nominal source arguments kind, raw, small, value, decoded =>
       (NominalCarriers.toNominalFunctor unit).nominalEncode_of_decode?
-        source productive (NRow.sortsWith unit C arguments)
+        source kind (frameFunctionsWith C arguments) (frameEncodersWith encode arguments)
+        (frameDecodersWith decode arguments) (NRow.sortsWith unit C arguments)
         (NRow.encodersWith encode arguments) (NRow.decodersWith unit decode arguments) raw value
+        (fun parameters shared results inner function below found => by
+          obtain ⟨closure, read, typed⟩ := Option.bind_eq_some_iff.mp found
+          have encoded := Codec.closure_tight inner closure read
+          show (encode _ shared _ function).encode = inner
+          rw [tight _ shared _ closure function
+            (by rw [show closure.encode = inner from encoded]; exact Nat.lt_trans below small)
+            typed]
+          exact encoded)
         (NRow.tightBelowWith arguments _ small) decoded
 
 /-- Every argument's decoder of this interpretation answers only where its
@@ -1090,9 +1144,12 @@ theorem NTy.admits_encodeWith : (τ : NTy) → (value : τ.carrierWith unit C) �
       rfl
   | .param _, _, _, _ => by simp [NTy.admits]
   | .function parameters shared results, value, small, _ => admitted parameters shared results value small
-  | .nominal source arguments productive, value, small, supported =>
-      NominalCarriers.admits source productive arguments (NRow.sortsWith unit C arguments)
+  | .nominal source arguments kind, value, small, supported =>
+      NominalCarriers.admits source kind arguments (frameFunctionsWith C arguments)
+        (frameEncodersWith encode arguments) (NRow.sortsWith unit C arguments)
         (NRow.encodersWith encode arguments) value (and_left supported)
+        (fun parameters shared results function inner =>
+          admitted _ shared _ function (Nat.lt_trans inner small))
         (NRow.admitsBelowWith _ arguments small (and_right supported))
 
 /-- Every argument's encoder of this interpretation encodes, below a bound
@@ -1258,10 +1315,20 @@ theorem NTy.decodeWith_congr : (τ : NTy) → (raw : RuntimeValue) → sizeOf ra
           have encoded := Codec.closure_tight raw closure read
           exact agree parameters shared results closure
             (by rw [show closure.encode = raw from encoded]; exact small)
-  | .nominal source arguments productive, raw, small =>
+  | .nominal source arguments kind, raw, small =>
       (NominalCarriers.toNominalFunctor unit).nominalDecode?_congr
-        source productive (NRow.sortsWith unit C arguments)
+        source kind (frameFunctionsWith C arguments) (frameDecodersWith decode arguments)
+        (frameDecodersWith decode' arguments) (NRow.sortsWith unit C arguments)
         (NRow.decodersWith unit decode arguments) (NRow.decodersWith unit decode' arguments) raw
+        (fun parameters shared results inner below => by
+          show (ClosureValue.decode? inner).bind (decode _ shared _) =
+            (ClosureValue.decode? inner).bind (decode' _ shared _)
+          cases read : ClosureValue.decode? inner with
+          | none => rfl
+          | some closure =>
+              have encoded := Codec.closure_tight inner closure read
+              exact agree _ shared _ closure
+                (by rw [show closure.encode = inner from encoded]; exact Nat.lt_trans below small))
         (NRow.agreeBelowWith arguments _ small)
 
 /-- Two decoders of this interpretation that agree below a bound give
@@ -1417,9 +1484,19 @@ theorem NTy.isSome_decodeWith : (τ : NTy) → (raw : RuntimeValue) → sizeOf r
           have encoded := Codec.closure_tight raw closure read
           exact agree parameters shared results closure
             (by rw [show closure.encode = raw from encoded]; exact small)
-  | .nominal source arguments productive, raw, small =>
-      (NominalCarriers.toNominalFunctor unit).nominalDecode?_isSome_congr source productive
+  | .nominal source arguments kind, raw, small =>
+      (NominalCarriers.toNominalFunctor unit).nominalDecode?_isSome_congr source kind
+        (frameDecodersWith decode arguments) (frameDecodersWith decode' arguments)
         (NRow.decodersWith unit decode arguments) (NRow.decodersWith unit decode' arguments) raw
+        (fun parameters shared results inner below => by
+          show ((ClosureValue.decode? inner).bind (decode _ shared _)).isSome =
+            ((ClosureValue.decode? inner).bind (decode' _ shared _)).isSome
+          cases read : ClosureValue.decode? inner with
+          | none => rfl
+          | some closure =>
+              have encoded := Codec.closure_tight inner closure read
+              exact agree _ shared _ closure
+                (by rw [show closure.encode = inner from encoded]; exact Nat.lt_trans below small))
         (NRow.someAgreeBelowWith arguments _ small)
 
 /-- Two decoders of this interpretation that decide alike below a bound give

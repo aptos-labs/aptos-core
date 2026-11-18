@@ -73,7 +73,9 @@ theorem NTy.carrier_with_own (Φ : Carriers) (newOwn : StructHandle → NRow →
   | .ghost s | .observed s => NTy.carrier_with_own Φ newOwn s
   | .sliceRef e => congrArg SpecSliceRef (NTy.carrier_with_own Φ newOwn e)
   | .ref r => congrArg2 Prod (NTy.carrier_with_own Φ newOwn r) (NTy.carrier_with_own Φ newOwn r)
-  | .nominal src args prod => congrArg (Φ.nominals.nominal src prod) (NRow.sorts_with_own Φ newOwn args)
+  | .nominal src args kind =>
+      congrArg (Φ.nominals.nominal src kind (@Carriers.frameFunctions Φ args))
+        (NRow.sorts_with_own Φ newOwn args)
 
 theorem HList.carrier_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :
     (row : NRow) → @HList { Φ with own := newOwn } row = @HList Φ row
@@ -135,11 +137,13 @@ theorem NTy.codec_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow �
       heq_unary (F := (Codec · RuntimeValue)) (G := fun α => Codec (α × α) RuntimeValue)
         (fun c => Codec.prophecyPair c)
         (NTy.carrier_with_own Φ newOwn r) (NTy.codec_heq_with_own Φ newOwn r)
-  | .nominal src args prod => by
+  | .nominal src args kind => by
       dsimp only [NTy.codec, Carriers.nominalCodec]
       exact heq_dep_unary (S := List Type) (A := SortCodecs)
-        (C := fun s => Codec (Φ.nominals.nominal src prod s) RuntimeValue)
-        (fun s sc => @Carriers.nominalCodec Φ src prod s sc)
+        (C := fun s =>
+          Codec (Φ.nominals.nominal src kind (@Carriers.frameFunctions Φ args) s) RuntimeValue)
+        (fun s sc => @Carriers.nominalCodec Φ src kind (@Carriers.frameFunctions Φ args)
+          (@Carriers.frameTyped Φ args) s sc)
         (NRow.sorts_with_own Φ newOwn args) (sortCodecs_heq_with_own Φ newOwn args)
 
 theorem rowCodec_heq_with_own (Φ : Carriers) (newOwn : StructHandle → NRow → RuntimeValue → Prop) :

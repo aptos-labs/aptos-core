@@ -95,6 +95,10 @@ def siteToken (stream token : Nat) : Nat :=
   let width := siteWidth siteTokenBits (token + 1)
   stream * 2 ^ (2 * width - 1) + (token + 1)
 
+/-- A list of numbers appended to a stream: its length, then each number. -/
+def siteNatTokens (numbers : List Nat) (stream : Nat) : Nat :=
+  numbers.foldl siteToken (siteToken stream numbers.length)
+
 /-- A list of bits appended to a stream: its length, then each bit. -/
 def siteBoolTokens (bits : List Bool) (stream : Nat) : Nat :=
   bits.foldl (fun stream bit => siteToken stream (if bit then 2 else 1))
@@ -137,10 +141,12 @@ def NTy.siteTokens : NTy → Nat → Nat
       NRow.siteTokens results (siteBoolTokens shared.results
         (siteBoolTokens shared.parameters (NRow.siteTokens parameters (siteToken stream 20))))
   | .observed referent, stream => NTy.siteTokens referent (siteToken stream 21)
-  | .nominal source arguments productive, stream =>
+  | .nominal source arguments kind, stream =>
       NRow.siteTokens arguments
-        (siteToken (siteToken (siteToken (siteToken stream 22) source.namespaceId.index)
-          source.structId) (if productive then 1 else 0))
+        (siteToken (siteToken (siteNatTokens kind.demands
+          (siteToken (siteToken (siteToken (siteToken stream 22) source.namespaceId.index)
+            source.structId) (if kind.productive then 1 else 0)))
+          (match kind.view with | .owned => 0 | .shared => 1)) (if kind.clean then 1 else 0))
 
 /-- A row appended to a stream of numbers: a mark per element, then the
 element, so that the row's end is read off the stream. -/

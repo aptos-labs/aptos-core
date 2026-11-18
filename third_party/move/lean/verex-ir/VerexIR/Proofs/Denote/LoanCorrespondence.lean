@@ -114,8 +114,8 @@ def NTy.corresponds (loans : LoanCorrespondence) :
   | .param index, value, raw => raw = NTy.encode (.param index) value
   | .function parameters shared results, value, raw =>
       raw = NTy.encode (.function parameters shared results) value
-  | .nominal source arguments productive, value, raw =>
-      raw = NTy.encode (.nominal source arguments productive) value
+  | .nominal source arguments kind, value, raw =>
+      raw = NTy.encode (.nominal source arguments kind) value
   | .observed referent, value, raw => raw = NTy.encode (.observed referent) value
 
 def NRow.corresponds (loans : LoanCorrespondence) :

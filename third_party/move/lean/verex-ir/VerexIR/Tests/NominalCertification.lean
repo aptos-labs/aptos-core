@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import VerexIR.Proofs.Denote.GivenOwn
+import VerexIR.Proofs.Denote.Compile
 
 /-!
 # Carrier independence and invariant sensitivity of nominals
@@ -11,8 +12,10 @@ Under the plain carrier representation:
   first), while `NTy.carrier` is independent of both `Carriers.own` and `Carriers.holds`
   (positive controls, definitionally on concrete argument rows and propositionally across all
   `arguments : NRow`);
-- `NTy.subst` distinguishes distinct nominal `productive` flags (negative control) and reaches
-  a nominal through its type arguments alone (positive control).
+- `NTy.subst` distinguishes distinct nominal kinds (negative control) and reaches
+  a nominal through its type arguments alone (positive control);
+- a declared type's inhabitability reads the arguments its kind demands, and the
+  kind's four components are each read into a declared type's token stream.
 -/
 
 namespace VerexIR.Proofs.Denote
@@ -31,7 +34,7 @@ private abbrev structTy : NTy := .struct testHandle .nil (.cons (.int 64 false) 
 
 private def zeroStruct : @NTy.carrier Carriers.ground structTy := (⟨0, rfl⟩, ())
 
-variable {source : StructHandle} {arguments : NRow} {productive : Bool}
+variable {source : StructHandle} {arguments : NRow} {kind : NominalKind}
 
 /-- Negative and positive semantic kernel control (first): the concrete value `zeroStruct`
 satisfies `¬ NTy.Holds` under `carriersOwnFalse` and `NTy.Holds` under `carriersOwnTrue`,
@@ -75,50 +78,50 @@ theorem carrier_structTy_indep_own :
 definitionally independent of `Carriers.own`. -/
 example (base : Carriers) :
     @NTy.carrier { base with own := fun _ _ _ => True }
-        (NTy.nominal source (.cons (.param 0) .nil) productive) =
+        (NTy.nominal source (.cons (.param 0) .nil) kind) =
       @NTy.carrier { base with own := fun _ _ _ => False }
-        (NTy.nominal source (.cons (.param 0) .nil) productive) := rfl
+        (NTy.nominal source (.cons (.param 0) .nil) kind) := rfl
 
 /-- Positive: Across every argument row, `NTy.carrier` of `NTy.nominal` is independent
 of `Carriers.own`. -/
 example (base : Carriers) :
-    @NTy.carrier { base with own := fun _ _ _ => True } (NTy.nominal source arguments productive) =
+    @NTy.carrier { base with own := fun _ _ _ => True } (NTy.nominal source arguments kind) =
       @NTy.carrier { base with own := fun _ _ _ => False }
-        (NTy.nominal source arguments productive) :=
-  (NTy.carrier_withOwn base _ (NTy.nominal source arguments productive)).trans
-    (NTy.carrier_withOwn base _ (NTy.nominal source arguments productive)).symm
+        (NTy.nominal source arguments kind) :=
+  (NTy.carrier_withOwn base _ (NTy.nominal source arguments kind)).trans
+    (NTy.carrier_withOwn base _ (NTy.nominal source arguments kind)).symm
 
 /-- Positive: Nor does the plain carrier type of `NTy.nominal` depend on `Carriers.holds`. -/
 example (base : Carriers) :
     @NTy.carrier { base with holds := fun _ _ => True }
-        (NTy.nominal source (.cons (.param 0) .nil) productive) =
+        (NTy.nominal source (.cons (.param 0) .nil) kind) =
       @NTy.carrier { base with holds := fun _ _ => False }
-        (NTy.nominal source (.cons (.param 0) .nil) productive) := rfl
+        (NTy.nominal source (.cons (.param 0) .nil) kind) := rfl
 
 /-- Negative semantic kernel control (first): substitution does not conflate distinct
-`productive` flags on `NTy.nominal`. -/
+kinds on `NTy.nominal`. -/
 theorem subst_nominal_productive_ne (θ : NRow) :
-    NTy.subst θ (NTy.nominal source arguments true) ≠
-      NTy.subst θ (NTy.nominal source arguments false) := by
+    NTy.subst θ (NTy.nominal source arguments ⟨true, [], .owned, true⟩) ≠
+      NTy.subst θ (NTy.nominal source arguments ⟨false, [], .owned, true⟩) := by
   intro h
-  change NTy.nominal source (NRow.subst θ arguments) true =
-    NTy.nominal source (NRow.subst θ arguments) false at h
-  injection h with _ _ hprod
-  cases hprod
+  change NTy.nominal source (NRow.subst θ arguments) ⟨true, [], .owned, true⟩ =
+    NTy.nominal source (NRow.subst θ arguments) ⟨false, [], .owned, true⟩ at h
+  injection h with _ _ hkind
+  exact absurd hkind (by decide)
 
 set_option linter.unusedVariables false in
-/-- Non-reduction check: substitution at distinct `productive` flags does not reduce to
+/-- Non-reduction check: substitution at distinct kinds does not reduce to
 definitionally equal types. -/
 example (θ : NRow) : True := by
   fail_if_success
-    have : NTy.subst θ (NTy.nominal source arguments true) =
-        NTy.subst θ (NTy.nominal source arguments false) := rfl
+    have : NTy.subst θ (NTy.nominal source arguments ⟨true, [], .owned, true⟩) =
+        NTy.subst θ (NTy.nominal source arguments ⟨false, [], .owned, true⟩) := rfl
   trivial
 
 /-- Positive: Substitution reaches a nominal through its type arguments alone. -/
 example (θ : NRow) :
-    NTy.subst θ (NTy.nominal source arguments productive) =
-      NTy.nominal source (NRow.subst θ arguments) productive := rfl
+    NTy.subst θ (NTy.nominal source arguments kind) =
+      NTy.nominal source (NRow.subst θ arguments) kind := rfl
 
 set_option linter.unusedVariables false in
 /-- Negative non-reduction check (first): `NTy.plainFallback` is opaque and does not
@@ -136,11 +139,33 @@ example [outer : Carriers] :
     @NTy.plainFallback (Carriers.instantiate θ outer) τ rfl =
       @NTy.plainFallback outer (τ.subst θ.1) rfl := rfl
 
+private abbrev functionRow : NRow := .cons (.function .nil ⟨[], []⟩ .nil) .nil
+private abbrev kindTokens (kind : NominalKind) : Nat :=
+  NTy.siteTokens (.nominal testHandle .nil kind) 0
+
+/-- Positive and negative: a declared type at a function-sort argument has values
+where its kind does not demand that argument, and none where it does, a function
+type alone having no value of its own. -/
+theorem inhabitable_demanded_function :
+    (NTy.nominal testHandle functionRow ⟨true, [], .owned, false⟩).inhabitable = true ∧
+      (NTy.nominal testHandle functionRow ⟨true, [0], .owned, false⟩).inhabitable = false :=
+  ⟨rfl, rfl⟩
+
+/-- Positive: each of the kind's four components is read into a declared type's
+token stream, so the stream differs where any one of them differs. -/
+theorem siteTokens_kind_components :
+    kindTokens ⟨false, [0], .owned, true⟩ ≠ kindTokens ⟨true, [0], .owned, true⟩ ∧
+      kindTokens ⟨true, [], .owned, true⟩ ≠ kindTokens ⟨true, [0], .owned, true⟩ ∧
+        kindTokens ⟨true, [0], .shared, true⟩ ≠ kindTokens ⟨true, [0], .owned, true⟩ ∧
+          kindTokens ⟨true, [0], .owned, false⟩ ≠ kindTokens ⟨true, [0], .owned, true⟩ := by
+  decide
+
 open Lean Elab Command in
 run_cmd do
   for name in [``holds_depends_on_own_zero, ``holds_depends_on_own,
       ``holds_depends_on_param_holds, ``carrier_structTy_indep_own,
-      ``subst_nominal_productive_ne] do
+      ``subst_nominal_productive_ne, ``inhabitable_demanded_function,
+      ``siteTokens_kind_components] do
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do
       throwError "unexpected axioms in {name}: {axioms}"
