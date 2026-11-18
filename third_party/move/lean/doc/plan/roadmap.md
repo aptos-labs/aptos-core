@@ -23,6 +23,14 @@ Designs: [`denotation.md`](../designs/denotation.md),
   target is the completeness and cost of the tree before the carriers. The
   nominal closed and open sorts
   ([`nominal-invariant-sorts.md`](nominal-invariant-sorts.md)) are closed.
+  Before a producer emits nominal types, make support available only through
+  an installed family: one constructor installs `own` and `declared` together,
+  with no operation replacing `own` on an installed family. Reconcile
+  mutation-end checks with all conjuncts of `declared`, since
+  `NTy.carriesInvariant` currently considers the own clause. The shared
+  continuation closer also skips declared facts normalized to
+  `FunctionCarriers.declared`; accepting those equivalent facts is a
+  completeness follow-up, as the obligation currently stays pending.
 
 - **Native verification, remaining items.** BigOrderedMap's
   `test_verify_modify`; the cost of generic map targets; reframe lemmas for
@@ -225,8 +233,13 @@ Designs: [`denotation.md`](../designs/denotation.md),
   continuity proof over the denotation), the connection between native
   storage and verification values, the remaining global-preservation
   hypotheses, `FailuresIntegral`, `RunsAgree`, `OwnersRepresentable` for
-  units whose owners are all tables, and `DataInvariantsSatisfiable`, which
-  a witness per declaration would discharge.
+  units whose owners are all tables, and data-invariant satisfiability.
+  Satisfiability is assumed for now. Add a declaration-owner check, using a
+  witness per inhabitable instance, that reports an unsatisfiable invariant
+  once at its declaration and blocks dependent acceptance. Consumers keep
+  assuming validity; this backlog does not add per-entry guards or repeat
+  the declaration proof at use sites. Check a nominal family's installation
+  once at the installation owner and carry its validity to consumers.
 - **Denotation coverage not carried.** Signed bitwise operations, `bytes`
   and fixed-length vectors, unspecified pure callees used as summaries,
   references inside an enum, range patterns over characters; generics:

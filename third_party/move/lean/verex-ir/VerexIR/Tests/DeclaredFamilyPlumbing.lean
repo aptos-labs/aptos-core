@@ -61,10 +61,13 @@ example : ¬ (Carriers.instantiate substitution family).declared
   have impossible : (⟨⟨0⟩, 1⟩ : StructHandle) = source := held.1
   cases impossible
 
--- Cut1 deliberately retains K1's nominal validity arm. K3 will change this
--- inhabited control to a rejection; the new field is only plumbing here.
-example : @NTy.Holds Carriers.ground (.nominal source .nil kind) ⟨rfl⟩ :=
-  @NTy.Holds.intro Carriers.ground _ _ trivial
+-- The default nominal carrier is inhabited; absent declared validity rejects
+-- that real value rather than relying on an empty carrier.
+example : ∃ value : @NTy.carrier Carriers.ground.toSorts (.nominal source .nil kind),
+    ¬ @NTy.Holds Carriers.ground (.nominal source .nil kind) value := by
+  refine ⟨⟨rfl⟩, ?_⟩
+  intro held
+  exact @NTy.Holds.deepHolds Carriers.ground _ _ held
 
 example : (Carriers.instantiate substitution family).toSorts =
     Sorts.instantiate substitution family.toSorts := rfl

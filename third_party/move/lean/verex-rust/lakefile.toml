@@ -2,7 +2,9 @@ name = "verex-rust"
 defaultTargets = ["VerexRust", "verex-rust"]
 # The differential check (`differentialCheck` below) is parked: its tree
 # evaluator does not build on the carriers base (`doc/plan/rust-verification.md`).
-# Until it does, `lake test` builds the test library.
+# Its declared values also need installed validity evidence; there is no
+# validity law for every inhabited value. Until migrated, `lake test` builds
+# only the active test library, excluding DenoteEval and DifferentialCheck.
 testDriver = "VerexRustTests"
 
 [[require]]

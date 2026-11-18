@@ -892,12 +892,21 @@ partial def defaultProveHoldsGoal? (goal : MVarId) : MetaM Bool := goal.withCont
         (mkApp3 (mkConst ``NTy.holds_observed) carriers referent val)
       return ← defaultProveHoldsGoal? next
     if τ'.isAppOfArity ``NTy.nominal 3 then
-      let goal ← if τ == τ' then pure goal else goal.change (mkApp3 (mkConst ``NTy.Holds) carriers τ' val)
-      let next ← goal.replaceTargetEq (mkConst ``True)
-        (mkAppN (mkConst ``NTy.holds_nominal)
-          #[carriers, τ'.getArg! 0, τ'.getArg! 1, τ'.getArg! 2, val])
-      next.assign (mkConst ``True.intro)
-      return true
+      let encoded := mkApp3 (mkConst ``NTy.encode)
+        (mkApp (mkConst ``Carriers.toSorts) carriers) τ' val
+      let expected := mkAppN (mkConst ``Carriers.declared)
+        #[carriers, τ'.getArg! 0, τ'.getArg! 1, τ'.getArg! 2, encoded]
+      for decl in ← getLCtx do
+        if decl.isAuxDecl then continue
+        let raw := decl.type.consumeMData
+        let ty ← if raw.hasMVar then pure (← instantiateMVars raw).consumeMData else pure raw
+        unless ty.isAppOfArity ``Carriers.declared 5 do continue
+        if ← withNewMCtxDepth (isDefEq ty expected) then
+          let proof ← mkAppOptM ``NTy.Holds.intro
+            #[some carriers, some τ, some val, some decl.toExpr]
+          goal.assign proof
+          return true
+      return false
     let deep := mkApp3 (mkConst ``NTy.deepHolds) carriers τ val
     if ← withNewMCtxDepth (isDefEq deep (mkConst ``True)) then
       let proof ← mkAppOptM ``NTy.Holds.intro #[some carriers, some τ, some val, some (mkConst ``True.intro)]

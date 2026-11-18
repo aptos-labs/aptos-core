@@ -4193,7 +4193,8 @@ struct or a variant, its declaration's (`Carriers.own`) of its encoding,
 and its fields'; through tuples, vectors, tables and ghost slots; of a
 mutable reference, its prophecy's only (`value.2`), the current being open
 while lent; at a type parameter, `Carriers.holds`; `True` on scalars,
-functions, and nominals. -/
+and functions; at a nominal, the stage's installed `Carriers.declared`
+predicate of its descriptor and encoding. -/
 def NTy.deepHolds : (τ : NTy) → τ.carrier → Prop
   | .tuple elements, values => HList.deepHolds elements values
   | .struct source arguments fields, row =>
@@ -4215,6 +4216,8 @@ def NTy.deepHolds : (τ : NTy) → τ.carrier → Prop
         (∀ final ∈ value.finalVector.values, NTy.deepHolds element final)
   | .observed referent, value => NTy.deepHolds referent value
   | .param index, value => Carriers.holds index value
+  | .nominal source arguments kind, value =>
+      Carriers.declared source arguments kind (NTy.encode (.nominal source arguments kind) value)
   | _, _ => True
 termination_by structural τ _ => τ
 
@@ -4556,7 +4559,9 @@ theorem NTy.deepHolds_function (parameters : NRow) (shared : Sharing)
     NTy.deepHolds (.function parameters shared results) value = True := rfl
 theorem NTy.deepHolds_nominal (source : StructHandle) (arguments : NRow)
     (kind : NominalKind) (value : (NTy.nominal source arguments kind).carrier) :
-    NTy.deepHolds (.nominal source arguments kind) value = True := rfl
+    NTy.deepHolds (.nominal source arguments kind) value =
+      Carriers.declared source arguments kind
+        (NTy.encode (.nominal source arguments kind) value) := rfl
 theorem NTy.deepHolds_tuple (elements : NRow)
     (values : (NTy.tuple elements).carrier) :
     NTy.deepHolds (.tuple elements) values = HList.deepHolds elements values := rfl
@@ -4677,7 +4682,10 @@ theorem NTy.holds_function (parameters : NRow) (shared : Sharing) (results : NRo
     NTy.Holds (.function parameters shared results) value = True := eq_true ⟨trivial⟩
 theorem NTy.holds_nominal (source : StructHandle) (arguments : NRow) (kind : NominalKind)
     (value : (NTy.nominal source arguments kind).carrier) :
-    NTy.Holds (.nominal source arguments kind) value = True := eq_true ⟨trivial⟩
+    NTy.Holds (.nominal source arguments kind) value =
+      Carriers.declared source arguments kind
+        (NTy.encode (.nominal source arguments kind) value) :=
+  propext (NTy.holds_iff _ value)
 
 theorem NTy.holds_tuple (elements : NRow) (values : (NTy.tuple elements).carrier) :
     NTy.Holds (.tuple elements) values = HList.Holds elements values :=
@@ -4919,6 +4927,7 @@ attribute [vir_denote_norm]
   HList.holds_nil HList.holds_cons
   variantCarrier.holds_inl variantCarrier.holds_inr
 end Carriers
+
 
 section Sorts
 variable [Sorts]
@@ -11089,7 +11098,14 @@ theorem NTy.deepHolds_toSkolem (θ : TypeArgs) : (τ : NTy) → (value : (τ.sub
     (@NTy.deepHolds (Carriers.instantiate θ Θ) τ (NTy.toSkolem θ τ value) ↔
       @NTy.deepHolds Θ (τ.subst θ.1) value)
   | .unit, _ | .bool, _ | .int _ _, _ | .num, _ | .address, _ | .signer, _ | .string, _
-  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ | .nominal _ _ _, _ => Iff.rfl
+  | .bytes, _ | .char, _ | .param _, _ | .function _ _ _, _ => Iff.rfl
+  | .nominal source arguments kind, value => by
+      show Θ.declared source (NRow.subst θ.1 arguments) kind
+          (@NTy.encode (Carriers.instantiate θ Θ).toSorts (.nominal source arguments kind)
+            (NTy.toSkolem θ (.nominal source arguments kind) value)) ↔
+        Θ.declared source (NRow.subst θ.1 arguments) kind
+          (NTy.encode (.nominal source (NRow.subst θ.1 arguments) kind) value)
+      rw [NTy.encode_toSkolem θ (.nominal source arguments kind) value]
   | .tuple elements, values => HList.deepHolds_toSkolem θ elements values
   | .ghost slot, value => NTy.deepHolds_toSkolem θ slot value
   | .ref referent, value => NTy.deepHolds_toSkolem θ referent value.2

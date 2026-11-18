@@ -171,13 +171,20 @@ Rust `SourceVerify` fixtures verify except for these:
   (`satisfiabilityOf`). Whether a unit with data invariants needs them there is
   not checked by any fixture.
 - The differential check is parked. Its tree evaluator
-  (`VerexRust/Tests/DenoteEval.lean`) does not build on the carriers base:
-  values of declared types carry certificates and their encodings are
-  noncomputable, and the terms added since have no tree cases. `lake test` in
-  `verex-rust` builds the test library and runs no differential check, so
-  nothing tests the denotation against Rust execution. Rebuild the tree over
-  the plain layer, where values compute, and state `checked_tree_means`
-  against the denotation with certificates forgotten.
+  (`VerexRust/Tests/DenoteEval.lean`) has not been migrated to the plain
+  carriers and current term cases. `lake test` in `verex-rust` builds the
+  active test library and excludes both this file and
+  `VerexRust/Tests/DifferentialCheck.lean`; it runs no Rust differential check.
+  Nominal validity now reads `Carriers.declared`, which defaults to false.
+  A replacement evaluator cannot prove validity of every inhabited value:
+  its declared values need the selected installation's validity evidence.
+  For types supported with no nominal declarations, parameter validity and
+  raw own facts suffice to establish validity. The custom runtime family and Skolem
+  frame in `DifferentialCheck` also need the unit's declared predicate and
+  `declared_resolve`. Rebuild the evaluator over the plain layer and state its
+  agreement with the current denotation, retaining the validity premises at
+  the points that receive values.
+
 
 ## Milestones
 

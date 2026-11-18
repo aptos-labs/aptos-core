@@ -83,21 +83,19 @@ hypotheses the theorems take.
   are to carry more than integers later
   ([`higher-order-functions.md`](../designs/higher-order-functions.md),
   "Function values as native data").
-- **`DataInvariantsSatisfiable`** (hypothesis; units whose declarations
-  state data invariants). Every such declaration has a value at every
-  inhabitable instance, from which the unit's inhabitants of certified
-  carriers are built (`CarriersNonempty.ofSatisfiable`). A data invariant is
-  part of the carrier of its type, and the denotation needs an inhabitant of
-  a carrier where no value is at hand — a read of an absent resource, a map
-  read of a missing key, a total variant field — so an unsatisfiable
-  invariant makes the unit's verification vacuous, as it does in the Move
-  Prover, which meets the same need silently (`select` of an absent key is
-  an arbitrary value that `assume forall a: WellFormed(mem[a])` declares
-  well-formed). A unit without data invariants carries no such hypothesis:
-  its invariants are trivially true and the instance is declared with the
-  unit. Establishing it: a witness per declaration, the zero row first
-  ([`data-invariants.md`](../designs/data-invariants.md),
-  "Inhabitants, by hypothesis").
+- **Data-invariant satisfiability** (assumption; declaration check pending).
+  Every declaration's invariant has a satisfying value at each inhabitable
+  instance. Consumers assume validity, and producers establish it where a
+  value is constructed or returned. Satisfiability is currently an unchecked
+  model assumption; the plain-carrier implementation does not generate the
+  former `DataInvariantsSatisfiable` hypothesis. The declaration owner must
+  eventually check this property once and report failure there, blocking
+  acceptance of dependent declarations and proofs. This owner check is in
+  the [roadmap](../plan/roadmap.md). Until it exists, consumers continue to
+  assume the property without per-entry guards or repeated proofs.
+  At an uninstalled family, nominal validity is `False`. Production
+  source-type conversion does not emit `NTy.nominal` yet; enabling nominal
+  support requires installation at its owner before use.
 - **`Terminating`** (hypothesis; functions whose proof reads `result_of`
   of a known function value). Runs of the unit's functions end, as the
   Move Prover assumes of every function.

@@ -266,6 +266,18 @@ partial def closedIdentity (type value : Lean.Expr) : BuildM Lean.Expr := do
     m!"the encoding of {type} is not the same at the two frames"
   stated (mkApp applied encoded) moved value
 
+/-- A comparison supplies the native type of both operands. An identical closed
+operand at a frame-independent type is its own move. Other operands carry
+their type in the reframe or projection from which they are read. -/
+partial def movedOperand (type installed caller : Lean.Expr) : BuildM Moved := do
+  let installed := installed.consumeMData
+  let caller := caller.consumeMData
+  if installed == caller && !caller.hasFVar && !caller.hasMVar && !caller.hasLooseBVars then
+    let identity ← closedIdentity type caller
+    let moved ← moveOf type caller
+    return { type, caller, moved, proof := ← stated (← mkEqSymm identity) installed moved }
+  movedValue installed caller
+
 /-- The installed term, a value used where no law of the move applies, as the
 caller's term: its type's carrier does not read the frame. -/
 partial def closedValue (installed caller : Lean.Expr) : BuildM Lean.Expr := do
@@ -331,8 +343,8 @@ partial def frameFree (installed caller : Lean.Expr) : BuildM (Option Lean.Expr)
       unless rank == rank' do
         throwError "the two readings order by different ranks: `{← spelled rank}` at the \
           declaration's frame, `{← spelled rank'}` at the caller's"
-      let first ← movedValue left left'
-      let second ← movedValue right right'
+      let first ← movedOperand type left left'
+      let second ← movedOperand type right right'
       let moved ← mkCongr (← mkCongrArg (mkAppN installed.getAppFn (arguments.extract 0 3)) first.proof)
         second.proof
       result (← mkEqTrans moved (← law ``Skolems.order_reframeAtInstance
@@ -341,8 +353,8 @@ partial def frameFree (installed caller : Lean.Expr) : BuildM (Option Lean.Expr)
       let_expr NTy.equal _ handles' _ left' right' := caller | different "an equality" installed caller
       unless handles == handles' && handles.isConstOf ``Bool.false do
         throwError "an equality that reads handle identity has no law"
-      let first ← movedValue left left'
-      let second ← movedValue right right'
+      let first ← movedOperand type left left'
+      let second ← movedOperand type right right'
       let moved ← mkCongr (← mkCongrArg (mkAppN installed.getAppFn (arguments.extract 0 3)) first.proof)
         second.proof
       result (← mkEqTrans moved (← law ``Skolems.equal_reframeAtInstance
@@ -352,8 +364,8 @@ partial def frameFree (installed caller : Lean.Expr) : BuildM (Option Lean.Expr)
       if domain == domain' then return ← congruence installed caller
       let_expr NTy.carrier _ type := domain
         | throwError "an equation at `{← spelled domain}` has no law"
-      let first ← movedValue left left'
-      let second ← movedValue right right'
+      let first ← movedOperand type left left'
+      let second ← movedOperand type right right'
       let moved ← mkCongr (← mkCongrArg (mkApp installed.getAppFn domain) first.proof) second.proof
       let equivalence ← law ``Skolems.reframeAtInstance_inj #[type, ← bounded type, left', right']
       let_expr Eq _ _ atMoved := ← inferType moved | throwError "internal"

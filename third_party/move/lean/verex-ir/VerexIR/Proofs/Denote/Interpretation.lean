@@ -84,11 +84,13 @@ is introduced into generic clauses. -/
 Given route is parked (`U2`), parameter well-formedness in the frame stays
 `True`; the relational transfer boundary (`RelationalTransfer.lean`,
 `GivenTransfer.lean`) still requires explicit `validArgs`/`validResult`
-evidence before exporting a concrete theorem. -/
+evidence before exporting a concrete theorem. The adapted reads and parameter
+predicate define a new stage. Its declared validity starts uninstalled. -/
 @[reducible] def GivenFrame.toCarriers (frame : GivenFrame) : Carriers :=
   { frame.operations with
     reads := frame.parameterReads
-    holds := fun _ _ => True }
+    holds := fun _ _ => True
+    declared := fun _ _ _ _ => False }
 
 /-- A given interpretation can choose its state independently of runtime
 memory. Relating that state to concrete memory is separate work. -/
@@ -107,7 +109,7 @@ theorem GivenFrame.deepHolds_param (frame : GivenFrame) (index : Nat)
   letI : Carriers := frame.toCarriers
   ⟨trivial⟩
 
-/-- Choosing given parameter sorts does not erase an ADT's declared invariant. -/
+/-- Choosing given parameter sorts keeps the ADT's own predicate. -/
 theorem GivenFrame.own_eq (frame : GivenFrame) (source : StructHandle)
     (arguments : NRow) (value : RuntimeValue) :
     @Carriers.own frame.toCarriers source arguments value =

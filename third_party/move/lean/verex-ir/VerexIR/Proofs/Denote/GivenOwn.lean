@@ -6,8 +6,8 @@ import VerexIR.Proofs.Denote.Interpretation
 namespace VerexIR.Proofs.Denote
 
 /-- The own-independent family used only while translating declaration
-clauses. It is never the family in which a function is verified: that family
-installs the resulting declarations with `withDeclarations`. -/
+clauses. It starts uninstalled, as does the verification stage that selects
+the resulting own predicates with `withDeclarations`. -/
 @[reducible] def GivenFrame.clauseScaffold (frame : GivenFrame) : Carriers :=
   { frame.toCarriers with own := fun _ _ _ => True }
 
@@ -46,12 +46,14 @@ def GivenOwnDeclarations.own {frame : GivenFrame}
   | none => True
   | some clause => clause.atRuntime raw
 
-/-- Install generated declaration predicates without changing the given sorts,
-their codecs, or their parameter well-formedness. The input frame's arbitrary
-own predicate is not inherited by this verification family. -/
+/-- Select the generated own predicates without changing the given sorts,
+codecs or parameter well-formedness. The resulting stage has uninstalled
+declared validity because the selected own predicate can differ. -/
 @[reducible] def GivenFrame.withDeclarations (frame : GivenFrame)
     (declarations : GivenOwnDeclarations frame) : GivenFrame where
-  operations := { frame.operations with own := declarations.own }
+  operations := { frame.operations with
+    own := declarations.own
+    declared := fun _ _ _ _ => False }
 
 theorem GivenFrame.withDeclarations_own (frame : GivenFrame)
     (declarations : GivenOwnDeclarations frame) (source : StructHandle)
