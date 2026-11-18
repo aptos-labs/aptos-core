@@ -1045,6 +1045,12 @@ appear. -/
       FunctionCarriers.own unit source (arguments.map Θ.resolve) value := by
   rw [Θ.own_resolve source arguments value, NRow.map_resolve Θ arguments]
 
+@[vir_denote_norm] theorem Carriers.declared_frame (Θ : Skolems unit) (source : StructHandle)
+    (arguments : NRow) (kind : NominalKind) (value : RuntimeValue) :
+    @Carriers.declared Θ.toCarriers source arguments kind value =
+      FunctionCarriers.declared unit source (arguments.map Θ.resolve) kind value := by
+  rw [Θ.declared_resolve source arguments kind value, NRow.map_resolve Θ arguments]
+
 /-- A declaration's own parameters substitute a type over them to itself. -/
 theorem NTy.subst_params {params : NRow} (own : params.isParamsFrom 0 = true) {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true) :

@@ -3078,6 +3078,9 @@ class Carriers extends Sorts where
   declaration without one (`NTy.deepHolds`, `NTy.Holds`,
   `doc/designs/data-invariants.md`). -/
   own : StructHandle → NRow → RuntimeValue → Prop := fun _ _ _ => True
+  /-- Full validity of a declared value at this stage, indexed by its handle,
+  type arguments, kind and encoding. An uninstalled stage accepts none. -/
+  declared : StructHandle → NRow → NominalKind → RuntimeValue → Prop := fun _ _ _ _ => False
 
 /-- The dictionary of typed function values a family's function sorts carry
 (`Sorts.functions`), at any family of function sorts. -/
@@ -3345,6 +3348,8 @@ class FunctionCarriers (unit : Validation.ValidatedUnit) where
   together, one pair per unit, so they are one parameter of every term that
   reads the unit's carriers. -/
   nominals : NominalCarriers unit := NominalCarriers.none unit
+  /-- The unit's declared validity, read by its runtime family. -/
+  declared : StructHandle → NRow → NominalKind → RuntimeValue → Prop := fun _ _ _ _ => False
 
 /-- A unit's nominal values are the ones its function values carry, so a term
 that binds `FunctionCarriers unit` finds them without a second instance. -/
@@ -3513,10 +3518,15 @@ loan-free runtime value, and the unit's function values. -/
     [FunctionCarriers unit] : Carriers where
   toSorts := Sorts.runtime unit
   own := FunctionCarriers.own unit
+  declared := FunctionCarriers.declared unit
 
 @[simp, vir_denote_norm] theorem Carriers.own_runtime (unit : Validation.ValidatedUnit)
     [functions : FunctionCarriers unit] :
     (Carriers.runtime unit).own = FunctionCarriers.own unit := rfl
+
+@[simp, vir_denote_norm] theorem Carriers.declared_runtime (unit : Validation.ValidatedUnit)
+    [FunctionCarriers unit] :
+    (Carriers.runtime unit).declared = FunctionCarriers.declared unit := rfl
 
 
 section Sorts
@@ -10036,11 +10046,18 @@ carried as the `i`-th argument at the caller's family. -/
   toSorts := Sorts.instantiate θ outer.toSorts
   holds := fun index => @NTy.deepHolds outer ((NTy.param index).subst θ.1)
   own := fun source arguments value => outer.own source (NRow.subst θ.1 arguments) value
+  declared := fun source arguments kind value =>
+    outer.declared source (NRow.subst θ.1 arguments) kind value
 
 @[simp, vir_denote_norm] theorem Carriers.own_instantiate (θ : TypeArgs) (outer : Carriers)
     (source : StructHandle) (arguments : NRow) (value : RuntimeValue) :
     @Carriers.own (Carriers.instantiate θ outer) source arguments value =
       outer.own source (NRow.subst θ.1 arguments) value := rfl
+
+@[simp, vir_denote_norm] theorem Carriers.declared_instantiate (θ : TypeArgs) (outer : Carriers)
+    (source : StructHandle) (arguments : NRow) (kind : NominalKind) (value : RuntimeValue) :
+    @Carriers.declared (Carriers.instantiate θ outer) source arguments kind value =
+      outer.declared source (NRow.subst θ.1 arguments) kind value := rfl
 
 
 @[vir_denote_norm] theorem Sorts.orders_instantiate (θ : TypeArgs) (outer : Sorts)
@@ -11586,6 +11603,10 @@ class Skolems (unit : outParam Validation.ValidatedUnit) [FunctionCarriers unit]
     @Carriers.own toCarriers source arguments value =
       FunctionCarriers.own unit source
         (NRow.substWith (fun index => resolve (.param index)) arguments) value
+  declared_resolve : ∀ source arguments kind value,
+    @Carriers.declared toCarriers source arguments kind value =
+      FunctionCarriers.declared unit source
+        (NRow.substWith (fun index => resolve (.param index)) arguments) kind value
 
 variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
@@ -11631,6 +11652,28 @@ parameters: the runtime family itself. -/
   encode_toRuntime := fun _ _ => rfl
   holds_toRuntime := fun _ _ => Iff.rfl
   own_resolve := fun _ arguments _ => by rw [NRow.substWith_param arguments]; rfl
+  declared_resolve := fun _ arguments _ _ => by rw [NRow.substWith_param arguments]; rfl
+
+/-- A row the caller resolves after the call's substitution is the row the
+call's resolutions substitute: the equation both staged laws of
+`Skolems.instantiate` read (`own_resolve`, `declared_resolve`). -/
+private theorem Skolems.resolved_subst_row (θ : TypeArgs) (outer : Skolems unit)
+    (arguments : NRow) :
+    NRow.substWith (fun index => outer.resolve (.param index)) (NRow.subst θ.1 arguments) =
+      NRow.substWith (fun index => outer.resolve ((NTy.param index).subst θ.1)) arguments := by
+  have marked : ∀ (types : Nat → NTy) (entry : NTy),
+      (entry.argumentWith types).unmark = (entry.substWith types).unmark := by
+    intro types entry
+    cases entry <;>
+      simp only [NTy.argumentWith, NTy.substWith, NTy.unmark, NTy.unmark_unmark]
+  rw [NRow.substWith_subst θ.1 (fun index => outer.resolve (.param index)) arguments]
+  refine NRow.substWith_unmarked_congr (fun index => ?_) arguments
+  have resolved : outer.resolve ((NTy.param index).subst θ.1) =
+      ((θ.1.argument index).substWith (fun i => outer.resolve (.param i))).unmark := by
+    rw [outer.resolve_eq_type]
+    show ((θ.1.argument index).unmark).substWith outer.type = _
+    rw [NTy.substWith_unmark]
+  rw [marked, resolved, NTy.unmark_unmark]
 
 /-- The frame a generic call's type arguments induce: its carriers are the
 arguments' at the caller's family, and its types resolve through the
@@ -11659,24 +11702,13 @@ caller's. -/
     NTy.inhabitable_argumentWith outer.argument_inhabitable _
       (NRow.getD_inhabitable θ.1 θ.2 index (.param index) rfl)
   own_resolve := fun source arguments value => by
-    have marked : ∀ (types : Nat → NTy) (entry : NTy),
-        (entry.argumentWith types).unmark = (entry.substWith types).unmark := by
-      intro types entry
-      cases entry <;>
-        simp only [NTy.argumentWith, NTy.substWith, NTy.unmark, NTy.unmark_unmark]
-    have row : NRow.substWith (fun index => outer.resolve (.param index))
-          (NRow.subst θ.1 arguments) =
-        NRow.substWith (fun index => outer.resolve ((NTy.param index).subst θ.1)) arguments := by
-      rw [NRow.substWith_subst θ.1 (fun index => outer.resolve (.param index)) arguments]
-      refine NRow.substWith_unmarked_congr (fun index => ?_) arguments
-      have resolved : outer.resolve ((NTy.param index).subst θ.1) =
-          ((θ.1.argument index).substWith (fun i => outer.resolve (.param i))).unmark := by
-        rw [outer.resolve_eq_type]
-        show ((θ.1.argument index).unmark).substWith outer.type = _
-        rw [NTy.substWith_unmark]
-      rw [marked, resolved, NTy.unmark_unmark]
     show @Carriers.own outer.toCarriers source (NRow.subst θ.1 arguments) value = _
-    rw [outer.own_resolve source (NRow.subst θ.1 arguments) value, row]
+    rw [outer.own_resolve source (NRow.subst θ.1 arguments) value,
+      Skolems.resolved_subst_row θ outer arguments]
+  declared_resolve := fun source arguments kind value => by
+    show @Carriers.declared outer.toCarriers source (NRow.subst θ.1 arguments) kind value = _
+    rw [outer.declared_resolve source (NRow.subst θ.1 arguments) kind value,
+      Skolems.resolved_subst_row θ outer arguments]
 
 attribute [vir_denote, vir_denote_norm] Skolems.ofRuntime_toRuntime Skolems.toRuntime_ofRuntime
 
