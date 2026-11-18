@@ -1096,20 +1096,24 @@ it explicitly, retaining local definitions as lets. The auxiliary theorem
 helper then only abstracts universes: it need not recheck the entire proof
 to discover which local definitions are safe to generalize. The resulting
 closed theorem still goes through the kernel's ordinary declaration check. -/
-private def certifyProof (locals : Array FVarId) (type proof : Lean.Expr) (kind : Name) : MetaM Lean.Expr := do
+private def certifyProof (locals : Array FVarId) (type proof : Lean.Expr) (kind : Name)
+    (prepare : Lean.Expr → CoreM Unit := fun _ => pure ()) : MetaM Lean.Expr := do
   let enclosing := locals.map mkFVar
   let closedType ← mkForallFVars enclosing type (usedLetOnly := false)
   let closedProof ← mkLambdaFVars enclosing proof (usedLetOnly := false)
   if closedType.hasFVar || closedProof.hasFVar then
     throwError "a shared summary has dependencies outside its enclosing context"
+  prepare closedType
+  prepare closedProof
   let certificate ← mkAuxTheorem closedType closedProof (zetaDelta := true)
     (kind? := some kind) (cache := false)
   let arguments ← enclosing.filterM fun parameter => do
     return !(← parameter.fvarId!.getDecl).isLet
   return mkAppN certificate arguments
 
-private def certifySummary (node : Node) (type proof : Lean.Expr) : MetaM Lean.Expr :=
-  certifyProof node.enclosing type proof `_verexJoinProof
+private def certifySummary (node : Node) (type proof : Lean.Expr)
+    (prepare : Lean.Expr → CoreM Unit := fun _ => pure ()) : MetaM Lean.Expr :=
+  certifyProof node.enclosing type proof `_verexJoinProof prepare
 
 /-- Close the dependencies of a shared proof in telescope order. Definitions
 remain definitions, including those required by the proof's expected type. -/
@@ -1138,14 +1142,16 @@ def sharedProof? (value : Lean.Expr) : Option Lean.Expr := do
 
 /-- Name a completed shared proof after its children are finalized. Every
 consumer then uses this constant instead of abstracting another body copy. -/
-def certifySharedProof (type proof : Lean.Expr) : MetaM Lean.Expr := do
-  certifyProof (← sharedProofLocals type proof) type proof `_verexSharedProof
+def certifySharedProof (type proof : Lean.Expr)
+    (prepare : Lean.Expr → CoreM Unit := fun _ => pure ()) : MetaM Lean.Expr := do
+  certifyProof (← sharedProofLocals type proof) type proof `_verexSharedProof prepare
 
 /-- Close predecessor holes only after the shared proof is complete. A
 successful summary is a theorem constant, so its proof is retained once.
 Reporting admissions propagate to the final artifact audit without entering
 the successful theorem cache. -/
-def finish? (node : Node) : MetaM (Option Node) := do
+def finish? (node : Node) (prepare : Lean.Expr → CoreM Unit := fun _ => pure ()) :
+    MetaM (Option Node) := do
   let some summary := node.summary? | return none
   summary.withContext do
   let proof ← instantiateMVars (mkMVar summary)
@@ -1157,7 +1163,7 @@ def finish? (node : Node) : MetaM (Option Node) := do
     holdsInstantiated := holdsInstantiated.push instantiated
   let type ← instantiateMVars (← summary.getType)
   let certificate ← if proof.hasSorry then pure proof
-    else certifySummary node type proof
+    else certifySummary node type proof prepare
   for arrival in node.arrivals, index in [:node.arrivals.size] do
     arrival.goal.withContext do
       let values := node.summaryArguments.map (·.select arrival.arguments)

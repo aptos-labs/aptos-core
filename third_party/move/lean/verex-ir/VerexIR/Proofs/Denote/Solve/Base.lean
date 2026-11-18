@@ -1599,6 +1599,34 @@ def nameTaken (name : Name) : MetaM Bool := do
   (← getLCtx).anyM fun decl => do
     return (scopeEntry? (← instantiateMVars decl.type)).any (·.1 == name.toString)
 
+/-- Declare the auxiliary theorems a proof uses (`hiddenTheorem`) that a
+backtracked attempt removed from the environment, walking registered hidden
+theorems in dependency order. Any declaration already present in a
+kernel-checked environment already has its dependencies in the environment. -/
+partial def declareHiddenTheorems (proof : Lean.Expr) : CoreM Unit := do
+  let state ← targetState
+  let hidden ← state.hiddenTheorems.get
+  if hidden.isEmpty then return
+  let env ← getEnv
+  if hidden.fold (fun allPresent name _ => allPresent && env.contains name) true then return
+  let visited ← IO.mkRef ({} : NameSet)
+  let rec visit (name : Name) : CoreM Unit := do
+    if (← visited.get).contains name || (← getEnv).contains name then return
+    visited.modify (·.insert name)
+    let some declaration := hidden[name]? | return
+    let expressions : Array Lean.Expr := match declaration with
+      | .thmDecl info => #[info.type, info.value]
+      | .defnDecl info => #[info.type, info.value]
+      | _ => #[]
+    for expression in expressions do
+      for dep in expression.getUsedConstants do
+        visit dep
+    unless (← getEnv).contains name do
+      addDecl declaration
+  for name in proof.getUsedConstants do
+    visit name
+
+
 /-- A proof as an auxiliary theorem of the theorem being proved, as
 `mkAuxTheorem` makes one, registered with the target: of a kind of its own,
 so that an attempt that is undone never frees its name for another
@@ -1606,6 +1634,8 @@ statement, and declared again where the proof is used after such an
 attempt removed it (`declareHiddenTheorems`). -/
 def hiddenTheorem (type value : Lean.Expr) : MetaM Lean.Expr := do
   let state ← targetState
+  declareHiddenTheorems type
+  declareHiddenTheorems value
   let index ← state.hiddenCount.modifyGet fun index => (index, index + 1)
   let proof ← mkAuxTheorem type value (zetaDelta := true)
     (kind? := some (Name.mkSimple s!"_hidden_{index}"))
@@ -1614,22 +1644,12 @@ def hiddenTheorem (type value : Lean.Expr) : MetaM Lean.Expr := do
   -- A statement an undone attempt hid already: its theorem, again.
   if let some earlier := (← state.hiddenStatements.get)[(info.levelParams, info.type)]? then
     if earlier != name then
-      unless (← getEnv).contains earlier do
-        if let some declaration := (← state.hiddenTheorems.get)[earlier]? then addDecl declaration
+      declareHiddenTheorems (mkConst earlier)
       return mkAppN (mkConst earlier proof.getAppFn.constLevels!) proof.getAppArgs
   unless (← state.hiddenTheorems.get).contains name do
     state.hiddenTheorems.modify (·.insert name (.thmDecl info))
     state.hiddenStatements.modify (·.insert (info.levelParams, info.type) name)
   return proof
-
-/-- Declare the auxiliary theorems a proof uses (`hiddenTheorem`) that a
-backtracked attempt removed from the environment. -/
-def declareHiddenTheorems (proof : Lean.Expr) : CoreM Unit := do
-  let hidden ← (← targetState).hiddenTheorems.get
-  if hidden.isEmpty then return
-  for name in proof.getUsedConstants do
-    unless (← getEnv).contains name do
-      if let some declaration := hidden[name]? then addDecl declaration
 
 /-- The facts connected to `seeds`: each sharing a key with a seed or with a
 fact reached, to a fixpoint, in context order per round. A fact not reached

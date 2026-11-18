@@ -1449,7 +1449,7 @@ private def finishShared : SolveM Unit := do
     for index in [: (← get).regions.size] do
       let region := (← get).regions[index]!
       if region.node.finished then continue
-      if let some node ← SharedContinuations.finish? region.node then
+      if let some node ← SharedContinuations.finish? region.node declareHiddenTheorems then
         modify fun s => { s with regions := s.regions.set! index { region with node := node } }
         progress := true
     unless progress do throwError "shared continuation proofs have unresolved dependencies"

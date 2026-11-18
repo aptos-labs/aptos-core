@@ -1846,6 +1846,7 @@ private partial def shareScopedProofs (root : MVarId) : Lean.Elab.Tactic.TacticM
       if let some certificate := (← certificates.get)[key]? then
         return certificate
       let certificate ← VerexIR.Proofs.Denote.SharedContinuations.certifySharedProof type proof
+        VerexIR.Proofs.Denote.declareHiddenTheorems
       certificates.modify (·.insert key certificate)
       return certificate
     -- Meta.transform opens binders, so even an already-instantiated marker
