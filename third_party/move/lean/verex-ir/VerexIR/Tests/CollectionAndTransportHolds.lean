@@ -28,7 +28,7 @@ example (θ : TypeArgs) (τ : NTy) (v : (τ.subst θ.1).carrier)
 
 -- Negative 2: transporting an invalid skolem value back via `NTy.ofSkolem`
 -- does not manufacture `NTy.Holds`.
-example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier (Carriers.instantiate θ Θ) τ)
+example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier ((Carriers.instantiate θ Θ)).toSorts τ)
     (bad : ¬@NTy.Holds (Carriers.instantiate θ Θ) τ v) :
     ¬@NTy.Holds Θ (τ.subst θ.1) (NTy.ofSkolem θ τ v) := by
   simp only [vir_transport]
@@ -41,7 +41,7 @@ example (θ : TypeArgs) (τ : NTy) (v : (τ.subst θ.1).carrier) :
       @NTy.Holds Θ (τ.subst θ.1) v := by
   simp only [vir_transport]
 
-example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier (Carriers.instantiate θ Θ) τ) :
+example (θ : TypeArgs) (τ : NTy) (v : @NTy.carrier ((Carriers.instantiate θ Θ)).toSorts τ) :
     (@NTy.Holds Θ (τ.subst θ.1) (NTy.ofSkolem θ τ v)) ↔
       @NTy.Holds (Carriers.instantiate θ Θ) τ v := by
   simp only [vir_transport]
@@ -51,7 +51,7 @@ example (θ : TypeArgs) (row : NRow) (vs : HList (NRow.subst θ.1 row)) :
       @HList.Holds Θ (NRow.subst θ.1 row) vs := by
   simp only [vir_transport]
 
-example (θ : TypeArgs) (row : NRow) (vs : @HList (Carriers.instantiate θ Θ) row) :
+example (θ : TypeArgs) (row : NRow) (vs : @HList ((Carriers.instantiate θ Θ)).toSorts row) :
     (@HList.Holds Θ (NRow.subst θ.1 row) (HList.ofSkolem θ row vs)) ↔
       @HList.Holds (Carriers.instantiate θ Θ) row vs := by
   simp only [vir_transport]
@@ -64,7 +64,7 @@ example (θ : TypeArgs) (names : List String) (rows : NRows)
   simp only [vir_transport]
 
 example (θ : TypeArgs) (names : List String) (rows : NRows)
-    (v : @variantCarrier (Carriers.instantiate θ Θ) names rows) :
+    (v : @variantCarrier ((Carriers.instantiate θ Θ)).toSorts names rows) :
     (@variantCarrier.Holds Θ names (NRows.subst θ.1 rows)
         (variantCarrier.ofSkolem θ names rows v)) ↔
       @variantCarrier.Holds (Carriers.instantiate θ Θ) names rows v := by
@@ -80,7 +80,7 @@ section FrameTests
 variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 
 -- Negative 1 (first): `Θ.toRuntime` preserves invalidity (`¬NTy.Holds`).
-example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier Θ.toCarriers τ)
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier (Θ.toCarriers).toSorts τ)
     (bad : ¬@NTy.Holds Θ.toCarriers τ v) :
     ¬@NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.toRuntime τ v) := by
   simp only [vir_transport]
@@ -90,19 +90,19 @@ example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier Θ.toCarriers τ)
 example (Θ : Skolems unit) {params : NRow}
     (own : params.isParamsFrom 0 = true) {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (v : @NTy.carrier Θ.toCarriers τ) (bad : ¬@NTy.Holds Θ.toCarriers τ v) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts τ) (bad : ¬@NTy.Holds Θ.toCarriers τ v) :
     ¬@NTy.Holds (Θ.instance params own).toCarriers τ (Θ.reframe own bounded v) := by
   simp only [vir_transport]
   exact bad
 
 -- Positive 1–4: `toRuntime`, `ofRuntime`, `reframe`, and `Skolems.instantiate`
 -- preserve `NTy.Holds` bijectively via `vir_transport`.
-example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier Θ.toCarriers τ) :
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier (Θ.toCarriers).toSorts τ) :
     @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) (Θ.toRuntime τ v) ↔
       @NTy.Holds Θ.toCarriers τ v := by
   simp only [vir_transport]
 
-example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier (Carriers.runtime unit) (Θ.resolve τ)) :
+example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier ((Carriers.runtime unit)).toSorts (Θ.resolve τ)) :
     @NTy.Holds Θ.toCarriers τ (Θ.ofRuntime τ v) ↔
       @NTy.Holds (Carriers.runtime unit) (Θ.resolve τ) v := by
   simp only [vir_transport]
@@ -110,13 +110,13 @@ example [Θ : Skolems unit] (τ : NTy) (v : @NTy.carrier (Carriers.runtime unit)
 example (Θ : Skolems unit) {params : NRow}
     (own : params.isParamsFrom 0 = true) {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (v : @NTy.carrier Θ.toCarriers τ) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts τ) :
     @NTy.Holds (Θ.instance params own).toCarriers τ (Θ.reframe own bounded v) ↔
       @NTy.Holds Θ.toCarriers τ v := by
   simp only [vir_transport]
 
 example [Θ : Skolems unit] (θ : TypeArgs) (τ : NTy)
-    (v : @NTy.carrier Θ.toCarriers (τ.subst θ.1)) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts (τ.subst θ.1)) :
     @NTy.Holds (Skolems.instantiate θ Θ).toCarriers τ (NTy.toSkolem θ τ v) ↔
       @NTy.Holds Θ.toCarriers (τ.subst θ.1) v := by
   simp only [vir_transport]

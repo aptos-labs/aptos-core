@@ -47,8 +47,8 @@ variable {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit] [Θ :
 -- A method premise at the frame instantiated by the caller's own type
 -- arguments is the premise the context states at the outer frame.
 example
-    (function : @NTy.carrier (Skolems.instantiate
-        ⟨.cons (.param 0) (.cons (.param 1) .nil), rfl⟩ Θ).toCarriers
+    (function : @NTy.carrier ((Skolems.instantiate
+        ⟨.cons (.param 0) (.cons (.param 1) .nil), rfl⟩ Θ).toCarriers).toSorts
       (.function (.cons (.param 0) (.cons (.int 64 false) .nil))
         { parameters := [true, false], results := [false] } (ResultShape.one (.param 1)).row))
     (stated : ReceiverScopedMethod (.cons (.param 0) (.cons (.int 64 false) .nil))
@@ -67,8 +67,8 @@ example
 -- At exchanged type arguments the instantiated rows are other rows: the
 -- premise at the outer frame is not the one owed.
 example
-    (function : @NTy.carrier (Skolems.instantiate
-        ⟨.cons (.param 1) (.cons (.param 0) .nil), rfl⟩ Θ).toCarriers
+    (function : @NTy.carrier ((Skolems.instantiate
+        ⟨.cons (.param 1) (.cons (.param 0) .nil), rfl⟩ Θ).toCarriers).toSorts
       (.function (.cons (.param 0) (.cons (.int 64 false) .nil))
         { parameters := [true, false], results := [false] } (ResultShape.one (.param 1)).row))
     (other : (NTy.function (.cons (.param 0) (.cons (.int 64 false) .nil))

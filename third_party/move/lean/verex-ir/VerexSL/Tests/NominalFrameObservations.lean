@@ -83,7 +83,7 @@ run_cmd do
       let boundedType ← mkEq (mkApp2 (mkConst ``NTy.paramsAll) allowed diamond) (mkConst ``Bool.true)
       let carriers := mkApp3 (mkConst ``Skolems.toCarriers) (mkConst name) functions frame
       withLocalDeclD `bounded boundedType fun bounded =>
-      withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) carriers diamond) fun value => do
+      withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) diamond) fun value => do
         let moved := mkAppN (mkConst ``Skolems.reframe)
           #[mkConst name, functions, frame, params, own, diamond, bounded, value]
         Meta.check moved

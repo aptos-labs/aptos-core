@@ -2127,19 +2127,19 @@ private def routedSelfBinders (segments : Array String) (unit : ValidatedUnit) (
       let refines ← atRuntime refinesBody
       pure (← `(bracketedBinder| ($(cycleSelf name) :
             @VerexIR.Proofs.Denote.HList
-              (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberParams →
+              ((VerexIR.Proofs.Denote.Carriers.runtime $unitTerm)).toSorts $memberParams →
             VerexIR.Proofs.Denote.Comp $unitTerm
               (@VerexIR.Proofs.Denote.ResultShape.carrier
-                (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberShape))),
+                ((VerexIR.Proofs.Denote.Carriers.runtime $unitTerm)).toSorts $memberShape))),
         ← `(bracketedBinder| ($(cycleSelfRefines name) : $refines)))
     else
       -- At the runtime frame, spelled out: binders precede the statement's.
       pure (← `(bracketedBinder| ($(cycleSelf name) :
             @VerexIR.Proofs.Denote.HList
-              (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberParams →
+              ((VerexIR.Proofs.Denote.Carriers.runtime $unitTerm)).toSorts $memberParams →
             VerexIR.Proofs.Denote.Comp $unitTerm
               (@VerexIR.Proofs.Denote.ResultShape.carrier
-                (VerexIR.Proofs.Denote.Carriers.runtime $unitTerm) $memberShape))),
+                ((VerexIR.Proofs.Denote.Carriers.runtime $unitTerm)).toSorts $memberShape))),
         ← `(bracketedBinder| ($(cycleSelfVerified name) :
             VerexIR.Proofs.Satisfies $(cycleSelf name)
               $(← atUnit segments unit contractName memberContract
@@ -2175,9 +2175,9 @@ private def modelInvokeBinders (segments : Array String) (unit : ValidatedUnit) 
     ∀ (Θ : VerexIR.Proofs.Denote.Skolems $unitTerm) (σs : VerexIR.Proofs.Denote.NRow)
       (shared : VerexIR.Proofs.Denote.Sharing) (shape : VerexIR.Proofs.Denote.ResultShape)
       (function : @VerexIR.Proofs.Denote.NTy.carrier
-        (@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ)
+        ((@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ)).toSorts
         (VerexIR.Proofs.Denote.NTy.function σs shared (VerexIR.Proofs.Denote.ResultShape.row shape)))
-      (args : @VerexIR.Proofs.Denote.HList (@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ) σs)
+      (args : @VerexIR.Proofs.Denote.HList ((@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ)).toSorts σs)
       (pre : VerexIR.Proofs.Denote.Memory $unitTerm),
       @VerexIR.Proofs.RequiresOf $unitTerm _ Θ $requiresMeaning σs shared
         (VerexIR.Proofs.Denote.ResultShape.row shape) function args pre →
@@ -2202,13 +2202,13 @@ private def modelInvokeBinders (segments : Array String) (unit : ValidatedUnit) 
           (weave : VerexIR.Proofs.Denote.Weave $params captured supplied)
           (typeInstantiation : Array (VerexIR.TypeId × VerexIR.TypeId))
           (captures : @VerexIR.Proofs.Denote.HList
-            (@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ) captured)
+            ((@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ)).toSorts captured)
           (shared : VerexIR.Proofs.Denote.Sharing)
           (typed : @VerexIR.Proofs.Denote.SiteTyped $unitTerm _ Θ supplied shared
             (VerexIR.Proofs.Denote.ResultShape.row $shape) $handleTerm
             (VerexIR.Proofs.Denote.Weave.mask weave) typeInstantiation captured)
           (args : @VerexIR.Proofs.Denote.HList
-            (@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ) supplied),
+            ((@VerexIR.Proofs.Denote.Skolems.toCarriers $unitTerm _ Θ)).toSorts supplied),
           $invokeIdent Θ supplied shared $shape
               (@VerexIR.Proofs.Denote.Skolems.construct $unitTerm _ Θ supplied shared
                 (VerexIR.Proofs.Denote.ResultShape.row $shape) $handleTerm
@@ -2235,7 +2235,7 @@ private def modelInvokeBinders (segments : Array String) (unit : ValidatedUnit) 
     let siteRow := rootIdent (functionValuesName segments ++ Name.mkSimple s!"siteRow{index}")
     let binderName := mkIdent (Name.mkSimple s!"invokeRoutes_{name}_{index}")
     routing := routing.push (← `(bracketedBinder| ($binderName :
-      ∀ (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $siteRow) args,
+      ∀ (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $siteRow) args,
         $invokeIdent $runtimeFrame _ _ $shape
             ($ctor captures) args =
           $(cycleSelf name)

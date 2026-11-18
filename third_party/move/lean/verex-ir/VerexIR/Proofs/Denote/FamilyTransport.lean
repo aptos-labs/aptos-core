@@ -99,20 +99,25 @@ at one of them is the operation at the other exactly where it reads the
 family through its type.  A step that exchanges the families must therefore
 check that much and take the equality from here, rather than claim the
 exchange as a conversion. -/
-theorem inhabitantOf_instantiate_heq {Θ : Carriers}
+theorem inhabitantOf_instantiate_heq {Θ : Sorts}
     (θ : TypeArgs) (τ : NTy) (inhabitable : τ.inhabitable = true)
     (substituted : (τ.subst θ.1).inhabitable = true) :
     HEq
-      (@NTy.inhabitantOf (Carriers.instantiate θ Θ) τ inhabitable)
-      (@NTy.inhabitantOf Θ (τ.subst θ.1) substituted) := by
+      (@NTy.inhabitantOf ((Sorts.instantiate θ Θ)) τ inhabitable)
+      (@NTy.inhabitantOf (Θ) (τ.subst θ.1) substituted) := by
   rw [NTy.inhabitantOf_instantiate]
   exact NTy.toSkolem_heq θ τ _
 
 /-- The type arguments and outer carriers of the carriers a call's type
 arguments induce, in either spelling: as carriers, or as the carriers of an
 induced frame. -/
-def inducedCarriers? (family : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
-  if family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 2 then
+partial def inducedCarriers? (family : Lean.Expr) : Option (Lean.Expr × Lean.Expr) :=
+  if family.isAppOfArity ``Carriers.toSorts 1 then do
+    let (arguments, outer) ← inducedCarriers? (family.getArg! 0).consumeMData
+    return (arguments, mkApp (mkConst ``Carriers.toSorts) outer)
+  else if family.isAppOfArity ``Sorts.instantiate 2 then
+    some (family.getArg! 0, family.getArg! 1)
+  else if family.isAppOfArity ``VerexIR.Proofs.Denote.Carriers.instantiate 2 then
     some (family.getArg! 0, family.getArg! 1)
   else if family.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 then
     let frame := family.getArg! 2
@@ -337,7 +342,7 @@ def respelledOperation? (t : Lean.Expr) : MetaM (Option (Lean.Expr × Nat)) := d
   -- These constructors name a family, rather than an operation at one.
   -- Induced and outer families remain distinct; their indexed native
   -- representations are what can acquire the substituted spelling.
-  if head == ``Skolems.toCarriers then return none
+  if head == ``Skolems.toCarriers || head == ``Carriers.toSorts then return none
   let args := t.getAppArgs
   let some (position, θ, outer) := operationFamily? args | return none
   let some row := substitutionRow? θ | return none
@@ -436,7 +441,7 @@ def respellInducedNode (e : Lean.Expr)
         pure ((substituteNRow row fields (some env)).map (mkApp2 (mkConst ``HEnv) outer))
     | ``variantCarrier, #[_, names, rows] =>
         pure ((substituteNRows row rows (some env)).map (mkApp3 (mkConst ``variantCarrier) outer names))
-    | ``Carriers.carrier, #[_, index] =>
+    | ``Sorts.carrier, #[_, index] =>
         pure do carrier (← rowEntry? row (← index.nat? <|> index.rawNatLit?))
     | ``ResultShape.carrier, #[_, shape] => do
         match (← whnfD shape).getAppFn.constName?, (← whnfD shape).getAppArgs with

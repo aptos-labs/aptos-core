@@ -109,14 +109,14 @@ meets the raw closure's shape requirements. Receipt checking remains separate. -
 theorem receiverScopedShape_of_function {unit : ValidatedUnit} [FunctionCarriers unit]
     [Θ : Skolems unit] (parameters : NRow) (shared : Sharing) (results : NRow)
     (function : (NTy.function parameters shared results).carrier) :
-    let closure := (Carriers.functions parameters shared results).closure function
+    let closure := (Sorts.functions parameters shared results).closure function
     receiverScopedShape unit closure.function closure.mask closure.typeInstantiation closure.captures = true := by
   have admitted := NTy.admits_encode_function unit
     (Θ.resolve (.function parameters shared results)) (NRow.substWith Θ.type parameters) shared
     (NRow.substWith Θ.type results) (by rw [Θ.resolve_eq_type]; rfl)
     (Θ.toRuntime (.function parameters shared results) function)
   change NTy.admits unit (Θ.resolve (.function parameters shared results))
-    (@NTy.encode (Carriers.runtime unit) _
+    (@NTy.encode ((Carriers.runtime unit)).toSorts _
       (Θ.toRuntime (.function parameters shared results) function)) = true at admitted
   rw [Θ.encode_toRuntime, Θ.resolve_eq] at admitted
   simp only [NTy.substWith, NTy.encode_function] at admitted
@@ -126,12 +126,12 @@ theorem receiverScopedShape_of_function {unit : ValidatedUnit} [FunctionCarriers
 def ReceiverScopedMethod {unit : ValidatedUnit} [FunctionCarriers unit] [Skolems unit]
     (parameters : NRow) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function parameters shared shape.row).carrier) : Prop :=
-  ReceiverScopedClosure unit ((Carriers.functions parameters shared shape.row).closure function).encode
+  ReceiverScopedClosure unit ((Sorts.functions parameters shared shape.row).closure function).encode
 
 theorem ReceiverScopedMethod.of_closure {unit : ValidatedUnit} [FunctionCarriers unit]
     [Skolems unit] {parameters : NRow} {shared : Sharing} {shape : ResultShape}
     {function : (NTy.function parameters shared shape.row).carrier} {closure : ClosureValue}
-    (closed : (Carriers.functions parameters shared shape.row).closure function = closure)
+    (closed : (Sorts.functions parameters shared shape.row).closure function = closure)
     (checked : ReceiverScopedClosure unit closure.encode) :
     ReceiverScopedMethod parameters shared shape function := by
   simpa only [ReceiverScopedMethod, closed] using checked
@@ -140,7 +140,7 @@ theorem ReceiverScopedMethod.of_closure {unit : ValidatedUnit} [FunctionCarriers
 theorem ReceiverScopedMethod.of_closure_scoped {unit : ValidatedUnit} [FunctionCarriers unit]
     [Skolems unit] {parameters : NRow} {shared : Sharing} {shape : ResultShape}
     {function : (NTy.function parameters shared shape.row).carrier} {closure : ClosureValue}
-    (closed : (Carriers.functions parameters shared shape.row).closure function = closure)
+    (closed : (Sorts.functions parameters shared shape.row).closure function = closure)
     (checked : receiverScopedShape unit closure.function closure.mask closure.typeInstantiation
         closure.captures = true → ReceiverScopedClosure unit closure.encode) :
     ReceiverScopedMethod parameters shared shape function := by
@@ -151,7 +151,7 @@ theorem ReceiverScopedMethod.of_closure_scoped {unit : ValidatedUnit} [FunctionC
 
 theorem ReceiverScopedMethod.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
     [Θ : Skolems unit] (θ : TypeArgs) {parameters : NRow} {shared : Sharing} {shape : ResultShape}
-    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (checked : ReceiverScopedMethod (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (shape.functionOfSkolem θ parameters shared function)) :

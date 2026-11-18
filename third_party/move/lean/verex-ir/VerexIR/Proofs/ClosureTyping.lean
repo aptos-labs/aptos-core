@@ -838,9 +838,9 @@ theorem Skolems.admits_carrier {unit : ValidatedUnit} [FunctionCarriers unit] [�
     {parameters results : NRow} {shared : Sharing}
     (function : (NTy.function parameters shared results).carrier) :
     NTy.admits unit (.function parameters.resolved shared results.resolved)
-      ((Carriers.functions parameters shared results).closure function).encode = true := by
+      ((Sorts.functions parameters shared results).closure function).encode = true := by
   have admitted : NTy.admits unit (Θ.resolve (.function parameters shared results))
-      (@NTy.encode (Carriers.runtime unit) _ (Θ.toRuntime _ function)) = true :=
+      (@NTy.encode ((Carriers.runtime unit)).toSorts _ (Θ.toRuntime _ function)) = true :=
     NTy.admits_encode_function unit _ (NRow.substWith Θ.type parameters) shared
       (NRow.substWith Θ.type results) (by rw [Θ.resolve_eq_type]; rfl) _
   rw [Θ.encode_toRuntime, NTy.encode_function, Θ.resolve_eq_type] at admitted
@@ -869,17 +869,17 @@ private theorem closureTyped_ofCarrier {unit : ValidatedUnit} [FunctionCarriers 
     (resultsFree : results.refFree = true) (parametersScalar : ScalarAt unit parameters)
     (resultsScalar : ScalarAt unit results) :
     ∃ parameterTypes resultTypes targetTypes, targetTypes.map observedType = parameterTypes ∧
-      ClosureTyped unit ((Carriers.functions parameters shared results).closure function).function
-        ((Carriers.functions parameters shared results).closure function).mask
-        ((Carriers.functions parameters shared results).closure function).typeInstantiation
-        ((Carriers.functions parameters shared results).closure function).captures
+      ClosureTyped unit ((Sorts.functions parameters shared results).closure function).function
+        ((Sorts.functions parameters shared results).closure function).mask
+        ((Sorts.functions parameters shared results).closure function).typeInstantiation
+        ((Sorts.functions parameters shared results).closure function).captures
         targetTypes resultTypes ∧
       RowTyped unit parameters parameterTypes ∧
       ∀ shape : ResultShape, shape.row = results → RowDecodes unit shape resultTypes := by
   obtain ⟨parameterTypes, parametersScalar⟩ := Option.isSome_iff_exists.mp parametersScalar
   obtain ⟨resultTypes, resultsScalar⟩ := Option.isSome_iff_exists.mp resultsScalar
   have admitted := Skolems.admits_carrier function
-  generalize (Carriers.functions parameters shared results).closure function = closure at admitted ⊢
+  generalize (Sorts.functions parameters shared results).closure function = closure at admitted ⊢
   obtain ⟨function, mask, typeInstantiation, captures, plain⟩ := closure
   simp only [ClosureValue.encode] at admitted
   obtain ⟨targetNs, declaration, arguments, allParameters, targetResults, namespace_eq,

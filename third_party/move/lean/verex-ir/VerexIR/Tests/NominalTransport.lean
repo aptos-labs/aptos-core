@@ -76,8 +76,8 @@ run_meta do
     let typeArgs ← whnf (mkConst ``TypeArgs)
     let args := mkApp4 (mkConst ``Subtype.mk [Level.one]) (mkConst ``NRow)
       (typeArgs.getArg! 1) row (← mkEqRefl (mkConst ``Bool.true))
-    withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
-      let family := mkApp2 (mkConst ``Carriers.instantiate) args outer
+    withLocalDeclD `outer (mkConst ``Sorts) fun outer => do
+      let family := mkApp2 (mkConst ``Sorts.instantiate) args outer
       let cons := mkApp2 (mkConst ``NRow.cons)
       withLocalDeclD `opaqueRow (mkConst ``NRow) fun opaqueRow => do
         for fields in [opaqueRow, cons generic opaqueRow] do
@@ -135,28 +135,28 @@ private def fallbackArgs : TypeArgs := ⟨.cons (.int 64 false) .nil, rfl⟩
 -- Negative control (first): `NTy.plainFallback` is opaque and never reduces to a literal.
 example [outer : Carriers] : True := by
   fail_if_success
-    have : (@NTy.plainFallback outer .bool rfl) = false := rfl
+    have : (@NTy.plainFallback (outer).toSorts .bool rfl) = false := rfl
   trivial
 
 example [outer : Carriers] :
-    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer) (.param 0) rfl =
-      @NTy.plainFallback outer (.int 64 false) rfl := rfl
+    @NTy.plainFallback ((Carriers.instantiate fallbackArgs outer)).toSorts (.param 0) rfl =
+      @NTy.plainFallback (outer).toSorts (.int 64 false) rfl := rfl
 
 example [outer : Carriers] :
-    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer)
+    @NTy.plainFallback ((Carriers.instantiate fallbackArgs outer)).toSorts
       (.struct ⟨⟨0⟩, 0⟩ (.cons (.param 0) .nil) (.cons (.param 0) .nil)) rfl =
-      @NTy.plainFallback outer
+      @NTy.plainFallback (outer).toSorts
         (.struct ⟨⟨0⟩, 0⟩ (.cons (.int 64 false) .nil) (.cons (.int 64 false) .nil)) rfl := rfl
 
 example [outer : Carriers] :
-    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer)
+    @NTy.plainFallback ((Carriers.instantiate fallbackArgs outer)).toSorts
       (.enum ⟨⟨0⟩, 0⟩ (.cons (.param 0) .nil) ["Only"]
         (.cons (.cons (.param 0) .nil) .nil) (by decide)) rfl =
-      @NTy.plainFallback outer
+      @NTy.plainFallback (outer).toSorts
         (.enum ⟨⟨0⟩, 0⟩ (.cons (.int 64 false) .nil) ["Only"]
           (.cons (.cons (.int 64 false) .nil) .nil) (by decide)) rfl := rfl
 
 example [outer : Carriers] :
-    @NTy.plainFallback (Carriers.instantiate fallbackArgs outer) (.vector (.param 0)) rfl =
-      @NTy.plainFallback outer (.vector (.int 64 false)) rfl := rfl
+    @NTy.plainFallback ((Carriers.instantiate fallbackArgs outer)).toSorts (.vector (.param 0)) rfl =
+      @NTy.plainFallback (outer).toSorts (.vector (.int 64 false)) rfl := rfl
 end PlainFallbackInstantiateDefEq

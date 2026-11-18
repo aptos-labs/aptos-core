@@ -144,11 +144,11 @@ simproc ↓ [vir_denote_norm] nominalOrder
   nominalOperation e (e.getArg! 2)
     #[``NTy.order.eq_11] #[``NTy.order.eq_12]
 
-theorem NTy.viewed_struct [Carriers] (prophecies : Bool) (source : StructHandle)
+theorem NTy.viewed_struct [Sorts] (prophecies : Bool) (source : StructHandle)
     (arguments fields : NRow) (values : (NTy.struct source arguments fields).carrier) :
     NTy.viewed prophecies (.struct source arguments fields) values =
       HList.viewed prophecies fields values := rfl
-theorem NTy.viewed_enum [Carriers] (prophecies : Bool) (source : StructHandle)
+theorem NTy.viewed_enum [Sorts] (prophecies : Bool) (source : StructHandle)
     (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
     (value : (NTy.enum source arguments names rows distinct).carrier) :
     NTy.viewed prophecies (.enum source arguments names rows distinct) value =
@@ -159,20 +159,20 @@ simproc [vir_denote_norm] nominalViewed
     (@NTy.viewed ?carriers _ _ _) := fun e => do
   nominalOperation e (e.getArg! 2) #[``NTy.viewed_struct] #[``NTy.viewed_enum]
 
-theorem NTy.observe_struct [Carriers] (source : StructHandle)
+theorem NTy.observe_struct [Sorts] (source : StructHandle)
     (arguments fields : NRow) (values : (NTy.struct source arguments fields).carrier) :
     NTy.observe (.struct source arguments fields) values =
       HList.observe fields values := rfl
-theorem NTy.observe_enum [Carriers] (source : StructHandle)
+theorem NTy.observe_enum [Sorts] (source : StructHandle)
     (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
     (value : (NTy.enum source arguments names rows distinct).carrier) :
     NTy.observe (.enum source arguments names rows distinct) value =
       variantObserve names rows value := rfl
-theorem NTy.unerase_struct [Carriers] (source : StructHandle)
+theorem NTy.unerase_struct [Sorts] (source : StructHandle)
     (arguments fields : NRow) (values : (NTy.struct source arguments fields).erase.carrier) :
     NTy.unerase (.struct source arguments fields) values =
       HList.unerase fields values := rfl
-theorem NTy.unerase_enum [Carriers] (source : StructHandle)
+theorem NTy.unerase_enum [Sorts] (source : StructHandle)
     (arguments : NRow) (names : List String) (rows : NRows) (distinct : names.Nodup)
     (value : (NTy.enum source arguments names rows distinct).erase.carrier) :
     NTy.unerase (.enum source arguments names rows distinct) value =
@@ -271,24 +271,24 @@ simproc [vir_denote, vir_denote_norm] nominalPatternBinding
 -- Rewrite primitive literals before unfolding the dependent carrier match.
 -- These equations preserve the literal directly, avoiding repeated reductions
 -- of the full native type recursion when a continuation is normalized.
-@[vir_denote_norm ↓] theorem ofGround_unit [Carriers] (value : Unit) :
+@[vir_denote_norm ↓] theorem ofGround_unit [Sorts] (value : Unit) :
     NTy.unit.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_bool [Carriers] (value : Bool) :
+@[vir_denote_norm ↓] theorem ofGround_bool [Sorts] (value : Bool) :
     NTy.bool.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_int [Carriers] (width : Nat) (signed : Bool)
+@[vir_denote_norm ↓] theorem ofGround_int [Sorts] (width : Nat) (signed : Bool)
     (value : (NTy.int width signed).groundCarrier) :
     (NTy.int width signed).ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_num [Carriers] (value : NTy.num.groundCarrier) :
+@[vir_denote_norm ↓] theorem ofGround_num [Sorts] (value : NTy.num.groundCarrier) :
     NTy.num.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_address [Carriers] (value : NTy.address.groundCarrier) :
+@[vir_denote_norm ↓] theorem ofGround_address [Sorts] (value : NTy.address.groundCarrier) :
     NTy.address.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_signer [Carriers] (value : NTy.signer.groundCarrier) :
+@[vir_denote_norm ↓] theorem ofGround_signer [Sorts] (value : NTy.signer.groundCarrier) :
     NTy.signer.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_string [Carriers] (value : String) :
+@[vir_denote_norm ↓] theorem ofGround_string [Sorts] (value : String) :
     NTy.string.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_bytes [Carriers] (value : NTy.bytes.groundCarrier) :
+@[vir_denote_norm ↓] theorem ofGround_bytes [Sorts] (value : NTy.bytes.groundCarrier) :
     NTy.bytes.ofGround rfl value = value := rfl
-@[vir_denote_norm ↓] theorem ofGround_char [Carriers] (value : NTy.char.groundCarrier) :
+@[vir_denote_norm ↓] theorem ofGround_char [Sorts] (value : NTy.char.groundCarrier) :
     NTy.char.ofGround rfl value = value := rfl
 
 -- The same constructor-first rule avoids traversing a dependent result match.
@@ -583,7 +583,7 @@ simproc ↓ [vir_denote_norm] instantiatedEqInCallerView (@Eq _ _ _) :=
     -- existential witness and make normalization repeat indefinitely.
     let some (outer, θ, τ) ← (do
         match carrier.getAppFn.constName?, carrier.getAppArgs with
-        | some ``VerexIR.Proofs.Denote.Carriers.carrier, #[family, index] =>
+        | some ``VerexIR.Proofs.Denote.Sorts.carrier, #[family, index] =>
             let some (θ, outer) := inducedCarriers? family | pure none
             pure (some (outer, θ, mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) index))
         | some ``VerexIR.Proofs.Denote.NTy.carrier, #[family, τ] =>
@@ -992,8 +992,10 @@ private def literalMapConstruction (e : Lean.Expr) : Bool := Id.run do
 /-- Upgrade a base function-carrier family (`<pkg>.functionCarriersBase`) to the
 full unit function-carrier family (`<pkg>.functionCarriers`) on own-independent
 carrier and value operations once `<pkg>.functionCarriers` is registered. -/
-private def upgradeBaseFamily? (env : Environment) (family : Lean.Expr) : Option Lean.Expr := do
+private partial def upgradeBaseFamily? (env : Environment) (family : Lean.Expr) : Option Lean.Expr := do
   let f := family.consumeMData
+  if f.isAppOfArity ``Carriers.toSorts 1 then
+    return mkApp (mkConst ``Carriers.toSorts) (← upgradeBaseFamily? env (f.getArg! 0))
   guard (f.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3)
   let unit := f.getArg! 0
   let base := f.getArg! 1
@@ -1041,6 +1043,8 @@ private def keptArgumentsConvert (fn : Lean.Expr) (args : Array Lean.Expr)
 private def isCarrierFamilyHead (name : Name) : Bool :=
   name == ``VerexIR.Proofs.Denote.Skolems.toCarriers ||
   name == ``VerexIR.Proofs.Denote.Carriers.instantiate ||
+  name == ``VerexIR.Proofs.Denote.Carriers.toSorts ||
+  name == ``VerexIR.Proofs.Denote.Sorts.instantiate ||
   name == ``VerexIR.Proofs.Denote.Skolems.instantiate ||
   name == `VerexIR.Proofs.Denote.GivenFrame.toCarriers
 
@@ -1053,6 +1057,7 @@ private def canonicalFamilies (e : Lean.Expr) : MetaM Lean.Expr := do
   let substituteNRows := fun row rows => FamilyTransport.substituteNRows row rows (some env)
   let instantiated := (e.find? fun t => t.isConstOf ``VerexIR.Proofs.Denote.Skolems.instantiate ||
       t.isConstOf ``VerexIR.Proofs.Denote.Carriers.instantiate ||
+      t.isConstOf ``VerexIR.Proofs.Denote.Sorts.instantiate ||
       t.isConstOf ``VerexIR.Proofs.Denote.NTy.subst || t.isConstOf ``VerexIR.Proofs.Denote.NRow.subst ||
       t.isConstOf ``VerexIR.Proofs.Denote.NRows.subst ||
       t.isConstOf ``VerexIR.Proofs.Denote.ResultShape.subst ||
@@ -1371,7 +1376,7 @@ dsimproc ↓ [vir_denote, vir_denote_norm] ofRuntimeOuterFrame
   let some (θ, outer, row) := inducedFrame? frame | return .continue
   let some substituted := substituteNTy row τ (some (← getEnv)) | return .continue
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer
-  return .visit (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers θ τ
+  return .visit (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) θ τ
     (mkApp5 e.getAppFn unit functions outer substituted value))
 
 /-- A value carried from an induced frame to the runtime family, as the
@@ -1383,7 +1388,7 @@ dsimproc ↓ [vir_denote, vir_denote_norm] toRuntimeOuterFrame
   let some (θ, outer, row) := inducedFrame? frame | return .continue
   let some substituted := substituteNTy row τ (some (← getEnv)) | return .continue
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer
-  let view := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.ofSkolem) carriers θ τ value
+  let view := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.ofSkolem) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) θ τ value
   return .visit (mkApp5 e.getAppFn unit functions outer substituted view)
 
 /-- Whether a term rebuilds a value from its components: the value itself,
@@ -1755,7 +1760,8 @@ private partial def closeStructuralHoldsSubgoal (g : MVarId) : MetaM Bool := wit
 
 private partial def holdsProof? (carriers τ v : Lean.Expr) : MetaM (Option Lean.Expr) := do
   try
-    let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers τ
+    let sorts := mkApp (mkConst ``Carriers.toSorts) carriers
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) sorts τ
     let vTyped ← withDefault do
       if (← inferType v) == carrierTy then pure v else mkExpectedTypeHint v carrierTy
     let expected := mkApp3 (mkConst ``NTy.Holds) carriers τ vTyped
@@ -1778,7 +1784,7 @@ private partial def holdsProof? (carriers τ v : Lean.Expr) : MetaM (Option Lean
             let readCarriers := mkApp3 (mkConst ``Skolems.toCarriers) args[0]! args[1]! args[2]!
             if ← withDefault (isDefEq readCarriers carriers) then
               if let some h ← (try withDefault do
-                  let readCarrierTy := mkApp2 (mkConst ``NTy.carrier) readCarriers args[3]!
+                  let readCarrierTy := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) readCarriers) args[3]!
                   let vRead ← mkExpectedTypeHint (rhs.getArg! 1) readCarrierTy
                   let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) readCarrierTy vRead)
                   let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
@@ -1793,7 +1799,8 @@ private partial def holdsProof? (carriers τ v : Lean.Expr) : MetaM (Option Lean
               isDefEq (lhs.getArg! 1) carriers) then
             let args := lhs.getAppArgs
             if let some h ← (try withDefault do
-                let readCarrierTy := mkApp2 (mkConst ``NTy.carrier) args[1]! args[4]!
+                let readSorts := mkApp (mkConst ``Carriers.toSorts) args[1]!
+                let readCarrierTy := mkApp2 (mkConst ``NTy.carrier) readSorts args[4]!
                 let vRead ← mkExpectedTypeHint (rhs.getArg! 1) readCarrierTy
                 let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) readCarrierTy vRead)
                 let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
@@ -1818,7 +1825,7 @@ private partial def holdsProof? (carriers τ v : Lean.Expr) : MetaM (Option Lean
         let saved ← saveState
         let closed? ← try withDefault do
           let goalMVar ← mkFreshExprMVar expected
-          let viewCarrierTy := mkApp2 (mkConst ``NTy.carrier) carriers view
+          let viewCarrierTy := mkApp2 (mkConst ``NTy.carrier) sorts view
           let vForView ←
             if (← inferType vTyped) == viewCarrierTy then pure vTyped
             else mkExpectedTypeHint vTyped viewCarrierTy
@@ -1854,7 +1861,7 @@ simproc ↓ [vir_denote, vir_denote_norm] plainAtOuterFrame
   let innerRead := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.plainAt)
     #[unit, functions, outer, substituted, substitutedArgs, key, memory]
   let transport := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem)
-    outerCarriers θ τ
+    (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) outerCarriers) θ τ
   let rhs ← mkAppM ``Option.map #[transport, innerRead]
   let rawProof := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.plainAt_instantiate)
     #[unit, functions, θ, outer, τ, arguments, key, memory]
@@ -1873,7 +1880,7 @@ simproc ↓ [vir_denote, vir_denote_norm] writePlainOuterFrame
   let some substitutedArgs := substituteNRow row arguments (some env) | return .continue
   let outerCarriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer
   let transport := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.ofSkolem)
-    outerCarriers θ τ
+    (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) outerCarriers) θ τ
   let mappedValue ← mkAppM ``Option.map #[transport, value]
   let rhs := mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.writePlain)
     #[unit, functions, outer, substituted, substitutedArgs, key, mappedValue, memory]
@@ -1930,7 +1937,7 @@ simproc [vir_denote, vir_denote_norm] reducePlainAtWritePlain
       let rhs := mkAppN (mkConst ``Skolems.plainAt)
         #[unit, functions, frame, σ, others, otherKey, innerMem]
       let rCarriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions frame
-      let rOptCarrierTy := mkApp (mkConst ``Option [Level.zero]) (mkApp2 (mkConst ``NTy.carrier) rCarriers σ)
+      let rOptCarrierTy := mkApp (mkConst ``Option [Level.zero]) (mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) rCarriers) σ)
       let targetEq := mkApp3 (mkConst ``Eq [Level.one]) rOptCarrierTy e rhs
       return .visit { expr := rhs, proof? := some (mkApp2 (mkConst ``id [Level.zero]) targetEq proof) }
     if let some ne ← distinctStorageKeyProof? otherKey key then
@@ -1939,7 +1946,7 @@ simproc [vir_denote, vir_denote_norm] reducePlainAtWritePlain
       let rhs := mkAppN (mkConst ``Skolems.plainAt)
         #[unit, functions, frame, σ, others, otherKey, innerMem]
       let rCarriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions frame
-      let rOptCarrierTy := mkApp (mkConst ``Option [Level.zero]) (mkApp2 (mkConst ``NTy.carrier) rCarriers σ)
+      let rOptCarrierTy := mkApp (mkConst ``Option [Level.zero]) (mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) rCarriers) σ)
       let targetEq := mkApp3 (mkConst ``Eq [Level.one]) rOptCarrierTy e rhs
       return .visit { expr := rhs, proof? := some (mkApp2 (mkConst ``id [Level.zero]) targetEq proof) }
   let exactSameRes := frame == wFrame && σ == τ && others == arguments
@@ -1947,7 +1954,7 @@ simproc [vir_denote, vir_denote_norm] reducePlainAtWritePlain
       else fastDefEq frame wFrame <&&> fastDefEq σ τ <&&> fastDefEq others arguments) do
     return .continue
   let carriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions wFrame
-  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers τ
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) τ
   let optCarrierTy := mkApp (mkConst ``Option [Level.zero]) carrierTy
   if value.consumeMData.isAppOfArity ``Option.none 1 then
     if otherKey == key then
@@ -2038,7 +2045,7 @@ simproc [vir_denote, vir_denote_norm] reduceWritePlainWritePlain
   unless v2Bare.isAppOfArity ``Option.some 2 do return .continue
   let carriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions frame
   let some holds2 ← holdsProof? carriers τ (v2Bare.getArg! 1) | return .continue
-  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers τ
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) τ
   let optCarrierTy := mkApp (mkConst ``Option [Level.zero]) carrierTy
   let v1Typed ← withDefault do
     if (← inferType v1) == optCarrierTy then pure v1 else mkExpectedTypeHint v1 optCarrierTy
@@ -2112,7 +2119,7 @@ theorem Skolems.isSome_writePlain_none_same_of_eq {unit : Validation.ValidatedUn
 
 theorem Skolems.isSome_writePlain_some_same_of_eq {unit : Validation.ValidatedUnit}
     [FunctionCarriers unit] {Θ : Skolems unit} (τ : NTy) (arguments : NRow)
-    (key : StorageKey) (value : @NTy.carrier Θ.toCarriers τ) (memory : Memory unit)
+    (key : StorageKey) (value : @NTy.carrier (Θ.toCarriers).toSorts τ) (memory : Memory unit)
     (holds : @NTy.Holds Θ.toCarriers τ value) {r : ResourceType} {k : StorageKey}
     (sameRes : r = Skolems.resource (Θ := Θ) τ arguments) (sameKey : k = key) :
     ((Skolems.writePlain (Θ := Θ) τ arguments key (some value) memory) r k).isSome = true := by
@@ -2149,7 +2156,7 @@ simproc [vir_denote, vir_denote_norm] reduceIsSomeWritePlainApply
     let v := vBare.getArg! 1
     let carriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions frame
     let some holds ← holdsProof? carriers τ v | return .continue
-    let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers τ
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) τ
     let vTyped ← withDefault do
       if (← inferType v) == carrierTy then pure v else mkExpectedTypeHint v carrierTy
     let holdsExpected := mkApp3 (mkConst ``NTy.Holds) carriers τ vTyped
@@ -2212,7 +2219,9 @@ simproc ↓ [vir_denote, vir_denote_norm] variantNameTransport
     (@VerexIR.Proofs.Denote.variantName ?carriers _ _ _) :=
   fun e => do
     let_expr VerexIR.Proofs.Denote.variantName carriers _ _ value := e | return .continue
-    let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit functions outer := carriers.consumeMData
+    let_expr VerexIR.Proofs.Denote.Carriers.toSorts family := carriers.consumeMData
+      | return .continue
+    let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit functions outer := family.consumeMData
       | return .continue
     let_expr VerexIR.Proofs.Denote.variantCarrier.ofSkolem _ θ names rows v := value
       | return .continue
@@ -2227,8 +2236,10 @@ private def variantOuterFamily (transport : Name) (e : Lean.Expr) : SimpM Simp.S
     | #[unit, functions, skolems, names, rows, value] =>
         pure (unit, functions, skolems, names, rows, value, false)
     | #[carriers, names, rows, value] =>
+        let_expr VerexIR.Proofs.Denote.Carriers.toSorts family := carriers.consumeMData
+          | return .continue
         let_expr VerexIR.Proofs.Denote.Skolems.toCarriers unit functions skolems :=
-            carriers.consumeMData
+            family.consumeMData
           | return .continue
         pure (unit, functions, skolems, names, rows, value, true)
     | _ => return .continue
@@ -2252,7 +2263,8 @@ private def variantOuterFamily (transport : Name) (e : Lean.Expr) : SimpM Simp.S
       let proof ← mkEqTrans (← mkEqSymm transported) (← mkCongrArg observe identity)
       let result := if carried then
           mkAppN e.getAppFn
-            #[mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer,
+            #[mkApp (mkConst ``Carriers.toSorts)
+              (mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions outer),
               names, substituted, value]
         else mkAppN e.getAppFn #[unit, functions, outer, names, substituted, value]
       pure (some (result, ← mkExpectedTypeHint proof (← mkEq e result)))
@@ -2319,7 +2331,7 @@ def NRows.comparesByValue : NRows → Bool
 end
 
 section EqualAsEquation
-variable [Carriers]
+variable [Sorts]
 
 private theorem listEqual_iff_eq {α : Type} (equal : α → α → Bool)
     (same : ∀ a b, equal a b = true ↔ a = b) (left right : List α) :
@@ -2543,7 +2555,7 @@ private def variantAt? (names rows : Lean.Expr) (count : Nat) :
 
 /-- The family a transport's type arguments induce over the family it carries. -/
 private def inducedFamily (outer θ : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst ``VerexIR.Proofs.Denote.Carriers.instantiate) θ outer
+  mkApp2 (mkConst ``VerexIR.Proofs.Denote.Sorts.instantiate) θ outer
 
 /-- A constructed enum value transported to a callee's family, injection by
 injection (`variantCarrier.toSkolem_inl`, `variantCarrier.toSkolem_inr`)
@@ -3322,13 +3334,13 @@ variable {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers un
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_inj {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (left right : @NTy.carrier Θ.toCarriers τ) :
+    (left right : @NTy.carrier (Θ.toCarriers).toSorts τ) :
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded left =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded right ↔
       left = right := by
   constructor
   · intro same
-    apply @NTy.encode_injective Θ.toCarriers τ
+    apply @NTy.encode_injective (Θ.toCarriers).toSorts τ
     rw [← Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded left,
       ← Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded right,
       same]
@@ -3336,36 +3348,36 @@ variable {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers un
 
 @[vir_denote_norm] theorem Skolems.equal_reframeAtBase {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (left right : @NTy.carrier Θ.toCarriers τ) :
-    @NTy.equal (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers false τ
+    (left right : @NTy.carrier (Θ.toCarriers).toSorts τ) :
+    @NTy.equal ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts false τ
         (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded left)
         (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded right) =
-      @NTy.equal Θ.toCarriers false τ left right := by
-  rw [@NTy.equal_codec (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers,
-    @NTy.equal_codec Θ.toCarriers]
+      @NTy.equal (Θ.toCarriers).toSorts false τ left right := by
+  rw [@NTy.equal_codec ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts,
+    @NTy.equal_codec (Θ.toCarriers).toSorts]
   simp only [NTy.codec_encode, Skolems.encode_reframeAtBase]
   rfl
 
 @[vir_denote_norm] theorem Skolems.order_reframeAtBase {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (rank : ValueRanks) (left right : @NTy.carrier Θ.toCarriers τ) :
-    @NTy.order (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers rank τ
+    (rank : ValueRanks) (left right : @NTy.carrier (Θ.toCarriers).toSorts τ) :
+    @NTy.order ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts rank τ
         (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded left)
         (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded right) =
-      @NTy.order Θ.toCarriers rank τ left right := by
-  rw [← @NTy.order_codec (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers,
-    ← @NTy.order_codec Θ.toCarriers]
+      @NTy.order (Θ.toCarriers).toSorts rank τ left right := by
+  rw [← @NTy.order_codec ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts,
+    ← @NTy.order_codec (Θ.toCarriers).toSorts]
   simp only [NTy.codec_encode, Skolems.encode_reframeAtBase]
 
-theorem Skolems.reframeAtBase_of_encode {τ : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers τ)
-    (carriers : @NTy.carrier Θ.toCarriers τ =
-      @NTy.carrier (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ)
+theorem Skolems.reframeAtBase_of_encode {τ : NTy} (bounded) (value : @NTy.carrier (Θ.toCarriers).toSorts τ)
+    (carriers : @NTy.carrier (Θ.toCarriers).toSorts τ =
+      @NTy.carrier ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ)
     (encoded : ∀ value,
-      @NTy.encode (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
-        (cast carriers value) = @NTy.encode Θ.toCarriers τ value) :
+      @NTy.encode ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ
+        (cast carriers value) = @NTy.encode (Θ.toCarriers).toSorts τ value) :
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value =
       cast carriers value := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ
   rw [Skolems.encode_reframeAtBase, encoded]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_unit (bounded) (value : Unit) :
@@ -3399,22 +3411,22 @@ theorem Skolems.reframeAtBase_of_encode {τ : NTy} (bounded) (value : @NTy.carri
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_struct_fst {source : StructHandle}
     {arguments : NRow} {τ : NTy} {rest : NRow} (bounded)
-    (value : @NTy.carrier Θ.toCarriers (.struct source arguments (.cons τ rest))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (.struct source arguments (.cons τ rest))) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value).1 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (paramsHead (paramsFields bounded)) value.1 := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ
   rw [(encodeFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
     Skolems.encode_reframeAtBase]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_struct_snd {source : StructHandle}
     {arguments : NRow} {τ : NTy} {rest : NRow} (bounded)
-    (value : @NTy.carrier Θ.toCarriers (.struct source arguments (.cons τ rest))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (.struct source arguments (.cons τ rest))) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value).2 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .struct source arguments rest)
         (paramsStruct (Bool.and_eq_true _ _ |>.mp bounded).1 (paramsTail (paramsFields bounded))) value.2 := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts
     (.struct source arguments rest)
   rw [(encodeFields _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
     Skolems.encode_reframeAtBase]
@@ -3445,22 +3457,22 @@ simproc [vir_denote_norm] reframeStructFst (Prod.fst _) := fun e => do
   return .done { expr := rhs, proof? := some proof }
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_tuple_fst {τ : NTy} {rest : NRow} (bounded)
-    (value : @NTy.carrier Θ.toCarriers (.tuple (.cons τ rest))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (.tuple (.cons τ rest))) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple (.cons τ rest)) bounded value).1 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := τ) (paramsHead bounded) value.1 := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ
   rw [(encodeElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).1,
     Skolems.encode_reframeAtBase]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_tuple_snd {τ : NTy} {rest : NRow} (bounded)
-    (value : @NTy.carrier Θ.toCarriers (.tuple (.cons τ rest))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (.tuple (.cons τ rest))) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple (.cons τ rest)) bounded value).2 =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple rest) (paramsTail bounded) value.2 := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers (.tuple rest)
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts (.tuple rest)
   rw [(encodeElements _ _ (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value)).2,
     Skolems.encode_reframeAtBase]
 
@@ -3475,12 +3487,12 @@ private theorem pVariant {f : Nat → Bool} {source : StructHandle}
 @[vir_denote_norm] theorem Skolems.reframeAtBase_enum_inl {source : StructHandle}
     {arguments fields : NRow} {name : String} {names : List String} {rest : NRows}
     {distinct : (name :: names).Nodup} (bounded)
-    (value : @HList Θ.toCarriers fields) :
+    (value : @HList (Θ.toCarriers).toSorts fields) :
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .enum source arguments (name :: names) (.cons fields rest) distinct) bounded (.inl value) =
       .inl (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .tuple fields) (pVariant bounded) value) := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts
     (.enum source arguments (name :: names) (.cons fields rest) distinct)
   have row := Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
     (τ := .tuple fields) (pVariant bounded) value
@@ -3490,27 +3502,27 @@ private theorem pVariant {f : Nat → Bool} {source : StructHandle}
 @[vir_denote_norm] theorem Skolems.reframeAtBase_enum_inr {source : StructHandle}
     {arguments fields : NRow} {name : String} {names : List String} {rest : NRows}
     {distinct : (name :: names).Nodup} (bounded)
-    (value : @variantCarrier Θ.toCarriers names rest) :
+    (value : @variantCarrier (Θ.toCarriers).toSorts names rest) :
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .enum source arguments (name :: names) (.cons fields rest) distinct) bounded (.inr value) =
       .inr (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .enum source arguments names rest (List.nodup_cons.mp distinct).2) (paramsVariants bounded) value) := by
-  apply @NTy.encode_injective (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
+  apply @NTy.encode_injective ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts
     (.enum source arguments (name :: names) (.cons fields rest) distinct)
   simp only [Skolems.encode_reframeAtBase, NTy.encode_enum_inr]
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_vector_values {element : NTy} (bounded)
-    (vector : @NTy.carrier Θ.toCarriers (.vector element)) :
+    (vector : @NTy.carrier (Θ.toCarriers).toSorts (.vector element)) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .vector element) bounded vector).values =
       vector.values.map (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := element) (by simpa only [NTy.paramsAll] using bounded)) := by
   let Φ := (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
   have encoded := Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded vector
-  rw [@NTy.encode_vector Φ, @NTy.encode_vector Θ.toCarriers] at encoded
+  rw [@NTy.encode_vector (Φ).toSorts, @NTy.encode_vector (Θ.toCarriers).toSorts] at encoded
   simp only [RuntimeValue.vector.injEq] at encoded
-  apply Array.map_inj_right (f := @NTy.encode Φ element)
-    (fun _ _ same => @NTy.encode_injective Φ element _ _ same) |>.mp
+  apply Array.map_inj_right (f := @NTy.encode (Φ).toSorts element)
+    (fun _ _ same => @NTy.encode_injective (Φ).toSorts element _ _ same) |>.mp
   rw [Array.map_map]
   refine encoded.trans ?_
   apply Array.map_congr_left
@@ -3518,15 +3530,15 @@ private theorem pVariant {f : Nat → Bool} {source : StructHandle}
   exact (Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable _ value).symm
 
 @[vir_denote_norm] theorem Skolems.reframeAtBase_ghost {slot : NTy} (bounded)
-    (value : @NTy.carrier Θ.toCarriers (.ghost slot)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (.ghost slot)) :
     Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .ghost slot) bounded value =
       Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := slot) (by simpa only [NTy.paramsAll] using bounded) value := by
   let Φ := (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
-  apply @NTy.encode_injective Φ (.ghost slot)
-  rw [Skolems.encode_reframeAtBase, @NTy.encode_ghost Φ,
-    Skolems.encode_reframeAtBase, @NTy.encode_ghost Θ.toCarriers]
+  apply @NTy.encode_injective (Φ).toSorts (.ghost slot)
+  rw [Skolems.encode_reframeAtBase, @NTy.encode_ghost (Φ).toSorts,
+    Skolems.encode_reframeAtBase, @NTy.encode_ghost (Θ.toCarriers).toSorts]
 
 private theorem pTableKey {allowed : Nat → Bool} {key value : NTy}
     (bounded : (NTy.table key value).paramsAll allowed = true) : key.paramsAll allowed = true := by
@@ -3538,7 +3550,7 @@ private theorem pTableValue {allowed : Nat → Bool} {key value : NTy}
 
 /-- A table's entries move with it. -/
 theorem Skolems.reframeAtBase_table_entries {key value : NTy} (bounded)
-    (table : @NTy.carrier Θ.toCarriers (.table key value)) :
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table key value)) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .table key value) bounded table).entries =
       table.entries.map fun entry =>
@@ -3548,33 +3560,33 @@ theorem Skolems.reframeAtBase_table_entries {key value : NTy} (bounded)
            (pTableValue bounded) entry.2) := by
   let Φ := (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
   have encoded := Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded table
-  rw [@NTy.encode_table Φ, @NTy.encode_table Θ.toCarriers] at encoded
+  rw [@NTy.encode_table (Φ).toSorts, @NTy.encode_table (Θ.toCarriers).toSorts] at encoded
   simp only [RuntimeValue.vector.injEq] at encoded
   have encoded := List.toArray_inj encoded
   rw [show (table.entries.map fun entry =>
-        RuntimeValue.tuple #[@NTy.encode Θ.toCarriers key entry.1, @NTy.encode Θ.toCarriers value entry.2]) =
+        RuntimeValue.tuple #[@NTy.encode (Θ.toCarriers).toSorts key entry.1, @NTy.encode (Θ.toCarriers).toSorts value entry.2]) =
       (table.entries.map fun entry =>
         (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable (pTableKey bounded) entry.1,
          Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable (pTableValue bounded) entry.2)).map
-        (fun entry => RuntimeValue.tuple #[@NTy.encode Φ key entry.1, @NTy.encode Φ value entry.2]) by
+        (fun entry => RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key entry.1, @NTy.encode (Φ).toSorts value entry.2]) by
       simp only [List.map_map, Function.comp_def, Φ, Skolems.encode_reframeAtBase]] at encoded
-  have injective : ∀ a b : @NTy.carrier Φ key × @NTy.carrier Φ value,
-      RuntimeValue.tuple #[@NTy.encode Φ key a.1, @NTy.encode Φ value a.2] =
-      RuntimeValue.tuple #[@NTy.encode Φ key b.1, @NTy.encode Φ value b.2] → a = b := by
+  have injective : ∀ a b : @NTy.carrier (Φ).toSorts key × @NTy.carrier (Φ).toSorts value,
+      RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key a.1, @NTy.encode (Φ).toSorts value a.2] =
+      RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key b.1, @NTy.encode (Φ).toSorts value b.2] → a = b := by
     intro a b same
     simp only [RuntimeValue.tuple.injEq, Array.mk.injEq, List.cons.injEq, and_true] at same
-    exact Prod.ext (@NTy.encode_injective Φ key _ _ same.1) (@NTy.encode_injective Φ value _ _ same.2)
+    exact Prod.ext (@NTy.encode_injective (Φ).toSorts key _ _ same.1) (@NTy.encode_injective (Φ).toSorts value _ _ same.2)
   exact List.map_inj_right (fun a b same => injective a b same) |>.mp encoded
 
 /-- The validity of a sequence map, under injective reads of its keys, is that
 of the keys: it does not see their move to the base frame of the type arguments. -/
 theorem Skolems.valid_sequence_reframeAtBase {key value : NTy} (bounded)
-    (table : @NTy.carrier Θ.toCarriers (.table key value))
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table key value))
     {K V K' V' : Type}
-    (readKey : @NTy.carrier (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers key → K)
-    (readValue : @NTy.carrier (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers value → V)
-    (readKey' : @NTy.carrier Θ.toCarriers key → K')
-    (readValue' : @NTy.carrier Θ.toCarriers value → V')
+    (readKey : @NTy.carrier ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts key → K)
+    (readValue : @NTy.carrier ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts value → V)
+    (readKey' : @NTy.carrier (Θ.toCarriers).toSorts key → K')
+    (readValue' : @NTy.carrier (Θ.toCarriers).toSorts value → V')
     (injective : Function.Injective readKey) (injective' : Function.Injective readKey') :
     SpecMap.Valid .sequence
         (SpecMap.ofEntries readKey readValue
@@ -3769,17 +3781,17 @@ attribute [vir_denote_norm] VerexIR.Proofs.Denote.Weave.supplying_nil
   VerexIR.Proofs.Denote.instantiatedTypeId_nil VerexIR.TypeId.mk.injEq
 -- A type parameter's value defaults under an induced family to its
 -- argument's value.
-attribute [vir_denote_norm] VerexIR.Proofs.Denote.Carriers.default_instantiate
+attribute [vir_denote_norm] VerexIR.Proofs.Denote.Sorts.default_instantiate
 
 theorem NTy.holds_instantiate_heq {outer : Carriers} (θ : TypeArgs) (τ : NTy)
-    (value : @NTy.carrier (Carriers.instantiate θ outer) τ)
-    (value' : @NTy.carrier outer (τ.subst θ.1))
+    (value : @NTy.carrier ((Carriers.instantiate θ outer)).toSorts τ)
+    (value' : @NTy.carrier (outer).toSorts (τ.subst θ.1))
     (h : HEq value value') :
     @NTy.Holds (Carriers.instantiate θ outer) τ value =
       @NTy.Holds outer (τ.subst θ.1) value' := by
   rw [← @NTy.holds_ofSkolem_iff outer θ τ value]
   congr 1
-  exact eq_of_heq ((@NTy.ofSkolem_heq outer θ τ value).trans h)
+  exact eq_of_heq ((@NTy.ofSkolem_heq (outer).toSorts θ τ value).trans h)
 
 simproc ↓ [vir_denote, vir_denote_norm] ntyHoldsOuterFamily
     (@VerexIR.Proofs.Denote.NTy.Holds ?family _ _) := fun e => do
@@ -3792,7 +3804,8 @@ simproc ↓ [vir_denote, vir_denote_norm] ntyHoldsOuterFamily
   let some substituted := substituteNTy row τ (some (← getEnv))
     | return .continue
   let some (rhs, equation) ← (try withTransparency .default do
-      let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) outer substituted
+      let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier)
+        (mkApp (mkConst ``Carriers.toSorts) outer) substituted
       unless ← isDefEq (← inferType value) expectedCarrier do return none
       let rhs := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.Holds) outer substituted value
       let heq ← mkHEqRefl value
@@ -3809,8 +3822,8 @@ it owes and the fact what follows it sees are one proposition
 (`NTy.holds_instantiate_heq`). -/
 theorem checkingAt_instantiate_heq {State : Type} {outer : Carriers} (site : Nat)
     (kind : CertifyKind) (θ : TypeArgs) (τ : NTy)
-    (value : @NTy.carrier (Carriers.instantiate θ outer) τ)
-    (value' : @NTy.carrier outer (τ.subst θ.1)) (h : HEq value value') :
+    (value : @NTy.carrier ((Carriers.instantiate θ outer)).toSorts τ)
+    (value' : @NTy.carrier (outer).toSorts (τ.subst θ.1)) (h : HEq value value') :
     @checkingAt (Carriers.instantiate θ outer) State site kind τ value =
       @checkingAt outer State site kind (τ.subst θ.1) value' := by
   have same := NTy.holds_instantiate_heq θ τ value value' h
@@ -3842,7 +3855,8 @@ private def checkAtOuterFamily? (e : Lean.Expr) : MetaM (Option (Lean.Expr × Le
   let saved ← saveState
   try
     let found ← withTransparency .default do
-      let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) outer substituted
+      let expectedCarrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier)
+        (mkApp (mkConst ``Carriers.toSorts) outer) substituted
       unless ← isDefEq (← inferType value) expectedCarrier do return none
       let rhs := mkAppN (mkConst ``VerexIR.Proofs.Denote.checkingAt)
         #[outer, state, site, kind, substituted, value]
@@ -4924,7 +4938,7 @@ dsimproc ↓ [vir_denote_norm, vir_transport] prevKeyReducedOrder
     (VerexIR.SpecMap.prevKey? _ _ _) := reducedOrderArguments
 
 /-- Integer keys compare as integers, at every rank. -/
-@[vir_denote_eval] theorem NTy.readOrder_compare_int [Carriers] (rank : VerexIR.ValueRanks)
+@[vir_denote_eval] theorem NTy.readOrder_compare_int [Sorts] (rank : VerexIR.ValueRanks)
     (width : Nat) (signed : Bool) (left right : Int) :
     (NTy.readOrder rank (.int width signed)).compare left right = compare left right := rfl
 
@@ -4978,7 +4992,7 @@ attribute [vir_transport] Skolems.toCarriers_instantiate Skolems.types_instantia
   NativeMaps.NTy.read_param_instantiate
   NativeMaps.NTy.unread_param_instantiate
   NativeMaps.ofEntriesTransport
-  Carriers.orders_instantiate Carriers.erasures_instantiate
+  Sorts.orders_instantiate Sorts.erasures_instantiate
   NTy.ofSkolem_toSkolem
   NTy.toSkolem_unit NTy.toSkolem_bool NTy.toSkolem_int NTy.toSkolem_num NTy.toSkolem_param
   NTy.toSkolem_tuple NTy.toSkolem_struct NTy.toSkolem_enum NTy.toSkolem_ref NTy.toSkolem_ghost

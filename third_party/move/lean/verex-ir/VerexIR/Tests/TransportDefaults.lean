@@ -20,12 +20,12 @@ private def checkTransportHandler (name : Name) (pre : Bool) (input expected : E
 
 -- Handler-only checks prevent unrelated reductions from hiding stale layouts.
 run_cmd liftTermElabM do
-  withLocalDecl `family .instImplicit (mkConst ``Carriers) fun family => do
+  withLocalDecl `family .instImplicit (mkConst ``Sorts) fun family => do
     let θ ← Term.elabTerm (← `((⟨NRow.nil, rfl⟩ : TypeArgs))) none
     let τ := mkConst ``NTy.bool
     let carrier := mkApp2 (mkConst ``NTy.carrier) family τ
-    let induced := mkApp2 (mkConst ``Carriers.instantiate) θ family
-    let nested := mkApp2 (mkConst ``Carriers.instantiate) θ induced
+    let induced := mkApp2 (mkConst ``Sorts.instantiate) θ family
+    let nested := mkApp2 (mkConst ``Sorts.instantiate) θ induced
     let proof ← mkEqRefl (mkConst ``Bool.true)
     -- Structural `NTy.inhabitantOf` normalization across `Carriers.instantiate`:
     -- negative check first (outer family stays untouched), then induced and nested frames.
@@ -90,13 +90,13 @@ run_cmd liftTermElabM do
   withLocalDeclD `unit (mkConst ``VerexIR.Validation.ValidatedUnit) fun unit => do
     withLocalDecl `functions .instImplicit (mkApp (mkConst ``FunctionCarriers) unit) fun functions => do
       withLocalDecl `skolems .instImplicit (mkApp2 (mkConst ``Skolems) unit functions) fun skolems => do
-        let family := mkApp3 (mkConst ``Skolems.toCarriers) unit functions skolems
+        let family := mkApp (mkConst ``Carriers.toSorts) (mkApp3 (mkConst ``Skolems.toCarriers) unit functions skolems)
         let θ ← Term.elabTerm (← `((⟨NRow.nil, rfl⟩ : TypeArgs))) none
         let names ← Term.elabTerm (← `((["End", "Present"] : List String))) none
         let rows ← Term.elabTerm
           (← `((NRows.cons NRow.nil (NRows.cons (NRow.cons NTy.bool NRow.nil) NRows.nil)))) none
         let inducedFrame := mkApp4 (mkConst ``Skolems.instantiate) unit functions θ skolems
-        let induced := mkApp3 (mkConst ``Skolems.toCarriers) unit functions inducedFrame
+        let induced := mkApp (mkConst ``Carriers.toSorts) (mkApp3 (mkConst ``Skolems.toCarriers) unit functions inducedFrame)
         withLocalDeclD `value (mkApp3 (mkConst ``variantCarrier) induced names rows) fun value => do
           let transported ← mkAppOptM ``variantCarrier.ofSkolem
             #[some family, some θ, some names, some rows, some value]
@@ -121,8 +121,8 @@ namespace VerexIR.Tests.TransportDefaults
 -- Negative 1 (first): independent `Carriers` families with distinct parameter inhabitants
 -- yield distinct `NTy.inhabitantOf` values at `.param 0`.
 theorem inhabitantOf_independent_families_ne :
-    @NTy.inhabitantOf (boolParamCarriers true) (.param 0) rfl ≠
-      @NTy.inhabitantOf (boolParamCarriers false) (.param 0) rfl := by
+    @NTy.inhabitantOf ((boolParamCarriers true)).toSorts (.param 0) rfl ≠
+      @NTy.inhabitantOf ((boolParamCarriers false)).toSorts (.param 0) rfl := by
   intro h
   unfold NTy.inhabitantOf at h
   change true = false at h
@@ -131,13 +131,13 @@ theorem inhabitantOf_independent_families_ne :
 -- Negative 2: independent `Carriers` families with distinct parameter inhabitants
 -- yield distinct `NTy.readBack` fallbacks on an unencoded runtime value (`.unit`).
 theorem readBack_independent_families_ne :
-    @NTy.readBack (boolParamCarriers true) (.tuple (.cons (.param 0) .nil)) rfl .unit ≠
-      @NTy.readBack (boolParamCarriers false) (.tuple (.cons (.param 0) .nil)) rfl .unit := by
+    @NTy.readBack ((boolParamCarriers true)).toSorts (.tuple (.cons (.param 0) .nil)) rfl .unit ≠
+      @NTy.readBack ((boolParamCarriers false)).toSorts (.tuple (.cons (.param 0) .nil)) rfl .unit := by
   intro h
-  rw [@NTy.readBack_unit (boolParamCarriers true) (.tuple (.cons (.param 0) .nil)) rfl,
-    @NTy.readBack_unit (boolParamCarriers false) (.tuple (.cons (.param 0) .nil)) rfl] at h
-  change @NTy.inhabitantOf (boolParamCarriers true) (.tuple (.cons (.param 0) .nil)) rfl =
-    @NTy.inhabitantOf (boolParamCarriers false) (.tuple (.cons (.param 0) .nil)) rfl at h
+  rw [@NTy.readBack_unit ((boolParamCarriers true)).toSorts (.tuple (.cons (.param 0) .nil)) rfl,
+    @NTy.readBack_unit ((boolParamCarriers false)).toSorts (.tuple (.cons (.param 0) .nil)) rfl] at h
+  change @NTy.inhabitantOf ((boolParamCarriers true)).toSorts (.tuple (.cons (.param 0) .nil)) rfl =
+    @NTy.inhabitantOf ((boolParamCarriers false)).toSorts (.tuple (.cons (.param 0) .nil)) rfl at h
   unfold NTy.inhabitantOf at h
   simp only [NTy.inhabitant, HList.inhabitant] at h
   exact Bool.noConfusion (Prod.mk.inj h).1
@@ -145,30 +145,30 @@ theorem readBack_independent_families_ne :
 -- Positive 1: `NTy.inhabitantOf` at an induced `Carriers.instantiate` family agrees
 -- with the outer family's `NTy.inhabitantOf` at the substituted type (`NTy.inhabitantOf_instantiate`).
 theorem inhabitantOf_instantiate_param [family : Carriers] :
-    @NTy.inhabitantOf (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    @NTy.inhabitantOf ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
         (.param 0) rfl =
-      @NTy.inhabitantOf family .bool rfl :=
+      @NTy.inhabitantOf (family).toSorts .bool rfl :=
   NTy.inhabitantOf_instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) (.param 0) rfl
 
 -- Positive 2: `NTy.inhabitantOf` on a compound parameterized tuple agrees across
 -- single and nested `Carriers.instantiate` frames.
 theorem inhabitantOf_instantiate_tuple [family : Carriers] :
-    @NTy.inhabitantOf (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    @NTy.inhabitantOf ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
         (.tuple (.cons (.param 0) .nil)) rfl =
-      @NTy.inhabitantOf family (.tuple (.cons .bool .nil)) rfl :=
+      @NTy.inhabitantOf (family).toSorts (.tuple (.cons .bool .nil)) rfl :=
   eq_of_heq (FamilyTransport.inhabitantOf_instantiate_heq
     (⟨.cons .bool .nil, rfl⟩ : TypeArgs) (.tuple (.cons (.param 0) .nil)) rfl rfl)
 
 theorem inhabitantOf_instantiate_nested_tuple [family : Carriers] :
     let outer := Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family
     let nested := Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) outer
-    @NTy.inhabitantOf nested (.tuple (.cons (.param 0) .nil)) rfl =
-      @NTy.inhabitantOf family (.tuple (.cons .bool .nil)) rfl := by
+    @NTy.inhabitantOf (nested).toSorts (.tuple (.cons (.param 0) .nil)) rfl =
+      @NTy.inhabitantOf (family).toSorts (.tuple (.cons .bool .nil)) rfl := by
   intro outer nested
   have step1 :
-      @NTy.inhabitantOf nested (.tuple (.cons (.param 0) .nil)) rfl =
-        @NTy.inhabitantOf outer (.tuple (.cons (.param 0) .nil)) rfl :=
-    eq_of_heq (@FamilyTransport.inhabitantOf_instantiate_heq outer
+      @NTy.inhabitantOf (nested).toSorts (.tuple (.cons (.param 0) .nil)) rfl =
+        @NTy.inhabitantOf (outer).toSorts (.tuple (.cons (.param 0) .nil)) rfl :=
+    eq_of_heq (@FamilyTransport.inhabitantOf_instantiate_heq outer.toSorts
       (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) (.tuple (.cons (.param 0) .nil)) rfl rfl)
   exact step1.trans (@inhabitantOf_instantiate_tuple family)
 
@@ -176,33 +176,33 @@ theorem inhabitantOf_instantiate_nested_tuple [family : Carriers] :
 -- the outer family's `NTy.readBack` at the substituted type, and on `.unit` agrees directly
 -- with the outer family's structural `NTy.inhabitantOf`.
 theorem readBack_instantiate_param [family : Carriers] :
-    @NTy.readBack (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    @NTy.readBack ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
         (.param 0) rfl =
-      @NTy.readBack family .bool rfl := rfl
+      @NTy.readBack (family).toSorts .bool rfl := rfl
 
 theorem readBack_unit_instantiate_eq_inhabitantOf [family : Carriers] (source : VerexIR.StructHandle) :
     let τ : NTy := .struct source .nil (.cons .bool .nil)
     let θ : TypeArgs := ⟨.cons τ .nil, rfl⟩
-    @NTy.readBack (Carriers.instantiate θ family) (.param 0) rfl .unit =
-      @NTy.inhabitantOf family τ rfl := by
+    @NTy.readBack ((Carriers.instantiate θ family)).toSorts (.param 0) rfl .unit =
+      @NTy.inhabitantOf (family).toSorts τ rfl := by
   intro τ θ
-  exact @NTy.readBack_unit family τ rfl
+  exact @NTy.readBack_unit (family).toSorts τ rfl
 
 -- Positive 4: `NTy.readBack` on a compound parameterized tuple agrees across
 -- `Carriers.instantiate` for every runtime value `raw`, and on `.unit` equals the
 -- outer family's structural `NTy.inhabitantOf`.
 theorem readBack_instantiate_tuple [family : Carriers] (raw : VerexIR.RuntimeValue) :
-    @NTy.readBack (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    @NTy.readBack ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
         (.tuple (.cons (.param 0) .nil)) rfl raw =
-      @NTy.readBack family (.tuple (.cons .bool .nil)) rfl raw :=
-  congrArg (((@NTy.codec family (.tuple (.cons .bool .nil))).decode? raw).getD ·)
+      @NTy.readBack (family).toSorts (.tuple (.cons .bool .nil)) rfl raw :=
+  congrArg (((@NTy.codec (family).toSorts (.tuple (.cons .bool .nil))).decode? raw).getD ·)
     inhabitantOf_instantiate_tuple
 
 theorem readBack_unit_instantiate_tuple_eq_inhabitantOf [family : Carriers] :
-    @NTy.readBack (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    @NTy.readBack ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
         (.tuple (.cons (.param 0) .nil)) rfl .unit =
-      @NTy.inhabitantOf family (.tuple (.cons .bool .nil)) rfl :=
-  (readBack_instantiate_tuple .unit).trans (@NTy.readBack_unit family (.tuple (.cons .bool .nil)) rfl)
+      @NTy.inhabitantOf (family).toSorts (.tuple (.cons .bool .nil)) rfl :=
+  (readBack_instantiate_tuple .unit).trans (@NTy.readBack_unit (family).toSorts (.tuple (.cons .bool .nil)) rfl)
 
 open Lean Elab Command in
 run_cmd do

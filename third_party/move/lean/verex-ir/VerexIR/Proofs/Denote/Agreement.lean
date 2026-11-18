@@ -70,15 +70,15 @@ axiom compileFunction_least_cycle {unit : ValidatedUnit} [FunctionCarriers unit]
     (compiled : ∀ index : CycleIndex members,
       compileFunction unit index.member.1 = .ok index.member.2)
     (typeInstantiation : Array (TypeId × TypeId)) (slot : CycleSlot unit members)
-    (args : @HList (familySkolems slot.family).toCarriers slot.position.member.2.params) :
+    (args : @HList ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.params) :
     Spec.Refines
       (@propheticMeaning _ _ executable (familySkolems slot.family)
         (familyInstantiation typeInstantiation slot.family) slot.position.member.1
         slot.position.member.2.params slot.position.member.2.result args)
       (Spec.fixFamily (Index := CycleSlot unit members)
-        (Args := fun slot => @HList (familySkolems slot.family).toCarriers slot.position.member.2.params)
+        (Args := fun slot => @HList ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.params)
         (Result := fun slot =>
-          @ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result)
+          @ResultShape.carrier ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.result)
         (fun self slot => @Function.denoteWith _ _ _ (familySkolems slot.family)
           (cycleMeanings executable members typeInstantiation self slot) slot.position.member.2)
         slot args)
@@ -163,8 +163,8 @@ theorem satisfies_cycle {unit : ValidatedUnit} [FunctionCarriers unit]
     (compiled : ∀ index : CycleIndex members,
       compileFunction unit index.member.1 = .ok index.member.2)
     (contracts : (slot : CycleSlot unit members) →
-      Contract (Memory unit) Failure (@HList (familySkolems slot.family).toCarriers slot.position.member.2.params)
-        (@ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result))
+      Contract (Memory unit) Failure (@HList ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.params)
+        (@ResultShape.carrier ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.result))
     (verified : ∀ self : CycleFamilySelves members,
       (∀ slot, Satisfies (self slot) (contracts slot)) →
       ∀ slot, Satisfies
@@ -220,8 +220,8 @@ theorem satisfies_cycle_family {unit : ValidatedUnit} [FunctionCarriers unit]
     (compiled : ∀ index : CycleIndex members,
       compileFunction unit index.member.1 = .ok index.member.2)
     (contracts : (index : CycleIndex members) → (Θ : Skolems unit) → Array (TypeId × TypeId) →
-      Contract (Memory unit) Failure (@HList Θ.toCarriers index.member.2.params)
-        (@ResultShape.carrier Θ.toCarriers index.member.2.result))
+      Contract (Memory unit) Failure (@HList (Θ.toCarriers).toSorts index.member.2.params)
+        (@ResultShape.carrier (Θ.toCarriers).toSorts index.member.2.result))
     (verified : ∀ self : @CycleFamilySelves _ _ root members,
       (∀ index Θ instantiation,
         Satisfies (self ⟨index, some (Θ, instantiation)⟩) (contracts index Θ instantiation)) →
@@ -333,7 +333,7 @@ private theorem resolvedHolds_apply [Carriers] : (σs : NRow) → {args resolved
       ⟨resolved.1 holds.1, resolvedHolds_apply rest holds.2 resolved.2⟩
 
 private theorem resolvedHolds_toSkolem {Θ : Carriers} (θ : TypeArgs) :
-    (σs : NRow) → {args resolved : @HList Θ (NRow.subst θ.1 σs)} →
+    (σs : NRow) → {args resolved : @HList (Θ).toSorts (NRow.subst θ.1 σs)} →
     @HList.ResolvedHolds Θ (NRow.subst θ.1 σs) args resolved →
     @HList.ResolvedHolds (Carriers.instantiate θ Θ) σs
       (HList.toSkolem θ σs args) (HList.toSkolem θ σs resolved)
@@ -366,8 +366,8 @@ theorem satisfies_run_at {unit : ValidatedUnit} [FunctionCarriers unit]
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (typeInstantiation : Array (TypeId × TypeId)) (σs : NRow)
     (shape : ResultShape)
-    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
-      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (contract : Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts σs)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticRun executable typeInstantiation handle σs shape) contract)
     (preservedValid : letI : Skolems unit := Skolems.runtime unit
@@ -428,8 +428,8 @@ theorem satisfies_prophetic_valid {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
-    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
-      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (contract : Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts σs)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticMeaning executable #[] handle σs shape) contract)
     (preservedValid : letI : Skolems unit := Skolems.runtime unit
@@ -452,8 +452,8 @@ theorem satisfies_prophetic {unit : ValidatedUnit} [FunctionCarriers unit]
     (executable : ExecutableUnit unit)
     (preserved : GlobalsPreserved executable) (integral : FailuresIntegral executable)
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
-    (contract : Contract (Memory unit) Failure (@HList (Carriers.runtime unit) σs)
-      (@ResultShape.carrier (Carriers.runtime unit) shape))
+    (contract : Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts σs)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts shape))
     (verified : letI : Skolems unit := Skolems.runtime unit
       Satisfies (propheticMeaning executable #[] handle σs shape) contract)
     [validArgs : @PreservedValidArgs (Carriers.runtime unit) σs contract.validArgs] :

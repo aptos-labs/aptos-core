@@ -33,10 +33,10 @@ private abbrev snum (n : Int) : SpecInt .unbounded true := ⟨n, rfl⟩
   { Carriers.ground with
     own := fun src _ raw =>
       if src == percentHandle then
-        ∀ row, (@NTy.codec Carriers.ground percentTy).decode? raw = some row →
+        ∀ row, (@NTy.codec (Carriers.ground).toSorts percentTy).decode? raw = some row →
           row.1.val ≤ 100
       else if src == slotHandle then
-        ∀ row, (@NTy.codec Carriers.ground slotTy).decode? raw = some row →
+        ∀ row, (@NTy.codec (Carriers.ground).toSorts slotTy).decode? raw = some row →
           ∀ p ∈ row.1.currentVector.values, p.1.val = 0
       else True }
 
@@ -47,7 +47,7 @@ private def mkPercent (n : Int) : percentTy.carrier := (snum n, ())
 private theorem holds_percent (n : Int) :
     NTy.Holds percentTy (mkPercent n) ↔ n ≤ 100 := by
   rw [NTy.holds_iff]
-  have hdec : (@NTy.codec Carriers.ground percentTy).decode?
+  have hdec : (@NTy.codec (Carriers.ground).toSorts percentTy).decode?
       (NTy.encode percentTy (mkPercent n)) = some (mkPercent n) :=
     Codec.decode_encode _ _
   constructor
@@ -65,7 +65,7 @@ private theorem holds_slot (slice : (NTy.sliceRef percentTy).carrier) :
       (∀ p ∈ slice.currentVector.values, p.1.val = 0) ∧
         NTy.Holds (.sliceRef percentTy) slice := by
   rw [NTy.holds_iff, NTy.holds_iff]
-  have hdec : (@NTy.codec Carriers.ground slotTy).decode?
+  have hdec : (@NTy.codec (Carriers.ground).toSorts slotTy).decode?
       (NTy.encode slotTy (slice, ())) = some (slice, ()) :=
     Codec.decode_encode _ _
   constructor

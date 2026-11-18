@@ -487,8 +487,8 @@ structure CallTree [Θ : Skolems unit] where
   direct : DirectCallTree (unit := unit)
   generic : FunctionHandle → Array GenericArgument → (θ : TypeArgs) →
     (σs : NRow) → (shape : ResultShape) →
-    @HList (Skolems.instantiate θ Θ).toCarriers σs →
-    Tree (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
+    @HList (Skolems.instantiate θ Θ).toCarriers.toSorts σs →
+    Tree (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers.toSorts shape)
   invoke : (σs : NRow) → (shared : Sharing) → (shape : ResultShape) →
     (NTy.function σs shared shape.row).carrier → HList σs → Tree shape.carrier
 
@@ -588,7 +588,7 @@ private def evalConstruct (parameters : NRow) (shared : Sharing) (results : NRow
     (NTy.function parameters shared results).carrier :=
   let raw : ClosureValue := ⟨handle, mask, typeInstantiation, (HList.encode captures).toArray,
     fun capture member => rowCodec_plain _ captures capture (by simpa [HList.encode] using member)⟩
-  ((Carriers.functions parameters shared results).ofClosure? raw).get (typed.decodes captures)
+  ((Sorts.functions parameters shared results).ofClosure? raw).get (typed.decodes captures)
 
 private theorem evalConstruct_eq (parameters : NRow) (shared : Sharing) (results : NRow)
     (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array (TypeId × TypeId))
@@ -596,9 +596,9 @@ private theorem evalConstruct_eq (parameters : NRow) (shared : Sharing) (results
     (typed : SiteTyped parameters shared results handle mask typeInstantiation σs) :
     evalConstruct parameters shared results handle mask typeInstantiation captures typed =
       Skolems.construct parameters shared results handle mask typeInstantiation captures typed := by
-  apply (Carriers.functions parameters shared results).closure_injective
+  apply (Sorts.functions parameters shared results).closure_injective
   rw [Skolems.closure_construct]
-  exact (Carriers.functions parameters shared results).closure_of_ofClosure? _ _
+  exact (Sorts.functions parameters shared results).closure_of_ofClosure? _ _
     (Option.some_get _).symm
 
 private def evalFunctionOfGeneric (outer : Array (TypeId × TypeId))
@@ -2197,7 +2197,7 @@ def closureCallee (closure : ClosureValue) (σs : NRow) (shape : ResultShape)
   else throw "uninhabitable closure type arguments"
 
 private def evalResultToSkolem (θ : TypeArgs) : (shape : ResultShape) →
-    (shape.subst θ.1).carrier → @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape
+    (shape.subst θ.1).carrier → @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers.toSorts shape
   | .none, value => value
   | .one τ, value => NTy.toSkolem θ τ value
 
@@ -2229,7 +2229,7 @@ def callTree (compiled : CompiledUnit unit) (loopFuel : Nat) :
             (HList.ofSkolem θ σs args)).bind fun result =>
               .ok (evalResultToSkolem θ shape result)
         invoke := fun σs shared shape function args =>
-          let closure := (Carriers.functions σs shared shape.row).closure function
+          let closure := (Sorts.functions σs shared shape.row).closure function
           match closureCallee closure σs shape args with
           | .error reason => .unknown reason
           | .ok ⟨f, values, same⟩ =>
@@ -2257,7 +2257,7 @@ noncomputable def inlined (executable : ExecutableUnit unit) (compiled : Compile
           Spec.bind (body handle (some (typeArgs, θ)) (NRow.subst θ.1 σs) (shape.subst θ.1)
             (HList.ofSkolem θ σs args)) fun result => Spec.pure (ResultShape.toSkolem θ shape result)
         invoke := fun σs shared shape function args =>
-          let closure := (Carriers.functions σs shared shape.row).closure function
+          let closure := (Sorts.functions σs shared shape.row).closure function
           match closureCallee closure σs shape args with
           | .error _ => Spec.bottom
           | .ok ⟨f, values, same⟩ =>

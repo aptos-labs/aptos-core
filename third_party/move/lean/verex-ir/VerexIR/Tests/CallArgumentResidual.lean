@@ -27,8 +27,8 @@ abbrev row : NRow := .cons (.int 64 false) (.cons (.param 0) .nil)
 
 /-- A callee whose arguments are valid where the second satisfies `P`. -/
 def guardedContract [C : Carriers] (State : Type)
-    (P : @NTy.carrier C (.param 0) → Prop) :
-    Contract State Failure (@HList C row) (@NTy.carrier C (.param 0)) where
+    (P : @NTy.carrier (C).toSorts (.param 0) → Prop) :
+    Contract State Failure (@HList (C).toSorts row) (@NTy.carrier (C).toSorts (.param 0)) where
   requires := fun _ _ => True
   ensures := fun args _ result _ => result = args.2.1
   aborts := fun _ _ _ => False
@@ -69,11 +69,11 @@ nothing, so the position is the row's and not the one left after erasure.
 #guard_reports "argument 2 of the call to `guarded_callee` is not established" in
 example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
-    (P : @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (P : @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
     (verified : Satisfies (ops.call handle row (.one (.param 0)))
       (@guardedContract G.toCarriers State P))
-    (count : @NTy.carrier G.toCarriers (.int 64 false))
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    (count : @NTy.carrier (G.toCarriers).toSorts (.int 64 false))
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (caller unit) (count, value, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [caller, row, Function.denoteIn]
@@ -86,11 +86,11 @@ example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
 
 theorem caller_holds (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
-    (P : @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (P : @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
     (verified : Satisfies (ops.call handle row (.one (.param 0)))
       (@guardedContract G.toCarriers State P))
-    (count : @NTy.carrier G.toCarriers (.int 64 false))
-    (value : @NTy.carrier G.toCarriers (.param 0)) (held : P value) (initial : State) :
+    (count : @NTy.carrier (G.toCarriers).toSorts (.int 64 false))
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (held : P value) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (caller unit) (count, value, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [caller, row, Function.denoteIn]
@@ -114,8 +114,8 @@ second, so the position the report names is the first.
 abbrev swappedRow : NRow := .cons (.param 0) (.cons (.int 64 false) .nil)
 
 def swappedContract [C : Carriers] (State : Type)
-    (P : @NTy.carrier C (.param 0) → Prop) :
-    Contract State Failure (@HList C swappedRow) (@NTy.carrier C (.param 0)) where
+    (P : @NTy.carrier (C).toSorts (.param 0) → Prop) :
+    Contract State Failure (@HList (C).toSorts swappedRow) (@NTy.carrier (C).toSorts (.param 0)) where
   requires := fun _ _ => True
   ensures := fun args _ result _ => result = args.1
   aborts := fun _ _ _ => False
@@ -136,11 +136,11 @@ def swappedCaller (unit : Validation.ValidatedUnit) : Function unit where
 #guard_reports "argument 1 of the call to `guarded_callee` is not established" in
 example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
-    (P : @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (P : @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
     (verified : Satisfies (ops.call handle swappedRow (.one (.param 0)))
       (@swappedContract G.toCarriers State P))
-    (value : @NTy.carrier G.toCarriers (.param 0))
-    (count : @NTy.carrier G.toCarriers (.int 64 false)) (initial : State) :
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0))
+    (count : @NTy.carrier (G.toCarriers).toSorts (.int 64 false)) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (swappedCaller unit) (value, count, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [swappedCaller, swappedRow, Function.denoteIn]

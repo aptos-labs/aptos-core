@@ -194,7 +194,7 @@ function value typed at the caller's carriers, is the caller's: the hypothesis
 does not state it as it stands and no splitter opens it; the premise step
 moves it whole to the caller's frame and reads the hypothesis there. -/
 example [Θ : Skolems unit] {shared : Sharing}
-    {function : @NTy.carrier Θ.toCarriers (.function (.cons (.param 0) .nil) shared .nil)}
+    {function : @NTy.carrier (Θ.toCarriers).toSorts (.function (.cons (.param 0) .nil) shared .nil)}
     (assumed : MethodContract executable (.cons (.param 0) .nil) shared .none function) :
     @MethodContract unit _ executable (Skolems.instantiate ⟨.cons (.param 0) .nil, rfl⟩ Θ)
       (.cons (.param 0) .nil) shared .none function := by

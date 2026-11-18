@@ -2134,7 +2134,8 @@ or a type spelled at a family a call's type arguments induce. Fails when it
 holds none. -/
 elab "verex_holds_transport" : tactic => focusGoal do
   let held ← mentionsAnywhere (← getMainGoal) fun t =>
-    isTransport t || t.isConstOf ``VerexIR.Proofs.Denote.Carriers.instantiate
+    isTransport t || t.isConstOf ``VerexIR.Proofs.Denote.Carriers.instantiate ||
+      t.isConstOf ``VerexIR.Proofs.Denote.Sorts.instantiate
   unless held do throwError "the leaf holds no value in a callee's view"
 
 /-- Substitute and renormalize until a substitution leaves the goal as it
@@ -3195,13 +3196,13 @@ private def labelDomain (domain : Lean.Expr) : MetaM Bool := do
   if d.isAppOf ``VerexIR.Proofs.Denote.Memory || d.isConstOf ``Int ||
       d.isConstOf ``Bool || d.isConstOf ``String ||
       d.isAppOf ``VerexIR.Proofs.Denote.NTy.carrier ||
-      d.isAppOf ``VerexIR.Proofs.Denote.Carriers.carrier ||
+      d.isAppOf ``VerexIR.Proofs.Denote.Sorts.carrier ||
       d.isAppOf ``VerexIR.Proofs.Denote.HList ||
       d.isAppOf ``VerexIR.Proofs.Denote.variantCarrier then
     return true
   let reduced ← whnfR d
   return reduced.isAppOf ``VerexIR.Proofs.Denote.NTy.carrier ||
-    reduced.isAppOf ``VerexIR.Proofs.Denote.Carriers.carrier ||
+    reduced.isAppOf ``VerexIR.Proofs.Denote.Sorts.carrier ||
     reduced.isAppOf ``VerexIR.Proofs.Denote.HList ||
     reduced.isAppOf ``VerexIR.Proofs.Denote.variantCarrier
 
@@ -5768,38 +5769,38 @@ theorem paramsAll_table_value {allowed : Nat → Bool} {key value : NTy}
 
 /-- A table's entries move with it. -/
 theorem Skolems.reframe_table_entries {key value : NTy} (bounded)
-    (table : @NTy.carrier Θ.toCarriers (.table key value)) :
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table key value)) :
     (Θ.reframe own (τ := .table key value) bounded table).entries =
       table.entries.map fun entry =>
         (Θ.reframe own (paramsAll_table_key bounded) entry.1,
          Θ.reframe own (paramsAll_table_value bounded) entry.2) := by
   let Φ := (Θ.instance params own).toCarriers
   have encoded := Θ.encode_reframe own bounded table
-  rw [@NTy.encode_table Φ, @NTy.encode_table Θ.toCarriers] at encoded
+  rw [@NTy.encode_table (Φ).toSorts, @NTy.encode_table (Θ.toCarriers).toSorts] at encoded
   simp only [RuntimeValue.vector.injEq] at encoded
   have encoded := List.toArray_inj encoded
   rw [show (table.entries.map fun entry =>
-        RuntimeValue.tuple #[@NTy.encode Θ.toCarriers key entry.1, @NTy.encode Θ.toCarriers value entry.2]) =
+        RuntimeValue.tuple #[@NTy.encode (Θ.toCarriers).toSorts key entry.1, @NTy.encode (Θ.toCarriers).toSorts value entry.2]) =
       (table.entries.map fun entry =>
         (Θ.reframe own (paramsAll_table_key bounded) entry.1,
          Θ.reframe own (paramsAll_table_value bounded) entry.2)).map
-        (fun entry => RuntimeValue.tuple #[@NTy.encode Φ key entry.1, @NTy.encode Φ value entry.2]) by
+        (fun entry => RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key entry.1, @NTy.encode (Φ).toSorts value entry.2]) by
       simp only [List.map_map, Function.comp_def, Φ, Θ.encode_reframe]] at encoded
-  have injective : ∀ a b : @NTy.carrier Φ key × @NTy.carrier Φ value,
-      RuntimeValue.tuple #[@NTy.encode Φ key a.1, @NTy.encode Φ value a.2] =
-      RuntimeValue.tuple #[@NTy.encode Φ key b.1, @NTy.encode Φ value b.2] → a = b := by
+  have injective : ∀ a b : @NTy.carrier (Φ).toSorts key × @NTy.carrier (Φ).toSorts value,
+      RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key a.1, @NTy.encode (Φ).toSorts value a.2] =
+      RuntimeValue.tuple #[@NTy.encode (Φ).toSorts key b.1, @NTy.encode (Φ).toSorts value b.2] → a = b := by
     intro a b same
     simp only [RuntimeValue.tuple.injEq, Array.mk.injEq, List.cons.injEq, and_true] at same
-    exact Prod.ext (@NTy.encode_injective Φ key _ _ same.1) (@NTy.encode_injective Φ value _ _ same.2)
+    exact Prod.ext (@NTy.encode_injective (Φ).toSorts key _ _ same.1) (@NTy.encode_injective (Φ).toSorts value _ _ same.2)
   exact List.map_inj_right (fun a b same => injective a b same) |>.mp encoded
 
 /-- The validity of a sequence map, under injective reads of its keys, is that
 of the keys: it does not see their move to the frame of the type arguments. -/
 theorem Skolems.valid_sequence_reframe {key value : NTy} (bounded)
-    (table : @NTy.carrier Θ.toCarriers (.table key value))
-    {K V K' V' : Type} (readKey : @NTy.carrier (Θ.instance params own).toCarriers key → K)
-    (readValue : @NTy.carrier (Θ.instance params own).toCarriers value → V)
-    (readKey' : @NTy.carrier Θ.toCarriers key → K') (readValue' : @NTy.carrier Θ.toCarriers value → V')
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table key value))
+    {K V K' V' : Type} (readKey : @NTy.carrier ((Θ.instance params own).toCarriers).toSorts key → K)
+    (readValue : @NTy.carrier ((Θ.instance params own).toCarriers).toSorts value → V)
+    (readKey' : @NTy.carrier (Θ.toCarriers).toSorts key → K') (readValue' : @NTy.carrier (Θ.toCarriers).toSorts value → V')
     (injective : Function.Injective readKey) (injective' : Function.Injective readKey') :
     SpecMap.Valid .sequence
         (SpecMap.ofEntries readKey readValue (Θ.reframe own (τ := .table key value) bounded table)) ↔
@@ -5848,10 +5849,10 @@ simproc ↓ [vir_denote, vir_denote_norm] validReframe (SpecMap.Valid _ _) := fu
     | return .continue
   let_expr NTy.table key element := ← withDefault (whnf τ) | return .continue
   let carriers := mkApp3 (mkConst ``Skolems.toCarriers) unit functions frame
-  let some keys ← NativeMaps.typedView? carriers key | return .continue
-  let some values ← NativeMaps.typedView? carriers element | return .continue
+  let some keys ← NativeMaps.typedView? (mkApp (mkConst ``Carriers.toSorts) carriers) key | return .continue
+  let some values ← NativeMaps.typedView? (mkApp (mkConst ``Carriers.toSorts) carriers) element | return .continue
   let injective (carriers τ read : Lean.Expr) : MetaM (Option Lean.Expr) := do
-    let proof := mkApp2 (mkConst ``NativeMaps.NTy.read_injective) carriers τ
+    let proof := mkApp2 (mkConst ``NativeMaps.NTy.read_injective) (mkApp (mkConst ``Carriers.toSorts) carriers) τ
     let statement ← mkAppM ``Function.Injective #[read]
     unless ← withDefault (isDefEq (← inferType proof) statement) do return none
     return some (← mkExpectedTypeHint proof statement)
@@ -5882,6 +5883,11 @@ private def leafFrame? (unit functions : Lean.Expr) : MetaM Lean.Expr := do
       return declaration.toExpr
   runtimeFrame unit functions
 
+/-- The semantic family explicitly retained by an operational parent. -/
+private def projectedFamily? (sorts : Lean.Expr) : Option Lean.Expr := do
+  let_expr Carriers.toSorts family := sorts.consumeMData | none
+  return family.consumeMData
+
 /-- A term with each native operation at closed types spelled at the frame
 `reader`: carriers, instances and reads at a closed type do not look at their
 frame, and convert where the operation reduces on its types. -/
@@ -5893,12 +5899,15 @@ private def respellClosedAt (reader e : Lean.Expr) : MetaM Lean.Expr := do
     let args := e.getAppArgs
     -- The frame: of the carriers it takes first, or the one after its unit and
     -- function values.
-    let family := (args[0]?.getD e).consumeMData
+    let argument := (args[0]?.getD e).consumeMData
+    let projected := projectedFamily? argument
+    let family := projected.getD argument
     let frameArgument := (args[2]?.getD e).consumeMData
     let some (position, frame, atReader, updateFunctions) :=
         if family.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 then
-          some (0, family.getArg! 2, mkApp3 family.appFn!.appFn!.appFn! (family.getArg! 0)
-            readerFunctions reader, false)
+          let atReader := mkApp3 family.getAppFn (family.getArg! 0) readerFunctions reader
+          let atReader := if projected.isSome then mkApp argument.getAppFn atReader else atReader
+          some (0, family.getArg! 2, atReader, false)
         else if frameArgument.isAppOf ``VerexIR.Proofs.Denote.Skolems.runtime ||
             frameArgument.isAppOf ``VerexIR.Proofs.Denote.Skolems.instantiate ||
             frameArgument.isAppOf ``VerexIR.Proofs.Denote.Skolems.instance ||
@@ -6008,7 +6017,7 @@ private def ownRowAtArguments (goal : MVarId) : TacticM MVarId := do
   let value := arguments[5]!.consumeMData
   unless value.isAppOfArity ``VerexIR.Proofs.Denote.NTy.encode 3 do
     throwError "the value a data invariant is stated of is not an encoding: {value}"
-  let carriers := (value.getArg! 0).consumeMData
+  let some carriers := projectedFamily? (value.getArg! 0) | return goal
   unless carriers.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 do return goal
   -- The leaf's own frame is a binder of its theorem; a frame the type
   -- arguments induce is a term built over the runtime frame, and a row
@@ -6076,7 +6085,8 @@ elab "verex_own_encoded" : tactic => focusGoal do
     let target ← instantiateMVars (← goal.getType)
     let arguments := target.getAppArgs
     let value := arguments[5]!.consumeMData
-    let frame := (value.getArg! 0).consumeMData
+    let sorts := (value.getArg! 0).consumeMData
+    let frame := (projectedFamily? sorts).getD sorts
     let row := value.getArg! 2
     -- The frame the value is encoded at carries the inhabitability of the
     -- arguments (`Skolems.atArguments`).  A frame spelled otherwise has it
@@ -6408,7 +6418,7 @@ elab "verex_observed_row_fields" : tactic => focusGoal do
 /-- The type of a certified value, recognized without unfolding a named
 declaration or inspecting unrelated implicit arguments of an observation. -/
 private def certifiedCongruenceType (type : Lean.Expr) : Bool :=
-  type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``Carriers.carrier 2
+  type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``Sorts.carrier 2
 
 /-- A carrier value, a named plain default constructor, or a direct observation
 of either. An ordinary computation

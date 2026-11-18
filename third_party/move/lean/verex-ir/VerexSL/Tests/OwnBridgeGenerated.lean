@@ -207,7 +207,7 @@ run_cmd do
       throwError "the form check accepts the installed clause"
     let some map := reading.find? (·.isAppOfArity ``VerexIR.SpecMap.ofEntries 7)
       | throwError "no map"
-    let key := mkApp2 (mkConst ``NTy.carrier) carriers (mkApp (mkConst ``NTy.param) (mkNatLit 0))
+    let key := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) (mkApp (mkConst ``NTy.param) (mkNatLit 0))
     let identity := Lean.Expr.lam `key key (.bvar 0) .default
     let other := reading.replace fun part =>
       if part == map.getArg! 4 then some identity else none
@@ -365,22 +365,22 @@ open VerexIR VerexIR.Proofs
 /-- A helper whose map is keyed by the identity at a type parameter. -/
 def hiddenIdentity
     (Θ : @Skolems «0x42».own_bridge_table.unit «0x42».own_bridge_table.functionCarriers)
-    (table : @NTy.carrier Θ.toCarriers (.table (.param 0) (.param 1))) : Prop :=
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table (.param 0) (.param 1))) : Prop :=
   SpecMap.Valid .sequence
-    (SpecMap.ofEntries (fun key : @NTy.carrier Θ.toCarriers (.param 0) => key)
+    (SpecMap.ofEntries (fun key : @NTy.carrier (Θ.toCarriers).toSorts (.param 0) => key)
       (fun value => value) table)
 
 /-- A helper whose map is keyed by the family's typed read of the parameter. -/
 def typedRead
     (Θ : @Skolems «0x42».own_bridge_table.unit «0x42».own_bridge_table.functionCarriers)
-    (table : @NTy.carrier Θ.toCarriers (.table (.param 0) (.param 1))) : Prop :=
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table (.param 0) (.param 1))) : Prop :=
   SpecMap.Valid .sequence
-    (SpecMap.ofEntries (@NTy.read Θ.toCarriers (.param 0)) (fun value => value) table)
+    (SpecMap.ofEntries (@NTy.read (Θ.toCarriers).toSorts (.param 0)) (fun value => value) table)
 
 /-- A helper that applies the helper with the identity reader. -/
 def nestedIdentity
     (Θ : @Skolems «0x42».own_bridge_table.unit «0x42».own_bridge_table.functionCarriers)
-    (table : @NTy.carrier Θ.toCarriers (.table (.param 0) (.param 1))) : Prop :=
+    (table : @NTy.carrier (Θ.toCarriers).toSorts (.table (.param 0) (.param 1))) : Prop :=
   hiddenIdentity Θ table ∧ True
 
 end OwnBridgeFormHelpers
@@ -391,7 +391,7 @@ run_cmd liftTermElabM do
     (mkConst (functionCarriersName segments))
   let family (frame : Lean.Expr) := mkApp3 (mkConst ``Skolems.toCarriers)
     (mkConst (unitName segments)) (mkConst (functionCarriersName segments)) frame
-  let tableType (frame : Lean.Expr) := mkApp2 (mkConst ``NTy.carrier) (family frame)
+  let tableType (frame : Lean.Expr) := mkApp2 (mkConst ``NTy.carrier) (carrierSorts (family frame))
     (mkApp2 (mkConst ``NTy.table) (mkApp (mkConst ``NTy.param) (toExpr (0 : Nat)))
       (mkApp (mkConst ``NTy.param) (toExpr (1 : Nat))))
   let helpers := [``OwnBridgeFormHelpers.hiddenIdentity, ``OwnBridgeFormHelpers.typedRead,
@@ -449,7 +449,7 @@ private def openInstalledRoutes (options : Options → Options) : CommandElabM U
       let respelled ← nativeTypeView
         (← quoteNTy (map.subst (.cons (.param 0) (.cons (.param 1) .nil))))
       for type in [unasked, unsupported, respelled] do
-        Meta.withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) carriers type) fun value => do
+        Meta.withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) type) fun value => do
           for _ in [0:2] do
             if (← ownBridge? carriers type value).isSome then
               throwError "a bridge is used at {type}"

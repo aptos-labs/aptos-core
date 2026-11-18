@@ -60,8 +60,8 @@ abbrev producerWeave : Weave producerRow producerCaptured producerSupplied := .s
 /-- A target whose theorem holds at arguments that hold their data
 invariants, and states nothing else. -/
 def targetContract (unit : Validation.ValidatedUnit) [FunctionCarriers unit] (row : NRow) :
-    Contract (Memory unit) Failure (@HList (Carriers.runtime unit) row)
-      (@ResultShape.carrier (Carriers.runtime unit) .none) where
+    Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts row)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts .none) where
   requires := fun _ _ => True
   ensures := fun _ _ _ _ => True
   aborts := fun _ _ _ => False
@@ -130,10 +130,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
       (@Skolems.construct unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
@@ -151,10 +151,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_held : @NTy.Holds (Carriers.runtime unit) Guarded current)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
@@ -174,10 +174,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_held : @NTy.Holds (Carriers.runtime unit) Guarded prophecy)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
@@ -197,10 +197,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_stated : @EnsuresOfEntries unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
       (@Skolems.construct unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
@@ -220,8 +220,8 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle captureRow .none)
       (targetContract unit captureRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
-    (captured : @NTy.carrier (Carriers.runtime unit) Guarded)
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
+    (captured : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded)
     (typed : @SiteTyped unit _ (Skolems.runtime unit) captureSupplied shared .nil handle
       captureWeave.mask #[] captureCaptured)
     (pre post : Memory unit)
@@ -239,8 +239,8 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle captureRow .none)
       (targetContract unit captureRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
-    (captured : @NTy.carrier (Carriers.runtime unit) Guarded)
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
+    (captured : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded)
     (typed : @SiteTyped unit _ (Skolems.runtime unit) captureSupplied shared .nil handle
       captureWeave.mask #[] captureCaptured)
     (pre post : Memory unit)
@@ -315,10 +315,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_held : @NTy.Holds (Carriers.runtime unit) Guarded current)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
@@ -336,10 +336,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_held : @NTy.Holds (Carriers.runtime unit) Guarded prophecy)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
@@ -358,10 +358,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (currentA prophecyA currentB prophecyB : @NTy.carrier (Carriers.runtime unit) Guarded)
+    (currentA prophecyA currentB prophecyB : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded)
     (pre post : Memory unit)
     (_ranA : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
@@ -385,10 +385,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (currentA prophecyA currentB prophecyB : @NTy.carrier (Carriers.runtime unit) Guarded)
+    (currentA prophecyA currentB prophecyB : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded)
     (pre post : Memory unit)
     (_heldB : @NTy.Holds (Carriers.runtime unit) Guarded prophecyB)
     (_ranB : @EnsuresOf unit _ (Skolems.runtime unit)
@@ -413,10 +413,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (currentA prophecyA currentB prophecyB : @NTy.carrier (Carriers.runtime unit) Guarded)
+    (currentA prophecyA currentB prophecyB : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded)
     (pre post : Memory unit)
     (_heldA : @NTy.Holds (Carriers.runtime unit) Guarded prophecyA)
     (_ranA : @EnsuresOf unit _ (Skolems.runtime unit)
@@ -505,10 +505,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
       (@Skolems.construct unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
@@ -523,10 +523,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (targetContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
       (@Skolems.construct unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
@@ -548,8 +548,8 @@ leaves the goal, its context and the proof as they were.
 /-- A target whose contract states that its runs keep the memory: a
 conjunct of a witness that only the derived fact gives. -/
 def keepingContract (unit : Validation.ValidatedUnit) [FunctionCarriers unit] (row : NRow) :
-    Contract (Memory unit) Failure (@HList (Carriers.runtime unit) row)
-      (@ResultShape.carrier (Carriers.runtime unit) .none) where
+    Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts row)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts .none) where
   requires := fun _ _ => True
   ensures := fun _ pre _ post => post = pre
   aborts := fun _ _ _ => False
@@ -599,10 +599,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (keepingContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_point : @ProgramPoint (Carriers.runtime unit) (Memory unit) .none .nil PUnit
       (@Flow.value (Carriers.runtime unit) .none .nil PUnit PUnit.unit ()) post)
     (_held : @NTy.Holds (Carriers.runtime unit) Guarded prophecy)
@@ -628,10 +628,10 @@ set_option linter.unusedVariables false in
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] handle receiverRow .none)
       (keepingContract unit receiverRow))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
-    (current prophecy : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current prophecy : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_point : @ProgramPoint (Carriers.runtime unit) (Memory unit) .none .nil PUnit
       (@Flow.value (Carriers.runtime unit) .none .nil PUnit PUnit.unit ()) post)
     (_ran : @EnsuresOf unit _ (Skolems.runtime unit)
@@ -660,8 +660,8 @@ candidate's fact is derived.  Both candidates are taken.
 /-- A target whose contract states the validity of the value its runs
 return. -/
 def producerContract (unit : Validation.ValidatedUnit) [FunctionCarriers unit] :
-    Contract (Memory unit) Failure (@HList (Carriers.runtime unit) producerRow)
-      (@ResultShape.carrier (Carriers.runtime unit) (.one Guarded)) where
+    Contract (Memory unit) Failure (@HList ((Carriers.runtime unit)).toSorts producerRow)
+      (@ResultShape.carrier ((Carriers.runtime unit)).toSorts (.one Guarded)) where
   requires := fun _ _ => True
   ensures := fun _ _ result _ => @NTy.Holds (Carriers.runtime unit) Guarded result
   aborts := fun _ _ _ => False
@@ -679,12 +679,12 @@ set_option linter.unusedVariables false in
       (@propheticMeaning unit _ executable (Skolems.runtime unit) #[] otherHandle producerRow
         (.one Guarded))
       (producerContract unit))
-    (shared : Sharing) (count : @NTy.carrier (Carriers.runtime unit) (.int 64 false))
+    (shared : Sharing) (count : @NTy.carrier ((Carriers.runtime unit)).toSorts (.int 64 false))
     (typed : @SiteTyped unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle
       receiverWeave.mask #[] receiverCaptured)
     (typedProducer : @SiteTyped unit _ (Skolems.runtime unit) producerSupplied shared
       (.cons Guarded .nil) otherHandle producerWeave.mask #[] producerCaptured)
-    (current produced : @NTy.carrier (Carriers.runtime unit) Guarded) (pre post : Memory unit)
+    (current produced : @NTy.carrier ((Carriers.runtime unit)).toSorts Guarded) (pre post : Memory unit)
     (_ranReceiver : @EnsuresOf unit _ (Skolems.runtime unit)
       (@closureMeaning unit _ executable (Skolems.runtime unit)) receiverSupplied shared .none
       (@Skolems.construct unit _ (Skolems.runtime unit) receiverSupplied shared .nil handle

@@ -2914,9 +2914,9 @@ callee's family. -/
 theorem variantName_ofSkolem {unit : Validation.ValidatedUnit}
     [FunctionCarriers unit] [Θ : Skolems unit]
     (θ : TypeArgs) : (names : List String) →
-    (rows : NRows) → (value : @variantCarrier (Carriers.instantiate θ Θ.toCarriers) names rows) →
+    (rows : NRows) → (value : @variantCarrier ((Carriers.instantiate θ Θ.toCarriers)).toSorts names rows) →
     variantName names (rows.subst θ.1) (variantCarrier.ofSkolem θ names rows value) =
-      @variantName (Carriers.instantiate θ Θ.toCarriers) names rows value
+      @variantName ((Carriers.instantiate θ Θ.toCarriers)).toSorts names rows value
   | _, .nil, value => nomatch value
   | [], .cons _ _, value => nomatch value
   | _ :: _, .cons _ _, .inl _ => rfl
@@ -3096,7 +3096,7 @@ abbrev CalleeMeaning : Type :=
 under the family its type arguments induce. -/
 abbrev GenericMeaning [Θ : Skolems unit] : Type :=
   FunctionHandle → Array GenericArgument → (θ : TypeArgs) → (σs : NRow) → (shape : ResultShape) →
-    @HList (Skolems.instantiate θ Θ).toCarriers σs → Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
+    @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs → Comp unit (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)
 
 end Runtime
 
@@ -3235,7 +3235,7 @@ theorem SiteTyped.decodes {parameters : NRow} {shared : Sharing} {results : NRow
     {handle : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
     {σs : NRow} (typed : SiteTyped parameters shared results handle mask typeInstantiation σs)
     (captures : HList σs) :
-    ((Carriers.functions parameters shared results).ofClosure?
+    ((Sorts.functions parameters shared results).ofClosure?
       (closureOf handle mask typeInstantiation captures)).isSome = true := by
   apply Skolems.ofClosure?_of_runtime
   rw [← NRow.resolved_eq_substWith, ← NRow.resolved_eq_substWith]
@@ -3348,7 +3348,7 @@ noncomputable def Skolems.construct (parameters : NRow) (shared : Sharing) (resu
     {σs : NRow} (captures : HList σs)
     (typed : SiteTyped parameters shared results handle mask typeInstantiation σs) :
     (NTy.function parameters shared results).carrier :=
-  ((Carriers.functions parameters shared results).ofClosure?
+  ((Sorts.functions parameters shared results).ofClosure?
     (closureOf handle mask typeInstantiation captures)).get (typed.decodes captures)
 
 /-- A created function value's runtime closure is the closure created. -/
@@ -3356,10 +3356,10 @@ theorem Skolems.closure_construct (parameters : NRow) (shared : Sharing) (result
     (handle : FunctionHandle) (mask : Nat) (typeInstantiation : Array (TypeId × TypeId))
     {σs : NRow} (captures : HList σs)
     (typed : SiteTyped parameters shared results handle mask typeInstantiation σs) :
-    (Carriers.functions parameters shared results).closure
+    (Sorts.functions parameters shared results).closure
         (Skolems.construct parameters shared results handle mask typeInstantiation captures typed) =
       closureOf handle mask typeInstantiation captures :=
-  (Carriers.functions parameters shared results).closure_of_ofClosure? _ _
+  (Sorts.functions parameters shared results).closure_of_ofClosure? _ _
     (Option.some_get (typed.decodes captures)).symm
 
 attribute [irreducible] Skolems.construct
@@ -3550,7 +3550,7 @@ closure (`closureRun`). -/
 def closureMeaning {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Skolems unit] : InvokeMeaning :=
   fun σs shared shape function args =>
-    closureRun executable ((Carriers.functions σs shared shape.row).closure function) σs shape args
+    closureRun executable ((Sorts.functions σs shared shape.row).closure function) σs shape args
 
 /-- What calls denote: a call without type arguments, and a call with them
 at the family they induce. -/
@@ -3597,47 +3597,47 @@ their relations are explicit inputs to generic verification. -/
 structure InterpreterOps (unit : Validation.ValidatedUnit) (carriers : Carriers)
     (State : Type) where
   call : (handle : FunctionHandle) → (parameters : NRow) → (shape : ResultShape) →
-    @HList carriers parameters → Spec State Failure (@ResultShape.carrier carriers shape)
+    @HList (carriers).toSorts parameters → Spec State Failure (@ResultShape.carrier (carriers).toSorts shape)
   generic : (handle : FunctionHandle) → Array GenericArgument → (arguments : TypeArgs) →
     (parameters : NRow) → (shape : ResultShape) →
-    @HList carriers (NRow.subst arguments.1 parameters) →
-    Spec State Failure (@ResultShape.carrier carriers (shape.subst arguments.1))
+    @HList (carriers).toSorts (NRow.subst arguments.1 parameters) →
+    Spec State Failure (@ResultShape.carrier (carriers).toSorts (shape.subst arguments.1))
   invoke : (parameters : NRow) → (shared : Sharing) → (shape : ResultShape) →
-    @NTy.carrier carriers (.function parameters shared shape.row) →
-    @HList carriers parameters → Spec State Failure (@ResultShape.carrier carriers shape)
+    @NTy.carrier (carriers).toSorts (.function parameters shared shape.row) →
+    @HList (carriers).toSorts parameters → Spec State Failure (@ResultShape.carrier (carriers).toSorts shape)
   closure : {full captured supplied : NRow} → (handle : FunctionHandle) →
     (weave : Weave full captured supplied) → (results : NRow) → (shared : Sharing) →
     closureRows? unit handle weave.mask = some (captured, supplied, results) →
     closureShared unit handle weave.mask = shared →
     (captured.paramFree && supplied.paramFree && results.paramFree) = true →
-    closureFaithful unit handle #[] = true → @HList carriers captured →
-    Spec State Failure (@NTy.carrier carriers (.function supplied shared results))
+    closureFaithful unit handle #[] = true → @HList (carriers).toSorts captured →
+    Spec State Failure (@NTy.carrier (carriers).toSorts (.function supplied shared results))
   closureGeneric : {full captured supplied : NRow} → (handle : FunctionHandle) →
     (weave : Weave full captured supplied) → Array GenericArgument → (arguments : TypeArgs) →
     (shape : ResultShape) → (shared : Sharing) →
     closureRows? unit handle weave.mask = some (captured, supplied, shape.row) →
     closureShared unit handle weave.mask = shared →
     closureSignatureBelow unit handle = true →
-    @HList carriers (NRow.subst arguments.1 captured) →
-    Spec State Failure (@NTy.carrier carriers
+    @HList (carriers).toSorts (NRow.subst arguments.1 captured) →
+    Spec State Failure (@NTy.carrier (carriers).toSorts
       (.function (NRow.subst arguments.1 supplied) shared (shape.subst arguments.1).row))
   read : (type : NTy) → (arguments : NRow) → StorageKey → State →
-    Option (@NTy.carrier carriers type)
+    Option (@NTy.carrier (carriers).toSorts type)
   read_holds : ∀ (type : NTy) (arguments : NRow) (key : StorageKey) (state : State)
-    (value : @NTy.carrier carriers type),
+    (value : @NTy.carrier (carriers).toSorts type),
     read type arguments key state = some value → @NTy.Holds carriers type value
   write : (type : NTy) → (arguments : NRow) → StorageKey →
-    Option (@NTy.carrier carriers type) → State → State
-  assumption : Nat → Option ((locals : NRow) × (@HEnv carriers locals → State → Prop))
+    Option (@NTy.carrier (carriers).toSorts type) → State → State
+  assumption : Nat → Option ((locals : NRow) × (@HEnv carriers.toSorts locals → State → Prop))
   ghost : Nat → Option ((locals : NRow) × (type : NTy) ×
-    (@HEnv carriers locals → State → Option (@NTy.carrier carriers type)))
+    (@HEnv carriers.toSorts locals → State → Option (@NTy.carrier (carriers).toSorts type)))
   ghostInit : Nat → Option ((fields : NRow) × (type : NTy) ×
-    (@HList carriers fields → State → Option (@NTy.carrier carriers type)))
+    (@HList (carriers).toSorts fields → State → Option (@NTy.carrier (carriers).toSorts type)))
   /-- A call at a type argument holding a mutable reference: at the caller's
   rows, which the callee instantiates itself. -/
   atInstance : (handle : FunctionHandle) → Array GenericArgument → (arguments : TypeArgs) →
     (parameters : NRow) → (shape : ResultShape) →
-    @HList carriers parameters → Spec State Failure (@ResultShape.carrier carriers shape)
+    @HList (carriers).toSorts parameters → Spec State Failure (@ResultShape.carrier (carriers).toSorts shape)
 
 
 section LocalComputations
@@ -4013,8 +4013,8 @@ transport of its own. -/
 noncomputable def specializedMeaning {unit : VerexIR.Validation.ValidatedUnit}
     [FunctionCarriers unit] [Θ : Skolems unit]
     (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
-    (meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
-      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
+    (meaning : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs →
+      Comp unit (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)) :
     HList (NRow.subst θ.1 σs) → Comp unit (shape.subst θ.1).carrier :=
   fun args => Spec.bind (meaning (HList.toSkolem θ σs args))
     fun result => Spec.pure (ResultShape.ofSkolem θ shape result)
@@ -4053,7 +4053,7 @@ theorem functionOfGeneric_closure
     (captures : HList (NRow.subst θ.1 captured))
     (typed : SiteTyped (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row
       handle weave.mask (frameInstantiation unit handle outer typeArgs) (NRow.subst θ.1 captured)) :
-    (Carriers.functions (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row).closure
+    (Sorts.functions (NRow.subst θ.1 supplied) shared (shape.subst θ.1).row).closure
         (functionOfGeneric unit outer typeArgs θ weave shape shared handle captures typed) =
       closureOfGeneric unit outer typeArgs θ weave shape handle captures :=
   Skolems.closure_construct _ _ _ _ _ _ captures typed
@@ -5054,7 +5054,7 @@ that a call to it with type arguments means it at the family and frame
 instantiation the call induces. -/
 abbrev SelfFamily (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (π : NRow) (ρ : ResultShape) : Type 1 :=
-  (Θ : Skolems unit) → Array (TypeId × TypeId) → @HList Θ.toCarriers π → Comp unit (@ResultShape.carrier Θ.toCarriers ρ)
+  (Θ : Skolems unit) → Array (TypeId × TypeId) → @HList (Θ.toCarriers).toSorts π → Comp unit (@ResultShape.carrier (Θ.toCarriers).toSorts ρ)
 
 omit [Skolems unit] in
 /-- A slot of a cycle's fixed point: a member at the runtime family
@@ -5083,8 +5083,8 @@ omit [Skolems unit] in
 /-- The meanings standing for a cycle's members, one per slot. -/
 abbrev CycleFamilySelves [Θ : Skolems unit]
     (members : List (FunctionHandle × Function unit)) : Type 1 :=
-  (slot : CycleSlot unit members) → @HList (familySkolems slot.family).toCarriers slot.position.member.2.params →
-    Comp unit (@ResultShape.carrier (familySkolems slot.family).toCarriers slot.position.member.2.result)
+  (slot : CycleSlot unit members) → @HList ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.params →
+    Comp unit (@ResultShape.carrier ((familySkolems slot.family).toCarriers).toSorts slot.position.member.2.result)
 
 omit [Skolems unit] in
 /-- Route calls with type arguments to one function: its handle at its own
@@ -5105,7 +5105,7 @@ omit [Skolems unit] in
     (handle : FunctionHandle) (π : NRow)
     (ρ : ResultShape) (self : SelfFamily unit π ρ)
     (frame : FunctionHandle → Array GenericArgument → Array (TypeId × TypeId)) (rest : GenericMeaning)
-    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers π) :
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts π) :
     routeGeneric handle π ρ self frame rest handle typeArgs θ π ρ args =
       self (Skolems.instantiate θ Θ) (frame handle typeArgs) args := by
   simp [routeGeneric]
@@ -5115,7 +5115,7 @@ theorem routeGeneric_other [Θ : Skolems unit]
     {handle callee : FunctionHandle} {π σs : NRow}
     {ρ shape : ResultShape} (self : SelfFamily unit π ρ)
     (frame : FunctionHandle → Array GenericArgument → Array (TypeId × TypeId)) (rest : GenericMeaning)
-    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
+    (typeArgs : Array GenericArgument) (θ : TypeArgs) (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
     (other : callee ≠ handle) :
     routeGeneric handle π ρ self frame rest callee typeArgs θ σs shape args =
       rest callee typeArgs θ σs shape args := by

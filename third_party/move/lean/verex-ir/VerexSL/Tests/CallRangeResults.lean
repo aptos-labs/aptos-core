@@ -254,21 +254,21 @@ example [outer : Carriers] :
     ∀ r : VerexIR.SpecInt (.bits 64) false,
     Obligation "probe" 0 0 (0 ≤ r.val ∧ r.val ≤
       ((@Array.size
-        (@NTy.carrier (Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer) (.param 0))
-        (([] : List (@NTy.carrier outer (.param 0))).toArray)) : Int)) → r.val = 0 := by
+        (@NTy.carrier ((Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer)).toSorts (.param 0))
+        (([] : List (@NTy.carrier (outer).toSorts (.param 0))).toArray)) : Int)) → r.val = 0 := by
   verex_call_result_cases
 
 example [outer : Carriers] (r : VerexIR.SpecInt (.bits 64) false)
     (first _second : r.val ≤
       ((@Array.size
-        (@NTy.carrier (Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer) (.param 0))
-        (([] : List (@NTy.carrier outer (.param 0))).toArray)) : Int)) : r.val ≤ 0 := by
+        (@NTy.carrier ((Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer)).toSorts (.param 0))
+        (([] : List (@NTy.carrier (outer).toSorts (.param 0))).toArray)) : Int)) : r.val ≤ 0 := by
   verex_canonical_hypotheses [first]
-  guard_hyp first :ₛ r.val ≤ ((([] : List (@NTy.carrier outer (.param 0))).toArray).size : Int)
+  guard_hyp first :ₛ r.val ≤ ((([] : List (@NTy.carrier (outer).toSorts (.param 0))).toArray).size : Int)
   guard_hyp _second :ₛ r.val ≤
       ((@Array.size
-        (@NTy.carrier (Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer) (.param 0))
-        (([] : List (@NTy.carrier outer (.param 0))).toArray)) : Int)
+        (@NTy.carrier ((Carriers.instantiate ⟨.cons (.param 0) .nil, rfl⟩ outer)).toSorts (.param 0))
+        (([] : List (@NTy.carrier (outer).toSorts (.param 0))).toArray)) : Int)
   simpa only [List.size_toArray, List.length_nil, Int.natCast_zero] using first
 
 -- A partition of literal entries determines an interior opaque result; other

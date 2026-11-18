@@ -111,9 +111,9 @@ abbrev openAtom :=
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) [Skolems unit]
     (shared : Sharing)
-    (function : @NTy.carrier Skolems.toCarriers (NTy.function row shared shape.row))
-    (count : @NTy.carrier Skolems.toCarriers (.int 64 false))
-    (x : @NTy.carrier Skolems.toCarriers Guarded)
+    (function : @NTy.carrier (Skolems.toCarriers).toSorts (NTy.function row shared shape.row))
+    (count : @NTy.carrier (Skolems.toCarriers).toSorts (.int 64 false))
+    (x : @NTy.carrier (Skolems.toCarriers).toSorts Guarded)
     (initial : Memory unit) (P : Memory unit → Prop)
     (_contract : @MethodContract unit _ executable _ row shared shape function),
     wp (@closureMeaning unit _ executable _ row shared shape function (count, x, ()))
@@ -124,9 +124,9 @@ abbrev paidAtom :=
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) [Skolems unit]
     (shared : Sharing)
-    (function : @NTy.carrier Skolems.toCarriers (NTy.function row shared shape.row))
-    (count : @NTy.carrier Skolems.toCarriers (.int 64 false))
-    (x : @NTy.carrier Skolems.toCarriers Guarded)
+    (function : @NTy.carrier (Skolems.toCarriers).toSorts (NTy.function row shared shape.row))
+    (count : @NTy.carrier (Skolems.toCarriers).toSorts (.int 64 false))
+    (x : @NTy.carrier (Skolems.toCarriers).toSorts Guarded)
     (initial : Memory unit) (P : Memory unit → Prop)
     (_held : @NTy.Holds Skolems.toCarriers Guarded x)
     (_contract : @MethodContract unit _ executable _ row shared shape function),
@@ -200,9 +200,9 @@ abbrev twoClauses :=
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) [Skolems unit]
     (shared : Sharing)
-    (function : @NTy.carrier Skolems.toCarriers (NTy.function pairRow shared shape.row))
-    (count : @NTy.carrier Skolems.toCarriers (.int 64 false))
-    (x y : @NTy.carrier Skolems.toCarriers Guarded)
+    (function : @NTy.carrier (Skolems.toCarriers).toSorts (NTy.function pairRow shared shape.row))
+    (count : @NTy.carrier (Skolems.toCarriers).toSorts (.int 64 false))
+    (x y : @NTy.carrier (Skolems.toCarriers).toSorts Guarded)
     (initial : Memory unit) (P : Memory unit → Prop)
     (_contract : @MethodContract unit _ executable _ pairRow shared shape function),
     wp (@closureMeaning unit _ executable _ pairRow shared shape function (count, (x, y, ()), ()))

@@ -21,8 +21,8 @@ run_cmd do
     withLocalDeclD `family (mkConst ``Carriers) fun family =>
       withLocalDeclD `unknown (mkConst ``NTy) fun unknown =>
         withLocalDeclD `pattern (mkApp2 (mkConst ``Pat) (mkConst ``NRow.nil) unknown) fun pattern =>
-          withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) family unknown) fun value =>
-            withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family (mkConst ``NRow.nil)) fun locals => do
+          withLocalDeclD `value (mkApp2 (mkConst ``NTy.carrier) (carrierSorts family) unknown) fun value =>
+            withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) (carrierSorts family) (mkConst ``NRow.nil)) fun locals => do
               let call := mkAppN (mkConst ``Pat.bindValue)
                 #[family, mkConst ``NRow.nil, unknown, pattern, value, locals]
               let (result, _) ← simp call context procs
@@ -45,8 +45,8 @@ run_cmd do
         | _ => throwError "unexpected pattern schema"
       for pattern in patterns do
         withLocalDeclD `family (mkConst ``Carriers) fun family =>
-          withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family (mkConst ``NRow.nil)) fun locals => do
-            let carrier := mkApp2 (mkConst ``NTy.carrier) family owner
+          withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) (carrierSorts family) (mkConst ``NRow.nil)) fun locals => do
+            let carrier := mkApp2 (mkConst ``NTy.carrier) (carrierSorts family) owner
             withLocalDeclD `value carrier fun value => do
               let call := mkAppN (mkConst ``Pat.bindValue)
                 #[family, mkConst ``NRow.nil, owner, pattern, value, locals]

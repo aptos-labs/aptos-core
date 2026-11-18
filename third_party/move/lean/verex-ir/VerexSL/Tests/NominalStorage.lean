@@ -68,7 +68,7 @@ run_cmd do
         withLocalDeclD `operations
             (mkApp3 (mkConst ``InterpreterOps) (mkConst name) family (mkConst ``Unit))
             fun operations =>
-          withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family row) fun locals => do
+          withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) (carrierSorts family) row) fun locals => do
             let call := mkAppN (mkConst ``Term.denoteIn)
               #[mkConst name, family, mkConst ``Unit, operations, shape, row, bodyType, quoted, locals]
             let (normalized, _) ← simp call context

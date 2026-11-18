@@ -40,7 +40,7 @@ example [family : Carriers] : True := by
     let semantic ← elabTerm (← `(@Flow
       (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
       (.one (.param 0)) .nil
-      (@HList (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
+      (@HList ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) $(mkIdent `family))).toSorts
         (NRow.replicate 0 (.param 0))))) none
     let semantic ← instantiateMVars semantic
     let rebuilt ← canonical semantic
@@ -48,7 +48,7 @@ example [family : Carriers] : True := by
     unless rebuilt.getArg! 0 == semantic.getArg! 0 && rebuilt.getArg! 1 == semantic.getArg! 1 do
       throwError "changed semantic Flow family or result shape"
     let alpha := rebuilt.getArg! 3
-    unless alpha.isAppOfArity ``HList 2 && alpha.getArg! 0 == mkFVar family &&
+    unless alpha.isAppOfArity ``HList 2 && alpha.getArg! 0 == VerexSL.Contract.carrierSorts (mkFVar family) &&
         (alpha.getArg! 1).isConstOf ``NRow.nil do
       throwError "parent Flow alpha did not acquire caller HList spelling: {alpha}"
     check rebuilt
@@ -66,16 +66,18 @@ example (_given : GivenFrame) : True := by
     let names ← elabTerm (← `(["Entry"])) none
     let proof ← mkEqRefl (mkConst ``Bool.true)
     let nativeType := mkApp (mkConst ``NTy.tuple) row
+    let innerSorts := VerexSL.Contract.carrierSorts inner
+    let outerSorts := VerexSL.Contract.carrierSorts outer
     let input := #[
-      mkApp3 (mkConst ``NTy.plainFallback) inner nativeType proof,
-      mkApp3 (mkConst ``NTy.inhabitant) inner nativeType proof,
-      mkApp3 (mkConst ``HList.inhabitant) inner row proof,
-      mkApp4 (mkConst ``variantCarrier.inhabitant) inner names rows proof]
+      mkApp3 (mkConst ``NTy.plainFallback) innerSorts nativeType proof,
+      mkApp3 (mkConst ``NTy.inhabitant) innerSorts nativeType proof,
+      mkApp3 (mkConst ``HList.inhabitant) innerSorts row proof,
+      mkApp4 (mkConst ``variantCarrier.inhabitant) innerSorts names rows proof]
     let expected := #[
-      mkApp3 (mkConst ``NTy.plainFallback) outer nativeType proof,
-      mkApp3 (mkConst ``NTy.inhabitant) outer nativeType proof,
-      mkApp3 (mkConst ``HList.inhabitant) outer row proof,
-      mkApp4 (mkConst ``variantCarrier.inhabitant) outer names rows proof]
+      mkApp3 (mkConst ``NTy.plainFallback) outerSorts nativeType proof,
+      mkApp3 (mkConst ``NTy.inhabitant) outerSorts nativeType proof,
+      mkApp3 (mkConst ``HList.inhabitant) outerSorts row proof,
+      mkApp4 (mkConst ``variantCarrier.inhabitant) outerSorts names rows proof]
     let canonical ← canonicalEmission {} none
     for i in [:input.size] do
       let output ← canonical input[i]!
@@ -97,7 +99,8 @@ example : True := by
     let canonical ← canonicalEmission {} none
     let input ← withLocalDecl `inner .instImplicit (mkConst ``Carriers) fun inner => do
       let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments inner
-      let value := mkApp3 (mkConst ``NTy.inhabitantOf) induced (mkConst ``NTy.bool) proof
+      let value := mkApp3 (mkConst ``NTy.inhabitantOf) (VerexSL.Contract.carrierSorts induced)
+        (mkConst ``NTy.bool) proof
       mkLambdaFVars #[inner] value
     check input
     let output ← canonical input
@@ -265,7 +268,7 @@ example [family : Carriers] (pair : Nat × Unit) : True := by
     let induced ← instantiateMVars (mkApp2 (mkConst ``Carriers.instantiate) arguments family)
     let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
     let owner := mkConst ``Nat
-    let respelled := mkApp2 (mkConst ``NTy.carrier) induced parameter
+    let respelled := mkApp2 (mkConst ``NTy.carrier) (VerexSL.Contract.carrierSorts induced) parameter
     let original ← mkAppM ``Prod.fst #[pair]
     let rewritten := original.withApp fun head args => mkAppN head (args.set! 0 respelled)
     -- The conversion of the whole projection is no evidence: both sides
@@ -287,7 +290,7 @@ example [family : Carriers] (pair : Nat × Unit) : True := by
 -- assert that a rewrite was refused: this instance's substituted carrier
 -- converts, so the contract holds whether or not the emission rewrites here.
 example [family : Carriers]
-    (pair : @NTy.carrier (Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)
+    (pair : @NTy.carrier ((Carriers.instantiate (⟨.cons .bool .nil, rfl⟩ : TypeArgs) family)).toSorts
       (.param 0) × Unit) : True := by
   run_tac withMainContext do
     let pair := (← getLocalDeclFromUserName `pair).toExpr
@@ -308,12 +311,12 @@ example [family : Carriers]
 -- input means: a dependent constructor that keeps a proof over a changed
 -- field, and a projection of a value at an induced family. The kernel checks
 -- the emitted term here, which is where a check of a whole term belongs.
-example [family : Carriers] (value : @NTy.carrier family (.int 64 false)) : True := by
+example [family : Carriers] (value : @NTy.carrier (family).toSorts (.int 64 false)) : True := by
   run_tac withMainContext do
     let canonical ← canonicalEmission {} none
     let vector ← instantiateMVars (← elabTerm (← `((⟨#[$(mkIdent `value)], by simp⟩ :
       @NTy.carrier
-        (Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
+        ((Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))).toSorts
         (.vector (.param 0))))) none)
     let rebuilt ← canonical vector
     check rebuilt
@@ -321,7 +324,7 @@ example [family : Carriers] (value : @NTy.carrier family (.int 64 false)) : True
       throwError "the emitted vector changed meaning"
     let pair ← instantiateMVars (← elabTerm (← `(((($(mkIdent `value)), true) :
       @NTy.carrier
-          (Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))
+          ((Carriers.instantiate (⟨.cons (.int 64 false) .nil, rfl⟩ : TypeArgs) $(mkIdent `family))).toSorts
           (.param 0) × Bool).fst)) none)
     let projected ← canonical pair
     check projected

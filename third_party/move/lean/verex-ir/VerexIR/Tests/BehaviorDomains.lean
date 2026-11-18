@@ -341,7 +341,7 @@ theorem keepsMemoryOf_at_induced_frame
     {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
     (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
     (free : θ.1.refFree = true)
-    {value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {value : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (kept : @KeepsMemoryAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared
       (shape.subst θ.1) (shape.functionOfSkolem θ parameters shared value)) :
@@ -359,7 +359,7 @@ not about the step that applies it, which is controlled in
 theorem induced_frame_needs_coherence (Θ : Skolems unit) (θ : TypeArgs)
     (_free : θ.1.refFree = true)
     {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
-    {value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {value : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (_kept : @KeepsMemoryAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared
       (shape.subst θ.1) (shape.functionOfSkolem θ parameters shared value))

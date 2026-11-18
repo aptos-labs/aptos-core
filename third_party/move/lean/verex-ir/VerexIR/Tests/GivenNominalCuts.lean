@@ -31,13 +31,13 @@ def falseClauses (G : GivenFrame) : GivenOwnDeclarations G := fun _ _ =>
 
 /-- An arbitrary predicate of a declaration, as a frame installs it. -/
 def predicateClauses (G : GivenFrame)
-    (predicate : @NTy.carrier G.toCarriers nominal → Prop) : GivenOwnDeclarations G :=
+    (predicate : @NTy.carrier (G.toCarriers).toSorts nominal → Prop) : GivenOwnDeclarations G :=
   fun _ _ => some ⟨nominal, predicate⟩
 
 -- Negative control first: a false declared invariant forbids every check kind,
 -- including both construction and mutation end, even though parameters hold freely.
 theorem false_declaration_rejected (G : GivenFrame) (State : Type) (initial : State)
-    (payload : @NTy.carrier (G.withDeclarations (falseClauses G)).toCarriers (.param 0))
+    (payload : @NTy.carrier ((G.withDeclarations (falseClauses G)).toCarriers).toSorts (.param 0))
     (kind : CertifyKind) :
     ¬ wp (@checkingAt (G.withDeclarations (falseClauses G)).toCarriers State 3 kind nominal
         (payload, (num 0, ())))
@@ -52,7 +52,7 @@ theorem false_declaration_rejected (G : GivenFrame) (State : Type) (initial : St
 
 -- This is the cut taken by an actual pack in the shared interpreter.
 theorem construction_valid (G : GivenFrame) (State : Type) (initial : State)
-    (payload : @NTy.carrier (G.withDeclarations (clauses G)).toCarriers (.param 0)) :
+    (payload : @NTy.carrier ((G.withDeclarations (clauses G)).toCarriers).toSorts (.param 0)) :
     wp (@checkingAt (G.withDeclarations (clauses G)).toCarriers State 1 .construction nominal
         (payload, (num 0, ())))
       (fun _ final => final = initial) (fun _ => False) initial := by
@@ -61,9 +61,9 @@ theorem construction_valid (G : GivenFrame) (State : Type) (initial : State)
 
 -- The ended loan must establish the declaration for its new current value.
 theorem mutation_valid (G : GivenFrame) (State : Type) (initial : State)
-    (payload : @NTy.carrier (G.withDeclarations (clauses G)).toCarriers (.param 0)) (n : Int)
+    (payload : @NTy.carrier ((G.withDeclarations (clauses G)).toCarriers).toSorts (.param 0)) (n : Int)
     (held : @Carriers.own (G.withDeclarations (clauses G)).toCarriers source arguments
-      (@NTy.encode (G.withDeclarations (clauses G)).toCarriers nominal (payload, (num n, ())))) :
+      (@NTy.encode ((G.withDeclarations (clauses G)).toCarriers).toSorts nominal (payload, (num n, ())))) :
     wp (@checkingAt (G.withDeclarations (clauses G)).toCarriers State 2 .mutationEnd nominal
         (payload, (num (n + 1), ())))
       (fun _ final => final = initial) (fun _ => False) initial := by
@@ -73,8 +73,8 @@ theorem mutation_valid (G : GivenFrame) (State : Type) (initial : State)
 -- Opening a declaration preserves an arbitrary predicate of the decoded row.
 -- In particular, it cannot replace the declared predicate by parameter validity.
 theorem predicate_construction (G : GivenFrame) (State : Type) (initial : State)
-    (P : @NTy.carrier G.toCarriers nominal → Prop)
-    (row : @NTy.carrier (G.withDeclarations (predicateClauses G P)).toCarriers nominal)
+    (P : @NTy.carrier (G.toCarriers).toSorts nominal → Prop)
+    (row : @NTy.carrier ((G.withDeclarations (predicateClauses G P)).toCarriers).toSorts nominal)
     (held : P row) :
     wp (@checkingAt (G.withDeclarations (predicateClauses G P)).toCarriers State
       4 .construction nominal row)

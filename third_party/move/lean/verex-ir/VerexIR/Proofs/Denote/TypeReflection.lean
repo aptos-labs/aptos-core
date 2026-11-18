@@ -128,7 +128,7 @@ def NTy.aggregatorMax : NTy → Int
 
 /-- An aggregator element's integer: the native model reads fields and
 values through this one observation. -/
-def NTy.aggregatorValue : (τ : NTy) → @NTy.carrier (Carriers.runtime unit) τ → Int
+def NTy.aggregatorValue : (τ : NTy) → @NTy.carrier ((Carriers.runtime unit)).toSorts τ → Int
   | .int _ _, value => SpecInt.val value
   | _, _ => 0
 
@@ -142,7 +142,7 @@ def Skolems.aggregatorMax (Θ : Skolems unit) (τ : NTy) : Int :=
 
 /-- `NTy.aggregatorValue` of a value of a frame. -/
 def Skolems.aggregatorValue (Θ : Skolems unit) (τ : NTy)
-    (value : @NTy.carrier Θ.toCarriers τ) : Int :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts τ) : Int :=
   NTy.aggregatorValue (Θ.resolve τ) (Θ.toRuntime τ value)
 
 @[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_instantiate
@@ -155,10 +155,10 @@ def Skolems.aggregatorValue (Θ : Skolems unit) (τ : NTy)
 
 @[vir_denote, vir_denote_norm] theorem Skolems.aggregatorValue_instantiate
     (θ : TypeArgs) (Θ : Skolems unit) (τ : NTy)
-    (value : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers τ) :
+    (value : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts τ) :
     (Skolems.instantiate θ Θ).aggregatorValue τ value =
       Θ.aggregatorValue (τ.subst θ.1)
-        (@NTy.ofSkolem Θ.toCarriers θ τ value) := rfl
+        (@NTy.ofSkolem (Θ.toCarriers).toSorts θ τ value) := rfl
 
 @[vir_denote, vir_denote_norm] theorem Skolems.isAggregatorElement_runtime (τ : NTy) :
     (Skolems.runtime unit).isAggregatorElement τ = τ.isAggregatorElement := rfl

@@ -109,7 +109,7 @@ before it builds anything. -/
 #guard_model_frame declines in
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ) (Θ : Skolems unit)
-    (value : @NTy.carrier (Skolems.instantiate scalarArgs Θ).toCarriers
+    (value : @NTy.carrier ((Skolems.instantiate scalarArgs Θ).toCarriers).toSorts
       (.function scalarRow sharing scalarShape.row)),
     @KeepsMemoryAtOf unit _ (Skolems.instantiate scalarArgs Θ)
       (invoke (Skolems.instantiate scalarArgs Θ)) scalarRow sharing scalarShape value
@@ -124,7 +124,7 @@ of it is built. -/
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ) (Θ : Skolems unit)
     (_coherent : InvokeMeaning.Coherent invoke)
-    (value : @NTy.carrier (Skolems.instantiate borrowedArgs Θ).toCarriers
+    (value : @NTy.carrier ((Skolems.instantiate borrowedArgs Θ).toCarriers).toSorts
       (.function scalarRow sharing scalarShape.row)),
     @KeepsMemoryAtOf unit _ (Skolems.instantiate borrowedArgs Θ)
       (invoke (Skolems.instantiate borrowedArgs Θ)) scalarRow sharing scalarShape value
@@ -138,7 +138,7 @@ constructs: the step restores what the peel changed and declines. -/
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ) (Θ : Skolems unit)
     (_coherent : InvokeMeaning.Coherent invoke)
-    (value : @NTy.carrier (Skolems.instantiate scalarArgs Θ).toCarriers
+    (value : @NTy.carrier ((Skolems.instantiate scalarArgs Θ).toCarriers).toSorts
       (.function scalarRow sharing scalarShape.row)),
     @KeepsMemoryAtOf unit _ (Skolems.instantiate scalarArgs Θ)
       (invoke (Skolems.instantiate scalarArgs Θ)) scalarRow sharing scalarShape value

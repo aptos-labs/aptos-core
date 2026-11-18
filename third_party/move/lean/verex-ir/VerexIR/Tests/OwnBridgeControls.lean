@@ -43,36 +43,36 @@ variable {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers un
 /-- An order at a type parameter, with the same ranks: the declaration's
 reading over moved values is the caller's family's order of the values, the
 form every reader of the caller's leaf uses. -/
-theorem order_parameter (rank : ValueRanks) (left right : @NTy.carrier Θ.toCarriers (.param 0))
+theorem order_parameter (rank : ValueRanks) (left right : @NTy.carrier (Θ.toCarriers).toSorts (.param 0))
     (outcome : Ordering) :
-    @NTy.order (Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
-          inhabitable).toCarriers rank (.param 0)
+    @NTy.order ((Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
+          inhabitable).toCarriers).toSorts rank (.param 0)
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
           inhabitable (τ := .param 0) rfl left)
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
           inhabitable (τ := .param 0) rfl right) = outcome ↔
-      (@Carriers.orders Θ.toCarriers 0).order rank left right = outcome := by
+      (@Sorts.orders (Θ.toCarriers).toSorts 0).order rank left right = outcome := by
   rw [Skolems.order_reframeAtInstance sameCarrier sameFunctions sameNominals Θ
     (.cons (.param 0) .nil) inhabitable (τ := .param 0) rfl rank left right]
   exact Iff.rfl
 
 /-- Equality at a type parameter, likewise: the caller's family's equality of
 the values. -/
-theorem equal_parameter (left right : @NTy.carrier Θ.toCarriers (.param 0)) (outcome : Bool) :
-    @NTy.equal (Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
-          inhabitable).toCarriers false (.param 0)
+theorem equal_parameter (left right : @NTy.carrier (Θ.toCarriers).toSorts (.param 0)) (outcome : Bool) :
+    @NTy.equal ((Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
+          inhabitable).toCarriers).toSorts false (.param 0)
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
           inhabitable (τ := .param 0) rfl left)
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
           inhabitable (τ := .param 0) rfl right) = outcome ↔
-      (@Carriers.erasures Θ.toCarriers 0).same left right = outcome := by
+      (@Sorts.erasures (Θ.toCarriers).toSorts 0).same left right = outcome := by
   rw [Skolems.equal_reframeAtInstance sameCarrier sameFunctions sameNominals Θ
     (.cons (.param 0) .nil) inhabitable (τ := .param 0) rfl left right]
   exact Iff.rfl
 
 /-- A field of a field of a nested generic struct: the key of the first entry
 of a moved value is the moved key, through two descriptors. -/
-theorem field_nested (value : @NTy.carrier Θ.toCarriers (nested (.param 0))) :
+theorem field_nested (value : @NTy.carrier (Θ.toCarriers).toSorts (nested (.param 0))) :
     (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
         inhabitable (τ := nested (.param 0)) rfl value).fst.fst =
       Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
@@ -89,15 +89,15 @@ theorem field_nested (value : @NTy.carrier Θ.toCarriers (nested (.param 0))) :
 moved value is the quantified order over the keys of the value, with each
 side's own fallback and no move left under the binders. -/
 theorem quantified_reads (rank : ValueRanks)
-    (value : @NTy.carrier Θ.toCarriers (keys (.param 0)))
-    (fallback : @NTy.carrier (Skolems.atArguments unit base
-      ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers (.param 0))
-    (fallback' : @NTy.carrier Θ.toCarriers (.param 0)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (keys (.param 0)))
+    (fallback : @NTy.carrier ((Skolems.atArguments unit base
+      ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers).toSorts (.param 0))
+    (fallback' : @NTy.carrier (Θ.toCarriers).toSorts (.param 0)) :
     (∀ i j : Int, 0 ≤ i → i < j →
         j < ↑(Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons (.param 0) .nil) inhabitable (τ := keys (.param 0)) rfl value).fst.values.size →
-        @NTy.order (Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
-            inhabitable).toCarriers rank (.param 0)
+        @NTy.order ((Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
+            inhabitable).toCarriers).toSorts rank (.param 0)
           ((Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
             (.cons (.param 0) .nil) inhabitable (τ := keys (.param 0)) rfl
             value).fst.values[i.toNat]?.getD fallback)
@@ -105,7 +105,7 @@ theorem quantified_reads (rank : ValueRanks)
             (.cons (.param 0) .nil) inhabitable (τ := keys (.param 0)) rfl
             value).fst.values[j.toNat]?.getD fallback) = .lt) ↔
       ∀ i j : Int, 0 ≤ i → i < j → j < ↑value.fst.values.size →
-        (@Carriers.orders Θ.toCarriers 0).order rank
+        (@Sorts.orders (Θ.toCarriers).toSorts 0).order rank
           (value.fst.values[i.toNat]?.getD fallback')
           (value.fst.values[j.toNat]?.getD fallback') = .lt := by
   have field :
@@ -135,11 +135,11 @@ theorem quantified_reads (rank : ValueRanks)
 /-- A read of a moved vector at any index is the moved read where the caller's
 fallback moves to the declaration's. -/
 theorem read_of_fallback {element : NTy} (bounded)
-    (vector : @NTy.carrier Θ.toCarriers (.vector (element.subst (.cons (.param 0) .nil))))
+    (vector : @NTy.carrier (Θ.toCarriers).toSorts (.vector (element.subst (.cons (.param 0) .nil))))
     (index : Nat)
-    (fallback : @NTy.carrier (Skolems.atArguments unit base
-      ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers element)
-    (fallback' : @NTy.carrier Θ.toCarriers (element.subst (.cons (.param 0) .nil)))
+    (fallback : @NTy.carrier ((Skolems.atArguments unit base
+      ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers).toSorts element)
+    (fallback' : @NTy.carrier (Θ.toCarriers).toSorts (element.subst (.cons (.param 0) .nil)))
     (moves : Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
       (.cons (.param 0) .nil) inhabitable (τ := element)
       (by simpa only [NTy.paramsAll] using bounded) fallback' = fallback) :
@@ -160,24 +160,24 @@ countermodel: it does not refute an agreement of the two fallbacks, and where
 the element's carrier does not read the frame, or the clause's own context
 bounds the read, the agreement is proved without the premise. -/
 theorem unbounded_read (rank : ValueRanks)
-    (value : @NTy.carrier Θ.toCarriers (keys (.param 0)))
-    (probe : @NTy.carrier Θ.toCarriers (.param 0))
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (keys (.param 0)))
+    (probe : @NTy.carrier (Θ.toCarriers).toSorts (.param 0))
     (moves : Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
         (.cons (.param 0) .nil) inhabitable (τ := .param 0) rfl
-        (@NTy.plainFallback Θ.toCarriers (.param 0) rfl) =
-      @NTy.plainFallback (Skolems.atArguments unit base
-        ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers (.param 0) rfl) :
-    @NTy.order (Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
-          inhabitable).toCarriers rank (.param 0)
+        (@NTy.plainFallback (Θ.toCarriers).toSorts (.param 0) rfl) =
+      @NTy.plainFallback ((Skolems.atArguments unit base
+        ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers).toSorts (.param 0) rfl) :
+    @NTy.order ((Skolems.atArguments unit base ((NRow.cons (.param 0) .nil).map Θ.resolve)
+          inhabitable).toCarriers).toSorts rank (.param 0)
         ((Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons (.param 0) .nil) inhabitable (τ := keys (.param 0)) rfl
           value).fst.values[0]?.getD
-            (@NTy.plainFallback (Skolems.atArguments unit base
-              ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers (.param 0) rfl))
+            (@NTy.plainFallback ((Skolems.atArguments unit base
+              ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers).toSorts (.param 0) rfl))
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons (.param 0) .nil) inhabitable (τ := .param 0) rfl probe) = .lt ↔
-      (@Carriers.orders Θ.toCarriers 0).order rank
-        (value.fst.values[0]?.getD (@NTy.plainFallback Θ.toCarriers (.param 0) rfl)) probe =
+      (@Sorts.orders (Θ.toCarriers).toSorts 0).order rank
+        (value.fst.values[0]?.getD (@NTy.plainFallback (Θ.toCarriers).toSorts (.param 0) rfl)) probe =
           .lt := by
   have field :
       (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ (.cons (.param 0) .nil)
@@ -191,9 +191,9 @@ theorem unbounded_read (rank : ValueRanks)
   fail_if_success
     have := Skolems.reframeAtInstance_vector_read sameCarrier sameFunctions sameNominals Θ
       (.cons (.param 0) .nil) inhabitable (element := .param 0) rfl value.fst 0 (by omega)
-      (@NTy.plainFallback (Skolems.atArguments unit base
-        ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers (.param 0) rfl)
-      (@NTy.plainFallback Θ.toCarriers (.param 0) rfl)
+      (@NTy.plainFallback ((Skolems.atArguments unit base
+        ((NRow.cons (.param 0) .nil).map Θ.resolve) inhabitable).toCarriers).toSorts (.param 0) rfl)
+      (@NTy.plainFallback (Θ.toCarriers).toSorts (.param 0) rfl)
   rw [field, read_of_fallback sameCarrier sameFunctions sameNominals Θ inhabitable
       (element := .param 0) rfl value.fst 0 _ _ moves,
     Skolems.order_reframeAtInstance sameCarrier sameFunctions sameNominals Θ
@@ -205,10 +205,10 @@ theorem unbounded_read (rank : ValueRanks)
 /-- The equivalence does not hold of a right-hand side chosen independently of
 the installed clauses: with the agreement premise dropped, the statement of
 the bridge is refuted by a pair of clauses that disagree. -/
-theorem no_bridge_without_agreement (value : @NTy.carrier Θ.toCarriers (box (.param 0))) :
+theorem no_bridge_without_agreement (value : @NTy.carrier (Θ.toCarriers).toSorts (box (.param 0))) :
     ¬(OwnAtArguments unit base (box (.param 0)) (fun _ _ => True)
         ((NRow.cons (.param 0) .nil).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (box (.param 0)) value) ↔ False) :=
+        (@NTy.encode (Θ.toCarriers).toSorts (box (.param 0)) value) ↔ False) :=
   fun bridge => bridge.mp fun _ _ _ => trivial
 
 end Shapes
@@ -224,9 +224,9 @@ at a family whose type parameter has no valid value, the clause of a box holds
 of every box and no box is valid. Certifying a constructed value therefore
 owes the fields' validity beside the clause, which is what the bridge's
 statement of a struct's fact lists (`NTy.holds_struct_bridge`). -/
-theorem clause_does_not_certify (value : @NTy.carrier invalidParameters (box (.param 0))) :
+theorem clause_does_not_certify (value : @NTy.carrier (invalidParameters).toSorts (box (.param 0))) :
     @Carriers.own invalidParameters ⟨⟨0⟩, 3⟩ (.cons (.param 0) .nil)
-        (@NTy.encode invalidParameters (box (.param 0)) value) ∧
+        (@NTy.encode (invalidParameters).toSorts (box (.param 0)) value) ∧
       ¬@NTy.Holds invalidParameters (box (.param 0)) value := by
   refine ⟨trivial, fun valid => ?_⟩
   have opened := (@NTy.holds_struct invalidParameters ⟨⟨0⟩, 3⟩ (.cons (.param 0) .nil)
@@ -246,7 +246,7 @@ declaration's is. A binder of an installed clause restricted to the valid
 values of a declared type therefore ranges over more values than the caller's,
 and only its opening half transfers
 (`Skolems.forall_holds_reframeAtInstance_mp`). -/
-theorem validity_reads_own (value : @NTy.carrier Carriers.ground (box (.param 0))) :
+theorem validity_reads_own (value : @NTy.carrier (Carriers.ground).toSorts (box (.param 0))) :
     @NTy.Holds Carriers.ground (box (.param 0)) value ∧
       ¬@NTy.Holds strictOwn (box (.param 0)) value := by
   constructor

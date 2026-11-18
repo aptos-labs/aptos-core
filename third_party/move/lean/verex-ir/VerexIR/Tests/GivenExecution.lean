@@ -21,23 +21,23 @@ section ParameterViews
 set_option linter.unusedVariables false in
 example (frame : GivenFrame) : True := by
   fail_if_success
-    have : @NTy.readCarrier frame.toCarriers (.int 64 false) =
-        @NTy.carrier frame.toCarriers (.int 64 false) := rfl
+    have : @NTy.readCarrier (frame.toCarriers).toSorts (.int 64 false) =
+        @NTy.carrier (frame.toCarriers).toSorts (.int 64 false) := rfl
   trivial
 
 -- Positive controls: specification views and their ordering on a Given parameter use the single abstract sort.
 example (frame : GivenFrame) (i : Nat)
-    (value : @NTy.carrier frame.toCarriers (.param i)) :
-    @NTy.read frame.toCarriers (.param i) value = value := rfl
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param i)) :
+    @NTy.read (frame.toCarriers).toSorts (.param i) value = value := rfl
 
 example (frame : GivenFrame) (i : Nat)
-    (value : @NTy.readCarrier frame.toCarriers (.param i)) :
-    @NTy.unread frame.toCarriers (.param i) rfl value = value := rfl
+    (value : @NTy.readCarrier (frame.toCarriers).toSorts (.param i)) :
+    @NTy.unread (frame.toCarriers).toSorts (.param i) rfl value = value := rfl
 
 example (frame : GivenFrame) (i : Nat) (rank : ValueRanks)
-    (left right : @NTy.carrier frame.toCarriers (.param i)) :
-    (@NTy.readOrder frame.toCarriers rank (.param i)).compare left right =
-      @NTy.order frame.toCarriers rank (.param i) left right := rfl
+    (left right : @NTy.carrier (frame.toCarriers).toSorts (.param i)) :
+    (@NTy.readOrder (frame.toCarriers).toSorts rank (.param i)).compare left right =
+      @NTy.order (frame.toCarriers).toSorts rank (.param i) left right := rfl
 
 end ParameterViews
 
@@ -164,7 +164,7 @@ theorem identity_refines {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarr
     {executable : VerexIR.Validation.ExecutableUnit unit} [Θ : Skolems unit]
     (meanings : Meanings executable) (G : GivenFrame) {State : Type}
     (givenOps : InterpreterOps unit G.toCarriers State)
-    (values : @NTy.carrier Θ.toCarriers (.param 0) → @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (values : @NTy.carrier (Θ.toCarriers).toSorts (.param 0) → @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
     (stores : Memory unit → State → Prop) :
     FunctionRelationalRefines (fun args givenArgs => values args.1 givenArgs.1) stores values Eq
       (fun _ _ => True) ((identity unit).denoteWith meanings)
@@ -191,8 +191,8 @@ theorem swapped_refines {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarri
     {executable : VerexIR.Validation.ExecutableUnit unit} [Θ : Skolems unit]
     (meanings : Meanings executable) (G : GivenFrame) {State : Type}
     (givenOps : InterpreterOps unit G.toCarriers State)
-    (lefts : @NTy.carrier Θ.toCarriers (.param 0) → @NTy.carrier G.toCarriers (.param 0) → Prop)
-    (rights : @NTy.carrier Θ.toCarriers (.param 1) → @NTy.carrier G.toCarriers (.param 1) → Prop)
+    (lefts : @NTy.carrier (Θ.toCarriers).toSorts (.param 0) → @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
+    (rights : @NTy.carrier (Θ.toCarriers).toSorts (.param 1) → @NTy.carrier (G.toCarriers).toSorts (.param 1) → Prop)
     (stores : Memory unit → State → Prop) :
     FunctionRelationalRefines
       (fun args givenArgs => lefts args.1 givenArgs.1 ∧ rights args.2.1 givenArgs.2.1)

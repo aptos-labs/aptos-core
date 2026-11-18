@@ -41,6 +41,23 @@ namespace VerexIR.Proofs.Denote
 
 open Lean Elab Tactic Meta
 
+/-- Operational applications read the parent of the semantic family. -/
+private def sortsExpr (carriers : Lean.Expr) : Lean.Expr :=
+  mkApp (mkConst ``Carriers.toSorts) carriers
+
+/-- Recognize a semantic family only when its parent is explicitly projected. -/
+private def semanticFamilyOfSorts? (sorts : Lean.Expr) : Option Lean.Expr :=
+  let sorts := sorts.consumeMData
+  if sorts.isAppOfArity ``Carriers.toSorts 1 then some sorts.appArg! else none
+
+/-- A reduced operational parent can retain the semantic family supplied by
+its producer. Equality of parents checks that candidate's representation; it
+never selects predicates or reconstructs a family from operational fields. -/
+private def semanticFamilyAtSorts? (candidate sorts : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  if let some family := semanticFamilyOfSorts? sorts then return some family
+  if ← withNewMCtxDepth (isDefEq sorts (sortsExpr candidate)) then return some candidate
+  return none
+
 deriving instance ToExpr for Sharing
 
 private def argumentSkolemsFrame? : Nat → Lean.Expr → MetaM (Option Lean.Expr)
@@ -3047,7 +3064,7 @@ def storageReadProof? (equation : Lean.Expr) (read : StorageRead) :
     | return none
   let lhs := lhs.consumeMData
   try withDefault do
-    let carrierTy := mkApp2 (mkConst ``NTy.carrier) read.carriers read.τ
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr read.carriers) read.τ
     let valueTyped ← mkExpectedTypeHint read.value carrierTy
     let stated ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy valueTyped)
     let typed ← mkExpectedTypeHint equation stated
@@ -3534,7 +3551,7 @@ def literalValue? (e : Lean.Expr) : MetaM (Option LiteralValue) := do
   unless closure.isAppOfArity ``closureOf 8 && read.isAppOfArity ``TypedFunctions.closure 3 do
     return none
   let functions := read.getArg! 1
-  unless functions.isAppOfArity ``Carriers.functions 4 do return none
+  unless functions.isAppOfArity ``Sorts.functions 4 do return none
   return some {
     value := e, parameters := functions.getArg! 1, frame := closure.getArg! 2
     handle := closure.getArg! 3, mask := closure.getArg! 4, instantiation := closure.getArg! 5
@@ -5044,8 +5061,8 @@ def reframedOwnAtInstance (unit functions base frame declared σ typeArgs row : 
     let target := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit base
       (mkAppN (mkConst ``VerexIR.Proofs.Denote.Skolems.atArguments) #[unit, base, typeArgs, stated])
     let leaf := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) unit functions frame
-    let left := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.encode) target declared row
-    let right := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.encode) leaf σ row
+    let left := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.encode) (sortsExpr target) declared row
+    let right := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.encode) (sortsExpr leaf) σ row
     if ← withNewMCtxDepth (withDefault (isDefEq left right)) then
       return (none, ← mkExpectedTypeHint (← mkEqRefl right) (← mkEq left right), stated)
     if verex.solverDebug.get (← getOptions) then
@@ -5115,7 +5132,7 @@ private def unsealedOwn? (type hypothesis : Lean.Expr) : TacticM (Option Lean.Ex
   unless args.size == 6 do return none
   let value := args[5]!.consumeMData
   unless value.isAppOfArity ``VerexIR.Proofs.Denote.NTy.encode 3 do return none
-  let carriers := (value.getArg! 0).consumeMData
+  let some carriers := semanticFamilyOfSorts? (value.getArg! 0).consumeMData | return none
   unless carriers.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 do return none
   let unit := carriers.getArg! 0
   let functions := carriers.getArg! 1
@@ -5195,7 +5212,7 @@ private def decodedOwnFact? (type proof : Lean.Expr) :
   -- resolves them, which is how a read of a stored value at a generic
   -- frame reaches its own certificate (`rowInhabitable?`).
   let canDirectDecode ← do
-    let f := family.consumeMData
+    let f := (semanticFamilyOfSorts? family.consumeMData).getD family.consumeMData
     if type.isAppOfArity ``VerexIR.Proofs.Denote.OwnAtArguments 6 &&
         f.isAppOfArity ``VerexIR.Proofs.Denote.Skolems.toCarriers 3 &&
         (f.getArg! 2).consumeMData.isFVar then
@@ -5251,7 +5268,11 @@ def ownAtArgumentsFact? (goal : MVarId) (fact : FVarId) : TacticM (Option MVarId
     -- Default transparency would unfold, for example, integer ≤ into NonNeg.
     let statement ← whnfR statement
     let encoded := type.appArg!.consumeMData
-    let family := encoded.getArg! 0
+    let operations := encoded.getArg! 0
+    let semantic? ← if type.isAppOfArity ``Carriers.own 4 then
+        semanticFamilyAtSorts? (type.getArg! 0) operations
+      else pure (semanticFamilyOfSorts? operations)
+    let family := semantic?.getD operations
     -- Given declarations introduce a fresh clause in their producer's plain
     -- family. Normalize that clause before splitting it into hypotheses; the
     -- surrounding context was normalized before this clause existed. Concrete
@@ -6883,7 +6904,7 @@ private partial def vectorHoldsInHand? (carriers elemTy vec : Lean.Expr) :
   if let some p ← trivialHoldsProof? carriers (mkApp (mkConst ``NTy.slice) elemTy) targetVec then
     return some (mkApp4 (mkConst ``holds_vector_of_slice) carriers elemTy targetVec p)
   let env ← getEnv
-  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr carriers) elemTy
   for decl in ← getLCtx do
     if decl.isImplementationDetail || decl.hasValue then continue
     let raw := decl.type.consumeMData
@@ -6941,7 +6962,7 @@ private def sliceRefFinalProof? (carriers elemTy ref : Lean.Expr) :
       cur := peelPairProj (cur.getArg! 1)
     else
       break
-  let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+  let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr carriers) elemTy
   let finalVec := mkApp2 (mkConst ``VerexIR.SpecSliceRef.finalVector) carrierTy cur
   if let some p ← trivialHoldsProof? carriers sliceTy finalVec then
     return some p
@@ -7343,7 +7364,7 @@ private def writtenContainerHolds? (goal : MVarId) (carriers view value : Lean.E
   if view.isAppOfArity ``NTy.array 2 then
     let elemTy := view.getArg! 0
     let len := view.getArg! 1
-    let carrierTy := mkApp2 (mkConst ``NTy.carrier) carriers elemTy
+    let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr carriers) elemTy
     let isBuilt := valuePeeled.isAppOfArity ``VerexIR.SpecArray.mk 4
     let arrVec :=
       if isBuilt then valuePeeled.getArg! 2
@@ -9155,8 +9176,9 @@ without exposing the declaration predicates carried by either view. -/
 def givenOperationProjection? (e : Lean.Expr) : Option Lean.Expr := Id.run do
   let some head := e.getAppFn.constName? | return none
   let args := e.getAppArgs
-  let some family := args[0]? | return none
-  unless #[``Carriers.carrier, ``Carriers.codec, ``Carriers.orders].contains head do return none
+  let some operations := args[0]? | return none
+  let some family := semanticFamilyOfSorts? operations | return none
+  unless #[``Sorts.carrier, ``Sorts.codec, ``Sorts.orders].contains head do return none
   let mut frame ← if family.isAppOfArity ``GivenFrame.toCarriers 1 ||
       family.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.clauseScaffold 1 then
         pure family.appArg!
@@ -9166,7 +9188,7 @@ def givenOperationProjection? (e : Lean.Expr) : Option Lean.Expr := Id.run do
       else return none
   while frame.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.withDeclarations 2 do
     frame := frame.getArg! 0
-  let original := mkApp (mkConst ``GivenFrame.operations) frame
+  let original := sortsExpr (mkApp (mkConst ``GivenFrame.operations) frame)
   return some (mkAppN e.getAppFn (args.set! 0 original))
 
 /-- Carrier, codec, and fallback operations read no declaration predicate, so
@@ -9187,15 +9209,16 @@ def givenCarrierViewProjection? (e : Lean.Expr)
     | _ => return none
   let args := e.getAppArgs
   unless args.size ≥ typed do return none
-  let family := args[0]!.consumeMData
+  let operations := args[0]!.consumeMData
+  let some family := semanticFamilyOfSorts? operations | return none
   let mut frame ← if family.isAppOfArity ``GivenFrame.toCarriers 1 ||
       family.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.clauseScaffold 1 then
         pure family.appArg!.consumeMData
       else return none
   while frame.isAppOfArity `VerexIR.Proofs.Denote.GivenFrame.withDeclarations 2 do
     frame := (frame.getArg! 0).consumeMData
-  let original := mkApp (mkConst ``GivenFrame.toCarriers) frame
-  if original == family then return none
+  let original := sortsExpr (mkApp (mkConst ``GivenFrame.toCarriers) frame)
+  if original == operations then return none
   let rebuiltArgs := args.set! 0 original
   let prefixOld := mkAppN e.getAppFn (args.extract 0 typed)
   let prefixNew := mkAppN e.getAppFn (rebuiltArgs.extract 0 typed)
@@ -9861,12 +9884,14 @@ def observedElementFacts (carriers τ container proof : Lean.Expr)
     let viewsCache ← IO.mkRef (none : Option (NativeMaps.TypedView × NativeMaps.TypedView × Lean.Expr × Lean.Expr))
     let getViewsAndHolds? : MetaM (Option (NativeMaps.TypedView × NativeMaps.TypedView × Lean.Expr × Lean.Expr)) := do
       if let some cached ← viewsCache.get then return some cached
-      let some keys ← NativeMaps.typedView? carriers κ | return none
-      let some values ← NativeMaps.typedView? carriers ν | return none
-      let viewHoldsProof (v : NativeMaps.TypedView) : MetaM Lean.Expr := do
+      let some keys ← NativeMaps.typedView? (sortsExpr carriers) κ | return none
+      let some values ← NativeMaps.typedView? (sortsExpr carriers) ν | return none
+      let some keyFamily ← semanticFamilyAtSorts? carriers keys.carriers | return none
+      let some valueFamily ← semanticFamilyAtSorts? carriers values.carriers | return none
+      let viewHoldsProof (family : Lean.Expr) (v : NativeMaps.TypedView) : MetaM Lean.Expr := do
         let dom := mkApp2 (mkConst ``NTy.carrier) v.carriers v.type
         withLocalDeclD `x dom fun x => do
-          let hxTy := mkApp3 (mkConst ``NTy.Holds) v.carriers v.type x
+          let hxTy := mkApp3 (mkConst ``NTy.Holds) family v.type x
           withLocalDeclD `hx hxTy fun hx => do
             if v.identity then
               mkLambdaFVars #[x, hx] hx
@@ -9874,11 +9899,11 @@ def observedElementFacts (carriers τ container proof : Lean.Expr)
               let rb ← v.readBack
               let eq := mkApp rb x
               let motive ← withLocalDeclD `y dom fun y =>
-                mkLambdaFVars #[y] (mkApp3 (mkConst ``NTy.Holds) v.carriers v.type y)
+                mkLambdaFVars #[y] (mkApp3 (mkConst ``NTy.Holds) family v.type y)
               let transported ← mkEqMPR (← mkCongrArg motive eq) hx
               mkLambdaFVars #[x, hx] transported
-      let kh ← viewHoldsProof keys
-      let vh ← viewHoldsProof values
+      let kh ← viewHoldsProof keyFamily keys
+      let vh ← viewHoldsProof valueFamily values
       let result := (keys, values, kh, vh)
       viewsCache.set (some result)
       return some result
@@ -9931,9 +9956,10 @@ def observedElementFacts (carriers τ container proof : Lean.Expr)
     let seenReads ← IO.mkRef (#[] : Array Lean.Expr)
     let emitted ← IO.mkRef found
     let pushCheckedFact (elemView : NativeMaps.TypedView) (elemExpr rawFact : Lean.Expr) : MetaM Unit := do
+      let some family ← semanticFamilyAtSorts? carriers elemView.carriers | return
       let fact? ← observing? (withNewMCtxDepth (withDefault do
         let expectedElem := if elemView.identity then elemExpr else elemView.unread.beta #[elemExpr]
-        let expectedTy := mkApp3 (mkConst ``NTy.Holds) elemView.carriers elemView.type expectedElem
+        let expectedTy := mkApp3 (mkConst ``NTy.Holds) family elemView.type expectedElem
         let fact ← mkExpectedTypeHint rawFact expectedTy
         let fact ← instantiateMVars fact
         if fact.hasExprMVar then failure
@@ -10185,7 +10211,7 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
               withDefault do
                 let args := lhs.getAppArgs
                 let readCarriers := mkApp3 (mkConst ``Skolems.toCarriers) args[0]! args[1]! args[2]!
-                let carrierTy := mkApp2 (mkConst ``NTy.carrier) readCarriers args[3]!
+                let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr readCarriers) args[3]!
                 let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy rhsVal)
                 let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
                 let h := mkAppN (mkConst ``Skolems.holds_plainAt) (args ++ #[rhsVal, eqTyped])
@@ -10201,7 +10227,7 @@ def assertCertifiedClauses (canonicalize : Lean.Expr → MetaM Lean.Expr)
             let holds? ← try
               withDefault do
                 let args := lhs.getAppArgs
-                let carrierTy := mkApp2 (mkConst ``NTy.carrier) args[1]! args[4]!
+                let carrierTy := mkApp2 (mkConst ``NTy.carrier) (sortsExpr args[1]!) args[4]!
                 let eqExpected ← mkEq lhs (mkApp2 (mkConst ``Option.some [Level.zero]) carrierTy rhsVal)
                 let eqTyped ← mkExpectedTypeHint decl.toExpr eqExpected
                 let h := mkAppN (mkConst ``InterpreterOps.read_holds) (args ++ #[rhsVal, eqTyped])

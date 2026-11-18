@@ -144,23 +144,23 @@ abbrev irPublishAddr : String := "0x1"
   { Carriers.ground with
     own := fun src _ raw =>
       if src == irCapHandle then
-        match (@NTy.codec Carriers.ground irCapTy).decode? raw with
+        match (@NTy.codec (Carriers.ground).toSorts irCapTy).decode? raw with
         | some row => Obligation file startByte endByte (row.1.val ≤ 100)
         | none => True
       else True }
 
 @[vir_denote_norm] theorem irCapCarriers_own_encode (file : String) (startByte endByte : Nat)
-    (row : @NTy.carrier (irCapCarriers file startByte endByte) irCapTy) :
+    (row : @NTy.carrier ((irCapCarriers file startByte endByte)).toSorts irCapTy) :
     @Carriers.own (irCapCarriers file startByte endByte) irCapHandle .nil
-      (@NTy.encode (irCapCarriers file startByte endByte) irCapTy row) =
+      (@NTy.encode ((irCapCarriers file startByte endByte)).toSorts irCapTy row) =
       Obligation file startByte endByte (row.1.val ≤ 100) := by
   have hbeq : (irCapHandle == irCapHandle) = true := by decide
-  have hdec : (@NTy.codec Carriers.ground irCapTy).decode?
-      (@NTy.encode (irCapCarriers file startByte endByte) irCapTy row) = some row :=
+  have hdec : (@NTy.codec (Carriers.ground).toSorts irCapTy).decode?
+      (@NTy.encode ((irCapCarriers file startByte endByte)).toSorts irCapTy row) = some row :=
     Codec.decode_encode _ _
   change (if (irCapHandle == irCapHandle) = true then
-      match (@NTy.codec Carriers.ground irCapTy).decode?
-        (@NTy.encode (irCapCarriers file startByte endByte) irCapTy row) with
+      match (@NTy.codec (Carriers.ground).toSorts irCapTy).decode?
+        (@NTy.encode ((irCapCarriers file startByte endByte)).toSorts irCapTy row) with
       | some row => Obligation file startByte endByte (row.1.val ≤ 100)
       | none => True
     else True) = Obligation file startByte endByte (row.1.val ≤ 100)
@@ -431,7 +431,7 @@ run_cmd do
       example (C : VerexIR.Proofs.Denote.Carriers)
           (u : VerexIR.Validation.ValidatedUnit) (State : Type)
           (ops : VerexIR.Proofs.Denote.InterpreterOps u C State)
-          (unheld : @VerexIR.Proofs.Denote.NTy.carrier C irParamTy)
+          (unheld : @VerexIR.Proofs.Denote.NTy.carrier (C).toSorts irParamTy)
           (initial : State)
           (hAbsent : ops.read irParamTy .nil (.address irPublishAddr) initial = none) :
           VerexIR.Proofs.wp
@@ -457,7 +457,7 @@ run_cmd do
       example (C : VerexIR.Proofs.Denote.Carriers)
           (u : VerexIR.Validation.ValidatedUnit) (State : Type)
           (ops : VerexIR.Proofs.Denote.InterpreterOps u C State)
-          (unheld : @VerexIR.Proofs.Denote.NTy.carrier C irParamTy)
+          (unheld : @VerexIR.Proofs.Denote.NTy.carrier (C).toSorts irParamTy)
           (initial : State) :
           VerexIR.Proofs.wp
             (@VerexIR.Proofs.Denote.Term.denoteIn u C State ops

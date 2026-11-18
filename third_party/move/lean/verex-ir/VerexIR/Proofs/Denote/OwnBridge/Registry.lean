@@ -69,7 +69,8 @@ def Entry.premiseAt (entry : Entry) (frame : Lean.Expr) : MetaM Lean.Expr :=
 open Lean Meta in
 /-- The value the theorem takes, at the frame's carriers. -/
 def Entry.valueType (entry : Entry) (frame : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst ``NTy.carrier) (entry.carriersAt frame) entry.instanceType
+  mkApp2 (mkConst ``NTy.carrier)
+    (mkApp (mkConst ``Carriers.toSorts) (entry.carriersAt frame)) entry.instanceType
 
 open Lean Meta in
 /-- The fact the theorem states of such a value: the left side of its

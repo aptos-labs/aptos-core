@@ -484,7 +484,7 @@ caller's, or a move: a right-hand side that names one is not in a leaf's form. -
 def foreignFrames : Array Name := #[
   ``Skolems.reframeAtInstance, ``Skolems.reframeAtBase, ``Skolems.reframe,
   ``Skolems.atArguments, ``Skolems.instantiate, ``Skolems.runtime, ``Carriers.runtime,
-  ``Carriers.instantiate, ``FunctionCarriers.runtime]
+  ``Carriers.instantiate, ``Sorts.runtime, ``Sorts.instantiate, ``FunctionCarriers.runtime]
 
 /-- The constants of a type a substitution or a resolution was not evaluated
 in: a descriptor a leaf does not spell. -/
@@ -497,12 +497,13 @@ at the family `carriers`: an integer's value, the family's read of a type
 parameter in constructor form (`NTy.read carriers (NTy.param i)`), or the
 identity at a type that is neither an integer nor a type parameter. -/
 def typedViewReader (carriers reader : Lean.Expr) : Bool :=
+  let operations := mkApp (mkConst ``Carriers.toSorts) carriers
   reader.isAppOfArity ``VerexIR.SpecInt.val 2 ||
-  (reader.isAppOfArity ``NTy.read 2 && reader.getArg! 0 == carriers &&
+  (reader.isAppOfArity ``NTy.read 2 && reader.getArg! 0 == operations &&
     (reader.getArg! 1).isAppOfArity ``NTy.param 1) ||
   (match reader with
     | .lam _ domain (.bvar 0) _ =>
-        domain.isAppOfArity ``NTy.carrier 2 && domain.getArg! 0 == carriers &&
+        domain.isAppOfArity ``NTy.carrier 2 && domain.getArg! 0 == operations &&
           !((domain.getArg! 1).isAppOf ``NTy.param || (domain.getArg! 1).isAppOf ``NTy.int ||
             (domain.getArg! 1).isConstOf ``NTy.num)
     | _ => false)

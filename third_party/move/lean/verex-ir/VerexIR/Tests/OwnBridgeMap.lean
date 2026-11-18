@@ -35,20 +35,20 @@ induce over the runtime frame, at the base function values, over a value of
 the declaration at its own parameters. -/
 def installed {unit : Validation.ValidatedUnit} (base : FunctionCarriers unit) (rank : ValueRanks)
     (θ : TypeArgs)
-    (value : @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+    (value : @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
       (map (.param 0) (.param 1))) : Prop :=
   Obligation "map" 400 547
     (∀ i j : Int, (0 ≤ i ∧ i < j) ∧ j < ↑value.fst.values.size →
       orderValue
-          (@NTy.order (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+          (@NTy.order ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
             rank (.param 0)
             (value.fst.values[i.toNat]?.getD
               (@NTy.plainFallback
-                (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+                ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
                 (entry (.param 0) (.param 1)) rfl)).fst
             (value.fst.values[j.toNat]?.getD
               (@NTy.plainFallback
-                (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+                ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
                 (entry (.param 0) (.param 1)) rfl)).fst) <
         0)
 
@@ -58,30 +58,30 @@ declaration's at the row. -/
 def callerAt {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions) (rank : ValueRanks) (κ ν : NTy)
     (inhabitable : (entry κ.unmark ν.unmark).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map κ.unmark ν.unmark)) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map κ.unmark ν.unmark)) : Prop :=
   Obligation "map" 400 547
     (∀ i j : Int, (0 ≤ i ∧ i < j) ∧ j < ↑value.fst.values.size →
       orderValue
-          (@NTy.order Θ.toCarriers rank κ.unmark
+          (@NTy.order (Θ.toCarriers).toSorts rank κ.unmark
             (value.fst.values[i.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry κ.unmark ν.unmark) inhabitable)).fst
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry κ.unmark ν.unmark) inhabitable)).fst
             (value.fst.values[j.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry κ.unmark ν.unmark) inhabitable)).fst) <
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry κ.unmark ν.unmark) inhabitable)).fst) <
         0)
 
 /-- The clause as a leaf of a function generic in `K` and `V` reads it: the
 order is the caller's family's order of its first type parameter. -/
 def caller {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions) (rank : ValueRanks)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1))) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1))) : Prop :=
   Obligation "map" 400 547
     (∀ i j : Int, (0 ≤ i ∧ i < j) ∧ j < ↑value.fst.values.size →
       orderValue
-          ((@Carriers.orders Θ.toCarriers 0).order rank
+          ((@Sorts.orders (Θ.toCarriers).toSorts 0).order rank
             (value.fst.values[i.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry (.param 0) (.param 1)) rfl)).fst
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.param 0) (.param 1)) rfl)).fst
             (value.fst.values[j.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry (.param 0) (.param 1)) rfl)).fst) <
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.param 0) (.param 1)) rfl)).fst) <
         0)
 
 section
@@ -95,7 +95,7 @@ variable {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers un
 theorem agreeAt (rank : ValueRanks) (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
     (fallback : (entry κ.unmark ν.unmark).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map κ.unmark ν.unmark)) :
     installed base rank ⟨(NRow.cons κ (.cons ν .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := map (.param 0) (.param 1)) rfl
@@ -122,10 +122,10 @@ theorem agreeAt (rank : ValueRanks) (κ ν : NTy)
       (.cons κ (.cons ν .nil)) inhabitable (element := entry (.param 0) (.param 1)) rfl
       value.fst index.toNat within
       (@NTy.plainFallback
-        (Skolems.atArguments unit base ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
-          inhabitable).toCarriers (entry (.param 0) (.param 1)) rfl)
-      (@NTy.plainFallback Θ.toCarriers (entry κ.unmark ν.unmark) fallback)
-  have key : ∀ element : @NTy.carrier Θ.toCarriers (entry κ.unmark ν.unmark),
+        ((Skolems.atArguments unit base ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
+          inhabitable).toCarriers).toSorts (entry (.param 0) (.param 1)) rfl)
+      (@NTy.plainFallback (Θ.toCarriers).toSorts (entry κ.unmark ν.unmark) fallback)
+  have key : ∀ element : @NTy.carrier (Θ.toCarriers).toSorts (entry κ.unmark ν.unmark),
       (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := entry (.param 0) (.param 1)) rfl
           element).fst =
@@ -152,10 +152,10 @@ for a symbolic caller frame. -/
 theorem bridgeAt (rank : ValueRanks) (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
     (fallback : (entry κ.unmark ν.unmark).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map κ.unmark ν.unmark)) :
     OwnAtArguments unit base (map (.param 0) (.param 1)) (installed base rank)
         ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (map κ.unmark ν.unmark) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (map κ.unmark ν.unmark) value) ↔
       callerAt Θ rank κ ν fallback value :=
   OwnAtArguments.bridge sameCarrier sameFunctions sameNominals Θ (.cons κ (.cons ν .nil))
     inhabitable (σ := map (.param 0) (.param 1)) rfl (installed base rank)
@@ -168,10 +168,10 @@ bridge at that row, whose right-hand side converts to the leaf's form. -/
 theorem bridge (rank : ValueRanks)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1))) :
     OwnAtArguments unit base (map (.param 0) (.param 1)) (installed base rank)
         ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (map (.param 0) (.param 1)) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (map (.param 0) (.param 1)) value) ↔
       caller Θ rank value :=
   bridgeAt sameCarrier sameFunctions sameNominals Θ rank (.param 0) (.param 1) inhabitable rfl
     value
@@ -180,15 +180,15 @@ theorem bridge (rank : ValueRanks)
 integers, ordered by their values. -/
 def callerInteger {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions)
-    (value : @NTy.carrier Θ.toCarriers (map (.int 64 false) (.param 0))) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.int 64 false) (.param 0))) : Prop :=
   Obligation "map" 400 547
     (∀ i j : Int, (0 ≤ i ∧ i < j) ∧ j < ↑value.fst.values.size →
       orderValue
           (compare
             (value.fst.values[i.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry (.int 64 false) (.param 0)) rfl)).fst.val
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.int 64 false) (.param 0)) rfl)).fst.val
             (value.fst.values[j.toNat]?.getD
-              (@NTy.plainFallback Θ.toCarriers (entry (.int 64 false) (.param 0)) rfl)).fst.val) <
+              (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.int 64 false) (.param 0)) rfl)).fst.val) <
         0)
 
 /-- The bridge at the row `[u64, T]`: the same instance of the declaration's
@@ -196,10 +196,10 @@ bridge, converting to that row's form. -/
 theorem bridgeInteger (rank : ValueRanks)
     (inhabitable :
       ((NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map (.int 64 false) (.param 0))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.int 64 false) (.param 0))) :
     OwnAtArguments unit base (map (.param 0) (.param 1)) (installed base rank)
         ((NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (map (.int 64 false) (.param 0)) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (map (.int 64 false) (.param 0)) value) ↔
       callerInteger Θ value :=
   bridgeAt sameCarrier sameFunctions sameNominals Θ rank (.int 64 false) (.param 0) inhabitable
     rfl value
@@ -215,7 +215,7 @@ theorem holds_bridge (rank : ValueRanks)
           value)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1))) :
     @NTy.Holds Θ.toCarriers (map (.param 0) (.param 1)) value ↔
       caller Θ rank value ∧
         @NTy.Holds Θ.toCarriers (.vector (entry (.param 0) (.param 1))) value.fst := by
@@ -239,7 +239,7 @@ theorem opened (rank : ValueRanks)
           value)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1)))
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1)))
     (valid : @NTy.Holds Θ.toCarriers (map (.param 0) (.param 1)) value) :
     caller Θ rank value :=
   ((holds_bridge sameCarrier sameFunctions sameNominals Θ rank installedOwn inhabitable
@@ -255,7 +255,7 @@ theorem certified (rank : ValueRanks)
           value)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1)))
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1)))
     (clause : caller Θ rank value)
     (entries : @NTy.Holds Θ.toCarriers (.vector (entry (.param 0) (.param 1))) value.fst) :
     @NTy.Holds Θ.toCarriers (map (.param 0) (.param 1)) value :=
@@ -267,14 +267,14 @@ omit sameCarrier sameFunctions sameNominals in
 hold, the caller's family's order of the keys read from the caller's own
 vector, and it is stable: a second pass changes nothing. -/
 theorem opened_normal (rank : ValueRanks)
-    (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1)))
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1)))
     (clause : caller Θ rank value) :
     ∀ i j : Int, 0 ≤ i → i < j → j < ↑value.fst.values.size →
-      (@Carriers.orders Θ.toCarriers 0).order rank
+      (@Sorts.orders (Θ.toCarriers).toSorts 0).order rank
         (value.fst.values[i.toNat]?.getD
-          (@NTy.plainFallback Θ.toCarriers (entry (.param 0) (.param 1)) rfl)).fst
+          (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.param 0) (.param 1)) rfl)).fst
         (value.fst.values[j.toNat]?.getD
-          (@NTy.plainFallback Θ.toCarriers (entry (.param 0) (.param 1)) rfl)).fst = .lt := by
+          (@NTy.plainFallback (Θ.toCarriers).toSorts (entry (.param 0) (.param 1)) rfl)).fst = .lt := by
   unfold caller Obligation at clause
   simp only [vir_denote_norm] at clause
   fail_if_success (simp only [vir_denote_norm] at clause)

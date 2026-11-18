@@ -579,7 +579,7 @@ def literalValue : (τ : NTy) → ConstValue → Except String τ.groundCarrier
       else .error "a vector literal is out of range"
   | _, _ => notCarried "a literal of this type"
 
-def literalRow : (row : NRow) → List ConstValue → Except String (@HList Carriers.ground row)
+def literalRow : (row : NRow) → List ConstValue → Except String (@HList (Carriers.ground).toSorts row)
   | .nil, [] => .ok ()
   | .cons τ rest, value :: values => do
       let head ← literalValue τ value

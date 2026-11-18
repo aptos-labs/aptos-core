@@ -151,7 +151,7 @@ local macro "target_aborts% " executable:term:max target:term:max entries:term:m
       FunctionValue.row1 FunctionValue.sharing1 (ResultShape.one FunctionValue.type1)
       $target $entries $state)
 
-local macro "U64" : term => `(@NTy.carrier (Carriers.runtime unit) (NTy.int 64 false))
+local macro "U64" : term => `(@NTy.carrier ((Carriers.runtime unit)).toSorts (NTy.int 64 false))
 
 /-- The fact of a value of the declared type, as its parameter states it. -/
 local macro "valid% " value:term:max : term =>

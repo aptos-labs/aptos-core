@@ -129,7 +129,7 @@ definition would put that family under the `Prod` of its row — a nested
 occurrence the kernel admits only in a positive position. -/
 private partial def spellType (family : Name) (reference : Ident) (τ : NTy) : GenM Term := do
   if τ.closureFree then
-    return ← `(@VerexIR.Proofs.Denote.NTy.carrier VerexIR.Proofs.Denote.Carriers.ground
+    return ← `(@VerexIR.Proofs.Denote.NTy.carrier (VerexIR.Proofs.Denote.Carriers.ground).toSorts
       $(← typeIdent family τ))
   match τ with
   | .function parameters shared results =>
@@ -357,9 +357,9 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
           (@VerexIR.Proofs.Denote.Weave.compose $unitIdent _
             (VerexIR.Proofs.Denote.Skolems.instantiate $(rootIdent arguments) $runtimeFrame)
             $fullRow $capturedRow $suppliedRow $weave
-            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers $(rootIdent arguments)
+            (@VerexIR.Proofs.Denote.HList.toSkolem ($runtimeCarriers).toSorts $(rootIdent arguments)
               $capturedRow $capturesTerm)
-            (@VerexIR.Proofs.Denote.HList.toSkolem $runtimeCarriers $(rootIdent arguments)
+            (@VerexIR.Proofs.Denote.HList.toSkolem ($runtimeCarriers).toSorts $(rootIdent arguments)
               $suppliedRow $args)) $state)
     let body ← bodyFor captures
     arms := arms.push (← `(Lean.Parser.Term.matchAltExpr| | $ctor $captures, $args => $body))
@@ -381,7 +381,7 @@ private def ensureFunctionRequires (segments : Array String) (unit : ValidatedUn
     elabCommand (← `(command|
       @[vir_denote_norm] theorem $(rootIdent (family ++ Name.mkSimple s!"requires{index}")):ident
           ($foreign : VerexIR.Proofs.RequiresMeaning $unitIdent)
-          ($(mkIdent `captures) : @VerexIR.Proofs.Denote.HList $runtimeCarriers $siteRow)
+          ($(mkIdent `captures) : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $siteRow)
           $args:ident $state:ident :
           $requiresIdent $foreign _ _ _ ($ctor $(mkIdent `captures)) $args $state = $body := rfl))
   elabCommand (← `(command|
@@ -698,7 +698,7 @@ mutual
 private theorem carrierWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
     (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
     (τ : NTy) → tyNominalFree τ = true →
-    NTy.carrierWith unit Φ.F τ = @NTy.carrier (@Carriers.runtime unit (Φ.functionCarriers own)) τ
+    NTy.carrierWith unit Φ.F τ = @NTy.carrier ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts τ
   | .tuple elements, free | .struct _ _ elements, free => HListWith_runtime Φ own elements free
   | .enum _ _ names rows _, free => variantCarrierWith_runtime Φ own names rows free
   | .vector element, free | .slice element, free =>
@@ -723,7 +723,7 @@ termination_by structural τ _ => τ
 private theorem HListWith_runtime {unit : ValidatedUnit} [NominalCarriers unit]
     (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
     (row : NRow) → rowNominalFree row = true →
-    HListWith unit Φ.F row = @HList (@Carriers.runtime unit (Φ.functionCarriers own)) row
+    HListWith unit Φ.F row = @HList ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts row
   | .nil, _ => rfl
   | .cons τ rest, free => by
       simp only [rowNominalFree, Bool.and_eq_true] at free
@@ -734,7 +734,7 @@ private theorem variantCarrierWith_runtime {unit : ValidatedUnit} [NominalCarrie
     (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
     (names : List String) → (rows : NRows) → rowsNominalFree rows = true →
     variantCarrierWith unit Φ.F names rows =
-      @variantCarrier (@Carriers.runtime unit (Φ.functionCarriers own)) names rows
+      @variantCarrier ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts names rows
   | _, .nil, _ | [], .cons _ _, _ => rfl
   | _ :: names, .cons fields rest, free => by
       simp only [rowsNominalFree, Bool.and_eq_true] at free
@@ -748,10 +748,10 @@ private theorem tyEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers uni
     (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
     (τ : NTy) → (free : tyNominalFree τ = true) →
     (w : NTy.carrierWith unit Φ.F τ) →
-    (v : @NTy.carrier (@Carriers.runtime unit (Φ.functionCarriers own)) τ) →
+    (v : @NTy.carrier ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts τ) →
     HEq w v →
     @NTy.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) τ w =
-      @NTy.encode (@Carriers.runtime unit (Φ.functionCarriers own)) τ v
+      @NTy.encode ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts τ v
   | .unit, _, _, _, same | .bool, _, _, _, same | .int _ _, _, _, _, same
   | .num, _, _, _, same | .address, _, _, _, same | .signer, _, _, _, same
   | .string, _, _, _, same | .bytes, _, _, _, same | .char, _, _, _, same
@@ -821,10 +821,10 @@ private theorem rowEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers un
     (Φ : SiteFamily unit) (own : VerexIR.StructHandle → NRow → VerexIR.RuntimeValue → Prop) :
     (row : NRow) → (free : rowNominalFree row = true) →
     (w : HListWith unit Φ.F row) →
-    (v : @HList (@Carriers.runtime unit (Φ.functionCarriers own)) row) →
+    (v : @HList ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts row) →
     HEq w v →
     @NRow.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) row w =
-      @HList.encode (@Carriers.runtime unit (Φ.functionCarriers own)) row v
+      @HList.encode ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts row v
   | .nil, _, _, _, _ => rfl
   | .cons τ rest, free, w, v, same => by
       letI : Carriers := @Carriers.runtime unit (Φ.functionCarriers own)
@@ -843,10 +843,10 @@ private theorem rowsEncodeWith_runtime {unit : ValidatedUnit} [NominalCarriers u
     (names : List String) → (rows : NRows) → (distinct : names.Nodup) →
     (free : rowsNominalFree rows = true) →
     (w : variantCarrierWith unit Φ.F names rows) →
-    (v : @variantCarrier (@Carriers.runtime unit (Φ.functionCarriers own)) names rows) →
+    (v : @variantCarrier ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts names rows) →
     HEq w v →
     @NRows.encodeWith unit _ Φ.F (fun _ _ _ value => Φ.encode value) source names rows w =
-      @NTy.encode (@Carriers.runtime unit (Φ.functionCarriers own))
+      @NTy.encode ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts
         (.enum source arguments names rows distinct) v
   | _, .nil, _, _, w, _, _ => nomatch w
   | [], .cons _ _, _, _, w, _, _ => nomatch w
@@ -881,7 +881,7 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
     elabCommand (← `(command|
       theorem $(rootIdent (family ++ Name.mkSimple s!"carrier{index}")):ident :
           @VerexIR.Proofs.Denote.HList
-            (VerexIR.Proofs.Denote.Carriers.runtime $unitIdent) $row = $captured := rfl))
+            ((VerexIR.Proofs.Denote.Carriers.runtime $unitIdent)).toSorts $row = $captured := rfl))
   -- Construction at the base frame: a site's key is its constructor, the
   -- mask and instantiation evaluated by the caller.
   let runtimeFrame ← `(VerexIR.Proofs.Denote.Skolems.runtime $unitIdent)
@@ -897,17 +897,17 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
     let encodeCapturesIdent := rootIdent (family ++ Name.mkSimple s!"encodeCaptures{index}")
     elabCommand (← `(command|
       theorem $encodeCapturesIdent:ident
-          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
+          (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row) :
           @VerexIR.Proofs.Denote.NRow.encodeWith $unitIdent _ $familyIdent
               (fun _ _ _ value => $(rootIdent (family ++ `encode)) value) $row captures =
-            @VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row captures :=
+            @VerexIR.Proofs.Denote.HList.encode ($runtimeCarriers).toSorts $row captures :=
         rowEncodeWith_runtime $(rootIdent (family ++ `family))
           (@VerexIR.Proofs.Denote.FunctionCarriers.own $unitIdent _) $row (by decide)
           captures captures HEq.rfl))
     let encodeSite := rootIdent (family ++ Name.mkSimple s!"encodeSite{index}")
     elabCommand (← `(command|
       theorem $encodeSite:ident
-          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
+          (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row) :
           VerexIR.Proofs.Denote.SiteFamily.encode $(rootIdent (family ++ `family))
               (VerexIR.Proofs.Denote.SiteFamily.site $(rootIdent (family ++ `family))
                 ⟨$(quote index), by decide⟩ captures) =
@@ -921,7 +921,7 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
           (mask : Nat) (masked : mask = ($key).mask)
           (instantiation : Array (VerexIR.TypeId × VerexIR.TypeId))
           (instantiated : instantiation = ($key).typeInstantiation)
-          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
           (typed : @VerexIR.Proofs.Denote.SiteTyped $unitIdent _ $runtimeFrame $parameters $shared
             $results ($key).function mask instantiation $row) :
           @VerexIR.Proofs.Denote.Skolems.construct $unitIdent _ $runtimeFrame $parameters $shared
@@ -939,14 +939,14 @@ private def defineSiteConstruction (unitIdent familyIdent : Ident) (family : Nam
     let erasedKey := rootIdent (family ++ Name.mkSimple s!"erasedKey{index}")
     elabCommand (← `(command|
       theorem $erasedKey:ident
-          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
-          (@VerexIR.Proofs.Denote.Carriers.functions $runtimeCarriers $parameters $shared
+          (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row) :
+          (@VerexIR.Proofs.Denote.Sorts.functions ($runtimeCarriers).toSorts $parameters $shared
               $results).erased ($ctor captures) =
             VerexIR.Proofs.Denote.ErasedClosure.mk
               (VerexIR.RuntimeValue.closure ($key).function ($key).mask
                 ($key).typeInstantiation
                 (VerexIR.RuntimeValue.eraseGhostsAll
-                  (@VerexIR.Proofs.Denote.HList.encode $runtimeCarriers $row
+                  (@VerexIR.Proofs.Denote.HList.encode ($runtimeCarriers).toSorts $row
                     captures)).toArray) := by
         show VerexIR.Proofs.Denote.ErasedClosure.mk
           (VerexIR.Proofs.Denote.SiteFamily.encode $(rootIdent (family ++ `family))
@@ -973,12 +973,12 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
       let left := mkIdent `left
       let right := mkIdent `right
       let erased (which : Nat) (value : Ident) : CommandElabM Term :=
-        `((@VerexIR.Proofs.Denote.Carriers.functions $runtimeCarriers $parameters $shared
+        `((@VerexIR.Proofs.Denote.Sorts.functions ($runtimeCarriers).toSorts $parameters $shared
               $results).erased
             ($(rootIdent (family ++ Name.mkSimple s!"site{which}")) $value))
       let statement ← if index == other then
           `(($(← erased index left) = $(← erased other right)) ↔
-            @VerexIR.Proofs.Denote.HList.equal $runtimeCarriers false $row $left $right =
+            @VerexIR.Proofs.Denote.HList.equal ($runtimeCarriers).toSorts false $row $left $right =
               true)
         else `(($(← erased index left) = $(← erased other right)) ↔ False)
       let theoremId := mkIdent (family ++ Name.mkSimple s!"erased{index}_{other}")
@@ -989,8 +989,8 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
       if index == other then
         elabCommand (← `(command|
           @[vir_denote_norm] theorem $theoremId:ident
-              ($left : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
-              ($right : @VerexIR.Proofs.Denote.HList $runtimeCarriers $otherRow) :
+              ($left : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
+              ($right : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $otherRow) :
               $statement := by
             simp only [$keys,*, VerexIR.Proofs.Denote.ErasedClosure.mk.injEq,
               VerexIR.RuntimeValue.closure.injEq, true_and, Array.mk.injEq,
@@ -1008,8 +1008,8 @@ private def defineSiteEquality (unitIdent : Ident) (family : Name)
             `(tactic| (intro _ _ same; exact absurd same (by decide)))
         elabCommand (← `(command|
           @[vir_denote_norm] theorem $theoremId:ident
-              ($left : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
-              ($right : @VerexIR.Proofs.Denote.HList $runtimeCarriers $otherRow) :
+              ($left : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
+              ($right : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $otherRow) :
               $statement := by
             simp only [$keys,*, VerexIR.Proofs.Denote.ErasedClosure.mk.injEq,
               VerexIR.RuntimeValue.closure.injEq, iff_false, not_and]
@@ -1053,8 +1053,8 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     let maskTerm ← `(VerexIR.Proofs.Denote.Weave.mask $weaveIdent)
     elabCommand (← `(command|
       theorem $(rootIdent (name "closure")):ident
-          (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row) :
-          (@VerexIR.Proofs.Denote.Carriers.functions $runtimeCarriers $parameters $shared
+          (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row) :
+          (@VerexIR.Proofs.Denote.Sorts.functions ($runtimeCarriers).toSorts $parameters $shared
               $results).closure ($ctor captures) =
             @VerexIR.Proofs.Denote.closureOf $unitIdent _ $runtimeFrame ($key).function $maskTerm
               #[] $row captures := by
@@ -1073,8 +1073,8 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
           elabCommand (← `(command|
             theorem $(rootIdent (name "invoke")):ident
                 (executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-                (captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
-                (args : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters) :
+                (captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
+                (args : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $parameters) :
                 @VerexIR.Proofs.Denote.closureMeaning $unitIdent _ executable $runtimeFrame
                     $parameters $shared $shape ($ctor captures) args =
                   @VerexIR.Proofs.Denote.propheticMeaning $unitIdent _ executable $runtimeFrame #[]
@@ -1168,9 +1168,9 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     elabCommand (← `(command|
       theorem $(rootIdent (family ++ Name.mkSimple s!"wovenAborts{index}")):ident
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-          ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          ($captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
           $capturesValid*
-          ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
+          ($entries : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $parameters)
           ($state : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
           @VerexIR.Proofs.AbortsOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
               $shared $shape ($ctor $captures) $entries $state =
@@ -1184,12 +1184,12 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
     elabCommand (← `(command|
       theorem $(rootIdent (family ++ Name.mkSimple s!"wovenEnsures{index}")):ident
           ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-          ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+          ($captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
           $capturesValid*
-          ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
-          ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
+          ($entries : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $parameters)
+          ($finals : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts
             (VerexIR.Proofs.Denote.NRow.finals $parameters))
-          ($result : @VerexIR.Proofs.Denote.ResultShape.carrier $runtimeCarriers $shape)
+          ($result : @VerexIR.Proofs.Denote.ResultShape.carrier ($runtimeCarriers).toSorts $shape)
           ($pre $post : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
           @VerexIR.Proofs.EnsuresOfEntries $unitIdent _ $runtimeFrame $meaning $parameters
               $shared $shape ($ctor $captures) $entries $finals $result
@@ -1212,12 +1212,12 @@ private def defineSiteEquations (unit : ValidatedUnit) (unitDefinition : Name)
         theorem
             $(rootIdent (family ++ Name.mkSimple s!"wovenEnsuresSettled{index}")):ident
             ($executable : VerexIR.Validation.ExecutableUnit $unitIdent)
-            ($captures : @VerexIR.Proofs.Denote.HList $runtimeCarriers $row)
+            ($captures : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $row)
             $capturesValid*
-            ($entries : @VerexIR.Proofs.Denote.HList $runtimeCarriers $parameters)
-            ($finals : @VerexIR.Proofs.Denote.HList $runtimeCarriers
+            ($entries : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts $parameters)
+            ($finals : @VerexIR.Proofs.Denote.HList ($runtimeCarriers).toSorts
               (VerexIR.Proofs.Denote.NRow.finals $parameters))
-            ($current : @VerexIR.Proofs.Denote.NTy.carrier $runtimeCarriers $σ)
+            ($current : @VerexIR.Proofs.Denote.NTy.carrier ($runtimeCarriers).toSorts $σ)
             ($pre $post : @VerexIR.Proofs.Denote.Memory $unitIdent _) :
             @VerexIR.Proofs.EnsuresOfSettled $unitIdent _ $runtimeFrame $meaning $parameters
                 $shared $σ ($ctor $captures) $entries $finals $current $pre $post =

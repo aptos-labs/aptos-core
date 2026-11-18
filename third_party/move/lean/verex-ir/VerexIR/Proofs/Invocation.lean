@@ -1157,8 +1157,8 @@ theorem wp_closureMeaning_unseen {unit : ValidatedUnit} [FunctionCarriers unit]
     (function : (NTy.function σs shared shape.row).carrier)
     (args : HList σs) (free : σs.refFree = true) (shapeFree : shape.row.refFree = true)
     {parameters results : List SemTy}
-    (typed : ClosureTyped unit ((Carriers.functions σs shared shape.row).closure function).function ((Carriers.functions σs shared shape.row).closure function).mask
-      ((Carriers.functions σs shared shape.row).closure function).typeInstantiation ((Carriers.functions σs shared shape.row).closure function).captures parameters results)
+    (typed : ClosureTyped unit ((Sorts.functions σs shared shape.row).closure function).function ((Sorts.functions σs shared shape.row).closure function).mask
+      ((Sorts.functions σs shared shape.row).closure function).typeInstantiation ((Sorts.functions σs shared shape.row).closure function).captures parameters results)
     (decodes : RowDecodes unit shape results) {initial : Memory unit}
     (validArgs : HList.Holds σs args)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1549,7 +1549,7 @@ theorem wp_named_typed {unit : ValidatedUnit} [FunctionCarriers unit]
     {handle : FunctionHandle} {typeInstantiation : Array (TypeId × TypeId)} {full : NRow}
     {shape : ResultShape} (fullFlat : full.lentFlat = true) (shapeFlat : shape.row.lentFlat = true)
     {shared : Sharing} {named : (NTy.function full shared shape.row).carrier}
-    (naming : (Carriers.functions full shared shape.row).closure named =
+    (naming : (Sorts.functions full shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     {args : HList full} (validArgs : HList.Holds full args)
     {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
@@ -1746,7 +1746,7 @@ theorem ValidResultsAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers u
     {executable : ExecutableUnit unit}
     [Θ : Skolems unit] (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
     {shared : Sharing} {shape : ResultShape}
-    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (valid : ValidResultsAt executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (shape.functionOfSkolem θ parameters shared function)) :
@@ -1773,7 +1773,7 @@ theorem ValidResultsAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
     (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
@@ -1809,9 +1809,9 @@ theorem FramedAt.of_instantiate {unit : ValidatedUnit} [FunctionCarriers unit]
     {executable : ExecutableUnit unit}
     [Θ : Skolems unit] (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
     {shared : Sharing} {shape : ResultShape}
-    {frame : @HList (Skolems.instantiate θ Θ).toCarriers parameters → Memory unit → Memory unit →
+    {frame : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts parameters → Memory unit → Memory unit →
       Prop}
-    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function parameters shared shape.row)}
+    {function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function parameters shared shape.row)}
     (framed : FramedAt executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (fun args => frame (HList.toSkolem θ parameters args))
       (shape.functionOfSkolem θ parameters shared function)) :
@@ -1903,7 +1903,7 @@ theorem MethodContract.of_instantiate {unit : ValidatedUnit} [FunctionCarriers u
     {executable : ExecutableUnit unit} [Θ : Skolems unit]
     (θ : TypeArgs) (free : θ.1.refFree = true) {parameters : NRow}
     {shared : Sharing} {shape : ResultShape}
-    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (checked : MethodContract executable (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (shape.functionOfSkolem θ parameters shared function)) :
@@ -1952,7 +1952,7 @@ theorem FramedAt.ofBody {unit : ValidatedUnit} [FunctionCarriers unit]
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {frame : HList supplied → Memory unit → Memory unit → Prop}
     (kept : ∀ (args : HList supplied) (pre : Memory unit), HList.Holds supplied args →
@@ -1978,7 +1978,7 @@ theorem FramedAt.ofVerified {unit : ValidatedUnit} [FunctionCarriers unit]
     (typeInstantiation : Array (TypeId × TypeId))
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {contract : Contract (Memory unit) Failure (HList full) shape.carrier}
     (verified : Satisfies (propheticMeaning executable typeInstantiation handle full shape) contract)
@@ -2073,9 +2073,9 @@ so it transports by the same rule. -/
 theorem FramedAtOf.of_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
     (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
     (free : θ.1.refFree = true) {parameters : NRow} {shared : Sharing} {shape : ResultShape}
-    {frame : @HList (Skolems.instantiate θ Θ).toCarriers parameters → Memory unit → Memory unit →
+    {frame : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts parameters → Memory unit → Memory unit →
       Prop}
-    {function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers
+    {function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts
       (.function parameters shared shape.row)}
     (framed : @FramedAtOf unit _ Θ (invoke Θ) (NRow.subst θ.1 parameters) shared (shape.subst θ.1)
       (fun args => frame (HList.toSkolem θ parameters args))

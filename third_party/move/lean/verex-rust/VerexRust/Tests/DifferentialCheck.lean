@@ -83,7 +83,7 @@ theorem runtimeCarriers_eq : runtimeCarriers unit = Carriers.runtime unit := by
     congr
     funext left right
     exact Subsingleton.elim _ _
-  unfold runtimeCarriers Carriers.runtime
+  unfold runtimeCarriers Carriers.runtime Sorts.runtime
   congr
   · funext _ left right
     exact Subsingleton.elim _ _
@@ -91,16 +91,16 @@ theorem runtimeCarriers_eq : runtimeCarriers unit = Carriers.runtime unit := by
     exact reads
 
 private theorem carrier_eq {F G : Carriers} (same : F = G) (τ : NTy) :
-    @NTy.carrier F τ = @NTy.carrier G τ := by
+    @NTy.carrier F.toSorts τ = @NTy.carrier G.toSorts τ := by
   subst same
   rfl
 
-private theorem encode_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : @NTy.carrier F τ) :
-    @NTy.encode G τ (cast (carrier_eq same τ) value) = @NTy.encode F τ value := by
+private theorem encode_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : @NTy.carrier F.toSorts τ) :
+    @NTy.encode G.toSorts τ (cast (carrier_eq same τ) value) = @NTy.encode F.toSorts τ value := by
   subst same
   rfl
 
-private theorem holds_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : @NTy.carrier F τ) :
+private theorem holds_cast {F G : Carriers} (same : F = G) (τ : NTy) (value : @NTy.carrier F.toSorts τ) :
     @NTy.Holds G τ (cast (carrier_eq same τ) value) ↔ @NTy.Holds F τ value := by
   subst same
   exact Iff.rfl

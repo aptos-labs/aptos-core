@@ -2168,7 +2168,7 @@ family carries play no part. -/
 theorem construct_eq {own : StructHandle → NRow → RuntimeValue → Prop}
     {parameters : NRow} {shared : Sharing} {results : NRow}
     {handle : FunctionHandle} {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)}
-    {σs : NRow} (captures : @HList (@Carriers.runtime unit (Φ.functionCarriers own)) σs)
+    {σs : NRow} (captures : @HList ((@Carriers.runtime unit (Φ.functionCarriers own))).toSorts σs)
     (typed : @SiteTyped unit (Φ.functionCarriers own)
       (@Skolems.runtime unit (Φ.functionCarriers own))
       parameters shared results handle mask typeInstantiation σs)

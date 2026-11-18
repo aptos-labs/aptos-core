@@ -113,8 +113,8 @@ variable (θ : TypeArgs)
 /-- The law for a type read as itself. -/
 theorem reads_instantiate_of_viewsItself (τ : NTy) (views : viewsItself τ = true)
     (inhabitable : τ.inhabitable = true) (substituted : (τ.subst θ.1).inhabitable = true) :
-    HEq (@NTy.reads (Carriers.instantiate θ Θ) τ inhabitable)
-      (@NTy.reads Θ (τ.subst θ.1) substituted) := by
+    HEq (@NTy.reads ((Carriers.instantiate θ Θ)).toSorts τ inhabitable)
+      (@NTy.reads (Θ).toSorts (τ.subst θ.1) substituted) := by
   refine typedReads_heq_of_data (NTy.carrier_instantiate θ τ) (encode_instantiate θ τ) ?_
   rw [@readsData_of_viewsItself (Carriers.instantiate θ Θ) τ views inhabitable,
     @readsData_of_viewsItself Θ (τ.subst θ.1) (viewsItself_subst θ.1 τ views) substituted]
@@ -125,8 +125,8 @@ theorem reads_instantiate_of_viewsItself (τ : NTy) (views : viewsItself τ = tr
 /-- The typed reads at the induced family are the substituted type's. -/
 theorem reads_instantiate : (τ : NTy) → (inhabitable : τ.inhabitable = true) →
     (substituted : (τ.subst θ.1).inhabitable = true) →
-    HEq (@NTy.reads (Carriers.instantiate θ Θ) τ inhabitable)
-      (@NTy.reads Θ (τ.subst θ.1) substituted)
+    HEq (@NTy.reads ((Carriers.instantiate θ Θ)).toSorts τ inhabitable)
+      (@NTy.reads (Θ).toSorts (τ.subst θ.1) substituted)
   | .int _ _, _, _ => HEq.rfl
   | .num, _, _ => HEq.rfl
   | .param _, _, _ => HEq.rfl

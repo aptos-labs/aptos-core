@@ -33,12 +33,12 @@ def owner (κ ν : NTy) : NTy :=
 arguments at the runtime family's reading of the row, the entries at the frame
 the row induces. -/
 def installed {unit : Validation.ValidatedUnit} (base : FunctionCarriers unit) (θ : TypeArgs)
-    (value : @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+    (value : @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
       (owner (.param 0) (.param 1))) : Prop :=
   Obligation "owner" 100 200
     (@SpecMap.Valid
-      (@NTy.carrier (@Carriers.runtime unit base) (θ.1.getD 0 (.param 0)).unmark)
-      (@NTy.carrier (@Carriers.runtime unit base) (θ.1.getD 1 (.param 1)).unmark)
+      (@NTy.carrier ((@Carriers.runtime unit base)).toSorts (θ.1.getD 0 (.param 0)).unmark)
+      (@NTy.carrier ((@Carriers.runtime unit base)).toSorts (θ.1.getD 1 (.param 1)).unmark)
       .sequence
       (SpecMap.ofEntries (fun key => key) (fun value => value) value.snd.fst))
 
@@ -46,12 +46,12 @@ def installed {unit : Validation.ValidatedUnit} (base : FunctionCarriers unit) (
 the induced frame's typed read of the key parameter, its types and its entries
 at that one frame. -/
 def installedRead {unit : Validation.ValidatedUnit} (base : FunctionCarriers unit) (θ : TypeArgs)
-    (value : @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+    (value : @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
       (owner (.param 0) (.param 1))) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid .sequence
       (SpecMap.ofEntries
-        (@NTy.read (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+        (@NTy.read ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
           (.param 0))
         (fun value => value) value.snd.fst))
 
@@ -59,24 +59,24 @@ def installedRead {unit : Validation.ValidatedUnit} (base : FunctionCarriers uni
 caller's typed key view of its own table. -/
 def callerAt {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions) (κ ν : NTy)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid .sequence
-      (SpecMap.ofEntries (@NTy.read Θ.toCarriers κ.unmark) (fun value => value) value.snd.fst))
+      (SpecMap.ofEntries (@NTy.read (Θ.toCarriers).toSorts κ.unmark) (fun value => value) value.snd.fst))
 
 /-- The clause as a leaf of a function generic in `K` and `V` reads it. -/
 def caller {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions)
-    (value : @NTy.carrier Θ.toCarriers (owner (.param 0) (.param 1))) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.param 0) (.param 1))) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid .sequence
-      (SpecMap.ofEntries (@NTy.read Θ.toCarriers (.param 0)) (fun value => value)
+      (SpecMap.ofEntries (@NTy.read (Θ.toCarriers).toSorts (.param 0)) (fun value => value)
         value.snd.fst))
 
 /-- The clause as a leaf reads it at the row `[u64, T]`. -/
 def callerInteger {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions)
-    (value : @NTy.carrier Θ.toCarriers (owner (.int 64 false) (.param 0))) : Prop :=
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.int 64 false) (.param 0))) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid .sequence
       (SpecMap.ofEntries SpecInt.val (fun value => value) value.snd.fst))
@@ -85,20 +85,20 @@ def callerInteger {unit : Validation.ValidatedUnit} {functions : FunctionCarrier
 structural order of the keys. -/
 def installedOrdered {unit : Validation.ValidatedUnit} (base : FunctionCarriers unit)
     (rank : ValueRanks) (θ : TypeArgs)
-    (value : @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+    (value : @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
       (owner (.param 0) (.param 1))) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid
       (.ordered (@NTy.keyOrder
-        (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers rank (.param 0)))
+        ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts rank (.param 0)))
       (SpecMap.ofEntries (fun key => key) (fun value => value) value.snd.fst))
 
 /-- The ordered clause at a caller's frame, under a key reader and a key order
 the caller names. -/
 def callerOrderedAt {unit : Validation.ValidatedUnit} {functions : FunctionCarriers unit}
     (Θ : @Skolems unit functions) (κ ν : NTy) {K : Type}
-    (readKey : @NTy.carrier Θ.toCarriers κ.unmark → K) (order : SpecMap.KeyOrder K)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) : Prop :=
+    (readKey : @NTy.carrier (Θ.toCarriers).toSorts κ.unmark → K) (order : SpecMap.KeyOrder K)
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) : Prop :=
   Obligation "owner" 100 200
     (SpecMap.Valid (.ordered order)
       (SpecMap.ofEntries readKey (fun value => value) value.snd.fst))
@@ -113,7 +113,7 @@ variable {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers un
 /-- The table of a moved owner is the moved table. -/
 theorem entries_moved (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
         (.cons κ (.cons ν .nil)) inhabitable (τ := owner (.param 0) (.param 1)) rfl
         value).snd.fst =
@@ -134,7 +134,7 @@ theorem entries_moved (κ ν : NTy)
 all, with the caller's clause under the caller's typed key view. -/
 theorem agreeAt (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     installed base ⟨(NRow.cons κ (.cons ν .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := owner (.param 0) (.param 1)) rfl value) ↔
@@ -153,7 +153,7 @@ typed read, with the caller's clause under the caller's typed key view: both
 reads are injective. -/
 theorem agreeReadAt (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     installedRead base ⟨(NRow.cons κ (.cons ν .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := owner (.param 0) (.param 1)) rfl value) ↔
@@ -164,13 +164,13 @@ theorem agreeReadAt (κ ν : NTy)
   have valid := Skolems.valid_sequence_reframeAtInstance sameCarrier sameFunctions
     sameNominals Θ (.cons κ (.cons ν .nil)) inhabitable (key := .param 0) (value := .param 1) rfl
     value.snd.fst
-    (@NTy.read (Skolems.atArguments unit base ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
-      inhabitable).toCarriers (.param 0))
-    (fun value => value) (@NTy.read Θ.toCarriers κ.unmark) (fun value => value)
+    (@NTy.read ((Skolems.atArguments unit base ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
+      inhabitable).toCarriers).toSorts (.param 0))
+    (fun value => value) (@NTy.read (Θ.toCarriers).toSorts κ.unmark) (fun value => value)
     (@NativeMaps.NTy.read_injective
       (Skolems.atArguments unit base ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
-        inhabitable).toCarriers (.param 0))
-    (@NativeMaps.NTy.read_injective Θ.toCarriers κ.unmark)
+        inhabitable).toCarriers.toSorts (.param 0))
+    (@NativeMaps.NTy.read_injective Θ.toCarriers.toSorts κ.unmark)
   rw [← moved] at valid
   exact valid
 
@@ -179,10 +179,10 @@ include sameCarrier sameFunctions sameNominals
 /-- The sequence owner's bridge, once for the declaration. -/
 theorem bridgeAt (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     OwnAtArguments unit base (owner (.param 0) (.param 1)) (installed base)
         ((NRow.cons κ (.cons ν .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (owner κ.unmark ν.unmark) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark) value) ↔
       callerAt Θ κ ν value :=
   OwnAtArguments.bridge sameCarrier sameFunctions sameNominals Θ (.cons κ (.cons ν .nil))
     inhabitable (σ := owner (.param 0) (.param 1)) rfl (installed base) (callerAt Θ κ ν) value
@@ -193,10 +193,10 @@ read of its first type parameter, as the leaf's own reads of the table are. -/
 theorem bridge
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.param 0) (.param 1))) :
     OwnAtArguments unit base (owner (.param 0) (.param 1)) (installed base)
         ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (owner (.param 0) (.param 1)) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (owner (.param 0) (.param 1)) value) ↔
       caller Θ value :=
   bridgeAt sameCarrier sameFunctions sameNominals Θ (.param 0) (.param 1) inhabitable value
 
@@ -204,10 +204,10 @@ theorem bridge
 theorem bridgeInteger
     (inhabitable :
       ((NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner (.int 64 false) (.param 0))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.int 64 false) (.param 0))) :
     OwnAtArguments unit base (owner (.param 0) (.param 1)) (installed base)
         ((NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (owner (.int 64 false) (.param 0)) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (owner (.int 64 false) (.param 0)) value) ↔
       callerInteger Θ value :=
   bridgeAt sameCarrier sameFunctions sameNominals Θ (.int 64 false) (.param 0) inhabitable value
 
@@ -216,11 +216,11 @@ compare two read keys as the caller's structural order compares the keys
 (`reads`). The premise is the caller's side alone; the move is discharged by
 the law. -/
 theorem agreeOrderedAt (rank : ValueRanks) (κ ν : NTy) {K : Type}
-    (readKey : @NTy.carrier Θ.toCarriers κ.unmark → K) (order : SpecMap.KeyOrder K)
+    (readKey : @NTy.carrier (Θ.toCarriers).toSorts κ.unmark → K) (order : SpecMap.KeyOrder K)
     (reads : ∀ a b, order.compare (readKey a) (readKey b) =
-      @NTy.order Θ.toCarriers rank κ.unmark a b)
+      @NTy.order (Θ.toCarriers).toSorts rank κ.unmark a b)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     installedOrdered base rank ⟨(NRow.cons κ (.cons ν .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := owner (.param 0) (.param 1)) rfl value) ↔
@@ -239,7 +239,7 @@ order: the premise holds by computation. -/
 theorem agreeOrderedInteger (rank : ValueRanks)
     (inhabitable :
       ((NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner (.int 64 false) (.param 0))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.int 64 false) (.param 0))) :
     installedOrdered base rank
         ⟨(NRow.cons (.int 64 false) (.cons (.param 0) .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
@@ -253,35 +253,35 @@ theorem agreeOrderedInteger (rank : ValueRanks)
 the premise holds by computation at every entry of the row. -/
 theorem agreeOrderedStructural (rank : ValueRanks) (κ ν : NTy)
     (inhabitable : ((NRow.cons κ (.cons ν .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner κ.unmark ν.unmark)) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner κ.unmark ν.unmark)) :
     installedOrdered base rank ⟨(NRow.cons κ (.cons ν .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons κ (.cons ν .nil)) inhabitable (τ := owner (.param 0) (.param 1)) rfl value) ↔
-      callerOrderedAt Θ κ ν (fun key => key) (@NTy.keyOrder Θ.toCarriers rank κ.unmark) value :=
+      callerOrderedAt Θ κ ν (fun key => key) (@NTy.keyOrder (Θ.toCarriers).toSorts rank κ.unmark) value :=
   agreeOrderedAt sameCarrier sameFunctions sameNominals Θ rank κ ν (fun key => key)
-    (@NTy.keyOrder Θ.toCarriers rank κ.unmark) (fun _ _ => rfl) inhabitable value
+    (@NTy.keyOrder (Θ.toCarriers).toSorts rank κ.unmark) (fun _ _ => rfl) inhabitable value
 
 /-- At a type parameter's key under the leaf's typed view (the family's read
 and the family's order of the typed keys) the premise is that the family
 orders two read keys as it orders the keys: stated here as a hypothesis, and
 discharged by the family's coherence law in `agreeOrderedParameterCoherent`. -/
 theorem agreeOrderedParameter (rank : ValueRanks)
-    (readsOrder : ∀ a b : @Carriers.carrier Θ.toCarriers 0,
-      ((@Carriers.reads Θ.toCarriers 0).order rank).compare
-          ((@Carriers.reads Θ.toCarriers 0).read a) ((@Carriers.reads Θ.toCarriers 0).read b) =
-        (@Carriers.orders Θ.toCarriers 0).order rank a b)
+    (readsOrder : ∀ a b : @Sorts.carrier (Θ.toCarriers).toSorts 0,
+      ((@Sorts.reads (Θ.toCarriers).toSorts 0).order rank).compare
+          ((@Sorts.reads (Θ.toCarriers).toSorts 0).read a) ((@Sorts.reads (Θ.toCarriers).toSorts 0).read b) =
+        (@Sorts.orders (Θ.toCarriers).toSorts 0).order rank a b)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.param 0) (.param 1))) :
     installedOrdered base rank
         ⟨(NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons (.param 0) (.cons (.param 1) .nil)) inhabitable
           (τ := owner (.param 0) (.param 1)) rfl value) ↔
-      callerOrderedAt Θ (.param 0) (.param 1) (@NTy.read Θ.toCarriers (.param 0))
-        (@NTy.readOrder Θ.toCarriers rank (.param 0)) value :=
+      callerOrderedAt Θ (.param 0) (.param 1) (@NTy.read (Θ.toCarriers).toSorts (.param 0))
+        (@NTy.readOrder (Θ.toCarriers).toSorts rank (.param 0)) value :=
   agreeOrderedAt sameCarrier sameFunctions sameNominals Θ rank (.param 0) (.param 1)
-    (@NTy.read Θ.toCarriers (.param 0)) (@NTy.readOrder Θ.toCarriers rank (.param 0)) readsOrder
+    (@NTy.read (Θ.toCarriers).toSorts (.param 0)) (@NTy.readOrder (Θ.toCarriers).toSorts rank (.param 0)) readsOrder
     inhabitable value
 
 /-- A family's typed reads compare as its values do
@@ -291,16 +291,16 @@ parameter's key under the typed view with no premise left. -/
 theorem agreeOrderedParameterCoherent (rank : ValueRanks)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (owner (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (owner (.param 0) (.param 1))) :
     installedOrdered base rank
         ⟨(NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve, inhabitable⟩
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ
           (.cons (.param 0) (.cons (.param 1) .nil)) inhabitable
           (τ := owner (.param 0) (.param 1)) rfl value) ↔
-      callerOrderedAt Θ (.param 0) (.param 1) (@NTy.read Θ.toCarriers (.param 0))
-        (@NTy.readOrder Θ.toCarriers rank (.param 0)) value :=
+      callerOrderedAt Θ (.param 0) (.param 1) (@NTy.read (Θ.toCarriers).toSorts (.param 0))
+        (@NTy.readOrder (Θ.toCarriers).toSorts rank (.param 0)) value :=
   agreeOrderedParameter sameCarrier sameFunctions sameNominals Θ rank
-    (fun left right => @NTy.readOrder_read_order Θ.toCarriers rank (.param 0) left right)
+    (fun left right => @NTy.readOrder_read_order (Θ.toCarriers).toSorts rank (.param 0) left right)
     inhabitable value
 
 end

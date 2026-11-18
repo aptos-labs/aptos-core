@@ -27,7 +27,7 @@ abbrev Interpretation.Comp (interpretation : Interpretation) (α : Type) :=
 /-- Checking needs no runtime-frame bijection. Declared invariants and
 parameter predicates are still supplied by the chosen carrier family. -/
 def Interpretation.checking (interpretation : Interpretation)
-    (τ : NTy) (value : @NTy.carrier interpretation.carriers τ) :
+    (τ : NTy) (value : @NTy.carrier (interpretation.carriers).toSorts τ) :
     interpretation.Comp PUnit :=
   Spec.certified (Invariant := @NTy.Holds interpretation.carriers τ value) (fun _ => ())
 
@@ -75,7 +75,7 @@ is introduced into generic clauses. -/
   unread_read := fun _ => rfl
   order := fun rank => by
     letI : Carriers := frame.operations
-    exact { compare := (Carriers.orders index).order rank,
+    exact { compare := (Sorts.orders index).order rank,
             lawful := inferInstance, trans := inferInstance }
   order_encode := fun rank left right =>
     ((frame.operations.orders index).order_encode rank left right).symm
@@ -98,11 +98,11 @@ memory. Relating that state to concrete memory is separate work. -/
 
 /-- Parameter well-formedness has no obligation in a parked given frame. -/
 theorem GivenFrame.deepHolds_param (frame : GivenFrame) (index : Nat)
-    (value : @NTy.carrier frame.toCarriers (.param index)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param index)) :
     @NTy.deepHolds frame.toCarriers (.param index) value = True := rfl
 
 @[simp] theorem GivenFrame.holds_param (frame : GivenFrame) (index : Nat)
-    (value : @NTy.carrier frame.toCarriers (.param index)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param index)) :
     @NTy.Holds frame.toCarriers (.param index) value :=
   letI : Carriers := frame.toCarriers
   ⟨trivial⟩
@@ -115,7 +115,7 @@ theorem GivenFrame.own_eq (frame : GivenFrame) (source : StructHandle)
 
 /-- A parameter check asks for no parameter invariant in a parked given frame. -/
 theorem GivenFrame.checking_param (frame : GivenFrame) (state : Type) (index : Nat)
-    (value : @NTy.carrier frame.toCarriers (.param index)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param index)) :
     (frame.interpretation state).checking (.param index) value =
       Spec.pure () := by
   letI : Carriers := frame.toCarriers

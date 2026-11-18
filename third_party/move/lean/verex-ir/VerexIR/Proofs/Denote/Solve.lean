@@ -2935,7 +2935,8 @@ the caller's frame, where that frame is `Skolems.instantiate θ Θ`. -/
 private def inducedArguments? (proofType : Lean.Expr) :
     MetaM (Option (Lean.Expr × Lean.Expr)) := do
   let_expr VerexIR.Proofs.Satisfies args _ _ _ _ _ := ← whnfR proofType | return none
-  let_expr VerexIR.Proofs.Denote.HList carriers _ := args.consumeMData | return none
+  let_expr VerexIR.Proofs.Denote.HList sorts _ := args.consumeMData | return none
+  let_expr VerexIR.Proofs.Denote.Carriers.toSorts carriers := sorts.consumeMData | return none
   let_expr VerexIR.Proofs.Denote.Skolems.toCarriers _ _ frame := carriers.consumeMData
     | return none
   let_expr VerexIR.Proofs.Denote.Skolems.instantiate _ _ θ outer := frame.consumeMData

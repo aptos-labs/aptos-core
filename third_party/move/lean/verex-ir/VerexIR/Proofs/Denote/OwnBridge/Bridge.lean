@@ -50,17 +50,17 @@ hypothesis of its own theorem. -/
 theorem OwnAtArguments.bridge {σ : NTy}
     (bounded : σ.paramsAll (fun index => decide (index < params.length)) = true)
     (holds : (θ : TypeArgs) →
-      @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers σ →
+      @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts σ →
         Prop)
-    (caller : @NTy.carrier Θ.toCarriers (σ.subst params) → Prop)
-    (value : @NTy.carrier Θ.toCarriers (σ.subst params))
+    (caller : @NTy.carrier (Θ.toCarriers).toSorts (σ.subst params) → Prop)
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (σ.subst params))
     (agree :
       holds ⟨params.map Θ.resolve, inhabitable⟩
           (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
             bounded value) ↔
         caller value) :
     OwnAtArguments unit base σ holds (params.map Θ.resolve)
-        (@NTy.encode Θ.toCarriers (σ.subst params) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (σ.subst params) value) ↔
       caller value := by
   rw [← Skolems.encode_reframeAtInstance sameCarrier sameFunctions sameNominals Θ params
     inhabitable bounded value]
@@ -74,20 +74,20 @@ encoding of its value exactly the clauses read at the caller's frame. -/
 theorem Carriers.own_bridge {source : StructHandle} {σ : NTy}
     (bounded : σ.paramsAll (fun index => decide (index < params.length)) = true)
     (holds : (θ : TypeArgs) →
-      @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers σ →
+      @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts σ →
         Prop)
     (installed : ∀ arguments value,
       @FunctionCarriers.own unit functions source arguments value =
         OwnAtArguments unit base σ holds arguments value)
-    (caller : @NTy.carrier Θ.toCarriers (σ.subst params) → Prop)
-    (value : @NTy.carrier Θ.toCarriers (σ.subst params))
+    (caller : @NTy.carrier (Θ.toCarriers).toSorts (σ.subst params) → Prop)
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (σ.subst params))
     (agree :
       holds ⟨params.map Θ.resolve, inhabitable⟩
           (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
             bounded value) ↔
         caller value) :
     @Carriers.own Θ.toCarriers source params
-        (@NTy.encode Θ.toCarriers (σ.subst params) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (σ.subst params) value) ↔
       caller value := by
   rw [@Carriers.own_frame unit functions Θ source params, installed]
   exact OwnAtArguments.bridge sameCarrier sameFunctions sameNominals Θ params inhabitable bounded
@@ -111,14 +111,14 @@ theorem NTy.holds_struct_bridge {source : StructHandle} {arguments fields : NRow
       (fun index => decide (index < params.length)) = true)
     (ownRow : NRow.subst params arguments = params)
     (holds : (θ : TypeArgs) →
-      @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+      @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
         (.struct source arguments fields) → Prop)
     (installed : ∀ arguments' value,
       @FunctionCarriers.own unit functions source arguments' value =
         OwnAtArguments unit base (.struct source arguments fields) holds arguments' value)
-    (caller : @NTy.carrier Θ.toCarriers
+    (caller : @NTy.carrier (Θ.toCarriers).toSorts
       (.struct source (NRow.subst params arguments) (NRow.subst params fields)) → Prop)
-    (value : @NTy.carrier Θ.toCarriers
+    (value : @NTy.carrier (Θ.toCarriers).toSorts
       (.struct source (NRow.subst params arguments) (NRow.subst params fields)))
     (agree :
       holds ⟨params.map Θ.resolve, inhabitable⟩
@@ -142,15 +142,15 @@ theorem NTy.holds_enum_bridge {source : StructHandle} {arguments : NRow} {names 
       (fun index => decide (index < params.length)) = true)
     (ownRow : NRow.subst params arguments = params)
     (holds : (θ : TypeArgs) →
-      @NTy.carrier (@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers
+      @NTy.carrier ((@Skolems.instantiate unit base θ (@Skolems.runtime unit base)).toCarriers).toSorts
         (.enum source arguments names rows distinct) → Prop)
     (installed : ∀ arguments' value,
       @FunctionCarriers.own unit functions source arguments' value =
         OwnAtArguments unit base (.enum source arguments names rows distinct) holds arguments'
           value)
-    (caller : @NTy.carrier Θ.toCarriers
+    (caller : @NTy.carrier (Θ.toCarriers).toSorts
       (.enum source (NRow.subst params arguments) names (NRows.subst params rows) distinct) → Prop)
-    (value : @NTy.carrier Θ.toCarriers
+    (value : @NTy.carrier (Θ.toCarriers).toSorts
       (.enum source (NRow.subst params arguments) names (NRows.subst params rows) distinct))
     (agree :
       holds ⟨params.map Θ.resolve, inhabitable⟩
@@ -182,8 +182,8 @@ move. -/
 theorem Skolems.forall_reframeAtInstance {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (τ.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (τ.subst params) → Prop}
     (agree : ∀ value,
       body (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
         bounded value) ↔ body' value) :
@@ -200,8 +200,8 @@ theorem Skolems.forall_reframeAtInstance {τ : NTy}
 theorem Skolems.exists_reframeAtInstance {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (τ.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (τ.subst params) → Prop}
     (agree : ∀ value,
       body (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
         bounded value) ↔ body' value) :
@@ -220,10 +220,10 @@ the bodies agree across the move for the caller's elements. -/
 theorem Skolems.forall_mem_reframeAtInstance {element : NTy}
     (bounded : (NTy.vector element).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (vector : @NTy.carrier Θ.toCarriers (.vector (element.subst params)))
+    (vector : @NTy.carrier (Θ.toCarriers).toSorts (.vector (element.subst params)))
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers element → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (element.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts element → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (element.subst params) → Prop}
     (agree : ∀ value, value ∈ vector.values →
       (body (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
         (τ := element) (by simpa only [NTy.paramsAll] using bounded) value) ↔ body' value)) :
@@ -243,10 +243,10 @@ theorem Skolems.forall_mem_reframeAtInstance {element : NTy}
 theorem Skolems.exists_mem_reframeAtInstance {element : NTy}
     (bounded : (NTy.vector element).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (vector : @NTy.carrier Θ.toCarriers (.vector (element.subst params)))
+    (vector : @NTy.carrier (Θ.toCarriers).toSorts (.vector (element.subst params)))
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers element → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (element.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts element → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (element.subst params) → Prop}
     (agree : ∀ value, value ∈ vector.values →
       (body (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
         (τ := element) (by simpa only [NTy.paramsAll] using bounded) value) ↔ body' value)) :
@@ -272,8 +272,8 @@ holds (`Skolems.forall_holds_reframeAtInstance_mp`). -/
 theorem Skolems.forall_holds_reframeAtInstance {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (τ.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (τ.subst params) → Prop}
     (valid : ∀ value,
       @NTy.Holds (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
           (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable
@@ -295,8 +295,8 @@ declaration's frame. The certifying half is not provable from preservation. -/
 theorem Skolems.forall_holds_reframeAtInstance_mp {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
     {body : @NTy.carrier
-      (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ → Prop}
-    {body' : @NTy.carrier Θ.toCarriers (τ.subst params) → Prop}
+      ((Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers).toSorts τ → Prop}
+    {body' : @NTy.carrier (Θ.toCarriers).toSorts (τ.subst params) → Prop}
     (preserved : ∀ value, @NTy.Holds Θ.toCarriers (τ.subst params) value →
       @NTy.Holds (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers τ
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ params inhabitable

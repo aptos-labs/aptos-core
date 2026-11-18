@@ -501,13 +501,13 @@ private def assertTacticFails (goalType : Lean.Expr) (tac : TSyntax `tactic) (la
 
 run_cmd liftTermElabM do
   let zeroGoal ← Elab.Term.elabTerm
-    (← `((@NTy.plainFallback Carriers.ground (.int 64 false) rfl).val = (0 : Int)))
+    (← `((@NTy.plainFallback (Carriers.ground).toSorts (.int 64 false) rfl).val = (0 : Int)))
     (some (.sort .zero))
   Elab.Term.synthesizeSyntheticMVarsNoPostponing
   assertTacticFails (← instantiateMVars zeroGoal) (← `(tactic| verex_decide))
     "prepared plainFallback u64 == 0"
   let boolGoal ← Elab.Term.elabTerm
-    (← `(@NTy.plainFallback Carriers.ground .bool rfl = false))
+    (← `(@NTy.plainFallback (Carriers.ground).toSorts .bool rfl = false))
     (some (.sort .zero))
   Elab.Term.synthesizeSyntheticMVarsNoPostponing
   assertTacticFails (← instantiateMVars boolGoal) (← `(tactic| verex_decide))

@@ -165,7 +165,7 @@ partial def quoteCarrier : (τ : NTy) → τ.groundCarrier → MetaM Lean.Expr
   | .function _ _ _, _ => throwError "a literal of a function type"
   | .nominal _ _ _, _ => throwError "a literal of a recursive type"
 
-partial def quoteRowValue : (row : NRow) → @HList Carriers.ground row → MetaM Lean.Expr
+partial def quoteRowValue : (row : NRow) → @HList (Carriers.ground).toSorts row → MetaM Lean.Expr
   | .nil, _ => return mkConst ``Unit.unit
   | .cons τ rest, value => do
       mkAppM ``Prod.mk #[← quoteCarrier τ value.1, ← quoteRowValue rest value.2]
@@ -1941,7 +1941,8 @@ def definitionAtInducedFrame? (condition : Name) (reading : Lean.Expr) :
   let keys := definitionKeys.getState (← getEnv)
   let inducedFrame? (argument : Lean.Expr) : Option Lean.Expr :=
     argument.find? fun sub =>
-      sub.isAppOf ``Skolems.instantiate || sub.isAppOf ``Carriers.instantiate
+      sub.isAppOf ``Skolems.instantiate || sub.isAppOf ``Carriers.instantiate ||
+      sub.isAppOf ``Sorts.instantiate
   let found ← IO.mkRef none
   reading.forEach' fun sub => do
     if (← found.get).isSome then return false
@@ -3207,8 +3208,8 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
   let stateType ← match interpretation with
     | some frame => pure frame.state
     | none => memoryAt outer
-  let envType := mkApp2 (mkConst ``HEnv) carriers (← quoteRow row)
-  let argumentsType := mkApp2 (mkConst ``HList) carriers (← quoteRow params)
+  let envType := mkApp2 (mkConst ``HEnv) (Contract.carrierSorts carriers) (← quoteRow row)
+  let argumentsType := mkApp2 (mkConst ``HList) (Contract.carrierSorts carriers) (← quoteRow params)
   let parameterTypes := params.toList
   let row := row.toList
   let localTypes ← clauseLocalTypes unit ns declaration
@@ -3269,8 +3270,8 @@ def loopInvariants (unit : ValidatedUnit) (outer : Lean.Expr) (namespaceId : Nam
                 unless τ.refFree do
                   let type ← quoteNTy τ
                   let view ← withLocalDeclD `held (Contract.carrierType carriers type) fun held =>
-                    mkLambdaFVars #[held] (mkApp4 (mkConst ``NTy.viewed) carriers (toExpr true)
-                      type held)
+                    mkLambdaFVars #[held] (mkApp4 (mkConst ``NTy.viewed)
+                      (Contract.carrierSorts carriers) (toExpr true) type held)
                   let prophecyOf (slot : Lean.Expr) : MetaM Lean.Expr := do
                     mkAppM ``Option.map #[view, slot]
                   frame := frame.push

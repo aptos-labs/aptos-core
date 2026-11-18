@@ -199,7 +199,7 @@ their values, other types as they are, a type parameter's as its family
 reads them (`NTy.read`). -/
 
 section NativeViews
-variable [Carriers]
+variable [Sorts]
 
 -- The typed map's removal lemmas: a removed key is absent, the others keep
 -- their values, the size drops by the key's presence, the positions after
@@ -252,16 +252,16 @@ of an instantiated family at its argument. -/
 @[simp, vir_denote_norm] theorem NTy.read_function (parameters : NRow) (shared : Sharing)
     (results : NRow) :
     NTy.read (.function parameters shared results) = fun value => value := rfl
-omit [Carriers] in
-@[simp, vir_denote_norm] theorem NTy.read_param_instantiate (θ : TypeArgs) (Θ : Carriers)
+omit [Sorts] in
+@[simp, vir_denote_norm] theorem NTy.read_param_instantiate (θ : TypeArgs) (Θ : Sorts)
     (index : Nat) :
-    @NTy.read (Carriers.instantiate θ Θ) (.param index) =
-      @NTy.read Θ ((NTy.param index).subst θ.1) := rfl
-omit [Carriers] in
-@[simp, vir_denote_norm] theorem NTy.unread_param_instantiate (θ : TypeArgs) (Θ : Carriers)
+    @NTy.read ((Sorts.instantiate θ Θ)) (.param index) =
+      @NTy.read (Θ) ((NTy.param index).subst θ.1) := rfl
+omit [Sorts] in
+@[simp, vir_denote_norm] theorem NTy.unread_param_instantiate (θ : TypeArgs) (Θ : Sorts)
     (index : Nat) (inhabitable : (NTy.param index).inhabitable = true) :
-    @NTy.unread (Carriers.instantiate θ Θ) (.param index) inhabitable =
-      @NTy.unread Θ ((NTy.param index).subst θ.1)
+    @NTy.unread ((Sorts.instantiate θ Θ)) (.param index) inhabitable =
+      @NTy.unread (Θ) ((NTy.param index).subst θ.1)
         ((NTy.inhabitable_unmark _).trans
           (NRow.getD_inhabitable θ.1 θ.inhabitable index (.param index) rfl)) := rfl
 
@@ -289,7 +289,7 @@ theorem NTy.equal_scalar (handles : Bool) : (τ : NTy) → τ.isScalar = true �
   | .nominal _ _ _, scalar, _, _ => by
       simp [NTy.isScalar] at scalar
 
-omit [Carriers] in
+omit [Sorts] in
 /-- Lists related element by element as the equality of their images. -/
 theorem listEqual_iff_map {α β : Type} (equal : α → α → Bool) (image : α → β)
     (same : ∀ a b, equal a b = true ↔ image a = image b) :
@@ -321,9 +321,9 @@ theorem NTy.read_injective : (τ : NTy) → Function.Injective (NTy.read τ)
   | .int _ _ => fun _ _ same => SpecInt.ext same
   | .num => fun _ _ same => SpecInt.ext same
   | .param index => fun a b same => by
-      have := congrArg (Carriers.reads index).unread same
+      have := congrArg (Sorts.reads index).unread same
       simp only [NTy.read] at this
-      rwa [(Carriers.reads index).unread_read, (Carriers.reads index).unread_read] at this
+      rwa [(Sorts.reads index).unread_read, (Sorts.reads index).unread_read] at this
   | .unit | .bool | .address | .signer | .string | .bytes | .char | .tuple _ | .struct _ _ _
   | .enum _ _ _ _ _ | .vector _ | .slice _ | .array _ _ | .table _ _ | .ghost _ | .ref _
   | .sliceRef _ | .function _ _ _
@@ -356,10 +356,10 @@ caller's table. -/
 
 /-- The typed map of a caller's table carried to a callee's family of type
 parameters is that of the caller's table. -/
-theorem ofEntries_toSkolem_params [Θ : Carriers] {K V : Type}
+theorem ofEntries_toSkolem_params [Θ : Sorts] {K V : Type}
     (θ : TypeArgs) (i j : Nat)
-    (key : @NTy.carrier (Carriers.instantiate θ Θ) (.param i) → K)
-    (value : @NTy.carrier (Carriers.instantiate θ Θ) (.param j) → V)
+    (key : @NTy.carrier ((Sorts.instantiate θ Θ)) (.param i) → K)
+    (value : @NTy.carrier ((Sorts.instantiate θ Θ)) (.param j) → V)
     (table : ((NTy.table (.param i) (.param j)).subst θ.1).carrier) :
     SpecMap.ofEntries key value (NTy.toSkolem θ (.table (.param i) (.param j)) table) =
       SpecMap.ofEntries key value table := by
@@ -371,26 +371,26 @@ theorem ofEntries_toSkolem_params [Θ : Carriers] {K V : Type}
 /-- A table of type parameters carried between a caller and a callee's
 family is the same table. -/
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.ofSkolem_table_params
-    [Θ : Carriers] (θ : TypeArgs) (i j : Nat)
-    (table : @NTy.carrier (Carriers.instantiate θ Θ) (.table (.param i) (.param j))) :
+    [Θ : Sorts] (θ : TypeArgs) (i j : Nat)
+    (table : @NTy.carrier ((Sorts.instantiate θ Θ)) (.table (.param i) (.param j))) :
     NTy.ofSkolem θ (.table (.param i) (.param j)) table = table :=
   SpecEntries.ext (by
     show List.map (fun entry => (entry.fst, entry.snd)) table.entries = table.entries
     exact List.map_id'' (fun _ => rfl) _)
 
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.toSkolem_table_params
-    [Θ : Carriers] (θ : TypeArgs) (i j : Nat)
+    [Θ : Sorts] (θ : TypeArgs) (i j : Nat)
     (table : ((NTy.table (.param i) (.param j)).subst θ.1).carrier) :
     NTy.toSkolem θ (.table (.param i) (.param j)) table = table :=
   SpecEntries.ext (by
     show List.map (fun entry => (entry.fst, entry.snd)) table.entries = table.entries
     exact List.map_id'' (fun _ => rfl) _)
 
-theorem ofEntries_ofSkolem_params [Θ : Carriers] {K V : Type}
+theorem ofEntries_ofSkolem_params [Θ : Sorts] {K V : Type}
     (θ : TypeArgs) (i j : Nat)
     (key : ((NTy.param i).subst θ.1).carrier → K)
     (value : ((NTy.param j).subst θ.1).carrier → V)
-    (table : @NTy.carrier (Carriers.instantiate θ Θ) (.table (.param i) (.param j))) :
+    (table : @NTy.carrier ((Sorts.instantiate θ Θ)) (.table (.param i) (.param j))) :
     SpecMap.ofEntries key value (NTy.ofSkolem θ (.table (.param i) (.param j)) table) =
       SpecMap.ofEntries key value table := by
   simp only [SpecMap.ofEntries]
@@ -724,10 +724,10 @@ simproc [vir_denote_norm] validOfEntriesRead (VerexIR.SpecMap.Valid _ _) := fun 
 /-- A type parameter's reading at the family a call's type arguments induce
 is the outer family's reading at the argument's type. -/
 @[simp, vir_denote_norm] theorem _root_.VerexIR.Proofs.Denote.NTy.read_instantiate
-    (θ : TypeArgs) (outer : Carriers) (index : Nat)
-    (value : @NTy.carrier (Carriers.instantiate θ outer) (.param index)) :
-    @NTy.read (Carriers.instantiate θ outer) (.param index) value =
-      @NTy.read outer ((NTy.param index).subst θ.1) value := rfl
+    (θ : TypeArgs) (outer : Sorts) (index : Nat)
+    (value : @NTy.carrier ((Sorts.instantiate θ outer)) (.param index)) :
+    @NTy.read ((Sorts.instantiate θ outer)) (.param index) value =
+      @NTy.read (outer) ((NTy.param index).subst θ.1) value := rfl
 
 open Lean Meta in
 /-- Reduce a native type's head without unfolding its canonical descriptor. -/
@@ -749,15 +749,7 @@ private partial def resolvedType (carriers τ : Lean.Expr) :
   let τ ← nativeTypeHead τ
   let_expr NTy.param index := τ | return (carriers, τ, none)
   -- The instantiated family, spelled by carriers or by skolems.
-  let instantiation? : Option (Lean.Expr × Lean.Expr) := do
-    let carriers := carriers.consumeMData
-    if carriers.isAppOfArity ``Carriers.instantiate 2 then
-      return (carriers.getArg! 0, carriers.getArg! 1)
-    let .app (.app (.app toCarriers unit) functions) skolems := carriers | none
-    guard (toCarriers.isConstOf ``Skolems.toCarriers)
-    let .app (.app (.app (.app instantiate _) _) θ) outer := skolems.consumeMData | none
-    guard (instantiate.isConstOf ``Skolems.instantiate)
-    return (θ, mkApp3 toCarriers unit functions outer)
+  let instantiation? := FamilyTransport.inducedCarriers? carriers.consumeMData
   let some (θ, outer) := instantiation? | return (carriers, τ, none)
   let parameter := mkApp (mkConst ``NTy.param) index
   -- The row the frame substitutes: `TypeArgs` is an abbreviation of the
@@ -788,7 +780,7 @@ private partial def resolvedType (carriers τ : Lean.Expr) :
 they are, a type parameter's as its family reads them, with the typed
 values' instances. -/
 structure TypedView where
-  /-- The family and type the view is decided on (`resolvedType`). -/
+  /-- The operational family and type the view is decided on (`resolvedType`). -/
   carriers : Lean.Expr
   type : Lean.Expr
   /-- The Lean type of the typed values. -/
@@ -859,7 +851,7 @@ off the view is decided on the family and type given, a parameter of an
 instantiated family included, so that it reads values of that family.
 Observable off-domain lookups (`SpecMap.valueAt`, `SpecMap.keyAt`) use the
 uninterpreted `NTy.plainFallback` witness rather than concrete structural
-defaults or `NTy.readBack`. -/
+defaults or `NTy.readBack`. The family argument is an expression of type `Sorts`. -/
 def typedView? (carriers τ : Lean.Expr) (resolve : Bool := true) : MetaM (Option TypedView) := do
   let (carriers, τ, resolved?) ← if resolve then resolvedType carriers τ
     else pure (carriers, ← nativeTypeHead τ, none)
@@ -891,7 +883,9 @@ def typedView? (carriers τ : Lean.Expr) (resolve : Bool := true) : MetaM (Optio
   -- A given parameter has one abstract sort for its native and
   -- specification roles. Emit that sort's identity view directly rather than
   -- reintroducing the concrete read/unread path into generic clauses.
-  if carriers.isAppOfArity ``GivenFrame.toCarriers 1 && τ.isAppOfArity ``NTy.param 1 then
+  if carriers.isAppOfArity ``Carriers.toSorts 1 &&
+      (carriers.getArg! 0).isAppOfArity ``GivenFrame.toCarriers 1 &&
+      τ.isAppOfArity ``NTy.param 1 then
     let carrier := mkApp2 (mkConst ``NTy.carrier) carriers τ
     let read ← withLocalDeclD `value carrier fun value => mkLambdaFVars #[value] value
     let inhabited := mkApp3 (mkConst ``nativeInhabited) carriers τ fallback

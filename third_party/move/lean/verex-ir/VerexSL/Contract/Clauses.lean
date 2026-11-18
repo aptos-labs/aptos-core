@@ -76,10 +76,10 @@ partial def weaveOf : List VerexIR.Proofs.Denote.NTy → Nat → MetaM Lean.Expr
 /-- The native row of native values, a nested pair. -/
 partial def nativeValueRow (carriers : Lean.Expr) :
     VerexIR.Proofs.Denote.NRow → List Lean.Expr → MetaM Lean.Expr
-  | .nil, [] => return mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) carriers
+  | .nil, [] => return mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) (carrierSorts carriers)
   | .cons τ rest, value :: values => do
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.HList.cons)
-        #[carriers, ← quoteNTy τ, ← quoteRow rest, value, ← nativeValueRow carriers rest values]
+        #[carrierSorts carriers, ← quoteNTy τ, ← quoteRow rest, value, ← nativeValueRow carriers rest values]
   | _, _ => throwError "internal: a row of native values differs from its row type"
 
 /-- The value of a type-reflecting native at the type `τ`, as its result type
@@ -241,7 +241,7 @@ def Invocation.directArguments (invocation : Invocation) (direct : DirectTarget)
   | some θ =>
       let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
         invocation.functions invocation.frame
-      mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.toSkolem) carriers θ direct.full
+      mkApp4 (mkConst ``VerexIR.Proofs.Denote.HList.toSkolem) (carrierSorts carriers) θ direct.full
         arguments
 
 /-- `aborts_of` of a target read directly, at the entry values of its
@@ -254,7 +254,7 @@ def Invocation.directAborts (invocation : Invocation) (direct : DirectTarget)
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
     invocation.functions invocation.frame
   let row ← quoteRow invocation.row
-  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row)
+  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts carriers) row)
     fun args => do
       let arguments := invocation.directArguments direct args
       let aborts ← match direct.reading with
@@ -285,7 +285,7 @@ def Invocation.atEntryFinals (invocation : Invocation) (entries finals : Lean.Ex
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
     invocation.functions invocation.frame
   let row ← quoteRow invocation.row
-  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row)
+  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts carriers) row)
     fun args => do mkLambdaFVars #[args] (← predicate args)
   return mkAppN (mkConst ``VerexIR.Proofs.Denote.AtEntryFinals)
     #[carriers, row, holds, entries, finals]
@@ -298,7 +298,7 @@ def Invocation.directEnsures (invocation : Invocation) (direct : DirectTarget)
   let carriers := mkApp3 (mkConst ``VerexIR.Proofs.Denote.Skolems.toCarriers) invocation.unit
     invocation.functions invocation.frame
   let inView ← match direct.θ?, direct.shape with
-    | some θ, .one τ => pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) carriers
+    | some θ, .one τ => pure (mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem) (carrierSorts carriers)
         θ (← quoteNTy τ) result)
     | _, _ => pure result
   match direct.reading with
@@ -342,7 +342,7 @@ private def viewedComponent? (context : Context) (held : Option VerexIR.Proofs.D
   unless read != held && read.erase == held do return none
   let carriers ← context.carriers
   return some <| mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
-    carriers (← quoteNTy read) value
+    (carrierSorts carriers) (← quoteNTy read) value
 
 /-- A tuple a field holds at the type a specification reads it, whose integers are
 unbounded where the field holds them at their widths. -/

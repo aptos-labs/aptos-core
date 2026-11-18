@@ -13,56 +13,56 @@ local notation "callerType" => (NTy.enum (⟨⟨0⟩, 0⟩ : VerexIR.StructHandl
 -- A callee's value at its instantiated family is the caller's value at the
 -- substituted type, spelled as the caller spells it.
 example [family : Carriers]
-    (value : @NTy.carrier (Carriers.instantiate arguments family) calleeType)
-    (other : @NTy.carrier family callerType) (same : value = other) :
-    @Eq (@NTy.carrier family callerType) value other := by
+    (value : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts calleeType)
+    (other : @NTy.carrier (family).toSorts callerType) (same : value = other) :
+    @Eq (@NTy.carrier (family).toSorts callerType) value other := by
   fail_if_success with_reducible exact same
   verex_canonical_families
   with_reducible exact same
 
 -- The conversion policy is fixed even when the caller restricts transparency.
 example [family : Carriers]
-    (value : @NTy.carrier (Carriers.instantiate arguments family) calleeType)
-    (other : @NTy.carrier family callerType) (same : value = other) :
-    @Eq (@NTy.carrier family callerType) value other := by
+    (value : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts calleeType)
+    (other : @NTy.carrier (family).toSorts callerType) (same : value = other) :
+    @Eq (@NTy.carrier (family).toSorts callerType) value other := by
   fail_if_success with_reducible exact same
   with_reducible verex_canonical_families
   with_reducible exact same
 
 -- Rewriting under a binder preserves its scope.
 example [family : Carriers]
-    (value : @NTy.carrier (Carriers.instantiate arguments family) calleeType)
-    (equal : ∀ other : @NTy.carrier (Carriers.instantiate arguments family) calleeType,
+    (value : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts calleeType)
+    (equal : ∀ other : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts calleeType,
       other = value)
-    (other : @NTy.carrier family callerType) :
-    @Eq (@NTy.carrier family callerType) other value := by
+    (other : @NTy.carrier (family).toSorts callerType) :
+    @Eq (@NTy.carrier (family).toSorts callerType) other value := by
   fail_if_success with_reducible exact equal other
   verex_canonical_families
   with_reducible exact equal other
 
 example [family : Carriers]
-    (value : @NTy.carrier (Carriers.instantiate arguments family) (.ghost calleeType))
-    (other : @NTy.carrier family (.ghost callerType)) (same : value = other) :
-    @Eq (@NTy.carrier family (.ghost callerType)) value other := by
+    (value : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts (.ghost calleeType))
+    (other : @NTy.carrier (family).toSorts (.ghost callerType)) (same : value = other) :
+    @Eq (@NTy.carrier (family).toSorts (.ghost callerType)) value other := by
   fail_if_success with_reducible exact same
   verex_canonical_families
   with_reducible exact same
 
 -- Nested variants and collections are spelled at the caller's types too.
 example [family : Carriers]
-    (values : @NTy.carrier (Carriers.instantiate arguments family) (.vector calleeType))
-    (others : @NTy.carrier family (.vector callerType)) (same : values = others) :
-    @Eq (@NTy.carrier family (.vector callerType)) values others := by
+    (values : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts (.vector calleeType))
+    (others : @NTy.carrier (family).toSorts (.vector callerType)) (same : values = others) :
+    @Eq (@NTy.carrier (family).toSorts (.vector callerType)) values others := by
   fail_if_success with_reducible exact same
   verex_canonical_families
   with_reducible exact same
 
 example [family : Carriers]
-    (value : @NTy.carrier (Carriers.instantiate arguments family)
+    (value : @NTy.carrier ((Carriers.instantiate arguments family)).toSorts
       (.tuple (.cons calleeType (.cons (.ghost calleeType) .nil))))
-    (other : @NTy.carrier family (.tuple (.cons callerType (.cons (.ghost callerType) .nil))))
+    (other : @NTy.carrier (family).toSorts (.tuple (.cons callerType (.cons (.ghost callerType) .nil))))
     (same : value = other) :
-    @Eq (@NTy.carrier family (.tuple (.cons callerType (.cons (.ghost callerType) .nil))))
+    @Eq (@NTy.carrier (family).toSorts (.tuple (.cons callerType (.cons (.ghost callerType) .nil))))
       value other := by
   fail_if_success with_reducible exact same
   verex_canonical_families
@@ -75,10 +75,10 @@ section
 local notation "addressArguments" => (⟨.cons .address .nil, rfl⟩ : TypeArgs)
 
 example [family : Carriers] (original : VerexIR.SpecVector String)
-    (returned : @NTy.carrier (Carriers.instantiate addressArguments family)
+    (returned : @NTy.carrier ((Carriers.instantiate addressArguments family)).toSorts
       (.vector (.param 0))) (needle : String)
-    (linked : returned = @NTy.toSkolem family addressArguments (.vector (.param 0)) original)
-    (found : (findIndex? (@NTy.eqb family .address) original.values needle
+    (linked : returned = @NTy.toSkolem (family).toSorts addressArguments (.vector (.param 0)) original)
+    (found : (findIndex? (@NTy.eqb family.toSorts .address) original.values needle
       original.values.size 0).isSome = true) :
     ∃ i : Int, 0 ≤ i ∧ i < returned.values.size ∧ returned.values[i.toNat]? = some needle := by
   verex_leaf
@@ -128,8 +128,8 @@ run_meta do
   let typeArgs ← whnf (mkConst ``TypeArgs)
   let substitution := mkApp4 (mkConst ``Subtype.mk [0]) (mkConst ``NRow)
     (typeArgs.getArg! 1) row (← mkEqRefl (mkConst ``Bool.true))
-  withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
-    let family := mkApp2 (mkConst ``Carriers.instantiate) substitution outer
+  withLocalDeclD `outer (mkConst ``Sorts) fun outer => do
+    let family := mkApp2 (mkConst ``Sorts.instantiate) substitution outer
     let resultRow := cons boolean (cons parameter nil)
     let rejectOperation (index : Expr) : MetaM Unit := do
       let operation := mkAppN (mkConst ``Vars.set) #[family, context, resultRow, index]
@@ -166,7 +166,7 @@ local notation "instRes" =>
 
 -- Negative check 1 (first): same declaration differing only by unresolved type parameters MUST decline.
 example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
-    (v : @NTy.carrier Θ.toCarriers genRes) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts genRes) :
     Skolems.plainAt genRes (.cons (.param 1) .nil) k
       (Skolems.writePlain genRes (.cons (.param 0) .nil) k (some v) m) =
     Skolems.plainAt genRes (.cons (.param 1) .nil) k
@@ -181,7 +181,7 @@ example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
 -- Negative check 2: same resource and key without `NTy.Holds resA v` MUST decline
 -- because `Skolems.writePlain` only stores `some v` when `NTy.Holds` holds.
 example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
-    (v : @NTy.carrier Θ.toCarriers resA) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts resA) :
     Skolems.plainAt resA .nil k (Skolems.writePlain resA .nil k (some v) m) =
       Skolems.plainAt resA .nil k (Skolems.writePlain resA .nil k (some v) m) := by
   fail_if_success
@@ -191,7 +191,7 @@ example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
 
 -- Fast path 1: distinct resources (premise-free, no `NTy.Holds` needed on `bad`)
 example [Θ : Skolems unit] (m : Memory unit) (k1 k2 : StorageKey)
-    (bad : @NTy.carrier Θ.toCarriers resA) :
+    (bad : @NTy.carrier (Θ.toCarriers).toSorts resA) :
     Skolems.plainAt resB .nil k2 (Skolems.writePlain resA .nil k1 (some bad) m) =
       Skolems.plainAt resB .nil k2 m := by
   simp only [vir_denote_norm]
@@ -203,7 +203,7 @@ example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey) :
 
 -- Fast path 3: `otherKey ≠ key` (premise-free, no `NTy.Holds` needed on `bad`)
 example [Θ : Skolems unit] (m : Memory unit) (a1 a2 : String) (hne : a2 ≠ a1)
-    (bad : @NTy.carrier Θ.toCarriers resA) :
+    (bad : @NTy.carrier (Θ.toCarriers).toSorts resA) :
     Skolems.plainAt resA .nil (.address a2)
       (Skolems.writePlain resA .nil (.address a1) (some bad) m) =
       Skolems.plainAt resA .nil (.address a2) m := by
@@ -211,7 +211,7 @@ example [Θ : Skolems unit] (m : Memory unit) (a1 a2 : String) (hne : a2 ≠ a1)
 
 -- Fast path 4: `LCtx` `NTy.Holds`
 example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
-    (v : @NTy.carrier Θ.toCarriers resA) (hv : @NTy.Holds Θ.toCarriers resA v) :
+    (v : @NTy.carrier (Θ.toCarriers).toSorts resA) (hv : @NTy.Holds Θ.toCarriers resA v) :
     Skolems.plainAt resA .nil k (Skolems.writePlain resA .nil k (some v) m) = some v := by
   simp only [vir_denote_norm]
 
@@ -222,7 +222,7 @@ example (outer : Skolems unit) (m : Memory unit) (k : StorageKey) :
   simp only [vir_denote_norm]
 
 example (outer : Skolems unit) (m : Memory unit) (k : StorageKey)
-    (v : Option (@NTy.carrier (Skolems.instantiate arguments outer).toCarriers genRes)) :
+    (v : Option (@NTy.carrier ((Skolems.instantiate arguments outer).toCarriers).toSorts genRes)) :
     @Skolems.writePlain unit _ (Skolems.instantiate arguments outer) genRes
       (.cons (.param 0) .nil) k v m =
       @Skolems.writePlain unit _ outer instRes (.cons (.int 64 false) .nil) k v m := by
@@ -230,14 +230,14 @@ example (outer : Skolems unit) (m : Memory unit) (k : StorageKey)
 
 -- `TableMemory.allocationResource` preservation under `Skolems.writePlain`
 example [Θ : Skolems unit] (m : Memory unit) (k1 k2 : StorageKey)
-    (v : Option (@NTy.carrier Θ.toCarriers resA)) :
+    (v : Option (@NTy.carrier (Θ.toCarriers).toSorts resA)) :
     Skolems.writePlain resA .nil k1 v m TableMemory.allocationResource k2 =
       m TableMemory.allocationResource k2 := by
   simp only [vir_denote_norm]
 
 -- `verex_frame_writes` (`closeFrameWrites`) over `Skolems.writePlain`
 example [Θ : Skolems unit] (m : Memory unit) (k : StorageKey)
-    (v : Option (@NTy.carrier Θ.toCarriers resA)) :
+    (v : Option (@NTy.carrier (Θ.toCarriers).toSorts resA)) :
     (∀ k' : StorageKey, k' ≠ k →
       Skolems.writePlain resA .nil k v m (Skolems.resource resA .nil) k' =
         m (Skolems.resource resA .nil) k') ∧

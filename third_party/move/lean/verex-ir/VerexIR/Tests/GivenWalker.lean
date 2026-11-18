@@ -31,7 +31,7 @@ def handle : VerexIR.FunctionHandle := ⟨⟨0⟩, ⟨0⟩⟩
 -- Real Given body evaluation and leaves use the ordinary solver.
 theorem given_identity (G : GivenFrame) (State : Type) (unit : VerexIR.Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (identity unit) (value, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [identity, Function.denoteIn]
@@ -48,8 +48,8 @@ theorem given_loop (G : GivenFrame) (State : Type) (unit : VerexIR.Validation.Va
   simp only [immediateLoop, Function.denoteIn]
   verex_normalize
   verex_obligations [(7, SiteCondition.Kind.loopInvariant, handle,
-    fun (_ : Unit) (_ : State) (_ : @HEnv G.toCarriers .nil) (entry : State)
-      (_ : @HEnv G.toCarriers .nil) (current : State) => current = entry)]
+    fun (_ : Unit) (_ : State) (_ : @HEnv G.toCarriers.toSorts .nil) (entry : State)
+      (_ : @HEnv G.toCarriers.toSorts .nil) (current : State) => current = entry)]
   all_goals verex_solve
 
 -- Concrete predicates retain their frame explicitly; the result is the
@@ -62,8 +62,8 @@ theorem concrete_loop {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarrier
   simp only [immediateLoop, Function.denoteWith]
   verex_normalize
   verex_obligations [(7, SiteCondition.Kind.loopInvariant, handle, concreteCondition Θ (fun frame =>
-    fun (_ : Unit) (_ : Memory unit) (_ : @HEnv frame.toCarriers .nil) (entry : Memory unit)
-      (_ : @HEnv frame.toCarriers .nil) (current : Memory unit) => current = entry))]
+    fun (_ : Unit) (_ : Memory unit) (_ : @HEnv frame.toCarriers.toSorts .nil) (entry : Memory unit)
+      (_ : @HEnv frame.toCarriers.toSorts .nil) (current : Memory unit) => current = entry))]
   all_goals verex_solve
 
 -- State-only call markers use the recorded ambient frame.
@@ -107,7 +107,7 @@ theorem generic_assertion (initial : State) :
       (fun result final => result = Flow.value () () ∧ final = initial)
       (fun _ => False) initial := by
   verex_obligations [(11, SiteCondition.Kind.assertion, handle,
-    fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True)]
+    fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => True)]
   all_goals verex_solve
 
 theorem generic_memory (initial : State) :
@@ -115,7 +115,7 @@ theorem generic_memory (initial : State) :
       (fun result final => result = Flow.value () () ∧ final = initial)
       (fun _ => False) initial := by
   verex_obligations [(12, SiteCondition.Kind.memoryWritten, handle,
-    fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True)]
+    fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => True)]
   all_goals verex_solve
 
 theorem generic_construction (value : NTy.carrier (.param 0)) (initial : State) :
@@ -131,7 +131,7 @@ theorem generic_mutation_end (initial : State) :
       (fun result final => result = Flow.value () () ∧ final = initial)
       (fun _ => False) initial := by
   verex_obligations [(15, SiteCondition.Kind.mutationEnd, handle,
-    fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True)]
+    fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => True)]
   all_goals verex_solve
 
 -- One site owes conditions of two kinds, as a mutable borrow of a resource
@@ -147,10 +147,10 @@ theorem markers_of_two_kinds (initial : State) :
       (fun _ => False) initial := by
   verex_obligations [
     (20, SiteCondition.Kind.memoryWritten, handle,
-      fun (_ : Unit) (_ : State) (_ : @AnchorOf C State 20 .nil) (_ : @HEnv C .nil)
+      fun (_ : Unit) (_ : State) (_ : @AnchorOf C State 20 .nil) (_ : @HEnv C.toSorts .nil)
         (_ : State) => True),
     (20, SiteCondition.Kind.mutationEnd, handle,
-      fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True)]
+      fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => True)]
   all_goals verex_solve
 
 -- Two conditions of one kind at one site, where the step reads one: the
@@ -167,9 +167,9 @@ theorem conditions_of_one_kind (initial : State) :
       (fun _ => False) initial := by
   verex_obligations [
     (22, SiteCondition.Kind.mutationEnd, handle,
-      fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => True),
+      fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => True),
     (22, SiteCondition.Kind.mutationEnd, handle,
-      fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => False)]
+      fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => False)]
   all_goals verex_solve
 
 -- A condition whose interface is not that of the rule of its step leaves a
@@ -196,12 +196,12 @@ theorem malformed_mutation_end (initial : State) :
       (fun result final => result = Flow.value () () ∧ final = initial)
       (fun _ => False) initial := by
   verex_obligations [(21, SiteCondition.Kind.mutationEnd, handle,
-    fun (_ : Unit) (_ : State) (_ : @HEnv C .nil) (_ : State) => Nat)]
+    fun (_ : Unit) (_ : State) (_ : @HEnv C.toSorts .nil) (_ : State) => Nat)]
   all_goals verex_solve
 end Markers
 
 theorem given_certification (G : GivenFrame) (State : Type)
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) :
     wp (@checkingAt G.toCarriers State 16 .copyOut (.param 0) value)
       (fun _ final => final = initial) (fun _ => False) initial := by
   verex_obligations []

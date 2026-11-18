@@ -38,7 +38,7 @@ run_meta do
   withLocalDeclD `given (mkConst ``GivenFrame) fun given => do
     let carriers := mkApp (mkConst ``GivenFrame.toCarriers) given
     let type := mkApp (mkConst ``NTy.param) (mkNatLit 0)
-    let some view ← NativeMaps.typedView? carriers type
+    let some view ← NativeMaps.typedView? (mkApp (mkConst ``Carriers.toSorts) carriers) type
       | throwError "missing given parameter map view"
     unless view.identity && view.read.isLambda && view.unread == view.read do
       throwError "given parameter map view retained a conversion"

@@ -1279,8 +1279,9 @@ private def rowComponentsAt (carriers row : Lean.Expr) (types : Array Lean.Expr)
       let tail := (types.extract (index + 1) types.size).foldr
         (fun ty row => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NRow.cons) ty row)
         (mkConst ``VerexIR.Proofs.Denote.NRow.nil)
-      let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers types[index]!
-      let tailType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers tail
+      let carrier := mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier)
+        (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers) types[index]!
+      let tailType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts carriers) tail
       values := values.push (mkApp3 (mkConst ``Prod.fst [Level.zero, Level.zero]) carrier tailType rest)
       rest := mkApp3 (mkConst ``Prod.snd [Level.zero, Level.zero]) carrier tailType rest
     return values
@@ -1321,7 +1322,7 @@ private def referenceParts (carriers type value : Lean.Expr) : MetaM (Lean.Expr 
 `prophecies` at exit (`NTy.viewed`). -/
 private def viewedNative (carriers : Lean.Expr) (prophecies : Bool) (ty value : Lean.Expr) :
     MetaM Lean.Expr := do
-  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) carriers
+  return mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.viewed) (carrierSorts carriers)
     (toExpr prophecies) ty value
 
 /-- Clause locals see through a chain of references. Keep the native carrier
@@ -1370,7 +1371,7 @@ private def parameterBinders (carriers : Lean.Expr) (slots : Array Slot) (types 
           return { entry := ← domain.binderOfNative value, entryNative := value }
         -- A shared view holds no loan: a clause reads what it holds as current.
         let entry := mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.unerase)
-          carriers (← quoteNTy slot.nty) value
+          (carrierSorts carriers) (← quoteNTy slot.nty) value
         return { entry := ← domain.binderOfNative entry, entryNative := entry }
 
 /-- The type a clause reads a local at: a reference local's referent. -/
@@ -1453,7 +1454,7 @@ private def fieldFrameTerm (context : Context) (owner : VerexIR.NamespaceId)
   if (declaration.locals[declaration.fields.size]?).any (·.name == "this") then
     locals := locals.set! declaration.fields.size (some whole)
   let typeArgumentTypes := scope.map (Scoped.toNative? context.unit owner)
-  let invocationType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
+  let invocationType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts carriers) row
   let memoryType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr functions
   let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
     withLocalDeclD `pre memoryType fun pre =>
@@ -2423,12 +2424,9 @@ def givenDataOwnTerms (unit : ValidatedUnit) : MetaM DataOwn := do
             mkLambdaFVars #[index] (mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.subst)
               arguments (mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.param) index))
           withLocalDeclD `value (carrierType original actual) fun value => do
-            let scaffoldEq ← mkAppM ``Eq.symm
-              #[mkApp2 (mkConst ``VerexIR.Proofs.Denote.GivenFrame.clauseScaffold_carrier)
-                given actual]
-            let scaffoldValue ← mkAppM ``cast #[scaffoldEq, value]
+            let scaffoldSorts := mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) scaffold
             let valueAtSchema := mkApp4 (mkConst ``VerexIR.Proofs.Denote.NTy.toSkolem)
-              scaffold θ schema scaffoldValue
+              scaffoldSorts θ schema value
             let interpretation : TranslationFrame := {
               unit := unitExpr, functions, carriers := induced, state := mkConst ``Unit, types }
             let context : Context := {
@@ -2744,7 +2742,7 @@ def buildDeclaredRequires (unit : ValidatedUnit) (namespaceId : VerexIR.Namespac
   withUnitVariable .default fun unitExpr functions => do
     let frame ← frameOf unitExpr functions
     let carriers ← frameCarriers frame
-    let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers row
+    let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts carriers) row
     withLocalDeclD `args argumentsType fun args =>
     withLocalDeclD `state (mkApp2 (mkConst ``VerexIR.Proofs.Denote.Memory) unitExpr functions)
       fun state => do
@@ -4024,14 +4022,15 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
     clauseLocalType unit ty
   let padLocals (values : Array (Option Lean.Expr)) : Array (Option Lean.Expr) :=
     values ++ Array.replicate (declaration.locals.size - values.size) none
-  let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (signature.frame.carriers)
+  let argumentsType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) (carrierSorts signature.frame.carriers)
     signature.params
-  let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) (signature.frame.carriers)
+  let resultType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.ResultShape.carrier) (carrierSorts signature.frame.carriers)
     signature.shape
   -- The domain a clause binds the result at: the carrier of its native type,
   -- as every other value of a clause is typed, and `Unit` without a result.
   let resultDomain := match signature.resultType with
-    | some ty => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) signature.frame.carriers ty
+    | some ty => mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier)
+        (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) signature.frame.carriers) ty
     | none => mkConst ``Unit
   let runtimeState := signature.frame.state
   let failure := mkConst ``VerexIR.Proofs.Failure
@@ -4332,7 +4331,7 @@ def buildContract (unit : ValidatedUnit) (namespaceId : VerexIR.NamespaceId)
               -- an invocation's arguments; `modifies_of<f> *` frames nothing.
               unless frame.modifiesAll do
                 let invocationType := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList)
-                  (signature.frame.carriers) row
+                  (carrierSorts signature.frame.carriers) row
                 let frameTerm ← withLocalDeclD `invocation invocationType fun invocation =>
                   withLocalDeclD `pre runtimeState fun pre =>
                     withLocalDeclD `post runtimeState fun post => do

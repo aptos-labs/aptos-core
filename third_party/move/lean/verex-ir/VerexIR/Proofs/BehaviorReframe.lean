@@ -56,12 +56,12 @@ theorem Denote.ResultShape.corresponds_refFree_iff [Carriers] (loans : LoanCorre
 private theorem closureRun_ok_of_encode (executable : ExecutableUnit unit)
     (Θ₁ Θ₂ : Skolems unit) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (parametersFree : σs.refFree = true) (resultsFree : shape.row.refFree = true)
-    {args₁ : @HList Θ₁.toCarriers σs} {args₂ : @HList Θ₂.toCarriers σs}
-    (sameArgs : @HList.encode Θ₁.toCarriers σs args₁ = @HList.encode Θ₂.toCarriers σs args₂)
-    {result₁ : @ResultShape.carrier Θ₁.toCarriers shape}
-    {result₂ : @ResultShape.carrier Θ₂.toCarriers shape}
-    (sameResult : (@resultCodec Θ₁.toCarriers shape).encode result₁ =
-      (@resultCodec Θ₂.toCarriers shape).encode result₂)
+    {args₁ : @HList (Θ₁.toCarriers).toSorts σs} {args₂ : @HList (Θ₂.toCarriers).toSorts σs}
+    (sameArgs : @HList.encode (Θ₁.toCarriers).toSorts σs args₁ = @HList.encode (Θ₂.toCarriers).toSorts σs args₂)
+    {result₁ : @ResultShape.carrier (Θ₁.toCarriers).toSorts shape}
+    {result₂ : @ResultShape.carrier (Θ₂.toCarriers).toSorts shape}
+    (sameResult : (@resultCodec Θ₁.toCarriers.toSorts shape).encode result₁ =
+      (@resultCodec Θ₂.toCarriers.toSorts shape).encode result₂)
     {pre post : Memory unit}
     (run : (@closureRun unit _ executable Θ₁ closure σs shape args₁).ok pre result₁ post) :
     (@closureRun unit _ executable Θ₂ closure σs shape args₂).ok pre result₂ post := by
@@ -90,12 +90,12 @@ encode alike run the closure alike, to results that encode alike. -/
 theorem closureRun_ok_iff_of_encode (executable : ExecutableUnit unit)
     (Θ₁ Θ₂ : Skolems unit) (closure : ClosureValue) {σs : NRow} {shape : ResultShape}
     (parametersFree : σs.refFree = true) (resultsFree : shape.row.refFree = true)
-    {args₁ : @HList Θ₁.toCarriers σs} {args₂ : @HList Θ₂.toCarriers σs}
-    (sameArgs : @HList.encode Θ₁.toCarriers σs args₁ = @HList.encode Θ₂.toCarriers σs args₂)
-    {result₁ : @ResultShape.carrier Θ₁.toCarriers shape}
-    {result₂ : @ResultShape.carrier Θ₂.toCarriers shape}
-    (sameResult : (@resultCodec Θ₁.toCarriers shape).encode result₁ =
-      (@resultCodec Θ₂.toCarriers shape).encode result₂)
+    {args₁ : @HList (Θ₁.toCarriers).toSorts σs} {args₂ : @HList (Θ₂.toCarriers).toSorts σs}
+    (sameArgs : @HList.encode (Θ₁.toCarriers).toSorts σs args₁ = @HList.encode (Θ₂.toCarriers).toSorts σs args₂)
+    {result₁ : @ResultShape.carrier (Θ₁.toCarriers).toSorts shape}
+    {result₂ : @ResultShape.carrier (Θ₂.toCarriers).toSorts shape}
+    (sameResult : (@resultCodec Θ₁.toCarriers.toSorts shape).encode result₁ =
+      (@resultCodec Θ₂.toCarriers.toSorts shape).encode result₂)
     (pre post : Memory unit) :
     (@closureRun unit _ executable Θ₁ closure σs shape args₁).ok pre result₁ post ↔
       (@closureRun unit _ executable Θ₂ closure σs shape args₂).ok pre result₂ post :=
@@ -110,12 +110,12 @@ variable (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true
 the frame moved there. -/
 theorem Denote.Skolems.reframe_surjective {τ : NTy}
     (bounded : τ.paramsAll (fun index => decide (index < params.length)) = true)
-    (moved : @NTy.carrier (Θ.instance params own).toCarriers τ) :
-    ∃ value : @NTy.carrier Θ.toCarriers τ, Θ.reframe own bounded value = moved := by
+    (moved : @NTy.carrier ((Θ.instance params own).toCarriers).toSorts τ) :
+    ∃ value : @NTy.carrier (Θ.toCarriers).toSorts τ, Θ.reframe own bounded value = moved := by
   refine ⟨Θ.ofRuntime τ
-    (cast (congrArg (@NTy.carrier (Carriers.runtime unit)) (Θ.resolve_instance_params own bounded))
+    (cast (congrArg (@NTy.carrier ((Carriers.runtime unit)).toSorts) (Θ.resolve_instance_params own bounded))
       ((Θ.instance params own).toRuntime τ moved)), ?_⟩
-  apply @NTy.encode_injective (Θ.instance params own).toCarriers τ
+  apply @NTy.encode_injective ((Θ.instance params own).toCarriers).toSorts τ
   rw [Θ.encode_reframe, ← Θ.encode_toRuntime, Θ.toRuntime_ofRuntime]
   exact (NTy.encode_castCarrier (Θ.resolve_instance_params own bounded) _ _).trans
     ((Θ.instance params own).encode_toRuntime τ moved)
@@ -141,12 +141,12 @@ theorem Denote.NTy.paramsAll_function_result {allowed : Nat → Bool} {parameter
 /-- A row moved to the frame of its type arguments keeps its encoding. -/
 theorem Denote.Skolems.encode_reframe_row {row : NRow}
     (bounded : (NTy.tuple row).paramsAll (fun index => decide (index < params.length)) = true)
-    (values : @HList Θ.toCarriers row) :
-    @HList.encode (Θ.instance params own).toCarriers row
+    (values : @HList (Θ.toCarriers).toSorts row) :
+    @HList.encode ((Θ.instance params own).toCarriers).toSorts row
         (Θ.reframe own (τ := .tuple row) bounded values) =
-      @HList.encode Θ.toCarriers row values := by
+      @HList.encode (Θ.toCarriers).toSorts row values := by
   have encoded := Θ.encode_reframe own (τ := .tuple row) bounded values
-  rw [@NTy.encode_tuple (Θ.instance params own).toCarriers, @NTy.encode_tuple Θ.toCarriers] at encoded
+  rw [@NTy.encode_tuple ((Θ.instance params own).toCarriers).toSorts, @NTy.encode_tuple (Θ.toCarriers).toSorts] at encoded
   simp only [RuntimeValue.tuple.injEq] at encoded
   exact List.toArray_inj encoded
 
@@ -154,7 +154,7 @@ theorem Denote.Skolems.encode_reframe_row {row : NRow}
 invariants. -/
 theorem Denote.Skolems.holds_reframe_row_iff {row : NRow}
     (bounded : (NTy.tuple row).paramsAll (fun index => decide (index < params.length)) = true)
-    (values : @HList Θ.toCarriers row) :
+    (values : @HList (Θ.toCarriers).toSorts row) :
     @HList.Holds (Θ.instance params own).toCarriers row
         (Θ.reframe own (τ := .tuple row) bounded values) ↔
       @HList.Holds Θ.toCarriers row values := by
@@ -166,10 +166,10 @@ runtime closure. -/
 theorem Denote.Skolems.closure_reframe {parameters : NRow} {shared : Sharing} {results : NRow}
     (bounded : (NTy.function parameters shared results).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (function : @NTy.carrier Θ.toCarriers (.function parameters shared results)) :
-    (@Carriers.functions (Θ.instance params own).toCarriers parameters shared results).closure
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function parameters shared results)) :
+    (@Sorts.functions ((Θ.instance params own).toCarriers).toSorts parameters shared results).closure
         (Θ.reframe own bounded function) =
-      (@Carriers.functions Θ.toCarriers parameters shared results).closure function :=
+      (@Sorts.functions (Θ.toCarriers).toSorts parameters shared results).closure function :=
   ClosureValue.encode_injective (Θ.encode_reframe own bounded function)
 
 /-- A run of a function value at the frame of its type arguments, of the
@@ -179,12 +179,12 @@ private theorem ensuresOf_reframe (executable : ExecutableUnit unit) {parameters
     (parametersFree : parameters.refFree = true) (resultsFree : shape.row.refFree = true)
     (bounded : (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (function : @NTy.carrier Θ.toCarriers (.function parameters shared shape.row))
-    (args : @HList Θ.toCarriers parameters)
-    {result : @ResultShape.carrier Θ.toCarriers shape}
-    {moved : @ResultShape.carrier (Θ.instance params own).toCarriers shape}
-    (sameResult : (@resultCodec (Θ.instance params own).toCarriers shape).encode moved =
-      (@resultCodec Θ.toCarriers shape).encode result)
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function parameters shared shape.row))
+    (args : @HList (Θ.toCarriers).toSorts parameters)
+    {result : @ResultShape.carrier (Θ.toCarriers).toSorts shape}
+    {moved : @ResultShape.carrier ((Θ.instance params own).toCarriers).toSorts shape}
+    (sameResult : (@resultCodec (Θ.instance params own).toCarriers.toSorts shape).encode moved =
+      (@resultCodec Θ.toCarriers.toSorts shape).encode result)
     (pre post : Memory unit) :
     @EnsuresOf unit _ (Θ.instance params own) (@closureMeaning unit _ executable (Θ.instance params own))
         parameters shared shape (Θ.reframe own bounded function)
@@ -204,10 +204,10 @@ private theorem result_reframe {parameters : NRow} {shared : Sharing} :
     (shape : ResultShape) →
     (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true →
-    (moved : @ResultShape.carrier (Θ.instance params own).toCarriers shape) →
-    ∃ result : @ResultShape.carrier Θ.toCarriers shape,
-      (@resultCodec (Θ.instance params own).toCarriers shape).encode moved =
-        (@resultCodec Θ.toCarriers shape).encode result ∧
+    (moved : @ResultShape.carrier ((Θ.instance params own).toCarriers).toSorts shape) →
+    ∃ result : @ResultShape.carrier (Θ.toCarriers).toSorts shape,
+      (@resultCodec (Θ.instance params own).toCarriers.toSorts shape).encode moved =
+        (@resultCodec Θ.toCarriers.toSorts shape).encode result ∧
       (@ResultShape.Holds (Θ.instance params own).toCarriers shape moved ↔
         @ResultShape.Holds Θ.toCarriers shape result)
   | .none, _, moved => ⟨moved, rfl, Iff.rfl⟩
@@ -223,10 +223,10 @@ private theorem result_moved {parameters : NRow} {shared : Sharing} :
     (shape : ResultShape) →
     (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true →
-    (result : @ResultShape.carrier Θ.toCarriers shape) →
-    ∃ moved : @ResultShape.carrier (Θ.instance params own).toCarriers shape,
-      (@resultCodec (Θ.instance params own).toCarriers shape).encode moved =
-        (@resultCodec Θ.toCarriers shape).encode result ∧
+    (result : @ResultShape.carrier (Θ.toCarriers).toSorts shape) →
+    ∃ moved : @ResultShape.carrier ((Θ.instance params own).toCarriers).toSorts shape,
+      (@resultCodec (Θ.instance params own).toCarriers.toSorts shape).encode moved =
+        (@resultCodec Θ.toCarriers.toSorts shape).encode result ∧
       (@ResultShape.Holds (Θ.instance params own).toCarriers shape moved ↔
         @ResultShape.Holds Θ.toCarriers shape result)
   | .none, _, result => ⟨result, rfl, Iff.rfl⟩
@@ -245,9 +245,9 @@ theorem FramedAt.reframe_iff (executable : ExecutableUnit unit) {parameters : NR
     {shared : Sharing} {shape : ResultShape}
     (bounded : (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (frame : @HList (Θ.instance params own).toCarriers parameters →
+    (frame : @HList ((Θ.instance params own).toCarriers).toSorts parameters →
       Memory unit → Memory unit → Prop)
-    (function : @NTy.carrier Θ.toCarriers (.function parameters shared shape.row)) :
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function parameters shared shape.row)) :
     @FramedAt unit _ executable (Θ.instance params own) parameters shared shape frame
         (Θ.reframe own bounded function) ↔
       @FramedAt unit _ executable Θ parameters shared shape
@@ -278,7 +278,7 @@ theorem KeepsMemoryAt.reframe_iff (executable : ExecutableUnit unit) {parameters
     {shared : Sharing} {shape : ResultShape}
     (bounded : (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (function : @NTy.carrier Θ.toCarriers (.function parameters shared shape.row)) :
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function parameters shared shape.row)) :
     @KeepsMemoryAt unit _ executable (Θ.instance params own) parameters shared shape
         (Θ.reframe own bounded function) ↔
       @KeepsMemoryAt unit _ executable Θ parameters shared shape function :=
@@ -294,7 +294,7 @@ theorem ValidResultsAt.reframe_iff (executable : ExecutableUnit unit) {parameter
     (parametersFree : parameters.refFree = true) (resultsFree : shape.row.refFree = true)
     (bounded : (NTy.function parameters shared shape.row).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (function : @NTy.carrier Θ.toCarriers (.function parameters shared shape.row)) :
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function parameters shared shape.row)) :
     @ValidResultsAt unit _ executable (Θ.instance params own) parameters shared shape
         (Θ.reframe own bounded function) ↔
       @ValidResultsAt unit _ executable Θ parameters shared shape function := by

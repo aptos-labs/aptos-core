@@ -37,8 +37,8 @@ def directCaller (unit : Validation.ValidatedUnit) : Function unit where
 -- Negative control first: a callee contract demanding an unestablished `validArgs`
 -- premise cannot be discharged at a Given call site without that validity proof.
 def guardedContract [C : Carriers] (State : Type)
-    (P : @NTy.carrier C (.param 0) → Prop) :
-    Contract State Failure (@HList C row) (@NTy.carrier C (.param 0)) where
+    (P : @NTy.carrier (C).toSorts (.param 0) → Prop) :
+    Contract State Failure (@HList (C).toSorts row) (@NTy.carrier (C).toSorts (.param 0)) where
   requires := fun _ _ => True
   ensures := fun args _ result _ => result = args.1
   aborts := fun _ _ _ => False
@@ -48,10 +48,10 @@ def guardedContract [C : Carriers] (State : Type)
 set_option linter.unusedVariables false in
 example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
     (ops : InterpreterOps unit G.toCarriers State)
-    (P : @NTy.carrier G.toCarriers (.param 0) → Prop)
+    (P : @NTy.carrier (G.toCarriers).toSorts (.param 0) → Prop)
     (verified : Satisfies (ops.call handle row (.one (.param 0)))
       (@guardedContract G.toCarriers State P))
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) : True := by
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) : True := by
   fail_if_success
     have : wp (@Function.denoteIn unit G.toCarriers State ops (directCaller unit) (value, ()))
         (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
@@ -63,7 +63,7 @@ example (G : GivenFrame) (State : Type) (unit : Validation.ValidatedUnit)
   trivial
 
 def identityContract [C : Carriers] (State : Type) :
-    Contract State Failure (@HList C row) (@NTy.carrier C (.param 0)) where
+    Contract State Failure (@HList (C).toSorts row) (@NTy.carrier (C).toSorts (.param 0)) where
   requires := fun _ _ => True
   ensures := fun args _ result _ => result = args.1
   aborts := fun _ _ _ => False
@@ -73,7 +73,7 @@ theorem given_caller (G : GivenFrame) (State : Type) (unit : Validation.Validate
     (ops : InterpreterOps unit G.toCarriers State)
     (verified : Satisfies (ops.generic handle #[] arguments row (.one (.param 0)))
       (@identityContract G.toCarriers State))
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (caller unit) (value, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [caller, row, Function.denoteIn]
@@ -86,7 +86,7 @@ theorem given_direct_caller (G : GivenFrame) (State : Type) (unit : Validation.V
     (ops : InterpreterOps unit G.toCarriers State)
     (verified : Satisfies (ops.call handle row (.one (.param 0)))
       (@identityContract G.toCarriers State))
-    (value : @NTy.carrier G.toCarriers (.param 0)) (initial : State) :
+    (value : @NTy.carrier (G.toCarriers).toSorts (.param 0)) (initial : State) :
     wp (@Function.denoteIn unit G.toCarriers State ops (directCaller unit) (value, ()))
       (fun result final => result = value ∧ final = initial) (fun _ => False) initial := by
   simp only [directCaller, row, Function.denoteIn]

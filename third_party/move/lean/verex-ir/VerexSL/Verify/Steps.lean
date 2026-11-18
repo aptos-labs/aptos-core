@@ -1301,8 +1301,11 @@ open Meta Tactic VerexIR.Proofs.Denote
 /-- The family a local's type or a hypothesis names: a value's carrier
 (`NTy.carrier`) or its data invariants (`NTy.Holds`). -/
 private def declCarriers? (type : Lean.Expr) : Option Lean.Expr :=
-  if type.isAppOfArity ``NTy.carrier 2 || type.isAppOfArity ``NTy.Holds 3 then
+  if type.isAppOfArity ``NTy.Holds 3 then
     some (type.getArg! 0).consumeMData
+  else if type.isAppOfArity ``NTy.carrier 2 then do
+    let_expr Carriers.toSorts carriers := (type.getArg! 0).consumeMData | none
+    return carriers.consumeMData
   else none
 
 /-- The carriers the leaf's native values are at: those of a local of a
@@ -3565,14 +3568,14 @@ private def elementRead (carrier : Lean.Expr) (τ : NTy) : MetaM (Lean.Expr × L
 /-- The equality a search compares a vector's elements of quoted native type
 `τ` by (`NTy.eqb`), and its soundness, where the type holds no reference and
 no ghost. -/
-private def elementEquality (carriers τ : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+private def elementEquality (sorts τ : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
   let decided (flag : Name) : MetaM Lean.Expr := do
     let statement ← mkEq (mkApp (mkConst flag) τ) (mkConst ``Bool.true)
     unless ← withDefault (isDefEq (mkApp (mkConst flag) τ) (mkConst ``Bool.true)) do
       throwError "a search compares elements holding a reference or a ghost"
     mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true)) statement
-  return (mkApp2 (mkConst ``NTy.eqb) carriers τ,
-    mkApp4 (mkConst ``NTy.eqb_iff) carriers τ (← decided ``NTy.refFree)
+  return (mkApp2 (mkConst ``NTy.eqb) sorts τ,
+    mkApp4 (mkConst ``NTy.eqb_iff) sorts τ (← decided ``NTy.refFree)
       (← decided ``NTy.ghostFree))
 
 /-- A built-in lemma's instance at its application: its theorem at the
@@ -3633,7 +3636,7 @@ def lemmaInstance (goal : MVarId) (step : LoweredStep) (reference : Syntax) (lem
               let quoted ← Contract.quoteNTy τ
               fallback := some (← Contract.plainFallbackValue carriers quoted)
               read := some (← elementRead (Contract.carrierType carriers quoted) τ)
-              search := some (← elementEquality carriers quoted)
+              search := some (← elementEquality (Contract.carrierSorts carriers) quoted)
               elementType := some τ
           Contract.translate context argument
       | _, none => throwErrorAt reference "a map lemma is applied at no map"
@@ -4909,7 +4912,7 @@ private def coerceWitness (goal : MVarId) (α value : Lean.Expr) (lowered : Lowe
       | throwErrorAt witness "the witness is not lowered"
     return (← context.carriers, ← context.nativeType (context.ns.typeId expression.typeId))
   let typed? ← goal.withContext do
-    let some view ← NativeMaps.typedView? carriers (← Contract.quoteNTy τ) | return none
+    let some view ← NativeMaps.typedView? (Contract.carrierSorts carriers) (← Contract.quoteNTy τ) | return none
     unless ← isDefEq view.type α do return none
     some <$> Contract.TypedTable.typedOf view τ value
   if let some typed := typed? then return typed

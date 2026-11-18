@@ -1050,7 +1050,7 @@ theorem neg_induced_family_check_of_other_value_stays_owed {State : Type} (state
 -- Positive: the fact at the induced carriers alone, of the goal as it is
 -- stated: the opener closes it whole.
 theorem pos_induced_family_fact_at_its_own_family_closes
-    (v : @NTy.carrier (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
+    (v : @NTy.carrier ((Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)).toSorts
       (.vector (NTy.param 0)))
     (hv : @NTy.Holds (Carriers.instantiate (⟨.cons (.param 0) .nil, rfl⟩ : TypeArgs) inferInstance)
       (.vector (NTy.param 0)) v) :

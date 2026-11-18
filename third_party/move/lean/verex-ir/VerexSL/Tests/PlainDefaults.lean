@@ -39,7 +39,7 @@ run_cmd liftTermElabM <| withSyntheticNativeTypes do
     let atInduced ← plainFallbackValue induced quoted
     unless actual.isAppOfArity ``NTy.plainFallback 3 || actual.isAppOfArity ``plainFallback 2 do
       throwError "plainFallbackValue lost its opaque plainFallback head: {actual}"
-    let expected := mkApp3 (mkConst ``NTy.plainFallback) frame quoted (← inhabitableProof quoted)
+    let expected := mkApp3 (mkConst ``NTy.plainFallback) (mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) frame) quoted (← inhabitableProof quoted)
     unless ← isDefEq actual expected do
       throwError "plainFallbackValue differs from NTy.plainFallback"
     unless ← isDefEq actual atScaffold do

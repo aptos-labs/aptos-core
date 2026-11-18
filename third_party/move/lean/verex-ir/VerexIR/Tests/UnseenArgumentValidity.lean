@@ -70,8 +70,8 @@ info: openAtom: value `function`, continuations [True], owed [(1, Carriers.own {
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) [Skolems unit]
     (shared : Sharing)
-    (function : @NTy.carrier Skolems.toCarriers (NTy.function row shared shape.row))
-    (x : @NTy.carrier Skolems.toCarriers Guarded)
+    (function : @NTy.carrier (Skolems.toCarriers).toSorts (NTy.function row shared shape.row))
+    (x : @NTy.carrier (Skolems.toCarriers).toSorts Guarded)
     (initial : Memory unit)
     (_contract : @MethodContract unit _ executable _ row shared shape function),
     wp (@closureMeaning unit _ executable _ row shared shape

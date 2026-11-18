@@ -687,7 +687,7 @@ it: stated before the order is read, as for `orderingVariant`. -/
   cases order <;> simp [orderingChoice, eq_comm]
 
 /-- The variant a chosen ordering value holds is the chosen variant's. -/
-theorem variantName_orderingChoice [VerexIR.Proofs.Denote.Carriers]
+theorem variantName_orderingChoice [VerexIR.Proofs.Denote.Sorts]
     (names : List String) (rows : VerexIR.Proofs.Denote.NRows)
     (less equal greater : VerexIR.Proofs.Denote.variantCarrier names rows) (order : Ordering) :
     VerexIR.Proofs.Denote.variantName names rows (orderingChoice less equal greater order) =
@@ -765,9 +765,17 @@ def Context.exprType (context : Context) (id : ExprId) : MetaM VerexIR.Proofs.De
     | throwError "specification expression {id.index} is out of range"
   context.nativeType (context.ns.typeId expression.typeId)
 
-/-- The Lean type of the native values of a quoted type at a family. -/
+/-- The operational parent of a semantic family expression. -/
+def carrierSorts (carriers : Lean.Expr) : Lean.Expr :=
+  mkApp (mkConst ``VerexIR.Proofs.Denote.Carriers.toSorts) carriers
+
+/-- The native value type at an already operational family. -/
+def carrierTypeAtSorts (sorts τ : Lean.Expr) : Lean.Expr :=
+  mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) sorts τ
+
+/-- The Lean type of the native values of a quoted type at a semantic family. -/
 def carrierType (carriers τ : Lean.Expr) : Lean.Expr :=
-  mkApp2 (mkConst ``VerexIR.Proofs.Denote.NTy.carrier) carriers τ
+  carrierTypeAtSorts (carrierSorts carriers) τ
 
 /-- The Lean type of a binder of a specification type: an integer's `Int`, a
 Boolean's `Bool`, a textual scalar's `String`, any other's carrier. -/
@@ -806,15 +814,25 @@ backed by a proof-irrelevant `Nonempty` witness so it requires no custom
 axioms. -/
 def plainFallbackValue (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
   return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainFallback)
-    carriers τ (← inhabitableProof τ)
+    (carrierSorts carriers) τ (← inhabitableProof τ)
 
 /-- The structural inhabitant of a native type whose inhabitability evaluates. -/
-def typedInhabitant? (carriers τ : Lean.Expr) : MetaM (Option Lean.Expr) := do
+def typedInhabitantAtSorts? (carriers τ : Lean.Expr) : MetaM (Option Lean.Expr) := do
   let inhabitable := mkApp (mkConst ``VerexIR.Proofs.Denote.NTy.inhabitable) τ
   unless ← withDefault (isDefEq inhabitable (mkConst ``Bool.true)) do return none
   let proof ← mkExpectedTypeHint (← mkEqRefl (mkConst ``Bool.true))
     (← mkEq inhabitable (mkConst ``Bool.true))
   return some (mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.plainFallback) carriers τ proof)
+
+/-- The structural inhabitant at a semantic family's parent. -/
+def typedInhabitant? (carriers τ : Lean.Expr) : MetaM (Option Lean.Expr) :=
+  typedInhabitantAtSorts? (carrierSorts carriers) τ
+
+/-- The inhabitant at an operational family. -/
+def typedInhabitantAtSorts (sorts τ : Lean.Expr) : MetaM Lean.Expr := do
+  let some inhabitant ← typedInhabitantAtSorts? sorts τ
+    | throwError "the native type {τ} has no value a specification can stand for"
+  pure inhabitant
 
 /-- The inhabitant of a native type, where a construct needs one. -/
 def typedInhabitant (carriers τ : Lean.Expr) : MetaM Lean.Expr := do
@@ -841,14 +859,14 @@ def conditional (test thenTerm elseTerm : Lean.Expr) (type? : Option Lean.Expr :
 cut to the type, `SpecInt.ofInt`), a Boolean's decision, any other value
 itself. An integer cut by `cut`, a clause's by `SpecInt.ofInt`. A native
 value, as a clause reads a type parameter's at every instance, is itself. -/
-def nativeOfClause (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (clause : Lean.Expr)
+def nativeOfClauseAtSorts (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (clause : Lean.Expr)
     (cut : Name := ``VerexIR.SpecInt.ofInt) : MetaM Lean.Expr := do
   let bare := clause.consumeMData
   if τ matches .int _ _ | .num | .bool then
-    if ← isDefEq (← inferType clause) (carrierType carriers (← quoteNTy τ)) then return clause
+    if ← isDefEq (← inferType clause) (carrierTypeAtSorts carriers (← quoteNTy τ)) then return clause
   match τ with
   | .int width signed =>
-      let carrier := carrierType carriers (← quoteNTy τ)
+      let carrier := carrierTypeAtSorts carriers (← quoteNTy τ)
       if bare.isAppOfArity ``VerexIR.SpecInt.val 3 then
         let value := bare.getArg! 2
         if ← isDefEq (← inferType value) carrier then return value
@@ -886,12 +904,12 @@ def nativeOfClause (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (clau
           #[decl.toExpr, lowerFits, lastFits])
       let default ← match ← certified 0 with
         | some zero => pure zero
-        | none => typedInhabitant carriers (← quoteNTy τ)
+        | none => typedInhabitantAtSorts carriers (← quoteNTy τ)
       return mkAppN (mkConst cut) #[widthExpr, toExpr signed, default, clause]
   | .num =>
       if bare.isAppOfArity ``VerexIR.SpecInt.val 3 then
         let value := bare.getArg! 2
-        if ← isDefEq (← inferType value) (carrierType carriers (← quoteNTy τ)) then return value
+        if ← isDefEq (← inferType value) (carrierTypeAtSorts carriers (← quoteNTy τ)) then return value
       let unbounded := mkConst ``VerexIR.IntWidth.unbounded
       let fits ← mkExpectedTypeHint (← mkEqRefl (← mkAppM ``Option.some #[mkConst ``Bool.true]))
         (← mkAppM ``VerexIR.IntegerValueFits #[unbounded, mkConst ``Bool.true, clause])
@@ -902,6 +920,11 @@ def nativeOfClause (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (clau
         return bare.getArg! 1
       decideProposition clause
   | _ => pure clause
+
+/-- Read a clause at the operational parent of a semantic family. -/
+def nativeOfClause (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (clause : Lean.Expr)
+    (cut : Name := ``VerexIR.SpecInt.ofInt) : MetaM Lean.Expr :=
+  nativeOfClauseAtSorts (carrierSorts carriers) τ clause cut
 
 /-- A proposition with each specification integer it cuts to a fixed width
 (`SpecInt.ofInt`) bound to the certified integer of that value, innermost
@@ -951,7 +974,7 @@ def storageKeyOf (carriers : Lean.Expr) (τ : VerexIR.Proofs.Denote.NTy) (key : 
     MetaM Lean.Expr := do
   match τ with
   | .address | .signer => return mkApp (mkConst ``VerexIR.StorageKey.address) key
-  | _ => return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.storageKey) carriers (← quoteNTy τ) key
+  | _ => return mkApp3 (mkConst ``VerexIR.Proofs.Denote.NTy.storageKey) (carrierSorts carriers) (← quoteNTy τ) key
 
 /-- The element types of a quoted row. -/
 partial def quotedRowTypes (row : Lean.Expr) : Array Lean.Expr :=
@@ -1006,7 +1029,7 @@ def typedVariantTest? (carriers τ value : Lean.Expr) (handle : VerexIR.StructHa
   unless view.isAppOfArity ``VerexIR.Proofs.Denote.NTy.enum 5 && view.getArg! 0 == toExpr handle do
     return none
   let name := mkAppN (mkConst ``VerexIR.Proofs.Denote.variantName)
-    #[carriers, view.getArg! 2, view.getArg! 3, value]
+    #[carrierSorts carriers, view.getArg! 2, view.getArg! 3, value]
   let tests ← mkListLit (mkConst ``String) (variants.toList.map toExpr)
   return some (mkApp2 (mkConst ``VerexIR.Proofs.Denote.namedIn) name tests)
 
@@ -1083,12 +1106,12 @@ def nativeVariantField (enum : VerexIR.Proofs.Denote.NTy) (choices : Array (Stri
 /-- The native row of clause values, a nested pair. -/
 partial def nativeRow (carriers : Lean.Expr) :
     VerexIR.Proofs.Denote.NRow → List Lean.Expr → MetaM Lean.Expr
-  | .nil, [] => return mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) carriers
+  | .nil, [] => return mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) (carrierSorts carriers)
   | .cons τ rest, operand :: operands => do
       let value ← nativeOfClause carriers τ operand
       let tail ← nativeRow carriers rest operands
       return mkAppN (mkConst ``VerexIR.Proofs.Denote.HList.cons)
-        #[carriers, ← quoteNTy τ, ← quoteRow rest, value, tail]
+        #[carrierSorts carriers, ← quoteNTy τ, ← quoteRow rest, value, tail]
   | _, _ => throwError "internal: a row of values differs from its row type"
 
 /-- An equation of two native values of one type. -/
@@ -1203,7 +1226,7 @@ def nativeOrderingValue (carriers : Lean.Expr) (unit : ValidatedUnit) (owner : V
       | throwError "the variant `{name}` of an ordering carries fields"
     return mkAppN (mkConst ``VerexIR.Proofs.Denote.Which.inject)
       #[carriers, namesExpr, rowsExpr, mkConst ``VerexIR.Proofs.Denote.NRow.nil,
-        ← quoteWhich which, mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) carriers]
+        ← quoteWhich which, mkApp (mkConst ``VerexIR.Proofs.Denote.HList.nil) (carrierSorts carriers)]
   let #[less, equal, greater] := values
     | throwError "the result of a structural order has three variants"
   return mkAppN (mkConst ``VerexSL.Contract.orderingChoice)
@@ -1217,7 +1240,7 @@ def structuralOrderTerm (context : Context) (τ : VerexIR.Proofs.Denote.NTy) (le
   let rank := mkApp (mkConst ``VerexIR.SemanticOperations.valueRanks)
     (← quoteValueOrders context.ns.orders)
   return mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.order)
-    #[carriers, rank, type, left, right]
+    #[carrierSorts carriers, rank, type, left, right]
 
 /-- The value of the ordering enum `ty` at an order. -/
 def orderingTerm (context : Context) (ty : IrTy) (order : Lean.Expr) : MetaM Lean.Expr := do
@@ -1316,7 +1339,7 @@ through its identity, by `NTy.equal` with handles (a table owner by its
 handle, no ghost slot read). -/
 def nativeEquation (carriers τ left right : Lean.Expr) (identity : Bool) : MetaM Lean.Expr := do
   unless identity do return ← equateNative carriers τ left right
-  mkEq (mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.equal) #[carriers, mkConst ``Bool.true, τ, left, right])
+  mkEq (mkAppN (mkConst ``VerexIR.Proofs.Denote.NTy.equal) #[carrierSorts carriers, mkConst ``Bool.true, τ, left, right])
     (mkConst ``Bool.true)
 
 /-! ## Intrinsic maps
@@ -1370,7 +1393,7 @@ structure TypedTable where
 (`NativeMaps.typedView?`). -/
 def typedViewOf (carriers τ : Lean.Expr) :
     MetaM VerexIR.Proofs.Denote.NativeMaps.TypedView := do
-  let some view ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers τ
+  let some view ← VerexIR.Proofs.Denote.NativeMaps.typedView? (carrierSorts carriers) τ
     | throwError "the map's keys or values of type {τ} have no typed view: the type has no \
         value a specification can stand for"
   pure view
@@ -1381,7 +1404,7 @@ itself, a value read as it is as its native value, any other value read
 def TypedTable.typedOf (view : VerexIR.Proofs.Denote.NativeMaps.TypedView)
     (τ : VerexIR.Proofs.Denote.NTy) (clause : Lean.Expr) : MetaM Lean.Expr := do
   if view.integer then return clause
-  let nativeValue ← nativeOfClause view.carriers τ clause
+  let nativeValue ← nativeOfClauseAtSorts view.carriers τ clause
   if view.identity then return nativeValue
   return (mkApp view.read nativeValue).headBeta
 
@@ -1394,7 +1417,7 @@ def TypedTable.clauseOf (view : VerexIR.Proofs.Denote.NativeMaps.TypedView) (dom
   if view.integer then
     if domain != .native then return typed
     let some τ := τ? | throwError "internal: a native clause of an integer map view has no type"
-    return ← nativeOfClause view.carriers τ typed
+    return ← nativeOfClauseAtSorts view.carriers τ typed
   domain.ofNative (mkApp view.unread typed).headBeta
 
 /-- The native value of a typed value of a view. -/
@@ -1583,21 +1606,21 @@ its keys are read by that family's typed view of the key type, a type
 parameter of an instantiated family included, and its values by that family's
 view of the value type where that view reads an integer. -/
 def NativeOwner.valid (owner : NativeOwner) (model : MapModel) : MetaM Lean.Expr := do
-  let_expr VerexIR.Proofs.Denote.NTy.carrier carriers table :=
+  let_expr VerexIR.Proofs.Denote.NTy.carrier sorts table :=
       (← instantiateMVars (← inferType owner.table)).consumeMData
     | throwError "internal: an owner's table is not at a native type"
   let_expr VerexIR.Proofs.Denote.NTy.table key value := table.consumeMData
     | throwError "internal: an owner's table is not at a table type"
-  let some keys ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers key (resolve := false)
+  let some keys ← VerexIR.Proofs.Denote.NativeMaps.typedView? sorts key (resolve := false)
     | throwError "the map's keys of type {key} have no typed view"
   let integerValues? : Option VerexIR.Proofs.Denote.NativeMaps.TypedView ← do
-    let some values ← VerexIR.Proofs.Denote.NativeMaps.typedView? carriers value (resolve := false)
+    let some values ← VerexIR.Proofs.Denote.NativeMaps.typedView? sorts value (resolve := false)
       | pure none
     pure (if values.integer then some values else none)
   let (valueRead, valueCarrier) ← match integerValues? with
     | some values => pure (values.read, values.carrier)
     | none => do
-        let nativeValue := carrierType carriers value
+        let nativeValue := carrierTypeAtSorts sorts value
         let identity ← withLocalDeclD `value nativeValue fun value => mkLambdaFVars #[value] value
         pure (identity, nativeValue)
   let map ← VerexIR.Proofs.Denote.NativeMaps.typedMapOfEntries keys.read valueRead owner.table

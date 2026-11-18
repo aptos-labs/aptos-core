@@ -104,9 +104,9 @@ theorem abortsNewFrom_indexed {n : Nat} {signed : Bool} {β : Type} (g : β → 
     SpecMap.AbortsNewFrom (xs.toList.map SpecInt.val) (ys.toList.map g) ↔
       (∃ i : Int, 0 ≤ i ∧ i < xs.size ∧ ∃ j : Int, 0 ≤ j ∧ j < xs.size ∧ ¬i = j ∧
         (xs[i.toNat]?.getD
-          (@NTy.plainFallback Carriers.ground (.int (n + 1) signed) rfl)).val =
+          (@NTy.plainFallback (Carriers.ground).toSorts (.int (n + 1) signed) rfl)).val =
           (xs[j.toNat]?.getD
-            (@NTy.plainFallback Carriers.ground (.int (n + 1) signed) rfl)).val) ∨
+            (@NTy.plainFallback (Carriers.ground).toSorts (.int (n + 1) signed) rfl)).val) ∨
       ¬(xs.size : Int) = ys.size :=
   abortsNewFrom_indexed_of g xs ys
 

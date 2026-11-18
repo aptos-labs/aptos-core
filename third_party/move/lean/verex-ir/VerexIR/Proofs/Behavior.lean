@@ -441,7 +441,7 @@ uninterpreted predicate (`requiresForeign`, or a model's hypothesis). -/
 abbrev RequiresMeaning (unit : Validation.ValidatedUnit) [FunctionCarriers unit] :=
   (parameters : NRow) → (shared : Sharing) → (results : NRow) →
     FunctionCarriers.carrier unit parameters shared results →
-    @HList (Carriers.runtime unit) parameters → Memory unit → Prop
+    @HList ((Carriers.runtime unit)).toSorts parameters → Memory unit → Prop
 
 /-- The declared precondition of a function value no closure site of the
 unit encodes: uninterpreted. Defining it as `True` would make every such
@@ -455,7 +455,7 @@ theorem RequiresMeaning.congr {unit : Validation.ValidatedUnit} [FunctionCarrier
     (shared : Sharing) (sameParameters : parameters = parameters') (sameResults : results = results')
     {value : FunctionCarriers.carrier unit parameters shared results}
     {value' : FunctionCarriers.carrier unit parameters' shared results'} (sameValue : HEq value value')
-    {args : @HList (Carriers.runtime unit) parameters} {args' : @HList (Carriers.runtime unit) parameters'}
+    {args : @HList ((Carriers.runtime unit)).toSorts parameters} {args' : @HList ((Carriers.runtime unit)).toSorts parameters'}
     (sameArgs : HEq args args') (state : Memory unit) :
     requires parameters shared results value args state =
       requires parameters' shared results' value' args' state := by
@@ -479,7 +479,7 @@ theorem Skolems.resolve_function (parameters : NRow) (shared : Sharing) (results
 def Skolems.functionToRuntime (parameters : NRow) (shared : Sharing) (results : NRow)
     (function : (NTy.function parameters shared results).carrier) :
     FunctionCarriers.carrier unit parameters.resolved shared results.resolved :=
-  cast (congrArg (@NTy.carrier (Carriers.runtime unit))
+  cast (congrArg (@NTy.carrier ((Carriers.runtime unit)).toSorts)
       (Skolems.resolve_function parameters shared results))
     (Θ.toRuntime (.function parameters shared results) function)
 
@@ -521,8 +521,8 @@ omit Θ in
 the arguments. -/
 theorem requiresOf_runtime
     (requires : RequiresMeaning unit) (σs : NRow) (shared : Sharing)
-    (results : NRow) (function : @NTy.carrier (Carriers.runtime unit) (.function σs shared results))
-    (args : @HList (Carriers.runtime unit) σs) (state : Memory unit) :
+    (results : NRow) (function : @NTy.carrier ((Carriers.runtime unit)).toSorts (.function σs shared results))
+    (args : @HList ((Carriers.runtime unit)).toSorts σs) (state : Memory unit) :
     @RequiresOf unit _ (Skolems.runtime unit) requires σs shared results function args state =
       requires σs shared results function args state := by
   unfold RequiresOf Skolems.functionToRuntime
@@ -552,12 +552,12 @@ theorem Skolems.functionToRuntime_construct (parameters : NRow) (shared : Sharin
         (Skolems.construct parameters shared results handle mask typeInstantiation captures typed) =
       @Skolems.construct unit _ (Skolems.runtime unit) parameters.resolved shared results.resolved
         handle mask typeInstantiation σs.resolved (HList.toRuntime σs captures) typed.atRuntime := by
-  apply @NTy.encode_injective (Carriers.runtime unit)
+  apply @NTy.encode_injective ((Carriers.runtime unit)).toSorts
     (.function parameters.resolved shared results.resolved)
   unfold Skolems.functionToRuntime
   rw [NTy.encode_castCarrier (Skolems.resolve_function parameters shared results),
     Θ.encode_toRuntime]
-  show ((Carriers.functions parameters shared results).closure _).encode =
+  show ((Sorts.functions parameters shared results).closure _).encode =
     ((FunctionCarriers.functions parameters.resolved shared results.resolved).closure _).encode
   rw [Skolems.closure_construct]
   erw [@Skolems.closure_construct unit _ (Skolems.runtime unit) parameters.resolved shared
@@ -566,7 +566,7 @@ theorem Skolems.functionToRuntime_construct (parameters : NRow) (shared : Sharin
   congr 1
   refine ClosureValue.ext rfl rfl rfl ?_
   show (HList.encode captures).toArray =
-    (@HList.encode (Carriers.runtime unit) σs.resolved (HList.toRuntime σs captures)).toArray
+    (@HList.encode ((Carriers.runtime unit)).toSorts σs.resolved (HList.toRuntime σs captures)).toArray
   rw [HList.encode_toRuntime]
 
 /-- `requires_of` of a construction at the frame is the requires meaning of
@@ -589,12 +589,12 @@ theorem requiresOf_construct (requires : RequiresMeaning unit) (parameters : NRo
 /-- A value at the frame of a type without type parameters, at the base
 frame at the same type. -/
 def Denote.Skolems.toRuntimeFree (τ : NTy) (free : τ.paramFree = true) (value : τ.carrier) :
-    @NTy.carrier (Carriers.runtime unit) τ :=
-  cast (congrArg (@NTy.carrier (Carriers.runtime unit)) (Skolems.resolve_paramFree free))
+    @NTy.carrier ((Carriers.runtime unit)).toSorts τ :=
+  cast (congrArg (@NTy.carrier ((Carriers.runtime unit)).toSorts) (Skolems.resolve_paramFree free))
     (Θ.toRuntime τ value)
 
 theorem Denote.Skolems.encode_toRuntimeFree (τ : NTy) (free : τ.paramFree = true) (value : τ.carrier) :
-    @NTy.encode (Carriers.runtime unit) τ (Θ.toRuntimeFree τ free value) = NTy.encode τ value := by
+    @NTy.encode ((Carriers.runtime unit)).toSorts τ (Θ.toRuntimeFree τ free value) = NTy.encode τ value := by
   unfold Skolems.toRuntimeFree
   rw [NTy.encode_castCarrier (Skolems.resolve_paramFree free), Θ.encode_toRuntime]
 
@@ -603,30 +603,30 @@ its current value and prophecy there. -/
 
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_unit (free) (value : Unit) :
     Θ.toRuntimeFree .unit free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .unit _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .unit _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_bool (free) (value : Bool) :
     Θ.toRuntimeFree .bool free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .bool _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .bool _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_int {width : Nat} {signed : Bool} (free)
     (value : SpecInt (.bits width) signed) :
     Θ.toRuntimeFree (.int width signed) free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) (.int width signed) _ _
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts (.int width signed) _ _
     (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_num (free) (value : SpecInt .unbounded true) :
     Θ.toRuntimeFree .num free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .num _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .num _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_address (free) (value : String) :
     Θ.toRuntimeFree .address free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .address _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .address _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_signer (free) (value : String) :
     Θ.toRuntimeFree .signer free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .signer _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .signer _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_string (free) (value : String) :
     Θ.toRuntimeFree .string free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .string _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .string _ _ (Θ.encode_toRuntimeFree _ free value)
 @[vir_denote_norm] theorem Denote.Skolems.toRuntimeFree_bytes (free) (value : Array UInt8) :
     Θ.toRuntimeFree .bytes free value = value :=
-  @NTy.encode_injective (Carriers.runtime unit) .bytes _ _ (Θ.encode_toRuntimeFree _ free value)
+  @NTy.encode_injective ((Carriers.runtime unit)).toSorts .bytes _ _ (Θ.encode_toRuntimeFree _ free value)
 
 /-- A mutable reference at the base frame pairs its current value with its
 prophecy there (`Skolems.toRuntimeFree`). -/
@@ -635,22 +635,22 @@ prophecy there (`Skolems.toRuntimeFree`). -/
     Θ.toRuntimeFree (.ref σ) free value =
       (Θ.toRuntimeFree σ (by simpa only [NTy.paramFree] using free) value.1,
         Θ.toRuntimeFree σ (by simpa only [NTy.paramFree] using free) value.2) := by
-  apply @NTy.encode_injective (Carriers.runtime unit) (.ref σ)
+  apply @NTy.encode_injective ((Carriers.runtime unit)).toSorts (.ref σ)
   rw [Θ.encode_toRuntimeFree]
   show RuntimeValue.tuple #[σ.encode value.1, σ.encode value.2] =
-    RuntimeValue.tuple #[@NTy.encode (Carriers.runtime unit) σ _,
-      @NTy.encode (Carriers.runtime unit) σ _]
+    RuntimeValue.tuple #[@NTy.encode ((Carriers.runtime unit)).toSorts σ _,
+      @NTy.encode ((Carriers.runtime unit)).toSorts σ _]
   rw [Θ.encode_toRuntimeFree, Θ.encode_toRuntimeFree]
 
 /-- Values of a row without type parameters at the frame, at the base frame
 at the same row. -/
 def HList.toRuntimeFree (row : NRow) (free : row.paramFree = true) (values : HList row) :
-    @HList (Carriers.runtime unit) row :=
-  cast (congrArg (@HList (Carriers.runtime unit)) (NRow.resolved_paramFree row free))
+    @HList ((Carriers.runtime unit)).toSorts row :=
+  cast (congrArg (@HList ((Carriers.runtime unit)).toSorts) (NRow.resolved_paramFree row free))
     (HList.toRuntime row values)
 
 theorem HList.encode_toRuntimeFree (row : NRow) (free : row.paramFree = true) (values : HList row) :
-    @HList.encode (Carriers.runtime unit) row (HList.toRuntimeFree row free values) =
+    @HList.encode ((Carriers.runtime unit)).toSorts row (HList.toRuntimeFree row free values) =
       HList.encode values := by
   unfold HList.toRuntimeFree
   rw [HList.encode_castCarrier (NRow.resolved_paramFree row free), HList.encode_toRuntime]
@@ -665,10 +665,10 @@ theorem HList.encode_toRuntimeFree (row : NRow) (free : row.paramFree = true) (v
           values.1,
         HList.toRuntimeFree rest (by simp only [NRow.paramFree, Bool.and_eq_true] at free; exact free.2)
           values.2) := by
-  apply (@rowCodec (Carriers.runtime unit) (.cons τ rest)).encode_injective
-  show @HList.encode (Carriers.runtime unit) _ _ = @HList.encode (Carriers.runtime unit) _ _
+  apply (@rowCodec ((Carriers.runtime unit)).toSorts (.cons τ rest)).encode_injective
+  show @HList.encode ((Carriers.runtime unit)).toSorts _ _ = @HList.encode ((Carriers.runtime unit)).toSorts _ _
   rw [HList.encode_toRuntimeFree, HList.encode_cons]
-  show _ = @NTy.encode (Carriers.runtime unit) τ _ :: @HList.encode (Carriers.runtime unit) rest _
+  show _ = @NTy.encode ((Carriers.runtime unit)).toSorts τ _ :: @HList.encode ((Carriers.runtime unit)).toSorts rest _
   rw [Θ.encode_toRuntimeFree, HList.encode_toRuntimeFree]
 
 omit Θ in
@@ -678,8 +678,8 @@ theorem Skolems.construct_heq_runtime
     (shared : Sharing) (handle : FunctionHandle) (mask : Nat)
     (typeInstantiation : Array (TypeId × TypeId)) (sameParameters : parameters = parameters')
     (sameResults : results = results') (sameCaptured : captured = captured')
-    {captures : @HList (Carriers.runtime unit) captured}
-    {captures' : @HList (Carriers.runtime unit) captured'} (sameCaptures : HEq captures captures')
+    {captures : @HList ((Carriers.runtime unit)).toSorts captured}
+    {captures' : @HList ((Carriers.runtime unit)).toSorts captured'} (sameCaptures : HEq captures captures')
     (typed : @SiteTyped unit _ (Skolems.runtime unit) parameters shared results handle mask
       typeInstantiation captured)
     (typed' : @SiteTyped unit _ (Skolems.runtime unit) parameters' shared results' handle mask
@@ -744,7 +744,7 @@ theorem closureMeaning_closureOf_coherent (executable : ExecutableUnit unit)
     (coherent : Coherent unit handle typeInstantiation) (captures : HList captured)
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     (args : HList supplied) :
     closureMeaning executable supplied shared shape
@@ -793,7 +793,7 @@ theorem ensuresOf_closureOf {executable : ExecutableUnit unit} {handle : Functio
     (ensures : EnsuresOf (closureMeaning executable) supplied shared shape
       function
       args result pre post)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures) :
     (propheticMeaning executable typeInstantiation handle full shape
       (weave.compose captures args)).ok pre result post := by
@@ -813,7 +813,7 @@ theorem abortsOf_closureOf {executable : ExecutableUnit unit} {handle : Function
     (aborts : AbortsOf (closureMeaning executable) supplied shared shape
       function
       args state)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures) :
     ∃ failure, (propheticMeaning executable typeInstantiation handle full shape
       (weave.compose captures args)).aborts state failure := by
@@ -837,7 +837,7 @@ theorem ensuresOf_closureOf_verified {executable : ExecutableUnit unit} {handle 
     (ensures : EnsuresOf (closureMeaning executable) supplied shared shape
       function
       args result pre post)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) pre)
     (permitted : contract.requires (weave.compose captures args) pre)
@@ -865,7 +865,7 @@ theorem abortsOf_closureOf_verified {executable : ExecutableUnit unit} {handle :
     (aborts : AbortsOf (closureMeaning executable) supplied shared shape
       function
       args state)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     (assumed : contract.assumes (weave.compose captures args) state)
     (permitted : contract.requires (weave.compose captures args) state)
@@ -882,10 +882,10 @@ theorem abortsOf_closureOf_woven {executable : ExecutableUnit unit} {handle : Fu
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
-    (naming : (Carriers.functions full named_shared shape.row).closure named =
+    (naming : (Sorts.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (args : HList supplied) (state : Memory unit) :
     AbortsOf (closureMeaning executable) supplied shared shape
@@ -904,10 +904,10 @@ theorem ensuresOf_closureOf_woven {executable : ExecutableUnit unit} {handle : F
     (typeInstantiation : Array (TypeId × TypeId)) (captures : HList (.cons τ captured))
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
-    (naming : (Carriers.functions full named_shared shape.row).closure named =
+    (naming : (Sorts.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (args : HList supplied) (result : shape.carrier) (pre post : Memory unit) :
     EnsuresOf (closureMeaning executable) supplied shared shape
@@ -923,7 +923,7 @@ theorem closureMeaning_named (executable : ExecutableUnit unit) {handle : Functi
     {typeInstantiation : Array (TypeId × TypeId)} (coherent : Coherent unit handle typeInstantiation)
     (full : NRow) (shared : Sharing) (shape : ResultShape)
     (named : (NTy.function full shared shape.row).carrier)
-    (naming : (Carriers.functions full shared shape.row).closure named =
+    (naming : (Sorts.functions full shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (args : HList full) :
     closureMeaning executable full shared shape named args =
@@ -938,7 +938,7 @@ returns and its `aborts_of` where it aborts. -/
 theorem wp_named {executable : ExecutableUnit unit} {handle : FunctionHandle}
     {typeInstantiation : Array (TypeId × TypeId)} {full : NRow} {shape : ResultShape}
     {shared : Sharing} {named : (NTy.function full shared shape.row).carrier}
-    (naming : (Carriers.functions full shared shape.row).closure named =
+    (naming : (Sorts.functions full shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     {args : HList full} {ensures : shape.carrier → Memory unit → Prop} {aborts : Failure → Prop}
     {initial : Memory unit}
@@ -998,9 +998,9 @@ the arguments and result read in its view. -/
 theorem ensuresOf_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
     (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
     (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
-    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
+    (result : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)
     (pre post : Memory unit) :
     @EnsuresOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function args result pre post =
@@ -1022,8 +1022,8 @@ theorem ensuresOf_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning u
 theorem abortsOf_instantiate {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
     (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit) (θ : TypeArgs)
     (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit) :
     @AbortsOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function args state =
       @AbortsOf unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
@@ -1038,8 +1038,8 @@ the arguments read in its view: both carry the value and the arguments to
 the base frame alike. -/
 theorem requiresOf_instantiate (Θ : Skolems unit) (θ : TypeArgs) (requires : RequiresMeaning unit)
     (σs : NRow) (shared : Sharing) (results : NRow)
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared results))
-    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared results))
+    (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit) :
     @RequiresOf unit _ (Skolems.instantiate θ Θ) requires σs shared results function args state =
       @RequiresOf unit _ Θ requires (NRow.subst θ.1 σs) shared (NRow.subst θ.1 results) function
         (HList.ofSkolem θ σs args) state := by
@@ -1073,7 +1073,7 @@ theorem Denote.HList.settle_of_refFree [Carriers] : (row : NRow) → row.refFree
 type arguments hold no reference. -/
 theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) :
-    (τ : NTy) → (value : @NTy.carrier (Carriers.instantiate θ Θ) τ) →
+    (τ : NTy) → (value : @NTy.carrier ((Carriers.instantiate θ Θ)).toSorts τ) →
     NTy.settle (τ.subst θ.1) (NTy.ofSkolem θ τ value) =
       NTy.ofSkolem θ τ (@NTy.settle (Carriers.instantiate θ Θ) τ value)
   | .param index, value => by
@@ -1089,7 +1089,7 @@ theorem Denote.NTy.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs)
 
 theorem Denote.HList.settle_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) :
-    (row : NRow) → (values : @HList (Carriers.instantiate θ Θ) row) →
+    (row : NRow) → (values : @HList ((Carriers.instantiate θ Θ)).toSorts row) →
     HList.settle (NRow.subst θ.1 row) (HList.ofSkolem θ row values) =
       HList.ofSkolem θ row (@HList.settle (Carriers.instantiate θ Θ) row values)
   | .nil, _ => rfl
@@ -1113,7 +1113,7 @@ theorem Denote.ResultShape.settled_one_of_refFree [Carriers] : (τ : NTy) → τ
 /-- A result is settled in either view alike. -/
 theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
     (free : θ.1.refFree = true) : (shape : ResultShape) →
-    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    (value : @ResultShape.carrier ((Carriers.instantiate θ Θ)).toSorts shape) →
     ((shape.subst θ.1).Settled (ResultShape.ofSkolem θ shape value) ↔
       @ResultShape.Settled (Carriers.instantiate θ Θ) shape value)
   | .none, _ => Iff.rfl
@@ -1147,7 +1147,7 @@ theorem Denote.ResultShape.settled_ofSkolem [Θ : Carriers] (θ : TypeArgs)
 /-- A result holds its data invariants in either view alike. -/
 theorem Denote.ResultShape.holds_ofSkolem_iff [Θ : Carriers] (θ : TypeArgs) :
     (shape : ResultShape) →
-    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    (value : @ResultShape.carrier ((Carriers.instantiate θ Θ)).toSorts shape) →
     ((shape.subst θ.1).Holds (ResultShape.ofSkolem θ shape value) ↔
       @ResultShape.Holds (Carriers.instantiate θ Θ) shape value)
   | .none, _ => Iff.rfl
@@ -1166,13 +1166,13 @@ theorem Denote.ResultShape.holds_toSkolem_iff [Θ : Skolems unit] (θ : TypeArgs
 /-- A result encodes alike in either view. -/
 theorem Denote.resultCodec_encode_ofSkolem [Θ : Carriers] (θ : TypeArgs) :
     (shape : ResultShape) →
-    (value : @ResultShape.carrier (Carriers.instantiate θ Θ) shape) →
+    (value : @ResultShape.carrier ((Carriers.instantiate θ Θ)).toSorts shape) →
     (resultCodec (shape.subst θ.1)).encode (ResultShape.ofSkolem θ shape value) =
-      (@resultCodec (Carriers.instantiate θ Θ) shape).encode value
+      (@resultCodec (Carriers.instantiate θ Θ).toSorts shape).encode value
   | .none, _ => rfl
   | .one τ, value => by
       show #[NTy.encode (τ.subst θ.1) (NTy.ofSkolem θ τ value)] =
-        #[@NTy.encode (Carriers.instantiate θ Θ) τ value]
+        #[@NTy.encode ((Carriers.instantiate θ Θ)).toSorts τ value]
       rw [NTy.encode_ofSkolem]
 
 end Settle
@@ -1184,8 +1184,8 @@ variable {invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ}
 outer frame on the entry values read in its view. -/
 theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
-    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (shape : ResultShape) (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (entries : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit) :
     @SettledEncoding unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared
         shape function entries state =
       @SettledEncoding unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
@@ -1220,8 +1220,8 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
     · rw [ensuresOf_instantiate coherent Θ θ free, HList.ofSkolem_toSkolem,
         ResultShape.ofSkolem_toSkolem]
       exact ran
-    · show (@HList.encode (Skolems.instantiate θ Θ).toCarriers σs (HList.toSkolem θ σs values),
-          (@resultCodec (Skolems.instantiate θ Θ).toCarriers shape).encode
+    · show (@HList.encode ((Skolems.instantiate θ Θ).toCarriers).toSorts σs (HList.toSkolem θ σs values),
+          (@resultCodec (Skolems.instantiate θ Θ).toCarriers.toSorts shape).encode
             (ResultShape.toSkolem θ shape result), final) = _
       rw [← HList.encode_ofSkolem, ← resultCodec_encode_ofSkolem, HList.ofSkolem_toSkolem,
         ResultShape.ofSkolem_toSkolem]
@@ -1230,8 +1230,8 @@ theorem settledEncoding_instantiate (coherent : InvokeMeaning.Coherent invoke) (
 /-- `state_of` at an induced frame is `state_of` at the outer frame. -/
 theorem stateOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
-    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit) :
+    (shape : ResultShape) (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (entries : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit) :
     @StateOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function entries state =
       @StateOf unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
@@ -1243,9 +1243,9 @@ theorem stateOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Sko
 back. -/
 theorem resultOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Skolems unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
-    (shape : ResultShape) (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
-    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    (shape : ResultShape) (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (entries : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit)
+    (default : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) :
     @ResultOf unit _ (Skolems.instantiate θ Θ) (invoke (Skolems.instantiate θ Θ)) σs shared shape
         function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (invoke Θ) (NRow.subst θ.1 σs) shared
@@ -1258,7 +1258,7 @@ theorem resultOf_instantiate (coherent : InvokeMeaning.Coherent invoke) (Θ : Sk
   · rename_i returns
     obtain ⟨⟨values, result, final⟩, _, chosen⟩ := returns.choose_spec
     rw [← chosen]
-    show ((@resultCodec (Skolems.instantiate θ Θ).toCarriers shape).decode?
+    show ((@resultCodec (Skolems.instantiate θ Θ).toCarriers.toSorts shape).decode?
         ((resultCodec (shape.subst θ.1)).encode result)).getD default =
       ResultShape.toSkolem θ shape (((resultCodec (shape.subst θ.1)).decode?
         ((resultCodec (shape.subst θ.1)).encode result)).getD (ResultShape.ofSkolem θ shape default))
@@ -1277,12 +1277,12 @@ transport's normal form (`vir_transport`), which reads each coherence. -/
 section Instances
 variable (executable : ExecutableUnit unit) (model : ModelUnit unit) (Θ : Skolems unit)
   (θ : TypeArgs) (σs : NRow) (shared : Sharing) (shape : ResultShape)
-  (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-  (args : @HList (Skolems.instantiate θ Θ).toCarriers σs)
-  (entries : @HList (Skolems.instantiate θ Θ).toCarriers σs) (state : Memory unit)
+  (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+  (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
+  (entries : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) (state : Memory unit)
 
 theorem closureMeaning_ensuresOf_instantiate (free : θ.1.refFree = true)
-    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (post : Memory unit) :
+    (result : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) (post : Memory unit) :
     @EnsuresOf unit _ (Skolems.instantiate θ Θ) (@closureMeaning unit _ executable (Skolems.instantiate θ Θ))
         σs shared shape function args result state post =
       @EnsuresOf unit _ Θ (@closureMeaning unit _ executable Θ) (NRow.subst θ.1 σs) shared
@@ -1301,7 +1301,7 @@ theorem closureMeaning_abortsOf_instantiate (free : θ.1.refFree = true) :
     state
 
 theorem closureMeaning_resultOf_instantiate (free : θ.1.refFree = true)
-    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    (default : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) :
     @ResultOf unit _ (Skolems.instantiate θ Θ) (@closureMeaning unit _ executable (Skolems.instantiate θ Θ))
         σs shared shape function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (@closureMeaning unit _ executable Θ)
@@ -1320,7 +1320,7 @@ theorem closureMeaning_stateOf_instantiate (free : θ.1.refFree = true) :
     state
 
 theorem ModelUnit.ensuresOf_instantiate (free : θ.1.refFree = true)
-    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) (post : Memory unit) :
+    (result : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) (post : Memory unit) :
     @EnsuresOf unit _ (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
         σs shared shape function args result state post =
       @EnsuresOf unit _ Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared (shape.subst θ.1)
@@ -1337,7 +1337,7 @@ theorem ModelUnit.abortsOf_instantiate (free : θ.1.refFree = true) :
   VerexIR.Proofs.abortsOf_instantiate model.coherent Θ θ free σs shared shape function args state
 
 theorem ModelUnit.resultOf_instantiate (free : θ.1.refFree = true)
-    (default : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) :
+    (default : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) :
     @ResultOf unit _ (Skolems.instantiate θ Θ) (model.invoke (Skolems.instantiate θ Θ))
         σs shared shape function entries state default =
       ResultShape.toSkolem θ shape (@ResultOf unit _ Θ (model.invoke Θ) (NRow.subst θ.1 σs) shared
@@ -1404,8 +1404,8 @@ theorem ensuresOf_generic_verified {unit : ValidatedUnit} [FunctionCarriers unit
     (args : HList (NRow.subst θ.1 supplied))
     {result : (shape.subst θ.1).carrier} {pre post : Memory unit}
     {contract : Contract (Memory unit) Failure
-      (@HList (Skolems.instantiate θ Θ).toCarriers full)
-      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+      (@HList ((Skolems.instantiate θ Θ).toCarriers).toSorts full)
+      (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)}
     (verified : Satisfies
       (@propheticMeaning unit _ executable (Skolems.instantiate θ Θ)
         (frameInstantiation unit handle outer typeArgs) handle full shape) contract)
@@ -1729,10 +1729,10 @@ theorem closureMeaning_closureOf_named {executable : ExecutableUnit unit} {handl
     (free : captured.refFree = true) (typeInstantiation : Array (TypeId × TypeId))
     (captures : HList captured) (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
-    (naming : (Carriers.functions full named_shared shape.row).closure named =
+    (naming : (Sorts.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (args : HList supplied) :
     closureMeaning executable supplied shared shape function args =
@@ -1750,10 +1750,10 @@ theorem abortsOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     (valid : HList.Holds captured captures)
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
-    (naming : (Carriers.functions full named_shared shape.row).closure named =
+    (naming : (Sorts.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (entries : HList supplied) (state : Memory unit) :
     AbortsOfEntries (closureMeaning executable) supplied shared shape function entries state =
@@ -1778,10 +1778,10 @@ theorem ensuresOfEntries_closureOf_woven {executable : ExecutableUnit unit}
     (valid : HList.Holds captured captures)
     (shared : Sharing) (shape : ResultShape)
     (function : (NTy.function supplied shared shape.row).carrier)
-    (closed : (Carriers.functions supplied shared shape.row).closure function =
+    (closed : (Sorts.functions supplied shared shape.row).closure function =
       closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing} (named : (NTy.function full named_shared shape.row).carrier)
-    (naming : (Carriers.functions full named_shared shape.row).closure named =
+    (naming : (Sorts.functions full named_shared shape.row).closure named =
       closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (entries : HList supplied) {finals : HList (NRow.finals supplied)}
     {finals' : HList (NRow.finals full)} (same : HEq finals' finals)
@@ -1809,11 +1809,11 @@ theorem ensuresOfSettled_closureOf_woven {executable : ExecutableUnit unit}
     (valid : HList.Holds captured captures)
     (shared : Sharing) (σ : NTy)
     (function : (NTy.function supplied shared (ResultShape.one (.ref σ)).row).carrier)
-    (closed : (Carriers.functions supplied shared (ResultShape.one (.ref σ)).row).closure
+    (closed : (Sorts.functions supplied shared (ResultShape.one (.ref σ)).row).closure
       function = closureOf handle weave.mask typeInstantiation captures)
     {named_shared : Sharing}
     (named : (NTy.function full named_shared (ResultShape.one (.ref σ)).row).carrier)
-    (naming : (Carriers.functions full named_shared (ResultShape.one (.ref σ)).row).closure
+    (naming : (Sorts.functions full named_shared (ResultShape.one (.ref σ)).row).closure
       named = closureOf handle (Weave.supplying full).mask typeInstantiation (σs := .nil) ())
     (entries : HList supplied) {finals : HList (NRow.finals supplied)}
     {finals' : HList (NRow.finals full)} (same : HEq finals' finals)

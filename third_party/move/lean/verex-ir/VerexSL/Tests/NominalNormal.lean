@@ -121,7 +121,7 @@ run_cmd do
         let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
         for concrete in [false, true] do
           let τ ← quoteNTy (if concrete then schema.subst (.cons .bool .nil) else schema)
-          withLocalDeclD `family (mkConst ``Carriers) fun family => do
+          withLocalDeclD `family (mkConst ``Sorts) fun family => do
             let carrier := mkApp2 (mkConst ``NTy.carrier) family τ
             withLocalDeclD `left carrier fun left => do
               withLocalDeclD `right carrier fun right => do
@@ -176,7 +176,7 @@ run_cmd do
       #[rules]
     withLocalDeclD `family (mkConst ``Carriers) fun family =>
       withLocalDeclD `operations (mkApp3 (mkConst ``InterpreterOps) (mkConst name) family (mkConst ``Unit)) fun operations =>
-        withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) family row) fun locals => do
+        withLocalDeclD `locals (mkApp2 (mkConst ``HEnv) (carrierSorts family) row) fun locals => do
           let call := mkAppN (mkConst ``Term.denoteIn)
             #[mkConst name, family, mkConst ``Unit, operations, shape, row, bodyType, quoted, locals]
           let (normalized, _) ← simp call context
@@ -199,7 +199,7 @@ run_cmd do
       let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
       let owner ← quoteNTy (schema.subst (.cons .bool .nil))
       withLocalDeclD `family (mkConst ``Carriers) fun family =>
-        withLocalDeclD `row (mkApp2 (mkConst ``NTy.carrier) family owner) fun row => do
+        withLocalDeclD `row (mkApp2 (mkConst ``NTy.carrier) (carrierSorts family) owner) fun row => do
           let view ← nativeTypeView owner
           let equivalence := if view.isAppOfArity ``NTy.struct 3 then ``NTy.holds_struct
             else ``NTy.holds_enum
@@ -208,7 +208,7 @@ run_cmd do
           let stated ← inferType opened
           let some encoded := stated.find? (·.isAppOfArity ``NTy.encode 3)
             | throwError "the opener's equivalence emitted no encoding"
-          unless encoded.getArg! 0 == family && encoded.getArg! 1 == view &&
+          unless encoded.getArg! 0 == carrierSorts family && encoded.getArg! 1 == view &&
               encoded.getArg! 2 == row do
             throwError "the opener's equivalence changed its encoding: {encoded}"
           unless ← isTypeCorrect opened do
@@ -223,7 +223,7 @@ run_cmd do
   liftTermElabM <| withNominalUnit name do
     let orderProcs ← Simp.SimprocsArray.add #[] ``nominalOrder false
     let context ← Simp.mkContext { zeta := false, beta := false, iota := false, proj := false }
-    withLocalDeclD `family (mkConst ``Carriers) fun family =>
+    withLocalDeclD `family (mkConst ``Sorts) fun family =>
       withLocalDeclD `rank (mkConst ``VerexIR.ValueRanks) fun rank =>
         withLocalDeclD `unknown (mkConst ``NTy) fun unknown => do
           let unknownCarrier := mkApp2 (mkConst ``NTy.carrier) family unknown
@@ -236,7 +236,7 @@ run_cmd do
     for index in [0, 5] do
       let some schema := structNTy unit ⟨⟨0⟩, index⟩ | throwError "missing fixture schema"
       let owner ← quoteNTy schema
-      withLocalDeclD `family (mkConst ``Carriers) fun family =>
+      withLocalDeclD `family (mkConst ``Sorts) fun family =>
         withLocalDeclD `rank (mkConst ``VerexIR.ValueRanks) fun rank => do
           let carrier := mkApp2 (mkConst ``NTy.carrier) family owner
           withLocalDeclD `left carrier fun left =>
@@ -273,7 +273,7 @@ run_cmd do
           let unread := mkApp4 (mkConst ``NTy.unread) family τ inhabitable typed
           let (result, _) ← simp unread context procs
           check unread typed result.expr
-    withLocalDeclD `family (mkConst ``Carriers) fun family => do
+    withLocalDeclD `family (mkConst ``Sorts) fun family => do
       normalUnread family (mkApp (mkConst ``NTy.param) (mkNatLit 0)) fun unread _ result => do
         unless result == unread do
           throwError "an unresolved parameter's native value was evaluated: {result}"
@@ -359,7 +359,7 @@ run_cmd do
     let owner ← quoteNTy (schema.subst (.cons .bool .nil))
     withLocalDeclD `family (mkConst ``Carriers) fun family => do
       let rowType := mkApp2 (mkConst ``NRow.cons) owner (mkConst ``NRow.nil)
-      withLocalDeclD `values (mkApp2 (mkConst ``HList) family rowType) fun values => do
+      withLocalDeclD `values (mkApp2 (mkConst ``HList) (carrierSorts family) rowType) fun values => do
         let projected ← quotedRowProjections family values #[owner]
         unless projected == #[← mkAppM ``Prod.fst #[values]] do
           throwError "field does not match an inferred named projection"

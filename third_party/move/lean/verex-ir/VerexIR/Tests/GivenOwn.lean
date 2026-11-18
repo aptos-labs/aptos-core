@@ -12,14 +12,14 @@ private def wrapper (source : StructHandle) : NTy :=
 
 /-- An ADT with no own clauses packs an arbitrary given parameter value. -/
 example (frame : GivenFrame) (source : StructHandle)
-    (value : @NTy.carrier frame.toCarriers (.param 0)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param 0)) :
     @NTy.deepHolds (frame.withDeclarations (fun _ _ => none)).toCarriers
       (wrapper source) (value, ()) := by
   exact ⟨trivial, trivial, trivial⟩
 
 /-- Installing declared invariants never constrains the opaque parameter sort. -/
 example (frame : GivenFrame) (declarations : GivenOwnDeclarations frame)
-    (index : Nat) (value : @NTy.carrier frame.toCarriers (.param index)) :
+    (index : Nat) (value : @NTy.carrier (frame.toCarriers).toSorts (.param index)) :
     @NTy.deepHolds (frame.withDeclarations declarations).toCarriers (.param index) value :=
   trivial
 
@@ -30,7 +30,7 @@ private def falseClauses (frame : GivenFrame) (source : StructHandle) :
 /-- A false declared invariant prevents validity, even though the field's
 given parameter invariant is True. -/
 theorem false_declared_rejected (frame : GivenFrame) (source : StructHandle)
-    (value : @NTy.carrier frame.toCarriers (.param 0)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param 0)) :
     ¬ @NTy.deepHolds (frame.withDeclarations (falseClauses frame source)).toCarriers
       (wrapper source) (value, ()) := by
   intro held
@@ -43,10 +43,10 @@ theorem false_declared_rejected (frame : GivenFrame) (source : StructHandle)
 invariant: deepHolds still descends into the field. -/
 theorem nested_declared_rejected (frame : GivenFrame) (inner outer : StructHandle)
     (distinct : outer ≠ inner)
-    (value : @NTy.carrier frame.toCarriers (.param 0)) :
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param 0)) :
     let family := (frame.withDeclarations (falseClauses frame inner)).toCarriers
     let type := NTy.struct outer .nil (.cons (wrapper inner) .nil)
-    @Carriers.own family outer .nil (@NTy.encode family type ((value, ()), ())) ∧
+    @Carriers.own family outer .nil (@NTy.encode (family).toSorts type ((value, ()), ())) ∧
       ¬ @NTy.deepHolds family type ((value, ()), ()) := by
   constructor
   · apply frame.withDeclarations_own_none (falseClauses frame inner)
@@ -57,8 +57,8 @@ theorem nested_declared_rejected (frame : GivenFrame) (inner outer : StructHandl
 /-- An opaque declaration predicate is preserved exactly, with no additional
 condition on parameter values and no runtime surjectivity premise. -/
 example (frame : GivenFrame) (source : StructHandle)
-    (predicate : @NTy.carrier frame.toCarriers (.param 0) → Prop)
-    (value : @NTy.carrier frame.toCarriers (.param 0)) :
+    (predicate : @NTy.carrier (frame.toCarriers).toSorts (.param 0) → Prop)
+    (value : @NTy.carrier (frame.toCarriers).toSorts (.param 0)) :
     let declarations : GivenOwnDeclarations frame :=
       fun _ _ => some ⟨wrapper source, fun row => predicate row.1⟩
     @NTy.deepHolds (frame.withDeclarations declarations).toCarriers

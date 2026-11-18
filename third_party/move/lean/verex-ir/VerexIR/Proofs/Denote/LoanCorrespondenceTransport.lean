@@ -108,7 +108,7 @@ theorem NTy.corresponds_toSkolem (θ : TypeArgs) (free : θ.1.refFree = true)
       simp only [NTy.subst]
       rw [NTy.corresponds_refFree_iff loans _
         ((NTy.refFree_unmark _).trans (getD_refFree θ.1 free index (.param index) rfl))]
-      change raw = @NTy.encode (Carriers.instantiate θ Θ) (.param index)
+      change raw = @NTy.encode ((Carriers.instantiate θ Θ)).toSorts (.param index)
         (NTy.toSkolem θ (.param index) value) ↔ _
       rw [NTy.encode_toSkolem]
   | .unit, value, raw | .bool, value, raw | .int _ _, value, raw | .num, value, raw

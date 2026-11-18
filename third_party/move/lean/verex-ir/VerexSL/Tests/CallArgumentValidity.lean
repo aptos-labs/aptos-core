@@ -437,7 +437,8 @@ run_cmd liftTermElabM do
   let τ := mkApp2 (mkConst ``NTy.int) (mkNatLit 64) (mkConst ``Bool.false)
   let row := mkApp2 (mkConst ``NRow.cons) τ (mkApp2 (mkConst ``NRow.cons) τ (mkConst ``NRow.nil))
   withLocalDeclD `Θ (mkConst ``Carriers) fun carriers => do
-    let rowType := mkApp2 (mkConst ``HList) carriers row
+    let sorts := VerexSL.Contract.carrierSorts carriers
+    let rowType := mkApp2 (mkConst ``HList) sorts row
     let held (values : Lean.Expr) : Lean.Expr :=
       mkApp3 (mkConst ``HList.Holds) carriers row values
     let component (index : Nat) (values : Lean.Expr) : MetaM Lean.Expr :=
@@ -461,8 +462,8 @@ run_cmd liftTermElabM do
             throwError "the second fact is not of the tail's head: {tail.type}"
         discard (component 0 values)
     -- The same row written out as a pair: the facts name the components.
-    withLocalDeclD `head (mkApp2 (mkConst ``NTy.carrier) carriers τ) fun first => do
-    withLocalDeclD `tail (mkApp2 (mkConst ``HList) carriers
+    withLocalDeclD `head (mkApp2 (mkConst ``NTy.carrier) sorts τ) fun first => do
+    withLocalDeclD `tail (mkApp2 (mkConst ``HList) sorts
         (mkApp2 (mkConst ``NRow.cons) τ (mkConst ``NRow.nil))) fun rest => do
       let pair ← mkAppM ``Prod.mk #[first, rest]
       withLocalDeclD `valid (held pair) fun valid => do

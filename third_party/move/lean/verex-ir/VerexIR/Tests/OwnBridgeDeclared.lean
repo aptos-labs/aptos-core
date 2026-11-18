@@ -68,10 +68,10 @@ declaration, at the ranks the unit names. -/
 theorem generated_installed :
     ∃ rank : ValueRanks, ∀ (θ : TypeArgs)
       (value : @NTy.carrier
-        (@Skolems.instantiate «0x42».own_bridge_declared.unit
+        ((@Skolems.instantiate «0x42».own_bridge_declared.unit
           «0x42».own_bridge_declared.functionCarriersBase θ
           (@Skolems.runtime «0x42».own_bridge_declared.unit
-            «0x42».own_bridge_declared.functionCarriersBase)).toCarriers
+            «0x42».own_bridge_declared.functionCarriersBase)).toCarriers).toSorts
         (map (.param 0) (.param 1))),
       «0x42».own_bridge_declared.dataOwn.case0 θ value ↔
         installed «0x42».own_bridge_declared.functionCarriersBase rank θ value := by
@@ -98,7 +98,7 @@ theorem declared :
     ∃ rank : ValueRanks,
       ∀ (Θ : @Skolems «0x42».own_bridge_declared.unit «0x42».own_bridge_declared.functionCarriers)
         (_ : ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-        (value : @NTy.carrier Θ.toCarriers (map (.param 0) (.param 1))),
+        (value : @NTy.carrier (Θ.toCarriers).toSorts (map (.param 0) (.param 1))),
         @NTy.Holds Θ.toCarriers (map (.param 0) (.param 1)) value ↔
           caller Θ rank value ∧
             @NTy.Holds Θ.toCarriers (.vector (entry (.param 0) (.param 1))) value.fst := by
@@ -123,10 +123,10 @@ theorem declared :
 hand-stated owner: its keys read by the induced frame's typed read. -/
 theorem generated_installed_owner (θ : TypeArgs)
     (value : @NTy.carrier
-      (@Skolems.instantiate «0x42».own_bridge_owner.unit
+      ((@Skolems.instantiate «0x42».own_bridge_owner.unit
         «0x42».own_bridge_owner.functionCarriersBase θ
         (@Skolems.runtime «0x42».own_bridge_owner.unit
-          «0x42».own_bridge_owner.functionCarriersBase)).toCarriers
+          «0x42».own_bridge_owner.functionCarriersBase)).toCarriers).toSorts
       (OwnBridgeTable.owner (.param 0) (.param 1))) :
     «0x42».own_bridge_owner.dataOwn.case0 θ value ↔
       OwnBridgeTable.installedRead «0x42».own_bridge_owner.functionCarriersBase θ value := by
@@ -154,9 +154,9 @@ theorem declaredOwner
     (Θ : @Skolems «0x42».own_bridge_owner.unit «0x42».own_bridge_owner.functionCarriers)
     (inhabitable :
       ((NRow.cons (.param 0) (.cons (.param 1) .nil)).map Θ.resolve).inhabitable = true)
-    (value : @NTy.carrier Θ.toCarriers (OwnBridgeTable.owner (.param 0) (.param 1))) :
+    (value : @NTy.carrier (Θ.toCarriers).toSorts (OwnBridgeTable.owner (.param 0) (.param 1))) :
     @Carriers.own Θ.toCarriers ⟨⟨0⟩, 0⟩ (.cons (.param 0) (.cons (.param 1) .nil))
-        (@NTy.encode Θ.toCarriers (OwnBridgeTable.owner (.param 0) (.param 1)) value) ↔
+        (@NTy.encode (Θ.toCarriers).toSorts (OwnBridgeTable.owner (.param 0) (.param 1)) value) ↔
       OwnBridgeTable.caller Θ value :=
   Carriers.own_bridge (functions := «0x42».own_bridge_owner.functionCarriers)
     (base := «0x42».own_bridge_owner.functionCarriersBase) rfl HEq.rfl rfl Θ

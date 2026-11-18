@@ -13,10 +13,11 @@ open Lean Meta Elab Command VerexIR VerexIR.Proofs.Denote VerexSL
 
 run_cmd liftTermElabM do
   let index := mkNatLit 0
-  let stable := #[``Carriers.carrier, ``Carriers.codec, ``Carriers.orders]
+  let stable := #[``Sorts.carrier, ``Sorts.codec, ``Sorts.orders]
+  let sorts := VerexSL.Contract.carrierSorts
   withLocalDeclD `unknown (mkConst ``Carriers) fun family => do
     for head in stable do
-      let projected := mkApp2 (mkConst head) family index
+      let projected := mkApp2 (mkConst head) (sorts family) index
       let result ← canonicalFamilyResult projected
       unless result.expr == projected do
         throwError "unknown operation family changed"
@@ -28,15 +29,16 @@ run_cmd liftTermElabM do
       for family in #[mkApp (mkConst ``GivenFrame.toCarriers) installed,
           mkApp (mkConst ``GivenFrame.clauseScaffold) given,
           mkApp (mkConst ``GivenFrame.operations) installed] do
-        for head in #[``Carriers.reads, ``Carriers.holds, ``Carriers.own] do
-          let projected := mkApp (mkConst head) family
+        for head in #[``Sorts.reads, ``Carriers.holds, ``Carriers.own] do
+          let dictionary := if head == ``Sorts.reads then sorts family else family
+          let projected := mkApp (mkConst head) dictionary
           let result ← canonicalFamilyResult projected
           unless result.expr == projected do
             throwError "operation observation erased a view-specific member: {result.expr}"
         for head in stable do
-          let projected := mkApp2 (mkConst head) family index
+          let projected := mkApp2 (mkConst head) (sorts family) index
           let result ← canonicalFamilyResult projected
-          let expected := mkApp2 (mkConst head) original index
+          let expected := mkApp2 (mkConst head) (sorts original) index
           unless result.expr == expected do
             throwError "stable given operation did not retain its original family: {result.expr}"
           unless ← isTypeCorrect result.expr do throwError "ill typed given operation"

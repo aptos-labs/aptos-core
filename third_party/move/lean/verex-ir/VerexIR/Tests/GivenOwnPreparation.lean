@@ -12,11 +12,11 @@ local notation "ownType" =>
 local notation "otherOwnType" =>
   NTy.struct ⟨⟨0⟩, 1⟩ (NRow.cons (NTy.param 0) NRow.nil) (NRow.cons (NTy.param 0) NRow.nil)
 
-def declarations (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop) :
+def declarations (G : GivenFrame) (predicate : @NTy.carrier (G.toCarriers).toSorts ownType → Prop) :
     GivenOwnDeclarations G := fun _ _ => some ⟨ownType, predicate⟩
 
 def twoDeclarations (G : GivenFrame)
-    (predicate₁ predicate₂ : @NTy.carrier G.toCarriers ownType → Prop) :
+    (predicate₁ predicate₂ : @NTy.carrier (G.toCarriers).toSorts ownType → Prop) :
     GivenOwnDeclarations G := fun handle _ =>
   if handle == ⟨⟨0⟩, 0⟩ then some ⟨ownType, predicate₁⟩
   else if handle == ⟨⟨0⟩, 1⟩ then some ⟨otherOwnType, predicate₂⟩
@@ -24,8 +24,8 @@ def twoDeclarations (G : GivenFrame)
 
 -- 1 (Negative): A plain value without `NTy.Holds` exposes no declaration invariant.
 set_option linter.unusedVariables false in
-example (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop)
-    (value : @NTy.carrier (G.withDeclarations (declarations G predicate)).toCarriers ownType) :
+example (G : GivenFrame) (predicate : @NTy.carrier (G.toCarriers).toSorts ownType → Prop)
+    (value : @NTy.carrier ((G.withDeclarations (declarations G predicate)).toCarriers).toSorts ownType) :
     True := by
   fail_if_success
     have : predicate value := by
@@ -35,8 +35,8 @@ example (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop
 
 -- 2 (Positive): Explicit `NTy.Holds` exposes the resolved `predicate value` before canonicalization,
 --    so construction-time and invariant readers see resolved type arguments at the actual value.
-example (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop)
-    (value : @NTy.carrier (G.withDeclarations (declarations G predicate)).toCarriers ownType)
+example (G : GivenFrame) (predicate : @NTy.carrier (G.toCarriers).toSorts ownType → Prop)
+    (value : @NTy.carrier ((G.withDeclarations (declarations G predicate)).toCarriers).toSorts ownType)
     (held : @NTy.Holds (G.withDeclarations (declarations G predicate)).toCarriers ownType value) :
     predicate value := by
   run_tac do
@@ -50,8 +50,8 @@ example (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop
 -- 3 (Positive): Whole-proposition `NTy.Holds` identity opens distinct Given declarations sharing
 --    the same plain value.
 example (G : GivenFrame)
-    (predicate₁ predicate₂ : @NTy.carrier G.toCarriers ownType → Prop)
-    (value : @NTy.carrier (G.withDeclarations (twoDeclarations G predicate₁ predicate₂)).toCarriers ownType)
+    (predicate₁ predicate₂ : @NTy.carrier (G.toCarriers).toSorts ownType → Prop)
+    (value : @NTy.carrier ((G.withDeclarations (twoDeclarations G predicate₁ predicate₂)).toCarriers).toSorts ownType)
     (held₁ : @NTy.Holds (G.withDeclarations (twoDeclarations G predicate₁ predicate₂)).toCarriers ownType value)
     (held₂ : @NTy.Holds (G.withDeclarations (twoDeclarations G predicate₁ predicate₂)).toCarriers otherOwnType value) :
     predicate₁ value ∧ predicate₂ value := by
@@ -59,11 +59,11 @@ example (G : GivenFrame)
   exact ⟨by assumption, by assumption⟩
 
 -- 4 (Positive): Explicit `Carriers.own` on an encoding decodes to `predicate value` under `verex_split_hypotheses`.
-example (G : GivenFrame) (predicate : @NTy.carrier G.toCarriers ownType → Prop)
-    (value : @NTy.carrier G.toCarriers ownType)
+example (G : GivenFrame) (predicate : @NTy.carrier (G.toCarriers).toSorts ownType → Prop)
+    (value : @NTy.carrier (G.toCarriers).toSorts ownType)
     (held : @Carriers.own (G.withDeclarations (declarations G predicate)).toCarriers
       ⟨⟨0⟩, 0⟩ (.cons (.param 0) .nil)
-      (@NTy.encode G.toCarriers ownType value)) : predicate value := by
+      (@NTy.encode (G.toCarriers).toSorts ownType value)) : predicate value := by
   verex_split_hypotheses
   assumption
 

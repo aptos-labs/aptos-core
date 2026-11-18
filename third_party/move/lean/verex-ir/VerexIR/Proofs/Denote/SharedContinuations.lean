@@ -725,69 +725,85 @@ def partitionArrivals [BEq κ] (key : Arrival → κ) (arrivals : Array Arrival)
 private def mentionsAnyBinder (binders : Array Lean.Expr) (e : Lean.Expr) : Bool :=
   e.hasAnyFVar fun id => binders.any (·.fvarId! == id)
 
+/-- Preserve a projected semantic stage, or the continuation's authoritative
+family when its operational parent types this value. A bare Sorts dictionary
+never supplies invented validity predicates. -/
+private def semanticFamilyAtSorts (flowFamily sorts : Lean.Expr) : MetaM Lean.Expr := do
+  let sorts := sorts.consumeMData
+  if sorts.isAppOfArity ``Carriers.toSorts 1 then return sorts.getArg! 0
+  let parent := mkApp (mkConst ``Carriers.toSorts) flowFamily
+  unless ← withNewMCtxDepth (isDefEq sorts parent) do
+    throwError "a shared continuation value has no semantic family in its flow"
+  return flowFamily
+
 /-- Collect mandatory `Holds` obligations for non-`invariantFree` components
 of `shaped` that vary across arrivals (mention at least one binder in `binders`).
 For `NTy.ref σ` decomposed as `Prod.mk current prophecy`, ONLY `prophecy`
 receives a `Holds` obligation, NEVER the open reference current `current`.
 For `NTy.struct`, `NTy.Holds` is stated on the whole reconstructed struct value
 rather than descending into its raw `Prod` representation. -/
-private partial def collectHoldsSpecs (binders : Array Lean.Expr) (type shaped : Lean.Expr) :
+private partial def collectHoldsSpecs (carriers : Lean.Expr) (binders : Array Lean.Expr) (type shaped : Lean.Expr) :
     MetaM (Array Lean.Expr) := do
   unless mentionsAnyBinder binders shaped do return #[]
   let type := type.consumeMData.headBeta
   let shaped := shaped.consumeMData.headBeta
   if type.isAppOfArity ``HEnv 2 then
-    let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
+    let (sorts, Γ) := (type.getArg! 0, type.getArg! 1)
     if ← isInvariantFreeNRow Γ then return #[]
     let Γ' ← (try whnfD Γ catch _ => pure Γ)
     if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
     if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
       let (τ, rest) := (Γ'.getArg! 0, Γ'.getArg! 1)
-      let slotType ← mkAppM ``Option #[mkApp2 (mkConst ``NTy.carrier) carriers τ]
-      let restType := mkApp2 (mkConst ``HEnv) carriers rest
-      return (← collectHoldsSpecs binders slotType (shaped.getArg! 2)) ++
-        (← collectHoldsSpecs binders restType (shaped.getArg! 3))
+      let slotType ← mkAppM ``Option #[mkApp2 (mkConst ``NTy.carrier) sorts τ]
+      let restType := mkApp2 (mkConst ``HEnv) sorts rest
+      return (← collectHoldsSpecs carriers binders slotType (shaped.getArg! 2)) ++
+        (← collectHoldsSpecs carriers binders restType (shaped.getArg! 3))
+    let carriers ← semanticFamilyAtSorts carriers sorts
     return #[mkApp3 (mkConst ``HEnv.Holds) carriers Γ shaped]
   if type.isAppOfArity ``HList 2 then
-    let (carriers, Γ) := (type.getArg! 0, type.getArg! 1)
+    let (sorts, Γ) := (type.getArg! 0, type.getArg! 1)
     if ← isInvariantFreeNRow Γ then return #[]
     let Γ' ← (try whnfD Γ catch _ => pure Γ)
     if Γ'.isAppOfArity ``NRow.nil 0 then return #[]
     if Γ'.isAppOfArity ``NRow.cons 2 && shaped.isAppOfArity ``Prod.mk 4 then
       let (τ, rest) := (Γ'.getArg! 0, Γ'.getArg! 1)
-      return (← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers τ) (shaped.getArg! 2)) ++
-        (← collectHoldsSpecs binders (mkApp2 (mkConst ``HList) carriers rest) (shaped.getArg! 3))
+      return (← collectHoldsSpecs carriers binders (mkApp2 (mkConst ``NTy.carrier) sorts τ) (shaped.getArg! 2)) ++
+        (← collectHoldsSpecs carriers binders (mkApp2 (mkConst ``HList) sorts rest) (shaped.getArg! 3))
+    let carriers ← semanticFamilyAtSorts carriers sorts
     return #[mkApp3 (mkConst ``HList.Holds) carriers Γ shaped]
   if type.isAppOfArity ``Option 1 then
     let elemType := (type.getArg! 0).consumeMData.headBeta
     if shaped.isAppOfArity ``Option.none 1 then return #[]
     if shaped.isAppOfArity ``Option.some 2 then
-      return ← collectHoldsSpecs binders elemType (shaped.getArg! 1)
+      return ← collectHoldsSpecs carriers binders elemType (shaped.getArg! 1)
     if elemType.isAppOfArity ``NTy.carrier 2 then
-      let (carriers, τ) := (elemType.getArg! 0, elemType.getArg! 1)
+      let (sorts, τ) := (elemType.getArg! 0, elemType.getArg! 1)
       if ← isInvariantFreeNTy τ then return #[]
+      let carriers ← semanticFamilyAtSorts carriers sorts
       return #[mkApp3 (mkConst ``Slot.Holds) carriers τ shaped]
     return #[]
   if type.isAppOfArity ``ResultShape.carrier 2 then
-    let (carriers, shape) := (type.getArg! 0, type.getArg! 1)
+    let (sorts, shape) := (type.getArg! 0, type.getArg! 1)
     let shape' ← (try whnfD shape catch _ => pure shape)
     if shape'.isAppOfArity ``ResultShape.none 0 then return #[]
     if shape'.isAppOfArity ``ResultShape.one 1 then
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers (shape'.getArg! 0)) shaped
+      return ← collectHoldsSpecs carriers binders (mkApp2 (mkConst ``NTy.carrier) sorts (shape'.getArg! 0)) shaped
+    let carriers ← semanticFamilyAtSorts carriers sorts
     return #[mkApp3 (mkConst ``ResultShape.Holds) carriers shape shaped]
   if type.isAppOfArity ``NTy.carrier 2 then
-    let (carriers, τ) := (type.getArg! 0, type.getArg! 1)
+    let (sorts, τ) := (type.getArg! 0, type.getArg! 1)
     if ← isInvariantFreeNTy τ then return #[]
     let τ' ← (try whnfD τ catch _ => pure τ)
     if τ'.isAppOfArity ``NTy.ref 1 && shaped.isAppOfArity ``Prod.mk 4 then
       let σ := τ'.getArg! 0
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``NTy.carrier) carriers σ) (shaped.getArg! 3)
+      return ← collectHoldsSpecs carriers binders (mkApp2 (mkConst ``NTy.carrier) sorts σ) (shaped.getArg! 3)
     if τ'.isAppOfArity ``NTy.tuple 1 && shaped.isAppOfArity ``Prod.mk 4 then
-      return ← collectHoldsSpecs binders (mkApp2 (mkConst ``HList) carriers (τ'.getArg! 0)) shaped
+      return ← collectHoldsSpecs carriers binders (mkApp2 (mkConst ``HList) sorts (τ'.getArg! 0)) shaped
+    let carriers ← semanticFamilyAtSorts carriers sorts
     return #[mkApp3 (mkConst ``NTy.Holds) carriers τ shaped]
   if type.isAppOfArity ``Prod 2 && shaped.isAppOfArity ``Prod.mk 4 then
-    return (← collectHoldsSpecs binders (type.getArg! 0) (shaped.getArg! 2)) ++
-      (← collectHoldsSpecs binders (type.getArg! 1) (shaped.getArg! 3))
+    return (← collectHoldsSpecs carriers binders (type.getArg! 0) (shaped.getArg! 2)) ++
+      (← collectHoldsSpecs carriers binders (type.getArg! 1) (shaped.getArg! 3))
   return #[]
 
 /-- Search an unsplit `And` / `HList.Holds` / `HEnv.Holds` hypothesis spine up
@@ -974,7 +990,7 @@ def sealNode (node : Node) (invariantProofs : Array Lean.Expr := #[]) (shared : 
         let mut holdsSpecs : Array Lean.Expr := #[]
         for parameter in parameters, shapedArg in shaped do
           let paramType := (← inferType parameter).replaceFVars parameters shaped
-          let specs ← collectHoldsSpecs binders paramType shapedArg
+          let specs ← collectHoldsSpecs (flowType.getArg! 0) binders paramType shapedArg
           for spec in specs do
             unless holdsSpecs.contains spec do
               holdsSpecs := holdsSpecs.push spec
@@ -1203,7 +1219,8 @@ private partial def entryValue (expression : Lean.Expr) : MetaM Lean.Expr := do
     let σs := e.getArg! 3
     let choice ← entryValue (e.getArg! 4)
     let variant ← entryValue (e.getArg! 5)
-    let rowTy := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList) carriers σs
+    let rowTy := mkApp2 (mkConst ``VerexIR.Proofs.Denote.HList)
+      (mkApp (mkConst ``Carriers.toSorts) carriers) σs
     if choice.isAppOfArity ``VerexIR.Proofs.Denote.Which.here 4 then
       if variant.isAppOfArity ``Sum.inl 3 then
         return ← entryValue (mkApp2 (mkConst ``Option.some [0]) rowTy (variant.getArg! 2))

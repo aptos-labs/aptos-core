@@ -23,7 +23,7 @@ private def scalarCertificateArgs : TypeArgs := ⟨.cons scalarCertificate .nil,
 open Lean Meta Elab Command in
 run_cmd liftTermElabM do
   let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
-  withLocalDeclD `unknown (mkConst ``Carriers) fun unknown => do
+  withLocalDeclD `unknown (mkConst ``Sorts) fun unknown => do
     let some unresolved ← NativeMaps.typedView? unknown parameter
       | throwError "unresolved parameter lost its typed view"
     if unresolved.identity then
@@ -32,7 +32,7 @@ run_cmd liftTermElabM do
       throwError "unresolved parameter reader changed: {unresolved.read}"
   let emptyEnum : NTy := .enum ⟨⟨0⟩, 2⟩ .nil [] .nil (by decide)
   let quotedEmpty ← withSyntheticNativeTypes (VerexSL.Contract.quoteNTy emptyEnum)
-  if (← NativeMaps.typedView? (mkConst ``Carriers.ground) quotedEmpty).isSome then
+  if (← NativeMaps.typedView? (mkConst ``Sorts.ground) quotedEmpty).isSome then
     throwError "an uninhabited enum acquired a typed map view"
 
 -- A frame's type arguments are read by the named field of their subtype, the
@@ -44,8 +44,8 @@ open Lean Meta Elab Command in
 run_cmd liftTermElabM do
   let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
   withLocalDeclD `arguments (mkConst ``TypeArgs) fun arguments =>
-    withLocalDeclD `outer (mkConst ``Carriers) fun outer => do
-      let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments outer
+    withLocalDeclD `outer (mkConst ``Sorts) fun outer => do
+      let induced := mkApp2 (mkConst ``Sorts.instantiate) arguments outer
       let some view ← NativeMaps.typedView? induced parameter
         | throwError "a symbolic frame's parameter lost its typed view"
       for (name, term) in #[("type", view.type), ("carrier", view.carrier),
@@ -60,27 +60,27 @@ run_cmd liftTermElabM do
 
 -- A concrete non-integer reader is the identity by construction over the single carrier.
 example [Θ : Carriers] :
-    NTy.read byteVector = (fun value : @NTy.carrier Θ byteVector => value) := rfl
+    NTy.read byteVector = (fun value : @NTy.carrier (Θ).toSorts byteVector => value) := rfl
 
 -- Instantiating a parameter reaches that same reader.
 example [Θ : Carriers] :
-    @NTy.read (Carriers.instantiate byteVectorArgs Θ) (.param 0) =
-      (fun value : @NTy.carrier Θ byteVector => value) := rfl
+    @NTy.read ((Carriers.instantiate byteVectorArgs Θ)).toSorts (.param 0) =
+      (fun value : @NTy.carrier (Θ).toSorts byteVector => value) := rfl
 
 -- The map receives the concrete reader directly, even while unapplied.
 example [Θ : Carriers]
-    (entries : SpecEntries (SpecInt (.bits 8) false × @NTy.carrier Θ byteVector)) :
+    (entries : SpecEntries (SpecInt (.bits 8) false × @NTy.carrier (Θ).toSorts byteVector)) :
     SpecMap.ofEntries SpecInt.val (NTy.read byteVector) entries =
       SpecMap.ofEntries SpecInt.val (fun value => value) entries := rfl
 
 -- Production call contracts use the projected carriers of an instantiated
 -- `Skolems` frame. This path retains the same reader directly.
 example {unit : Validation.ValidatedUnit} [FunctionCarriers unit] (frame : Skolems unit) :
-    @NTy.read (Skolems.instantiate byteVectorArgs frame).toCarriers (.param 0) =
-      (fun value : @NTy.carrier frame.toCarriers byteVector => value) := rfl
+    @NTy.read ((Skolems.instantiate byteVectorArgs frame).toCarriers).toSorts (.param 0) =
+      (fun value : @NTy.carrier (frame.toCarriers).toSorts byteVector => value) := rfl
 
 example (frame : GivenFrame) (index : Nat) :
-    @NTy.read frame.toCarriers (.param index) =
+    @NTy.read (frame.toCarriers).toSorts (.param index) =
       (fun value : frame.operations.carrier index => value) := rfl
 
 -- Concrete views use the same typed sort, reader, inverse, and `plainFallback`
@@ -88,23 +88,25 @@ example (frame : GivenFrame) (index : Nat) :
 -- including nominal structs and vectors of nominal structs.
 open Lean Meta Elab Command in
 run_cmd liftTermElabM do
-  let family := mkConst ``Carriers.ground
+  let family := mkConst ``Sorts.ground
   for (type, args) in #[(mkConst ``byteVector, mkConst ``byteVectorArgs),
       (mkConst ``nestedCertificate, mkConst ``nestedCertificateArgs),
       (mkConst ``scalarCertificate, mkConst ``scalarCertificateArgs)] do
     let some concrete ← NativeMaps.typedView? family type
       | throwError "missing concrete typed view"
-    let induced := mkApp2 (mkConst ``Carriers.instantiate) args family
+    let induced := mkApp2 (mkConst ``Sorts.instantiate) args family
     let some generic ← NativeMaps.typedView? induced (mkApp (mkConst ``NTy.param) (mkNatLit 0))
       | throwError "missing instantiated typed view"
     for (name, left, right) in #[("carrier", concrete.carrier, generic.carrier),
         ("reader", concrete.read, generic.read),
         ("unread", concrete.unread, generic.unread),
         ("inhabited", concrete.inhabited, generic.inhabited)] do
+      check left
+      check right
       unless ← withNewMCtxDepth (withTransparency .default (isDefEq left right)) do
         throwError "concrete and generic {name} disagree"
   withLocalDeclD `given (mkConst ``GivenFrame) fun given => do
-    let givenCarriers := mkApp (mkConst ``GivenFrame.toCarriers) given
+    let givenCarriers := mkApp (mkConst ``Carriers.toSorts) (mkApp (mkConst ``GivenFrame.toCarriers) given)
     let some view ← NativeMaps.typedView? givenCarriers (mkApp (mkConst ``NTy.param) (mkNatLit 0))
       | throwError "missing Given parameter typed view"
     unless view.identity do
@@ -114,7 +116,7 @@ run_cmd liftTermElabM do
 -- to the exact concrete map AST for both free vectors and nominal-bearing types.
 open Lean Meta Elab Command in
 run_cmd liftTermElabM do
-  let family := mkConst ``Carriers.ground
+  let family := mkConst ``Sorts.ground
   for constant in #[``byteVector, ``scalarCertificate, ``nestedCertificate] do
     let type ← withDefault (whnf (mkConst constant))
     let canonicalType := mkApp2 (mkConst ``NTy.carrier) family type
@@ -126,15 +128,17 @@ run_cmd liftTermElabM do
         #[mkConst ``Int, canonicalType, mkConst ``Int, canonicalType, keys, identity, entries]
       let row := mkApp2 (mkConst ``NRow.cons) type (mkConst ``NRow.nil)
       let typeArgs ← whnf (mkConst ``TypeArgs)
-      let arguments := mkApp4 (mkConst ``Subtype.mk [Level.zero]) (mkConst ``NRow)
+      let arguments := mkApp4 (mkConst ``Subtype.mk [Level.succ Level.zero]) (mkConst ``NRow)
         (typeArgs.getArg! 1) row (← mkEqRefl (mkConst ``Bool.true))
-      let induced := mkApp2 (mkConst ``Carriers.instantiate) arguments family
+      let induced := mkApp2 (mkConst ``Sorts.instantiate) arguments family
       let parameter := mkApp (mkConst ``NTy.param) (mkNatLit 0)
       let paramCarrier := mkApp2 (mkConst ``NTy.carrier) induced parameter
       let typedParameter := mkApp2 (mkConst ``NTy.readCarrier) induced parameter
       let genericReader := mkApp2 (mkConst ``NTy.read) induced parameter
       let genericMap := mkAppN (mkConst ``SpecMap.ofEntries)
         #[mkConst ``Int, paramCarrier, mkConst ``Int, typedParameter, keys, genericReader, entries]
+      check expected
+      check genericMap
       unless (← canonicalFamilyResult genericMap).expr == expected do
         throwError "a generic reader's full map AST differs from the concrete map for {constant}"
 

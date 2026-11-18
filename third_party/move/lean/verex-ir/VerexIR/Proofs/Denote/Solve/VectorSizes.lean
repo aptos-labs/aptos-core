@@ -21,11 +21,11 @@ variable {unit : Validation.ValidatedUnit} [FunctionCarriers unit]
 /-- Reframing vector elements preserves the number of elements. -/
 private theorem Skolems.reframe_vector_size
     (Θ : Skolems unit) {params : NRow} (own : params.isParamsFrom 0 = true)
-    {element : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers (.vector element)) :
+    {element : NTy} (bounded) (value : @NTy.carrier (Θ.toCarriers).toSorts (.vector element)) :
     (Θ.reframe own bounded value).values.size = value.values.size := by
   have encoded := Θ.encode_reframe own bounded value
-  rw [@NTy.encode_vector (Θ.instance params own).toCarriers,
-    @NTy.encode_vector Θ.toCarriers] at encoded
+  rw [@NTy.encode_vector ((Θ.instance params own).toCarriers).toSorts,
+    @NTy.encode_vector (Θ.toCarriers).toSorts] at encoded
   have same := congrArg Array.size (RuntimeValue.vector.inj encoded)
   simpa only [Array.size_map] using same
 
@@ -39,12 +39,12 @@ theorem Skolems.reframeAtBase_vector_size {unit : Validation.ValidatedUnit}
     (sameNominals : functions.nominals = base.nominals)
     (Θ : @Skolems unit functions) {params : NRow} (own : params.isParamsFrom 0 = true)
     (inhabitable : (params.map Θ.resolve).inhabitable = true)
-    {element : NTy} (bounded) (value : @NTy.carrier Θ.toCarriers (.vector element)) :
+    {element : NTy} (bounded) (value : @NTy.carrier (Θ.toCarriers).toSorts (.vector element)) :
     (Skolems.reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable
         (τ := .vector element) bounded value).values.size = value.values.size := by
   let Φ := (Skolems.atArguments unit base (params.map Θ.resolve) inhabitable).toCarriers
   have encoded := Skolems.encode_reframeAtBase sameCarrier sameFunctions sameNominals Θ own inhabitable bounded value
-  rw [@NTy.encode_vector Φ, @NTy.encode_vector Θ.toCarriers] at encoded
+  rw [@NTy.encode_vector (Φ).toSorts, @NTy.encode_vector (Θ.toCarriers).toSorts] at encoded
   have same := congrArg Array.size (RuntimeValue.vector.inj encoded)
   simpa only [Array.size_map] using same
 

@@ -32,7 +32,7 @@ private abbrev structTy : NTy := .struct testHandle .nil (.cons (.int 64 false) 
   { Carriers.ground with
     own := fun src _ _ => if src == testHandle then True else True }
 
-private def zeroStruct : @NTy.carrier Carriers.ground structTy := (⟨0, rfl⟩, ())
+private def zeroStruct : @NTy.carrier (Carriers.ground).toSorts structTy := (⟨0, rfl⟩, ())
 
 variable {source : StructHandle} {arguments : NRow} {kind : NominalKind}
 
@@ -47,7 +47,7 @@ theorem holds_depends_on_own_zero :
 
 /-- Over every plain carrier value `v` of `structTy`, `NTy.Holds` is refuted under
 `carriersOwnFalse` and holds under `carriersOwnTrue`. -/
-theorem holds_depends_on_own (v : @NTy.carrier Carriers.ground structTy) :
+theorem holds_depends_on_own (v : @NTy.carrier (Carriers.ground).toSorts structTy) :
     ¬ @NTy.Holds carriersOwnFalse structTy v ∧
       @NTy.Holds carriersOwnTrue structTy v :=
   ⟨fun h => (@NTy.Holds.deepHolds carriersOwnFalse structTy v h).1,
@@ -63,7 +63,7 @@ theorem holds_depends_on_param_holds (base : Carriers) (v : base.carrier 0) :
 set_option linter.unusedVariables false in
 /-- Non-reduction check: `NTy.Holds` under distinct `Carriers.own` predicates does not
 reduce to definitionally equal propositions. -/
-example (base : Carriers) (v : @NTy.carrier base (.struct source .nil .nil)) : True := by
+example (base : Carriers) (v : @NTy.carrier (base).toSorts (.struct source .nil .nil)) : True := by
   fail_if_success
     have : @NTy.Holds { base with own := fun _ _ _ => True } (.struct source .nil .nil) v =
         @NTy.Holds { base with own := fun _ _ _ => False } (.struct source .nil .nil) v := rfl
@@ -72,30 +72,29 @@ example (base : Carriers) (v : @NTy.carrier base (.struct source .nil .nil)) : T
 /-- Positive: On `structTy`, `carriersOwnFalse` and `carriersOwnTrue` share the identical
 plain carrier type definitionally. -/
 theorem carrier_structTy_indep_own :
-    @NTy.carrier carriersOwnFalse structTy = @NTy.carrier carriersOwnTrue structTy := rfl
+    @NTy.carrier (carriersOwnFalse).toSorts structTy = @NTy.carrier (carriersOwnTrue).toSorts structTy := rfl
 
 /-- Positive: On concrete argument rows, the plain carrier type of `NTy.nominal` is
 definitionally independent of `Carriers.own`. -/
 example (base : Carriers) :
-    @NTy.carrier { base with own := fun _ _ _ => True }
+    @NTy.carrier ({ base with own := fun _ _ _ => True }).toSorts
         (NTy.nominal source (.cons (.param 0) .nil) kind) =
-      @NTy.carrier { base with own := fun _ _ _ => False }
+      @NTy.carrier ({ base with own := fun _ _ _ => False }).toSorts
         (NTy.nominal source (.cons (.param 0) .nil) kind) := rfl
 
 /-- Positive: Across every argument row, `NTy.carrier` of `NTy.nominal` is independent
 of `Carriers.own`. -/
 example (base : Carriers) :
-    @NTy.carrier { base with own := fun _ _ _ => True } (NTy.nominal source arguments kind) =
-      @NTy.carrier { base with own := fun _ _ _ => False }
+    @NTy.carrier ({ base with own := fun _ _ _ => True }).toSorts (NTy.nominal source arguments kind) =
+      @NTy.carrier ({ base with own := fun _ _ _ => False }).toSorts
         (NTy.nominal source arguments kind) :=
-  (NTy.carrier_withOwn base _ (NTy.nominal source arguments kind)).trans
-    (NTy.carrier_withOwn base _ (NTy.nominal source arguments kind)).symm
+  rfl
 
 /-- Positive: Nor does the plain carrier type of `NTy.nominal` depend on `Carriers.holds`. -/
 example (base : Carriers) :
-    @NTy.carrier { base with holds := fun _ _ => True }
+    @NTy.carrier ({ base with holds := fun _ _ => True }).toSorts
         (NTy.nominal source (.cons (.param 0) .nil) kind) =
-      @NTy.carrier { base with holds := fun _ _ => False }
+      @NTy.carrier ({ base with holds := fun _ _ => False }).toSorts
         (NTy.nominal source (.cons (.param 0) .nil) kind) := rfl
 
 /-- Negative semantic kernel control (first): substitution does not conflate distinct
@@ -128,7 +127,7 @@ set_option linter.unusedVariables false in
 definitionally reduce to a concrete value. -/
 example [outer : Carriers] : True := by
   fail_if_success
-    have : (@NTy.plainFallback outer .bool rfl) = false := rfl
+    have : (@NTy.plainFallback (outer).toSorts .bool rfl) = false := rfl
   trivial
 
 /-- Positive: `NTy.plainFallback` converts definitionally across `Carriers.instantiate`
@@ -136,8 +135,8 @@ once the plain carriers coincide. -/
 example [outer : Carriers] :
     let θ : TypeArgs := ⟨.cons (.int 64 false) .nil, rfl⟩
     let τ : NTy := .struct source (.cons (.param 0) .nil) (.cons (.param 0) .nil)
-    @NTy.plainFallback (Carriers.instantiate θ outer) τ rfl =
-      @NTy.plainFallback outer (τ.subst θ.1) rfl := rfl
+    @NTy.plainFallback ((Carriers.instantiate θ outer)).toSorts τ rfl =
+      @NTy.plainFallback (outer).toSorts (τ.subst θ.1) rfl := rfl
 
 private abbrev functionRow : NRow := .cons (.function .nil ⟨[], []⟩ .nil) .nil
 private abbrev kindTokens (kind : NominalKind) : Nat :=

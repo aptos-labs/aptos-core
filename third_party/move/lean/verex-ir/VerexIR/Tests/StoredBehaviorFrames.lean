@@ -55,7 +55,7 @@ variable (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
 states one: over an instance's type arguments and a value at the frame they
 induce, each clause under its marker. -/
 def holderCase
-    (value : @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers Holder) : Prop :=
+    (value : @NTy.carrier ((Skolems.instantiate θ (Skolems.runtime unit)).toCarriers).toSorts Holder) : Prop :=
   Obligation "holder" 1 2
       (@ValidResultsAt unit _ executable (Skolems.instantiate θ (Skolems.runtime unit)) scalar
         shared (.one (.param 0)) value.1) ∧
@@ -65,14 +65,14 @@ def holderCase
 
 /-- The case of `Lender`: the validity of results at a row with a reference. -/
 def lenderCase
-    (value : @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers Lender) : Prop :=
+    (value : @NTy.carrier ((Skolems.instantiate θ (Skolems.runtime unit)).toCarriers).toSorts Lender) : Prop :=
   Obligation "lender" 1 2
     (@ValidResultsAt unit _ executable (Skolems.instantiate θ (Skolems.runtime unit)) borrowed
       shared (.one (.param 0)) value.1)
 
 /-- The case of `Both`: one clause at a row with a reference, one without. -/
 def bothCase
-    (value : @NTy.carrier (Skolems.instantiate θ (Skolems.runtime unit)).toCarriers Both) : Prop :=
+    (value : @NTy.carrier ((Skolems.instantiate θ (Skolems.runtime unit)).toCarriers).toSorts Both) : Prop :=
   Obligation "both" 1 2
       (@ValidResultsAt unit _ executable (Skolems.instantiate θ (Skolems.runtime unit)) borrowed
         shared (.one (.param 0)) value.1) ∧
@@ -143,7 +143,7 @@ clause it was, at the induced frame, of the moved holder. -/
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) (Θ : Skolems unit)
     (bounded : Lender.paramsAll (fun index => decide (index < params.length)) = true)
-    (value : @NTy.carrier Θ.toCarriers Lender),
+    (value : @NTy.carrier (Θ.toCarriers).toSorts Lender),
     lenderCase unit executable (Θ.typeArgs params own) (Θ.reframe own bounded value)
 
 /-! Beside a clause that is converted, it is kept as it was: at the induced
@@ -153,7 +153,7 @@ frame, of the field moved. -/
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) (Θ : Skolems unit)
     (bounded : Both.paramsAll (fun index => decide (index < params.length)) = true)
-    (value : @NTy.carrier Θ.toCarriers Both),
+    (value : @NTy.carrier (Θ.toCarriers).toSorts Both),
     bothCase unit executable (Θ.typeArgs params own) (Θ.reframe own bounded value)
 
 /-! ## The clauses of a function field
@@ -166,7 +166,7 @@ markers. -/
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) (Θ : Skolems unit)
     (bounded : Holder.paramsAll (fun index => decide (index < params.length)) = true)
-    (value : @NTy.carrier Θ.toCarriers Holder),
+    (value : @NTy.carrier (Θ.toCarriers).toSorts Holder),
     holderCase unit executable (Θ.typeArgs params own) (Θ.reframe own bounded value)
 
 /-! A statement that is no case's clause is not converted. -/
@@ -174,7 +174,7 @@ markers. -/
 #guard_caller_clause none in
   ∀ (unit : Validation.ValidatedUnit) [FunctionCarriers unit]
     (executable : Validation.ExecutableUnit unit) (Θ : Skolems unit)
-    (function : @NTy.carrier Θ.toCarriers (.function scalar shared generic)),
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function scalar shared generic)),
     @ValidResultsAt unit _ executable Θ scalar shared (.one (.param 0)) function
 
 /-! ## A frame that reads its arguments
@@ -191,8 +191,8 @@ run_meta do
         (executable : Validation.ExecutableUnit unit) (Θ : Skolems unit)
         (bounded : (NTy.function generic shared generic).paramsAll
           (fun index => decide (index < params.length)) = true)
-        (observed : @HList (Θ.instance params own).toCarriers generic → Memory unit → Prop)
-        (function : @NTy.carrier Θ.toCarriers (.function generic shared generic)),
+        (observed : @HList ((Θ.instance params own).toCarriers).toSorts generic → Memory unit → Prop)
+        (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic shared generic)),
         @FramedAt unit _ executable (Θ.instance params own) generic shared (.one (.param 0))
           (fun args _ post => observed args post) (Θ.reframe own bounded function)))
     Term.synthesizeSyntheticMVarsNoPostponing

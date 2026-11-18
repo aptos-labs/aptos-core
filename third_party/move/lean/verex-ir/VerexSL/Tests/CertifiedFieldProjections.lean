@@ -31,7 +31,7 @@ run_cmd do
       let quoted ← quoteNTy concrete
       withLocalDeclD `family (mkConst ``Carriers) fun family => do
         let checkView (carriers type : Lean.Expr) : MetaM Unit := do
-          let some view ← NativeMaps.typedView? carriers type | throwError "missing view"
+          let some view ← NativeMaps.typedView? (carrierSorts carriers) type | throwError "missing view"
           unless view.type == quoted && view.carrier == carrierType family quoted do
             throwError "view expanded descriptor: {view.type}"
           unless view.read.isLambda && view.read.bindingDomain! == carrierType family quoted do
@@ -49,7 +49,7 @@ run_cmd do
           let (ctx, simprocs) ← normalization
           for (carriers, type) in #[(family, quoted),
               (induced, mkApp (mkConst ``NTy.param) (toExpr (0 : Nat)))] do
-            let read := mkApp2 (mkConst ``NTy.read) carriers type
+            let read := mkApp2 (mkConst ``NTy.read) (carrierSorts carriers) type
             let (result, _) ← Simp.main read ctx (methods := Simp.mkDefaultMethodsCore simprocs)
             unless result.expr.isLambda && result.expr.bindingDomain! == carrierType family quoted do
               throwError "read evaluator expanded descriptor: {result.expr}"
@@ -58,16 +58,16 @@ run_cmd do
           (← Tactic.getMainGoal).assign (mkConst ``True.intro)
 
         let parameter := mkApp (mkConst ``NTy.param) (toExpr (0 : Nat))
-        let readDefault ← mkAppOptM ``NTy.readInhabited #[induced, parameter,
+        let readDefault ← mkAppOptM ``NTy.readInhabited #[carrierSorts induced, parameter,
           ← inhabitableProof parameter]
         let quotedProof ← inhabitableProof quoted
         let expectedStructuralDefault :=
-          mkApp3 (mkConst ``nativeInhabited) family quoted
-            (mkApp3 (mkConst ``NTy.inhabitantOf) family quoted quotedProof)
+          mkApp3 (mkConst ``nativeInhabited) (carrierSorts family) quoted
+            (mkApp3 (mkConst ``NTy.inhabitantOf) (carrierSorts family) quoted quotedProof)
         let expectedFallbackDefault :=
-          mkApp3 (mkConst ``nativeInhabited) family quoted
-            (mkApp3 (mkConst ``NTy.plainFallback) family quoted quotedProof)
-        let some expectedView ← NativeMaps.typedView? family quoted | throwError "missing expected view"
+          mkApp3 (mkConst ``nativeInhabited) (carrierSorts family) quoted
+            (mkApp3 (mkConst ``NTy.plainFallback) (carrierSorts family) quoted quotedProof)
+        let some expectedView ← NativeMaps.typedView? (carrierSorts family) quoted | throwError "missing expected view"
         unless expectedView.inhabited == expectedFallbackDefault do
           throwError "view default did not use plainFallback: {expectedView.inhabited}"
         let goal ← mkFreshExprMVar (← mkEq readDefault readDefault)
@@ -96,10 +96,10 @@ run_meta withSyntheticNativeTypes do
 -- Field selection must specialize by conversion before any free-field simplification.
 example [outer : Carriers] :
     @Var.select
-      (Carriers.instantiate ⟨.cons (.int 8 false) (.cons (.int 64 false) .nil), by decide⟩ outer)
+      (Sorts.instantiate ⟨.cons (.int 8 false) (.cons (.int 64 false) .nil), by decide⟩ outer.toSorts)
       (.cons (.table (.param 0) (.param 1)) .nil)
       (.table (.param 0) (.param 1)) .here =
-    @Var.select outer (.cons (.table (.int 8 false) (.int 64 false)) .nil)
+    @Var.select outer.toSorts (.cons (.table (.int 8 false) (.int 64 false)) .nil)
       (.table (.int 8 false) (.int 64 false)) .here := rfl
 
 set_option maxHeartbeats 25000

@@ -44,14 +44,14 @@ example : borrowed.refFree = false := rfl
 
 /-- The frame predicate states nothing at such a row, whatever the frame and
 the value. -/
-example (frame : @HList Θ.toCarriers borrowed → Memory unit → Memory unit → Prop)
-    (function : @NTy.carrier Θ.toCarriers (.function borrowed shared (.cons (.int 64 false) .nil))) :
+example (frame : @HList (Θ.toCarriers).toSorts borrowed → Memory unit → Memory unit → Prop)
+    (function : @NTy.carrier (Θ.toCarriers).toSorts (.function borrowed shared (.cons (.int 64 false) .nil))) :
     @FramedAt unit _ executable Θ borrowed shared (.one (.int 64 false)) frame function :=
   fun free => nomatch free
 
 /-! ## A closed row -/
 
-example (function : @NTy.carrier Θ.toCarriers (.function scalar shared scalar))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function scalar shared scalar))
     (bounded : (NTy.function scalar shared scalar).paramsAll
       (fun index => decide (index < params.length)) = true) :
     @ValidResultsAt unit _ executable (Θ.instance params own) scalar shared (.one (.int 64 false))
@@ -60,7 +60,7 @@ example (function : @NTy.carrier Θ.toCarriers (.function scalar shared scalar))
   ValidResultsAt.reframe_iff (parameters := scalar) (shared := shared)
     (shape := .one (.int 64 false)) Θ own executable rfl rfl bounded function
 
-example (function : @NTy.carrier Θ.toCarriers (.function scalar shared scalar))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function scalar shared scalar))
     (bounded : (NTy.function scalar shared scalar).paramsAll
       (fun index => decide (index < params.length)) = true) :
     @KeepsMemoryAt unit _ executable (Θ.instance params own) scalar shared (.one (.int 64 false))
@@ -71,7 +71,7 @@ example (function : @NTy.carrier Θ.toCarriers (.function scalar shared scalar))
 
 /-! ## A row of the declaration's parameter -/
 
-example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic shared generic))
     (bounded : (NTy.function generic shared generic).paramsAll
       (fun index => decide (index < params.length)) = true) :
     @ValidResultsAt unit _ executable (Θ.instance params own) generic shared (.one (.param 0))
@@ -80,7 +80,7 @@ example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic
   ValidResultsAt.reframe_iff (parameters := generic) (shared := shared) (shape := .one (.param 0))
     Θ own executable rfl rfl bounded function
 
-example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic shared generic))
     (bounded : (NTy.function generic shared generic).paramsAll
       (fun index => decide (index < params.length)) = true) :
     @KeepsMemoryAt unit _ executable (Θ.instance params own) generic shared (.one (.param 0))
@@ -95,7 +95,7 @@ example : (NTy.function scalar shared generic).paramsAll
 
 /-! ## A function returning nothing -/
 
-example (function : @NTy.carrier Θ.toCarriers (.function generic ⟨[false], []⟩ .nil))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic ⟨[false], []⟩ .nil))
     (bounded : (NTy.function generic ⟨[false], []⟩ .nil).paramsAll
       (fun index => decide (index < params.length)) = true) :
     @ValidResultsAt unit _ executable (Θ.instance params own) generic ⟨[false], []⟩ .none
@@ -111,13 +111,13 @@ arguments.  At the frame the value was moved from it is read at the
 arguments moved there: a run at the frame on `args` keeps it at
 `Θ.reframe … args`, the induced frame's view of the same arguments. -/
 
-example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic shared generic))
     (bounded : (NTy.function generic shared generic).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (observed : @HList (Θ.instance params own).toCarriers generic → Memory unit → Prop)
+    (observed : @HList ((Θ.instance params own).toCarriers).toSorts generic → Memory unit → Prop)
     (framed : @FramedAt unit _ executable (Θ.instance params own) generic shared (.one (.param 0))
       (fun args _ post => observed args post) (Θ.reframe own bounded function))
-    (args : @HList Θ.toCarriers generic) (result : @NTy.carrier Θ.toCarriers (.param 0))
+    (args : @HList (Θ.toCarriers).toSorts generic) (result : @NTy.carrier (Θ.toCarriers).toSorts (.param 0))
     (pre post : Memory unit) (valid : @HList.Holds Θ.toCarriers generic args)
     (held : @NTy.Holds Θ.toCarriers (.param 0) result) (typed : MemoryTyped unit pre)
     (ran : @EnsuresOf unit _ Θ (@closureMeaning unit _ executable Θ) generic shared
@@ -131,10 +131,10 @@ example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic
 /-- And conversely the induced frame's predicate, at any of its arguments,
 from the frame the value keeps where it was moved from: every argument row
 of the induced frame is a row moved there. -/
-example (function : @NTy.carrier Θ.toCarriers (.function generic shared generic))
+example (function : @NTy.carrier (Θ.toCarriers).toSorts (.function generic shared generic))
     (bounded : (NTy.function generic shared generic).paramsAll
       (fun index => decide (index < params.length)) = true)
-    (observed : @HList (Θ.instance params own).toCarriers generic → Memory unit → Prop)
+    (observed : @HList ((Θ.instance params own).toCarriers).toSorts generic → Memory unit → Prop)
     (framed : @FramedAt unit _ executable Θ generic shared (.one (.param 0))
       (fun args _ post => observed
         (Θ.reframe own (τ := .tuple generic) (NTy.paramsAll_function_parameters bounded) args) post)
@@ -150,11 +150,11 @@ Two frames, one closure, arguments and results that encode alike: the runs
 are the same proposition's two readings. -/
 
 example (Θ₁ Θ₂ : Skolems unit) (closure : ClosureValue)
-    (args₁ : @HList Θ₁.toCarriers generic) (args₂ : @HList Θ₂.toCarriers generic)
-    (sameArgs : @HList.encode Θ₁.toCarriers generic args₁ = @HList.encode Θ₂.toCarriers generic args₂)
-    (result₁ : @NTy.carrier Θ₁.toCarriers (.param 0)) (result₂ : @NTy.carrier Θ₂.toCarriers (.param 0))
-    (sameResult : @NTy.encode Θ₁.toCarriers (.param 0) result₁ =
-      @NTy.encode Θ₂.toCarriers (.param 0) result₂)
+    (args₁ : @HList (Θ₁.toCarriers).toSorts generic) (args₂ : @HList (Θ₂.toCarriers).toSorts generic)
+    (sameArgs : @HList.encode (Θ₁.toCarriers).toSorts generic args₁ = @HList.encode (Θ₂.toCarriers).toSorts generic args₂)
+    (result₁ : @NTy.carrier (Θ₁.toCarriers).toSorts (.param 0)) (result₂ : @NTy.carrier (Θ₂.toCarriers).toSorts (.param 0))
+    (sameResult : @NTy.encode (Θ₁.toCarriers).toSorts (.param 0) result₁ =
+      @NTy.encode (Θ₂.toCarriers).toSorts (.param 0) result₂)
     (pre post : Memory unit) :
     (@closureRun unit _ executable Θ₁ closure generic (.one (.param 0)) args₁).ok pre result₁ post ↔
       (@closureRun unit _ executable Θ₂ closure generic (.one (.param 0)) args₂).ok pre result₂ post :=

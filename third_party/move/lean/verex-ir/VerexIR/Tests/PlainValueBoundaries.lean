@@ -33,7 +33,7 @@ private abbrev snum (n : Int) : SpecInt .unbounded true := ⟨n, rfl⟩
   { Carriers.ground with
     own := fun src _ raw =>
       if src == percentHandle then
-        ∀ row, (@NTy.codec Carriers.ground percentTy).decode? raw = some row →
+        ∀ row, (@NTy.codec (Carriers.ground).toSorts percentTy).decode? raw = some row →
           row.1.val ≤ 100
       else True }
 
@@ -44,7 +44,7 @@ private def mkPercent (n : Nat) : percentTy.carrier := (snum (n : Int), ())
 private theorem holds_percent_iff (n : Nat) :
     NTy.Holds percentTy (mkPercent n) ↔ n ≤ 100 := by
   rw [NTy.holds_iff]
-  have hdec : (@NTy.codec Carriers.ground percentTy).decode?
+  have hdec : (@NTy.codec (Carriers.ground).toSorts percentTy).decode?
       (NTy.encode percentTy (mkPercent n)) = some (mkPercent n) :=
     Codec.decode_encode _ _
   constructor
@@ -61,7 +61,7 @@ private theorem holds_percent_iff (n : Nat) :
 
 private theorem val_le_100_of_holds {r : percentTy.carrier}
     (hr : NTy.Holds percentTy r) : r.1.val ≤ 100 := by
-  have hdec : (@NTy.codec Carriers.ground percentTy).decode?
+  have hdec : (@NTy.codec (Carriers.ground).toSorts percentTy).decode?
       (NTy.encode percentTy r) = some r :=
     Codec.decode_encode _ _
   exact hr.deepHolds.1 r hdec
@@ -442,7 +442,7 @@ attribute [-instance] testCarriers
 attribute [local instance] percentFunctions
 
 @[reducible] private def percentVal (unit : Validation.ValidatedUnit) (n : Nat) :
-    @NTy.carrier (percentSkolems unit).toCarriers percentTy :=
+    @NTy.carrier ((percentSkolems unit).toCarriers).toSorts percentTy :=
   (snum (n : Int), ())
 
 private theorem runtime_holds_percent_iff (unit : Validation.ValidatedUnit) (n : Nat) :
@@ -465,11 +465,11 @@ private abbrev publishAddr : String := "0x1"
 private abbrev percentLocalRow : NRow := .cons percentTy .nil
 
 @[reducible] private def percentEnv (unit : Validation.ValidatedUnit) (n : Nat) :
-    @HEnv (percentSkolems unit).toCarriers percentLocalRow :=
+    @HEnv (percentSkolems unit).toCarriers.toSorts percentLocalRow :=
   (some (percentVal unit n), ())
 
 @[reducible] private def percentDone (unit : Validation.ValidatedUnit)
-    (v : @NTy.carrier (percentSkolems unit).toCarriers percentTy) :
+    (v : @NTy.carrier ((percentSkolems unit).toCarriers).toSorts percentTy) :
     @Flow (percentSkolems unit).toCarriers .none percentLocalRow Unit :=
   @Flow.value (percentSkolems unit).toCarriers .none percentLocalRow Unit () (some v, ())
 
@@ -497,7 +497,7 @@ private noncomputable def occupiedMem (unit : Validation.ValidatedUnit) : Memory
 private theorem publishPercentTerm_denote {unit : Validation.ValidatedUnit}
     {executable : Validation.ExecutableUnit unit}
     (meanings : @Meanings unit (percentFunctions unit) executable (percentSkolems unit))
-    (v : @NTy.carrier (percentSkolems unit).toCarriers percentTy) :
+    (v : @NTy.carrier ((percentSkolems unit).toCarriers).toSorts percentTy) :
     Term.denote (Θ := percentSkolems unit) meanings (publishPercentTerm unit) (some v, ()) =
       (Spec.bind Spec.get fun memory =>
         match Skolems.plainAt (Θ := percentSkolems unit) percentTy .nil
@@ -521,7 +521,7 @@ private theorem publishPercentTerm_denote {unit : Validation.ValidatedUnit}
 private theorem ghostStorePercentTerm_denote {unit : Validation.ValidatedUnit}
     {executable : Validation.ExecutableUnit unit}
     (meanings : @Meanings unit (percentFunctions unit) executable (percentSkolems unit))
-    (v : @NTy.carrier (percentSkolems unit).toCarriers percentTy) :
+    (v : @NTy.carrier ((percentSkolems unit).toCarriers).toSorts percentTy) :
     Term.denote (Θ := percentSkolems unit) meanings (ghostStorePercentTerm unit) (some v, ()) =
       (Spec.bind Spec.get fun memory =>
         Spec.bind (@checkingAt (percentSkolems unit).toCarriers (Memory unit)

@@ -113,12 +113,12 @@ example {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers uni
     (sameNominals : functions.nominals = base.nominals)
     (Θ : @Skolems unit functions)
     (inhabitable : (instanceRow.map Θ.resolve).inhabitable = true)
-    (row : @NTy.carrier Θ.toCarriers (owner.subst instanceRow)) :
+    (row : @NTy.carrier (Θ.toCarriers).toSorts (owner.subst instanceRow)) :
     @NTy.encode
-        (Skolems.atArguments unit base (instanceRow.map Θ.resolve) inhabitable).toCarriers owner
+        ((Skolems.atArguments unit base (instanceRow.map Θ.resolve) inhabitable).toCarriers).toSorts owner
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ instanceRow
           inhabitable (by decide) row) =
-      @NTy.encode Θ.toCarriers (owner.subst instanceRow) row :=
+      @NTy.encode (Θ.toCarriers).toSorts (owner.subst instanceRow) row :=
   Skolems.encode_reframeAtInstance sameCarrier sameFunctions sameNominals Θ instanceRow
     inhabitable (by decide) row
 
@@ -129,12 +129,12 @@ example {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers uni
     (sameNominals : functions.nominals = base.nominals)
     (Θ : @Skolems unit functions)
     (inhabitable : (nestedRow.map Θ.resolve).inhabitable = true)
-    (row : @NTy.carrier Θ.toCarriers (owner.subst nestedRow)) :
+    (row : @NTy.carrier (Θ.toCarriers).toSorts (owner.subst nestedRow)) :
     @NTy.encode
-        (Skolems.atArguments unit base (nestedRow.map Θ.resolve) inhabitable).toCarriers owner
+        ((Skolems.atArguments unit base (nestedRow.map Θ.resolve) inhabitable).toCarriers).toSorts owner
         (Skolems.reframeAtInstance sameCarrier sameFunctions sameNominals Θ nestedRow
           inhabitable (by decide) row) =
-      @NTy.encode Θ.toCarriers (owner.subst nestedRow) row :=
+      @NTy.encode (Θ.toCarriers).toSorts (owner.subst nestedRow) row :=
   Skolems.encode_reframeAtInstance sameCarrier sameFunctions sameNominals Θ nestedRow
     inhabitable (by decide) row
 
@@ -152,9 +152,9 @@ def closedRow : NRow := .cons (.int 64 false) (.cons (.int 64 false) .nil)
 example {unit : Validation.ValidatedUnit} {functions base : FunctionCarriers unit}
     (Θ : @Skolems unit functions)
     (inhabitable : closedRow.inhabitable = true)
-    (row : @NTy.carrier Θ.toCarriers (owner.subst closedRow)) :
-    @NTy.encode (Skolems.atArguments unit base closedRow inhabitable).toCarriers owner row =
-      @NTy.encode Θ.toCarriers (owner.subst closedRow) row := rfl
+    (row : @NTy.carrier (Θ.toCarriers).toSorts (owner.subst closedRow)) :
+    @NTy.encode ((Skolems.atArguments unit base closedRow inhabitable).toCarriers).toSorts owner row =
+      @NTy.encode (Θ.toCarriers).toSorts (owner.subst closedRow) row := rfl
 
 -- The row a statement carries is the normal form of those resolutions: a
 -- closed entry stands unresolved, an entry over a parameter resolved, and the

@@ -872,7 +872,7 @@ end
 /-- A result in the caller's view lends as it does at the target's family. -/
 theorem ResultShape.lend_ofSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
     (shape : ResultShape) → (prophecies : Bool) →
-    (result : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) → (loans : List Nat) →
+    (result : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) → (loans : List Nat) →
     (shape.subst θ.1).lend prophecies (ResultShape.ofSkolem θ shape result) loans =
       @ResultShape.lend _ _ (Skolems.instantiate θ Θ) shape prophecies result loans
   | .none, _, _, loans => by cases loans <;> rfl
@@ -882,7 +882,7 @@ theorem ResultShape.lend_ofSkolem (θ : TypeArgs) (free : θ.1.refFree = true) :
 
 /-- A result in the target's view. -/
 noncomputable def ResultShape.toSkolem (θ : TypeArgs) : (shape : ResultShape) →
-    (shape.subst θ.1).carrier → @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape
+    (shape.subst θ.1).carrier → @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape
   | .none, value => value
   | .one τ, value => NTy.toSkolem θ τ value
 
@@ -893,7 +893,7 @@ theorem ResultShape.ofSkolem_toSkolem (θ : TypeArgs) : (shape : ResultShape) �
   | .one τ, value => NTy.ofSkolem_toSkolem θ τ value
 
 theorem NTy.toSkolem_ofSkolem_shape (θ : TypeArgs) : (shape : ResultShape) →
-    (value : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape) →
+    (value : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape) →
     ResultShape.toSkolem θ shape (ResultShape.ofSkolem θ shape value) = value
   | .none, _ => rfl
   | .one τ, value => NTy.toSkolem_ofSkolem θ τ value
@@ -1032,7 +1032,7 @@ theorem propheticRun_subst {unit : VerexIR.Validation.ValidatedUnit} [FunctionCa
 view (`NTy.ofSkolem`), at the substituted result shape's row. -/
 noncomputable def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (shared : Sharing) :
     (shape : ResultShape) →
-    @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row) →
+    @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row) →
     (NTy.function (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).carrier
   | .none, function => NTy.ofSkolem θ (.function σs shared .nil) function
   | .one τ, function => NTy.ofSkolem θ (.function σs shared (.cons τ .nil)) function
@@ -1040,10 +1040,10 @@ noncomputable def ResultShape.functionOfSkolem (θ : TypeArgs) (σs : NRow) (sha
 /-- A function value in the caller's view is the same closure. -/
 @[simp] theorem ResultShape.closure_functionOfSkolem (θ : TypeArgs) (σs : NRow)
     (shared : Sharing) : (shape : ResultShape) →
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row)) →
-    (Carriers.functions (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).closure
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row)) →
+    (Sorts.functions (NRow.subst θ.1 σs) shared (shape.subst θ.1).row).closure
         (shape.functionOfSkolem θ σs shared function) =
-      (@Carriers.functions (Skolems.instantiate θ Θ).toCarriers σs shared shape.row).closure function
+      (@Sorts.functions ((Skolems.instantiate θ Θ).toCarriers).toSorts σs shared shape.row).closure function
   | .none, _ => rfl
   | .one _, _ => rfl
 
@@ -1052,7 +1052,7 @@ run at the caller's types, read in the callee's view. -/
 theorem closureRun_instantiate {unit : VerexIR.Validation.ValidatedUnit} [FunctionCarriers unit]
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (closure : ClosureValue) (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow)
-    (shape : ResultShape) (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
+    (shape : ResultShape) (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) :
     @closureRun _ _ executable (Skolems.instantiate θ Θ) closure σs shape args =
       Spec.bind (closureRun executable closure (NRow.subst θ.1 σs) (shape.subst θ.1)
           (HList.ofSkolem θ σs args))
@@ -1138,8 +1138,8 @@ theorem closureMeaning_instantiate {unit : VerexIR.Validation.ValidatedUnit} [Fu
     (executable : VerexIR.Validation.ExecutableUnit unit) [Θ : Skolems unit]
     (θ : TypeArgs) (free : θ.1.refFree = true) (σs : NRow) (shared : Sharing)
     (shape : ResultShape)
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs) :
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs) :
     @closureMeaning _ _ executable (Skolems.instantiate θ Θ) σs shared shape function args =
       Spec.bind (closureMeaning executable (NRow.subst θ.1 σs) shared (shape.subst θ.1)
           (shape.functionOfSkolem θ σs shared function) (HList.ofSkolem θ σs args))
@@ -1155,8 +1155,8 @@ result carried back, as both views hold the same runtime values. -/
 def InvokeMeaning.Coherent (invoke : (Θ : Skolems unit) → @InvokeMeaning unit _ Θ) : Prop :=
   ∀ (Θ : Skolems unit) (θ : TypeArgs), θ.1.refFree = true → ∀ (σs : NRow) (shared : Sharing)
     (shape : ResultShape)
-    (function : @NTy.carrier (Skolems.instantiate θ Θ).toCarriers (.function σs shared shape.row))
-    (args : @HList (Skolems.instantiate θ Θ).toCarriers σs),
+    (function : @NTy.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts (.function σs shared shape.row))
+    (args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs),
     invoke (Skolems.instantiate θ Θ) σs shared shape function args =
       Spec.bind (invoke Θ (NRow.subst θ.1 σs) shared (shape.subst θ.1)
           (@ResultShape.functionOfSkolem _ _ Θ θ σs shared shape function) (HList.ofSkolem θ σs args))
@@ -1172,8 +1172,8 @@ theorem closureMeaning_coherent (executable : VerexIR.Validation.ExecutableUnit 
 /-- A contract at the frame type arguments induce, read in the caller's
 view. -/
 def _root_.VerexIR.Proofs.Contract.ofSkolem (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
-    (contract : Contract (Memory unit) Failure (@HList (Skolems.instantiate θ Θ).toCarriers σs)
-      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)) :
+    (contract : Contract (Memory unit) Failure (@HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
+      (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)) :
     Contract (Memory unit) Failure (HList (NRow.subst θ.1 σs)) (shape.subst θ.1).carrier where
   requires := fun args => contract.requires (HList.toSkolem θ σs args)
   assumes := fun args => contract.assumes (HList.toSkolem θ σs args)
@@ -1193,10 +1193,10 @@ satisfies, at the caller's types, every contract equivalent to that one
 read in the caller's view (`doc/designs/native-verification.md`, "Specialized
 contracts"). -/
 theorem satisfies_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
-    {meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
-      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
-    {generic : Contract (Memory unit) Failure (@HList (Skolems.instantiate θ Θ).toCarriers σs)
-      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
+    {meaning : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs →
+      Comp unit (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)}
+    {generic : Contract (Memory unit) Failure (@HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
+      (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)}
     {specialized : Contract (Memory unit) Failure (HList (NRow.subst θ.1 σs)) (shape.subst θ.1).carrier}
     (verified : Satisfies meaning generic)
     (equivalent : Contract.Equivalent specialized (generic.ofSkolem θ)) :
@@ -1271,10 +1271,10 @@ theorem satisfies_of_equivalent {Args Result : Type}
 caller's types (`specializedMeaning`): its arguments read in the caller's
 view, its result carried back into the callee's. -/
 theorem wp_specialized (θ : TypeArgs) {σs : NRow} {shape : ResultShape}
-    {meaning : @HList (Skolems.instantiate θ Θ).toCarriers σs →
-      Comp unit (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape)}
-    {args : @HList (Skolems.instantiate θ Θ).toCarriers σs}
-    {ensures : @ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape → Memory unit → Prop}
+    {meaning : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs →
+      Comp unit (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape)}
+    {args : @HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs}
+    {ensures : @ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape → Memory unit → Prop}
     {aborts : Failure → Prop} {initial : Memory unit}
     (holds : wp (specializedMeaning θ meaning (HList.ofSkolem θ σs args))
       (fun result => ensures (ResultShape.toSkolem θ shape result)) aborts initial) :
@@ -1288,8 +1288,8 @@ read in the caller's view, of the run at the caller's types. -/
 theorem satisfies_run_ofSkolem (executable : VerexIR.Validation.ExecutableUnit unit)
     (θ : TypeArgs) (free : θ.1.refFree = true) (typeInstantiation : Array (TypeId × TypeId))
     (handle : FunctionHandle) (σs : NRow) (shape : ResultShape)
-    (contract : Contract (Memory unit) Failure (@HList (Skolems.instantiate θ Θ).toCarriers σs)
-      (@ResultShape.carrier (Skolems.instantiate θ Θ).toCarriers shape))
+    (contract : Contract (Memory unit) Failure (@HList ((Skolems.instantiate θ Θ).toCarriers).toSorts σs)
+      (@ResultShape.carrier ((Skolems.instantiate θ Θ).toCarriers).toSorts shape))
     (verified : Satisfies
       (@propheticRun _ _ executable (Skolems.instantiate θ Θ) typeInstantiation handle σs shape)
       contract) :
@@ -1668,12 +1668,12 @@ theorem erased_eq_closureOf {parameters results : NRow} {shared : Sharing}
     {left right : (NTy.function parameters shared results).carrier} {handle : FunctionHandle}
     {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)} {captured : NRow}
     {leftCaptures rightCaptures : HList captured}
-    (closedLeft : (Carriers.functions parameters shared results).closure left =
+    (closedLeft : (Sorts.functions parameters shared results).closure left =
       closureOf handle mask typeInstantiation leftCaptures)
-    (closedRight : (Carriers.functions parameters shared results).closure right =
+    (closedRight : (Sorts.functions parameters shared results).closure right =
       closureOf handle mask typeInstantiation rightCaptures) :
-    ((Carriers.functions parameters shared results).erased left =
-        (Carriers.functions parameters shared results).erased right) =
+    ((Sorts.functions parameters shared results).erased left =
+        (Sorts.functions parameters shared results).erased right) =
       (HList.equal false captured leftCaptures rightCaptures = true) := by
   simp only [TypedFunctions.erased, closedLeft, closedRight, ClosureValue.erased, ErasedClosure.mk.injEq,
     closureOf, ClosureValue.encode, RuntimeValue.eraseGhosts_closure, RuntimeValue.closure.injEq,
@@ -1685,11 +1685,11 @@ theorem order_closureOf (rank : ValueRanks) {parameters results : NRow} {shared 
     {left right : (NTy.function parameters shared results).carrier} {handle : FunctionHandle}
     {mask : Nat} {typeInstantiation : Array (TypeId × TypeId)} {captured : NRow}
     {leftCaptures rightCaptures : HList captured}
-    (closedLeft : (Carriers.functions parameters shared results).closure left =
+    (closedLeft : (Sorts.functions parameters shared results).closure left =
       closureOf handle mask typeInstantiation leftCaptures)
-    (closedRight : (Carriers.functions parameters shared results).closure right =
+    (closedRight : (Sorts.functions parameters shared results).closure right =
       closureOf handle mask typeInstantiation rightCaptures) :
-    (Carriers.functions parameters shared results).order rank left right =
+    (Sorts.functions parameters shared results).order rank left right =
       HList.order rank captured leftCaptures rightCaptures := by
   simp only [TypedFunctions.order, closedLeft, closedRight, ClosureValue.order, closureOf,
     compareInstantiation, Std.compare_self, Ordering.eq_then, List.toList_toArray, HList.encode,
@@ -1709,12 +1709,12 @@ theorem order_closureOf_ne (rank : ValueRanks) {parameters results : NRow} {shar
     {left right : (NTy.function parameters shared results).carrier} {handle handle' : FunctionHandle}
     {mask mask' : Nat} {typeInstantiation : Array (TypeId × TypeId)}
     {captured captured' : NRow} {leftCaptures : HList captured} {rightCaptures : HList captured'}
-    (closedLeft : (Carriers.functions parameters shared results).closure left =
+    (closedLeft : (Sorts.functions parameters shared results).closure left =
       closureOf handle mask typeInstantiation leftCaptures)
-    (closedRight : (Carriers.functions parameters shared results).closure right =
+    (closedRight : (Sorts.functions parameters shared results).closure right =
       closureOf handle' mask' typeInstantiation rightCaptures)
     (different : (handle, mask) ≠ (handle', mask')) :
-    (Carriers.functions parameters shared results).order rank left right =
+    (Sorts.functions parameters shared results).order rank left right =
       closureKeyOrder rank handle handle' mask mask' := by
   simp only [TypedFunctions.order, closedLeft, closedRight, ClosureValue.order, closureOf,
     closureKeyOrder, compareInstantiation, Std.compare_self, Ordering.eq_then]
@@ -1741,13 +1741,13 @@ theorem erased_eq_closureOf_ne {parameters results : NRow} {shared : Sharing}
     {left right : (NTy.function parameters shared results).carrier} {handle handle' : FunctionHandle}
     {mask mask' : Nat} {typeInstantiation typeInstantiation' : Array (TypeId × TypeId)}
     {captured captured' : NRow} {leftCaptures : HList captured} {rightCaptures : HList captured'}
-    (closedLeft : (Carriers.functions parameters shared results).closure left =
+    (closedLeft : (Sorts.functions parameters shared results).closure left =
       closureOf handle mask typeInstantiation leftCaptures)
-    (closedRight : (Carriers.functions parameters shared results).closure right =
+    (closedRight : (Sorts.functions parameters shared results).closure right =
       closureOf handle' mask' typeInstantiation' rightCaptures)
     (different : (handle, mask, typeInstantiation) ≠ (handle', mask', typeInstantiation')) :
-    ((Carriers.functions parameters shared results).erased left =
-        (Carriers.functions parameters shared results).erased right) = False := by
+    ((Sorts.functions parameters shared results).erased left =
+        (Sorts.functions parameters shared results).erased right) = False := by
   simp only [TypedFunctions.erased, closedLeft, closedRight, ClosureValue.erased, ErasedClosure.mk.injEq,
     closureOf, ClosureValue.encode, RuntimeValue.eraseGhosts_closure, RuntimeValue.closure.injEq,
     eq_iff_iff, iff_false, not_and]

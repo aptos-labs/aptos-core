@@ -551,7 +551,7 @@ def splitVectorRead? (goal : MVarId) : MetaM (Option (List MVarId)) := goal.with
         statedElementFact case carriers τ values index held equation
       else if owes then owedElementFact case carriers τ values index equation
       else pure case
-    literalReadElement case equation (some (carriers, τ))
+    literalReadElement case equation (some (mkApp (mkConst ``Carriers.toSorts) carriers, τ))
 
 /-- Split a binder, conjunction or conditional. Dependent actions introduce
   their branch assumptions before normalization. If a computation cannot be
@@ -1182,7 +1182,7 @@ of, which a clause builds them from.  `none` where the values name no row,
 as the current of a mutable reference names no prophecy. -/
 private def recoverRow? (carriers row entries : Lean.Expr) : MetaM (Option Lean.Expr) :=
   withNewMCtxDepth do
-    let args ← mkFreshExprMVar (mkApp2 (mkConst ``HList) carriers row)
+    let args ← mkFreshExprMVar (mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) carriers) row)
     unless ← isDefEq (mkApp3 (mkConst ``HList.settle) carriers row args) entries do
       return none
     let args ← instantiateMVars args
@@ -1293,7 +1293,7 @@ private def entriesView? (statement : Lean.Expr) : MetaM (Option EntriesView) :=
     let parts := statement.getAppArgs
     let carriers := mkApp3 (mkConst ``Skolems.toCarriers) parts[0]! parts[1]! parts[2]!
     let row := parts[4]!
-    let holds ← withLocalDeclD `args (mkApp2 (mkConst ``HList) carriers row) fun args =>
+    let holds ← withLocalDeclD `args (mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) carriers) row) fun args =>
       mkLambdaFVars #[args] (mkAppN (mkConst ``VerexIR.Proofs.EnsuresOf)
         ((parts.extract 0 8 |>.push args) ++ parts.extract 10 13))
     return some { carriers, row, holds, entries := parts[8]!, finals? := some parts[9]! }
@@ -1303,7 +1303,7 @@ private def entriesView? (statement : Lean.Expr) : MetaM (Option EntriesView) :=
   let parts := statement.getAppArgs
   let carriers := mkApp3 (mkConst ``Skolems.toCarriers) parts[0]! parts[1]! parts[2]!
   let row := parts[4]!
-  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``HList) carriers row) fun args =>
+  let holds ← withLocalDeclD `args (mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) carriers) row) fun args =>
     mkLambdaFVars #[args] (mkAppN (mkConst ``VerexIR.Proofs.AbortsOf)
       (parts.extract 0 8 |>.push args |>.push parts[9]!))
   return some { carriers, row, holds, entries := parts[8]! }
@@ -1768,13 +1768,13 @@ private partial def rowMetavariables (carriers row : Lean.Expr) :
   let spelled := (← whnfR τ).consumeMData
   let head ← if spelled.isAppOfArity ``NTy.ref 1 then
       let σ := spelled.appArg!
-      let referent := mkApp2 (mkConst ``NTy.carrier) carriers σ
+      let referent := mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``Carriers.toSorts) carriers) σ
       mkAppOptM ``Prod.mk #[referent, referent, ← mkFreshExprMVar referent,
         ← mkFreshExprMVar referent]
-    else mkFreshExprMVar (mkApp2 (mkConst ``NTy.carrier) carriers τ)
+    else mkFreshExprMVar (mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``Carriers.toSorts) carriers) τ)
   let some tail ← rowMetavariables carriers rest | return none
-  return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) carriers τ,
-    mkApp2 (mkConst ``HList) carriers rest, head, tail])
+  return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``Carriers.toSorts) carriers) τ,
+    mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) carriers) rest, head, tail])
 
 /-- The row a clause's entry values name where unification over a single row
 metavariable does not read a spelled product spine: the values themselves,
@@ -1792,8 +1792,8 @@ private partial def spelledEntries? (carriers row entries : Lean.Expr) :
     unless entries.isAppOfArity ``Prod.mk 4 do return none
     let (value, others) := (entries.getArg! 2, entries.getArg! 3)
     let some tail ← spell rest others | return none
-    return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) carriers τ,
-      mkApp2 (mkConst ``HList) carriers rest, value, tail])
+    return some (← mkAppOptM ``Prod.mk #[mkApp2 (mkConst ``NTy.carrier) (mkApp (mkConst ``Carriers.toSorts) carriers) τ,
+      mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) carriers) rest, value, tail])
   spell row entries
 
 /-- A proposition with every statement over entry values in a positive
@@ -1841,7 +1841,7 @@ private partial def strengthenEntries (statement : Lean.Expr) :
       let args ← match ← (if view.finals?.isSome then rowMetavariables view.carriers view.row
           else pure none) with
         | some spelled => pure spelled
-        | none => mkFreshExprMVar (mkApp2 (mkConst ``HList) view.carriers view.row)
+        | none => mkFreshExprMVar (mkApp2 (mkConst ``HList) (mkApp (mkConst ``Carriers.toSorts) view.carriers) view.row)
       unless ← isDefEq (mkApp3 (mkConst ``HList.settle) view.carriers view.row args)
           view.entries do
         return none

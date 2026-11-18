@@ -505,4 +505,78 @@ example (b : Bool) (left right : (NTy.int 64 false).carrier)
   with
     trivial
 
+-- A scalar at an independent operational family still needs zero Holds premises.
+example (operations : Sorts) (b : Bool)
+    (left right : @NTy.carrier operations (.int 64 false))
+    (env : @HEnv (inferInstance : Carriers).toSorts Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (_ : Flow ρ Γ (@NTy.carrier operations (.int 64 false))) _ => True)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
+-- A contributed result shape can carry the same invariant-free scalar.
+example (operations : Sorts) (b : Bool)
+    (left right : @ResultShape.carrier operations (.one (.int 64 false)))
+    (env : @HEnv (inferInstance : Carriers).toSorts Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (_ : Flow ρ Γ (@ResultShape.carrier operations (.one (.int 64 false)))) _ => True)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
+-- The value spells the reduced Sorts.instantiate parent. The flow supplies
+-- the semantic stage, whose predicate differs from ordinary instantiation.
+private abbrev joinStage (θ : TypeArgs) (outer : Carriers) (accepted : Prop) : Carriers :=
+  { Carriers.instantiate θ outer with holds := fun _ _ => accepted }
+
+example (θ : TypeArgs) (outer : Carriers) (accepted : Prop) (b : Bool)
+    (left right : @NTy.carrier (Sorts.instantiate θ outer.toSorts) (.param 0))
+    (hLeft : @NTy.Holds (joinStage θ outer accepted) (.param 0) left)
+    (hRight : @NTy.Holds (joinStage θ outer accepted) (.param 0) right)
+    (env : @HEnv (joinStage θ outer accepted).toSorts Γ) (state : Memory unit) :
+    wp (Result := @Flow (joinStage θ outer accepted) ρ Γ
+          (@NTy.carrier (Sorts.instantiate θ outer.toSorts) (.param 0)))
+      (if b then Spec.pure (@Flow.value (joinStage θ outer accepted) ρ Γ _ left env)
+        else Spec.pure (@Flow.value (joinStage θ outer accepted) ρ Γ _ right env))
+      (fun (flow : @Flow (joinStage θ outer accepted) ρ Γ
+          (@NTy.carrier (Sorts.instantiate θ outer.toSorts) (.param 0))) _ =>
+        letI : Carriers := joinStage θ outer accepted
+        match flow with
+        | .value v _ => @NTy.Holds (joinStage θ outer accepted) (.param 0) v
+        | _ => False)
+      (fun (_ : Failure) => False) state := by
+  check_shared_holds 1 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    assumption
+
+-- An unrelated Sorts can type the result but supplies no Holds predicate.
+-- The join must reject this even though the rest of the continuation is trivial.
+example (operations : Sorts) (b : Bool)
+    (left right : @NTy.carrier operations (.param 0))
+    (env : @HEnv (inferInstance : Carriers).toSorts Γ) (state : Memory unit) :
+    wp (if b then Spec.pure (.value left env) else Spec.pure (.value right env))
+      (fun (_ : Flow ρ Γ (@NTy.carrier operations (.param 0))) _ => True)
+      (fun (_ : Failure) => False) state := by
+  run_tac do
+    let saved ← Lean.Elab.Tactic.saveState
+    let branch := mkIdent `b
+    let failure? ← try
+      evalTactic (← `(tactic| check_shared_holds 0 :
+        cases $branch:ident <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+        with trivial))
+      pure none
+    catch error => pure (some error)
+    saved.restore
+    let some error := failure? | throwError "sealed a join at an unrelated Sorts dictionary"
+    unless (← error.toMessageData.toString) ==
+        "a shared continuation value has no semantic family in its flow" do
+      throw error
+  cases b <;> simp [wp_pure]
+
 end JoinHoldsTests
