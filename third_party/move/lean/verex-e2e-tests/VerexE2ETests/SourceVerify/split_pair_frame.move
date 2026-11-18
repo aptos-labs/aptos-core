@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// A match on a pair of a resource and an argument: the split reduces its
-// constructor reading at the matched values, and the join carries the
-// component equations to the closure invoke of `process`. `plain` is the
-// pair match with no closure invoke.
+// A match on a pair of a resource and an argument: the split reduces
+// constructor readings; `process` (with a closure invoke) and `plain` (without
+// one) verify; the component-equation mechanism at the join is supported by
+// source, while individual join leaves are not traced.
 module 0x43::split_pair_frame {
     use 0x1::signer::address_of;
 

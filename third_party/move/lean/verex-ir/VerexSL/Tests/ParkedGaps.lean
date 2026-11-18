@@ -52,9 +52,9 @@ fixture is no evidence for a match-split cause. The same loop by the automatic
 route (`drain_automatic`) verifies.
 
 `split_pair_frame`: under a match on a pair of a resource and an argument, the
-split reduces its constructor reading at the matched values and the join
-carries the component equations to the closure invoke, so both `process` and
-`plain` verify.
+split reduces constructor readings; `process` and `plain` now verify; the
+component-equation mechanism at the join is supported by source, while
+individual join leaves were not traced.
 
 `generic_join_ghost`: the unit declares a spec ghost, so the generic callee
 runs in its caller's walk; automatic verification of `settle_token` fails at
