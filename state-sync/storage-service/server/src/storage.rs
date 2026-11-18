@@ -4,7 +4,9 @@
 use crate::{error::Error, metrics};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::{debug, warn};
-use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult, StateKind};
+use aptos_storage_interface::{
+    AptosDbError, CheckpointStateReader, DbReader, Result as StorageResult, StateKind,
+};
 use aptos_storage_service_types::{
     requests::{GetTransactionDataWithProofRequest, TransactionDataRequestType},
     responses::{
@@ -1360,6 +1362,8 @@ impl TimedStorageReader {
         Self { storage }
     }
 }
+
+impl CheckpointStateReader for TimedStorageReader {}
 
 impl DbReader for TimedStorageReader {
     timed_read!(
