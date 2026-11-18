@@ -9,7 +9,7 @@ use crate::{
     heap::{alloc_enum_no_gc, alloc_vec_no_gc, AllocationError, Heap},
 };
 use mono_move_core::{
-    memory::{MemAddr, Obj},
+    memory::{HeapObject, MemAddr},
     types::InternedType,
     FieldValueLayout, LayoutKind, LayoutProvider, ValueLayout, ENUM_DATA_OFFSET,
 };
@@ -82,7 +82,7 @@ impl<'a, L: LayoutProvider + ?Sized> ValueWriter<'a, L> {
 
     /// Writes an integer's little-endian bytes into a matching integer slot.
     /// Integer slots hold little-endian bytes on every host (all integer
-    /// stores go through `MemAddr::store`), so the copy is exact by
+    /// writes go through `MemAddr::write`), so the copy is exact by
     /// construction.
     fn write_int(self, signed: bool, bytes: &[u8]) -> Result<(), RuntimeError> {
         let kind_matches = match self.layout.kind {
@@ -156,7 +156,7 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
             return Err(self.mismatch("a bool"));
         }
         // SAFETY: `dst` is writable for the 1-byte bool slot.
-        unsafe { self.dst.store_bool(v) };
+        unsafe { self.dst.write_bool(v) };
         Ok(())
     }
 
@@ -259,7 +259,7 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         if v.is_empty() {
             // The empty vector is the null pointer.
             // SAFETY: `dst` is writable for the vector's pointer slot.
-            unsafe { self.dst.store_ptr(MemAddr::NULL) };
+            unsafe { self.dst.write_ptr(MemAddr::NULL) };
             return Ok(());
         }
         check_sequence_len(v.len())?;
@@ -269,7 +269,7 @@ impl<'a, L: LayoutProvider + ?Sized> MoveValueVisitor for ValueWriter<'a, L> {
         // region was allocated for exactly `v.len()` bytes.
         unsafe { vec.vec_data().copy_from_slice(v) };
         // SAFETY: `dst` is writable for the vector's pointer slot.
-        unsafe { self.dst.store_ptr(vec.addr()) };
+        unsafe { self.dst.write_ptr(vec.addr()) };
         Ok(())
     }
 
@@ -396,8 +396,9 @@ impl<L: LayoutProvider + ?Sized> VectorElementVisitor for SeqWriter<'_, L> {
         // SAFETY: `written < expected`, so `expected > 0` and `vec_ptr` is the
         // live vector object `visit_vector` allocated for `expected` elements;
         // the `written`th element lies within its data region.
-        let elem_dst =
-            unsafe { Obj::new(self.vec_ptr).vec_elem(self.written as u64, self.elem_layout.size) };
+        let elem_dst = unsafe {
+            HeapObject::new(self.vec_ptr).vec_elem(self.written as u64, self.elem_layout.size)
+        };
         value.visit(ValueWriter {
             layouts: self.layouts,
             heap: self.heap,
@@ -418,7 +419,7 @@ impl<L: LayoutProvider + ?Sized> VectorElementVisitor for SeqWriter<'_, L> {
             ));
         }
         // SAFETY: `dst` is writable for the vector's pointer slot.
-        unsafe { self.dst.store_ptr(self.vec_ptr) };
+        unsafe { self.dst.write_ptr(self.vec_ptr) };
         Ok(())
     }
 }
@@ -474,7 +475,7 @@ impl<L: LayoutProvider + ?Sized> FieldVisitor for FieldsWriter<'_, L> {
         }
         if let Some((obj_ptr, slot)) = self.finish {
             // SAFETY: `slot` is writable for the enum's pointer slot.
-            unsafe { slot.store_ptr(obj_ptr) };
+            unsafe { slot.write_ptr(obj_ptr) };
         }
         Ok(())
     }

@@ -3,7 +3,7 @@
 
 //! Structural equality and ordering of two VM values, driven by their layout.
 //
-// Host endianness: every integer goes through `MemAddr::load_unaligned`, which
+// Host endianness: every integer goes through `MemAddr::read_unaligned`, which
 // decodes the little-endian in-memory bytes on any host, and the byte-wise
 // fast paths (equality over pointer-free values, address ordering) compare the
 // little-endian image itself, so the walks hold on big-endian hosts by
@@ -11,7 +11,7 @@
 
 use crate::error::{RuntimeError, RuntimeInvariantViolation};
 use mono_move_core::{
-    memory::{vec_len_or_zero, MemAddr, Obj},
+    memory::{vec_len_or_zero, HeapObject, MemAddr},
     types::InternedType,
     LayoutId, LayoutKind, LayoutProvider, VMInternalError, VMResult, ENUM_DATA_OFFSET,
 };
@@ -103,9 +103,9 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             // SAFETY: vector values hold 8-byte heap pointers pointing to
             // their data for any well-typed value (null for the empty vector).
             // The length is stored in the data pointed to.
-            let vec_a = unsafe { a.load_ptr() };
+            let vec_a = unsafe { a.read_ptr() };
             let len_a = unsafe { vec_len_or_zero(vec_a) };
-            let vec_b = unsafe { b.load_ptr() };
+            let vec_b = unsafe { b.read_ptr() };
             let len_b = unsafe { vec_len_or_zero(vec_b) };
 
             if len_a != len_b {
@@ -121,7 +121,7 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
             let elem_size = elem_layout.size;
             // SAFETY: both vectors are live heap objects: the empty (null)
             // case was excluded above.
-            let (obj_a, obj_b) = unsafe { (Obj::new(vec_a), Obj::new(vec_b)) };
+            let (obj_a, obj_b) = unsafe { (HeapObject::new(vec_a), HeapObject::new(vec_b)) };
             if elem_layout.has_no_pointers_no_padding() {
                 // SAFETY: the data regions hold `len_a` elements of `elem_size`
                 // bytes each, with no pointer slots and no padding by the flag.
@@ -153,8 +153,8 @@ pub(crate) unsafe fn equals_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
             // every enum object stores its tag followed by the variant body.
-            let obj_a = unsafe { Obj::new(a.load_ptr()) };
-            let obj_b = unsafe { Obj::new(b.load_ptr()) };
+            let obj_a = unsafe { HeapObject::new(a.read_ptr()) };
+            let obj_b = unsafe { HeapObject::new(b.read_ptr()) };
             let tag_a = unsafe { obj_a.enum_tag() };
             let tag_b = unsafe { obj_b.enum_tag() };
 
@@ -263,7 +263,7 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
         // A `bool` is a 1-byte `0`/`1` value, so it compares like a `u8`.
         LayoutKind::Bool | LayoutKind::UnsignedInt => {
             // Load the little-endian bytes as the native integer of the
-            // matching width and compare numerically. `load_unaligned`
+            // matching width and compare numerically. `read_unaligned`
             // decodes little-endian on any host, and takes no alignment
             // requirement: these values may sit at any offset in a struct.
             //
@@ -271,12 +271,12 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // no pointer slots.
             Ok(unsafe {
                 match layout.size {
-                    1 => a.load::<u8>().cmp(&b.load::<u8>()),
-                    2 => a.load_unaligned::<u16>().cmp(&b.load_unaligned::<u16>()),
-                    4 => a.load_unaligned::<u32>().cmp(&b.load_unaligned::<u32>()),
-                    8 => a.load_unaligned::<u64>().cmp(&b.load_unaligned::<u64>()),
-                    16 => a.load_unaligned::<u128>().cmp(&b.load_unaligned::<u128>()),
-                    32 => a.load_unaligned::<U256>().cmp(&b.load_unaligned::<U256>()),
+                    1 => a.read::<u8>().cmp(&b.read::<u8>()),
+                    2 => a.read_unaligned::<u16>().cmp(&b.read_unaligned::<u16>()),
+                    4 => a.read_unaligned::<u32>().cmp(&b.read_unaligned::<u32>()),
+                    8 => a.read_unaligned::<u64>().cmp(&b.read_unaligned::<u64>()),
+                    16 => a.read_unaligned::<u128>().cmp(&b.read_unaligned::<u128>()),
+                    32 => a.read_unaligned::<U256>().cmp(&b.read_unaligned::<U256>()),
                     _ => {
                         return Err(VMInternalError::new(RuntimeError::InvariantViolation(
                             RuntimeInvariantViolation::Unreachable(
@@ -292,12 +292,12 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // no pointer slots.
             Ok(unsafe {
                 match layout.size {
-                    1 => a.load::<i8>().cmp(&b.load::<i8>()),
-                    2 => a.load_unaligned::<i16>().cmp(&b.load_unaligned::<i16>()),
-                    4 => a.load_unaligned::<i32>().cmp(&b.load_unaligned::<i32>()),
-                    8 => a.load_unaligned::<i64>().cmp(&b.load_unaligned::<i64>()),
-                    16 => a.load_unaligned::<i128>().cmp(&b.load_unaligned::<i128>()),
-                    32 => a.load_unaligned::<I256>().cmp(&b.load_unaligned::<I256>()),
+                    1 => a.read::<i8>().cmp(&b.read::<i8>()),
+                    2 => a.read_unaligned::<i16>().cmp(&b.read_unaligned::<i16>()),
+                    4 => a.read_unaligned::<i32>().cmp(&b.read_unaligned::<i32>()),
+                    8 => a.read_unaligned::<i64>().cmp(&b.read_unaligned::<i64>()),
+                    16 => a.read_unaligned::<i128>().cmp(&b.read_unaligned::<i128>()),
+                    32 => a.read_unaligned::<I256>().cmp(&b.read_unaligned::<I256>()),
                     _ => {
                         return Err(VMInternalError::new(RuntimeError::InvariantViolation(
                             RuntimeInvariantViolation::Unreachable(
@@ -336,9 +336,9 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             // SAFETY: vector values hold 8-byte heap pointers pointing to
             // their data for any well-typed value (null for the empty vector).
             // The length is stored in the data pointed to.
-            let vec_a = unsafe { a.load_ptr() };
+            let vec_a = unsafe { a.read_ptr() };
             let len_a = unsafe { vec_len_or_zero(vec_a) };
-            let vec_b = unsafe { b.load_ptr() };
+            let vec_b = unsafe { b.read_ptr() };
             let len_b = unsafe { vec_len_or_zero(vec_b) };
 
             let elem = layouts.layout(*elem_id).ok_or({
@@ -351,7 +351,7 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
             }
             // SAFETY: both lengths are non-zero, so both vectors are live
             // (non-null) heap objects.
-            let (obj_a, obj_b) = unsafe { (Obj::new(vec_a), Obj::new(vec_b)) };
+            let (obj_a, obj_b) = unsafe { (HeapObject::new(vec_a), HeapObject::new(vec_b)) };
             for i in 0..common_len {
                 // SAFETY: `i` is below both lengths, so the ith element lies
                 // within both data regions.
@@ -370,8 +370,8 @@ pub(crate) unsafe fn compare_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: well-typed enum values hold non-null heap pointers and
             // every enum object stores its tag followed by the variant body.
-            let obj_a = unsafe { Obj::new(a.load_ptr()) };
-            let obj_b = unsafe { Obj::new(b.load_ptr()) };
+            let obj_a = unsafe { HeapObject::new(a.read_ptr()) };
+            let obj_b = unsafe { HeapObject::new(b.read_ptr()) };
             let tag_a = unsafe { obj_a.enum_tag() };
             let tag_b = unsafe { obj_b.enum_tag() };
 

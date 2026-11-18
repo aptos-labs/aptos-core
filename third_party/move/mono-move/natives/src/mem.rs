@@ -19,7 +19,7 @@ pub fn native_swap<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     unsafe {
         let left: Ref<Opaque> = ctx.arg(0)?;
         let right: Ref<Opaque> = ctx.arg(1)?;
-        // TODO(correctness): `MemAddr::swap_nonoverlapping_with` would be UB if the two referents
+        // TODO(correctness): `MemAddr::swap_nonoverlapping` would be UB if the two referents
         // ever alias. Move borrow rules forbid that, but it's unclear whether
         // Block-STM speculative execution can transiently produce aliasing
         // references — so swap via a temporary, which is sound either way until

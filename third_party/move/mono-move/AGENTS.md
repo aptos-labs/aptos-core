@@ -58,7 +58,7 @@ a comment saying why; that is an intended outcome, not a workaround.
 ## Raw memory access
 
 All raw memory access goes through `MemAddr` in the `mono-move-mem` crate
-(`mem/`). The VM-level types sit on top of it: `FatRef`, `Frame` and `Obj` in
+(`mem/`). The VM-level types sit on top of it: `FatRef`, `Frame` and `HeapObject` in
 `mono_move_core::memory`.
 
 Rules:
@@ -71,13 +71,13 @@ Rules:
   code-pointer word becomes a typed reference through
   `MemAddr::as_ref::<T>()`. Enforced by the `raw_memory_access` lint (see
   "Custom lints"; `lean-link`'s C ABI is exempt by config).
-- Pointer-bearing words go through `load_ptr` / `store_ptr`, never
-  `load::<u64>` (that strips provenance). Eight opaque bytes that may be a
+- Pointer-bearing words go through `read_ptr` / `write_ptr`, never
+  `read::<u64>` (that strips provenance). Eight opaque bytes that may be a
   pointer, a scalar, or padding move with `copy_word`.
-- Wrapper unsafety: constructing `Frame` / `Obj` is `unsafe` and asserts the
+- Wrapper unsafety: constructing `Frame` / `HeapObject` is `unsafe` and asserts the
   pointee invariant once; methods that take an untrusted offset (`slot`,
   `at`, `field`, `vec_elem`, `FatRef::target`) are `unsafe`; what the
-  construction covers (`meta()`, `header()`) is safe; every load and store
+  construction covers (`meta()`, `header()`) is safe; every read and write
   is `unsafe`.
 - Every `unsafe` block carries a `// SAFETY:` comment naming the concrete
   invariant that discharges the method's `# Safety` contract — which

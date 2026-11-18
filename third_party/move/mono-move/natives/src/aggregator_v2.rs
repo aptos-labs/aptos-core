@@ -77,7 +77,7 @@ impl<T: UnsignedInt> AggregatorOrSnapshotRef<'_, T> {
         // AggregatorSnapshot, so we read directly from the referent without
         // extra offsets. The referent stays rooted for the call. Fields are
         // not necessarily `T`-aligned in VM memory, so the load is unaligned.
-        unsafe { self.value_addr().load_unaligned::<T>() }
+        unsafe { self.value_addr().read_unaligned::<T>() }
     }
 
     fn write_value(&self, value: T) {
@@ -85,7 +85,7 @@ impl<T: UnsignedInt> AggregatorOrSnapshotRef<'_, T> {
         // AggregatorSnapshot, so we write directly to the referent without
         // extra offsets. The referent stays rooted for the call. Fields are
         // not necessarily `T`-aligned in VM memory, so the store is unaligned.
-        unsafe { self.value_addr().store_unaligned::<T>(value) }
+        unsafe { self.value_addr().write_unaligned::<T>(value) }
     }
 
     fn read_max_value(&self) -> T {
@@ -93,7 +93,7 @@ impl<T: UnsignedInt> AggregatorOrSnapshotRef<'_, T> {
         // past `value` within the same live referent, which stays rooted for
         // the call. Fields are not necessarily `T`-aligned in VM memory, so
         // the load is unaligned.
-        unsafe { self.value_addr().add(T::SIZE).load_unaligned::<T>() }
+        unsafe { self.value_addr().add(T::SIZE).read_unaligned::<T>() }
     }
 }
 

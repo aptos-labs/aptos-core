@@ -38,7 +38,7 @@ use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, NoInterrupts, TxnOutcome,
 };
 use mono_move_core::{
-    memory::Obj,
+    memory::HeapObject,
     storage::resource_provider::{InMemoryStorageKey, ReadPin},
     struct_tag_of,
 };
@@ -61,7 +61,7 @@ use provider::BlockSTMSequentialProvider;
 #[derive(Clone)]
 pub enum MonoValue {
     Write {
-        ptr: Obj,
+        ptr: HeapObject,
         kind: WriteOpKind,
         /// Pins the allocation backing the pointer. As long as we hold the pin,
         /// using the pointer is safe.

@@ -4,8 +4,8 @@
 //! Resource storage access for the runtime.
 
 use crate::{
-    memory::Obj, native::TableHandle, struct_tag_of, types::InternedType, ExecutionErrorKind,
-    IntoExecutionError,
+    memory::HeapObject, native::TableHandle, struct_tag_of, types::InternedType,
+    ExecutionErrorKind, IntoExecutionError,
 };
 use anyhow::anyhow;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
@@ -159,7 +159,7 @@ pub enum StorageRead {
     /// a cached DB read or a write from soe transaction at lower version.
     ExternalHeap {
         /// The value's object, allocated in the arena `pin` keeps alive.
-        ptr: Obj,
+        ptr: HeapObject,
         /// Version of this read from Block-STM. Used for read-set validation.
         version: Version,
         /// Keeps the arena `ptr` points into alive while this read is retained.

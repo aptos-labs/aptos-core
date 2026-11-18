@@ -11,7 +11,7 @@ use crate::{
 use bytes::Bytes;
 use mono_move_core::{
     intern_type_tag,
-    memory::Obj,
+    memory::HeapObject,
     nominal_tag,
     storage::resource_provider::InMemoryStorageKey,
     type_tag_of,
@@ -511,7 +511,7 @@ pub(crate) fn resource_changes(
         let tag = nominal_tag(*ty).map_err(|err| RunError::Commit(format!("{err:#}")))?;
         // SAFETY: written pointers refer to live values in the effects' frozen
         // heap, and `guard` is the guard that described them.
-        let written = |ptr: Obj| {
+        let written = |ptr: HeapObject| {
             unsafe { serialize(guard, ptr.addr(), *ty) }
                 .map(Bytes::from)
                 .map_err(RunError::from)

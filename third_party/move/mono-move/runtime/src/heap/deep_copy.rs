@@ -12,7 +12,7 @@ use crate::{
     types::VEC_DATA_OFFSET,
 };
 use mono_move_core::{
-    memory::{MemAddr, Obj, ObjHeader},
+    memory::{HeapObject, MemAddr, ObjectHeader},
     DescriptorId, DescriptorProvider, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, ENUM_DATA_OFFSET, OBJECT_HEADER_SIZE,
 };
@@ -25,14 +25,14 @@ impl Heap {
     /// allocation that does not fit. There is no GC during copying: on
     /// out-of-memory the caller may have to run GC and retry.
     ///
-    /// `src` is a live object by [`Obj`]'s construction invariant; its header
+    /// `src` is a live object by [`HeapObject`]'s construction invariant; its header
     /// must be valid (object-header integrity).
     pub(crate) fn try_deep_copy<P: DescriptorProvider + ?Sized>(
         &mut self,
         descriptors: &P,
-        src: Obj,
-    ) -> AllocationResult<Obj> {
-        let ObjHeader { descriptor, size } = src.header();
+        src: HeapObject,
+    ) -> AllocationResult<HeapObject> {
+        let ObjectHeader { descriptor, size } = src.header();
         let src_size = size as usize;
         let src_desc_id = DescriptorId(descriptor);
         debug_assert!(src_size >= OBJECT_HEADER_SIZE);
@@ -171,17 +171,17 @@ impl Heap {
         slot: MemAddr,
     ) -> AllocationResult<()> {
         // SAFETY: `slot` is a pointer slot (this function's contract).
-        let child_src = unsafe { slot.load_ptr() };
+        let child_src = unsafe { slot.read_ptr() };
         if child_src.is_null() {
             return Ok(());
         }
         // SAFETY: the parent's descriptor lists this slot as a heap pointer,
         // so a non-null `child_src` is the data pointer of a live object.
-        let child_src = unsafe { Obj::new(child_src) };
+        let child_src = unsafe { HeapObject::new(child_src) };
         let child_dst = self.try_deep_copy(descriptors, child_src)?;
         // SAFETY: same slot as the read above.
         unsafe {
-            slot.store_ptr(child_dst.addr());
+            slot.write_ptr(child_dst.addr());
         }
         Ok(())
     }

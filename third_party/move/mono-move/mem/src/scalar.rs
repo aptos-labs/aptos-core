@@ -13,9 +13,9 @@ use move_core_types::{
 ///
 /// Not `bool`: reading a byte other than `0` or `1` as a `bool` is immediate
 /// undefined behavior, so booleans are read as `u8` and checked instead
-/// ([`MemAddr::load_bool`](crate::MemAddr::load_bool)). Not pointers: they
+/// ([`MemAddr::read_bool`](crate::MemAddr::read_bool)). Not pointers: they
 /// carry provenance that an integer load would strip
-/// ([`MemAddr::load_ptr`](crate::MemAddr::load_ptr)).
+/// ([`MemAddr::read_ptr`](crate::MemAddr::read_ptr)).
 ///
 /// # Safety
 ///
@@ -128,12 +128,12 @@ mod tests {
         let i = I256::from_le_bytes(std::array::from_fn(|i| 0xF0 - i as u8));
         let a = AccountAddress::new(std::array::from_fn(|i| 0x40 + i as u8));
         unsafe {
-            base.store(u);
-            base.add(32).store(i);
-            base.add(64).store(a);
-            assert_eq!(base.load::<U256>(), u);
-            assert_eq!(base.add(32).load::<I256>(), i);
-            assert_eq!(base.add(64).load::<AccountAddress>(), a);
+            base.write(u);
+            base.add(32).write(i);
+            base.add(64).write(a);
+            assert_eq!(base.read::<U256>(), u);
+            assert_eq!(base.add(32).read::<I256>(), i);
+            assert_eq!(base.add(64).read::<AccountAddress>(), a);
         }
         // The stored image is the little-endian encoding regardless of host.
         assert_eq!(&buf.0[..32], &u.to_le_bytes());

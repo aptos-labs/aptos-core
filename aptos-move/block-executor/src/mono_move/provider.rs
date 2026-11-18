@@ -15,7 +15,7 @@ use aptos_types::{
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
 use mono_move_core::{
-    memory::Obj,
+    memory::HeapObject,
     nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -59,7 +59,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
         &self,
         key: &InMemoryStorageKey,
         blob: &[u8],
-    ) -> Result<(Obj, Arc<SharedArena>), ResourceProviderError> {
+    ) -> Result<(HeapObject, Arc<SharedArena>), ResourceProviderError> {
         let value_ty = key.value_ty();
 
         let layout = self
@@ -75,7 +75,7 @@ impl<'a, 'ctx, S: TStateView<Key = StateKey>> BlockSTMSequentialProvider<'a, 'ct
             .resource_arena()
             .expect("Arena always exists for MonoMove execution");
 
-        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<Obj, _> {
+        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<HeapObject, _> {
             // TODO(completeness): ensure this never errors! Our arena should grow.
             let obj = heap
                 .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
@@ -227,7 +227,7 @@ impl<S: TStateView<Key = StateKey>> AptosDataProvider for BlockSTMSequentialProv
     }
 }
 
-fn read(ptr: Obj, pin: Arc<dyn ReadPin>) -> StorageRead {
+fn read(ptr: HeapObject, pin: Arc<dyn ReadPin>) -> StorageRead {
     StorageRead::ExternalHeap {
         ptr,
         // Version is irrelevant for sequential execution.

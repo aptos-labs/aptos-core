@@ -17,7 +17,7 @@ use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
 use mono_move_core::{
-    memory::Obj,
+    memory::HeapObject,
     nominal_tag,
     storage::{
         module_provider::ModuleProvider,
@@ -260,7 +260,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
 
         let mut inner = self.inner.borrow_mut();
         let arena = inner.arena.clone();
-        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<Obj, _> {
+        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<HeapObject, _> {
             let obj = heap
                 .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
                 .ok_or_else(|| internal("resource arena is full".to_string()))?;

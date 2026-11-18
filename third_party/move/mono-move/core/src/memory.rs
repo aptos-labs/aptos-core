@@ -3,13 +3,13 @@
 
 //! The VM's view of memory on top of [`MemAddr`]: a Move reference
 //! ([`FatRef`]), a call frame ([`Frame`], [`FrameMeta`]) and a heap object
-//! ([`Obj`], [`ObjHeader`]).
+//! ([`HeapObject`], [`ObjectHeader`]).
 //!
 //! An object pointer addresses the first byte of the object's data; the
 //! `[descriptor_id: u32 | size: u32]` header occupies the 8 bytes just below
 //! it (the allocator reserves `OBJECT_HEADER_SIZE` bytes there, which keeps
-//! the data `MAX_ALIGN`-aligned). [`Obj::header`], [`Obj::write_header`] and
-//! [`Obj::set_descriptor`] are the only places that reach below a data
+//! the data `MAX_ALIGN`-aligned). [`HeapObject::header`], [`HeapObject::write_header`] and
+//! [`HeapObject::set_descriptor`] are the only places that reach below a data
 //! pointer.
 
 use crate::{
@@ -60,12 +60,12 @@ impl FatRef {
     ///
     /// `slot` must be a readable, initialized, pointer-aligned 16-byte slot.
     #[inline(always)]
-    pub unsafe fn load_from(slot: MemAddr) -> FatRef {
+    pub unsafe fn read_from(slot: MemAddr) -> FatRef {
         // SAFETY: forwarded to the caller; both halves lie within the slot.
         unsafe {
             FatRef {
-                base: slot.load_ptr(),
-                offset: slot.add(FAT_PTR_OFFSET_HALF).load::<u64>(),
+                base: slot.read_ptr(),
+                offset: slot.add(FAT_PTR_OFFSET_HALF).read::<u64>(),
             }
         }
     }
@@ -74,11 +74,11 @@ impl FatRef {
     ///
     /// `slot` must be a writable, pointer-aligned 16-byte slot.
     #[inline(always)]
-    pub unsafe fn store_to(self, slot: MemAddr) {
+    pub unsafe fn write_to(self, slot: MemAddr) {
         // SAFETY: forwarded to the caller; both halves lie within the slot.
         unsafe {
-            slot.store_ptr(self.base);
-            slot.add(FAT_PTR_OFFSET_HALF).store::<u64>(self.offset);
+            slot.write_ptr(self.base);
+            slot.add(FAT_PTR_OFFSET_HALF).write::<u64>(self.offset);
         }
     }
 
@@ -156,7 +156,7 @@ impl Frame {
     #[inline(always)]
     pub unsafe fn ref_target(self, off: FrameOffset) -> MemAddr {
         // SAFETY: forwarded to the caller.
-        unsafe { FatRef::load_from(self.slot(off)).target() }
+        unsafe { FatRef::read_from(self.slot(off)).target() }
     }
 
     /// `fp + bytes`, for offsets that are not [`FrameOffset`]s.
@@ -207,21 +207,21 @@ impl FrameMeta {
     #[inline(always)]
     pub fn saved_pc_word(self) -> u64 {
         // SAFETY: `Frame::meta` guarantees an initialized, aligned block.
-        unsafe { self.0.add(META_SAVED_PC_OFFSET).load::<u64>() }
+        unsafe { self.0.add(META_SAVED_PC_OFFSET).read::<u64>() }
     }
 
     /// The caller's frame pointer.
     #[inline(always)]
     pub fn saved_fp(self) -> MemAddr {
         // SAFETY: `Frame::meta` guarantees an initialized, aligned block.
-        unsafe { self.0.add(META_SAVED_FP_OFFSET).load_ptr() }
+        unsafe { self.0.add(META_SAVED_FP_OFFSET).read_ptr() }
     }
 
     /// The caller's function pointer, or null for the root frame.
     #[inline(always)]
     pub fn saved_func_ptr(self) -> MemAddr {
         // SAFETY: `Frame::meta` guarantees an initialized, aligned block.
-        unsafe { self.0.add(META_SAVED_FUNC_PTR_OFFSET).load_ptr() }
+        unsafe { self.0.add(META_SAVED_FUNC_PTR_OFFSET).read_ptr() }
     }
 
     /// The caller's function, or `None` for the root frame. This is the one
@@ -258,15 +258,15 @@ impl FrameMeta {
     ) {
         // SAFETY: forwarded to the caller; all three words lie within the block.
         unsafe {
-            at.add(META_SAVED_PC_OFFSET).store::<u64>(saved_pc_word);
-            at.add(META_SAVED_FP_OFFSET).store_ptr(saved_fp);
-            at.add(META_SAVED_FUNC_PTR_OFFSET).store_ptr(saved_func_ptr);
+            at.add(META_SAVED_PC_OFFSET).write::<u64>(saved_pc_word);
+            at.add(META_SAVED_FP_OFFSET).write_ptr(saved_fp);
+            at.add(META_SAVED_FUNC_PTR_OFFSET).write_ptr(saved_func_ptr);
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Obj: a live heap object
+// HeapObject: a live heap object
 // ---------------------------------------------------------------------------
 
 /// `descriptor_id` sits at `data - 8`, `size` at `data - 4`.
@@ -280,25 +280,25 @@ const HEADER_SIZE_NEG_OFFSET: usize = 4;
 /// the object; reading the header is safe.
 #[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Obj(MemAddr);
+pub struct HeapObject(MemAddr);
 
 /// An object's header, loaded by value.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct ObjHeader {
+pub struct ObjectHeader {
     /// Descriptor id, or the GC's forwarded marker during a collection.
     pub descriptor: u32,
     /// Total size: header plus `MAX_ALIGN`-rounded payload.
     pub size: u32,
 }
 
-impl Obj {
+impl HeapObject {
     /// # Safety
     ///
     /// `data` must be the data pointer of a live heap object.
     #[inline(always)]
-    pub unsafe fn new(data: MemAddr) -> Obj {
+    pub unsafe fn new(data: MemAddr) -> HeapObject {
         debug_assert!(!data.is_null());
-        Obj(data)
+        HeapObject(data)
     }
 
     /// The data pointer.
@@ -310,26 +310,26 @@ impl Obj {
     /// The header's descriptor word.
     #[inline(always)]
     fn descriptor_slot(self) -> MemAddr {
-        // SAFETY: `Obj::new` guarantees an allocator-written header at `-8`.
+        // SAFETY: `HeapObject::new` guarantees an allocator-written header at `-8`.
         unsafe { self.0.sub(HEADER_DESCRIPTOR_NEG_OFFSET) }
     }
 
     /// The header's size word.
     #[inline(always)]
     fn size_slot(self) -> MemAddr {
-        // SAFETY: `Obj::new` guarantees an allocator-written header at `-8`.
+        // SAFETY: `HeapObject::new` guarantees an allocator-written header at `-8`.
         unsafe { self.0.sub(HEADER_SIZE_NEG_OFFSET) }
     }
 
     /// The object's header.
     #[inline(always)]
-    pub fn header(self) -> ObjHeader {
-        // SAFETY: `Obj::new` guarantees an allocator-written header: both
+    pub fn header(self) -> ObjectHeader {
+        // SAFETY: `HeapObject::new` guarantees an allocator-written header: both
         // words are initialized and aligned.
         unsafe {
-            ObjHeader {
-                descriptor: self.descriptor_slot().load::<u32>(),
-                size: self.size_slot().load::<u32>(),
+            ObjectHeader {
+                descriptor: self.descriptor_slot().read::<u32>(),
+                size: self.size_slot().read::<u32>(),
             }
         }
     }
@@ -386,7 +386,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn vec_len(self) -> u64 {
         // SAFETY: forwarded to the caller: a vector's length word is at offset 0.
-        unsafe { self.0.add(VEC_LENGTH_OFFSET).load::<u64>() }
+        unsafe { self.0.add(VEC_LENGTH_OFFSET).read::<u64>() }
     }
 
     /// Sets a vector's length word.
@@ -397,7 +397,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn set_vec_len(self, len: u64) {
         // SAFETY: forwarded to the caller.
-        unsafe { self.0.add(VEC_LENGTH_OFFSET).store::<u64>(len) }
+        unsafe { self.0.add(VEC_LENGTH_OFFSET).write::<u64>(len) }
     }
 
     /// An enum object's variant tag.
@@ -408,7 +408,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn enum_tag(self) -> u64 {
         // SAFETY: forwarded to the caller.
-        unsafe { self.0.add(ENUM_TAG_OFFSET).load::<u64>() }
+        unsafe { self.0.add(ENUM_TAG_OFFSET).read::<u64>() }
     }
 
     /// Sets an enum object's variant tag.
@@ -419,7 +419,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn set_enum_tag(self, tag: u64) {
         // SAFETY: forwarded to the caller.
-        unsafe { self.0.add(ENUM_TAG_OFFSET).store::<u64>(tag) }
+        unsafe { self.0.add(ENUM_TAG_OFFSET).write::<u64>(tag) }
     }
 
     // ----- Closure layout -----
@@ -438,14 +438,14 @@ impl Obj {
         unsafe {
             (
                 self.field(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET)
-                    .load::<u8>(),
+                    .read::<u8>(),
                 self.field(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET)
-                    .load_ptr(),
+                    .read_ptr(),
             )
         }
     }
 
-    /// Writes a closure's function reference; see [`Obj::closure_func_ref`].
+    /// Writes a closure's function reference; see [`HeapObject::closure_func_ref`].
     ///
     /// # Safety
     ///
@@ -456,9 +456,9 @@ impl Obj {
         // layout.
         unsafe {
             self.field(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET)
-                .store::<u8>(tag);
+                .write::<u8>(tag);
             self.field(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET)
-                .store_ptr(payload);
+                .write_ptr(payload);
         }
     }
 
@@ -470,7 +470,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn closure_mask(self) -> u64 {
         // SAFETY: forwarded to the caller; the word is within the closure layout.
-        unsafe { self.field(CLOSURE_MASK_OFFSET).load::<u64>() }
+        unsafe { self.field(CLOSURE_MASK_OFFSET).read::<u64>() }
     }
 
     /// A closure's captured-data object pointer; null before `PackClosure`
@@ -482,7 +482,7 @@ impl Obj {
     #[inline(always)]
     pub unsafe fn closure_captured_data(self) -> MemAddr {
         // SAFETY: forwarded to the caller; the word is within the closure layout.
-        unsafe { self.field(CLOSURE_CAPTURED_DATA_PTR_OFFSET).load_ptr() }
+        unsafe { self.field(CLOSURE_CAPTURED_DATA_PTR_OFFSET).read_ptr() }
     }
 
     /// Sets a closure's captured-data object pointer.
@@ -495,7 +495,7 @@ impl Obj {
         // SAFETY: forwarded to the caller; the word is within the closure layout.
         unsafe {
             self.field(CLOSURE_CAPTURED_DATA_PTR_OFFSET)
-                .store_ptr(captured_data)
+                .write_ptr(captured_data)
         }
     }
 
@@ -520,7 +520,7 @@ impl Obj {
         // layout.
         unsafe {
             self.set_closure_func_ref(tag, payload);
-            self.field(CLOSURE_MASK_OFFSET).store::<u64>(mask);
+            self.field(CLOSURE_MASK_OFFSET).write::<u64>(mask);
         }
     }
 
@@ -533,13 +533,17 @@ impl Obj {
     /// `data` must be the data start of a reservation that includes the
     /// header bytes below it.
     #[inline(always)]
-    pub unsafe fn write_header(data: MemAddr, descriptor_id: DescriptorId, size: u32) -> Obj {
+    pub unsafe fn write_header(
+        data: MemAddr,
+        descriptor_id: DescriptorId,
+        size: u32,
+    ) -> HeapObject {
         // SAFETY: forwarded to the caller: the reservation includes the header
-        // bytes, which is what `Obj::new` needs here.
+        // bytes, which is what `HeapObject::new` needs here.
         unsafe {
-            let obj = Obj::new(data);
-            obj.descriptor_slot().store::<u32>(descriptor_id.as_u32());
-            obj.size_slot().store::<u32>(size);
+            let obj = HeapObject::new(data);
+            obj.descriptor_slot().write::<u32>(descriptor_id.as_u32());
+            obj.size_slot().write::<u32>(size);
             obj
         }
     }
@@ -553,15 +557,15 @@ impl Obj {
     /// needs the new descriptor (e.g. a GC forwarding marker).
     #[inline(always)]
     pub unsafe fn set_descriptor(self, descriptor: u32) {
-        // SAFETY: `Obj::new` guarantees an allocator-written header: the word
+        // SAFETY: `HeapObject::new` guarantees an allocator-written header: the word
         // is aligned and within the reservation.
-        unsafe { self.descriptor_slot().store::<u32>(descriptor) }
+        unsafe { self.descriptor_slot().write::<u32>(descriptor) }
     }
 }
 
 /// Byte offset of the `idx`-th element of a vector with `elem_size`-byte
 /// elements from the object's data start; the offset form of
-/// [`Obj::vec_elem`].
+/// [`HeapObject::vec_elem`].
 #[inline(always)]
 pub const fn vec_elem_offset(idx: u64, elem_size: u32) -> usize {
     VEC_DATA_OFFSET + idx as usize * elem_size as usize
@@ -578,7 +582,7 @@ pub unsafe fn vec_len_or_zero(ptr: MemAddr) -> u64 {
         0
     } else {
         // SAFETY: the caller guarantees a vector.
-        unsafe { Obj::new(ptr).vec_len() }
+        unsafe { HeapObject::new(ptr).vec_len() }
     }
 }
 
@@ -596,7 +600,7 @@ pub unsafe fn vec_bytes_or_empty<'a>(ptr: MemAddr) -> &'a [u8] {
         // SAFETY: the caller guarantees a `vector<u8>` with `len` initialized,
         // pointer-free bytes from the data start.
         unsafe {
-            let vec = Obj::new(ptr);
+            let vec = HeapObject::new(ptr);
             vec.vec_data().as_bytes(vec.vec_len() as usize)
         }
     }

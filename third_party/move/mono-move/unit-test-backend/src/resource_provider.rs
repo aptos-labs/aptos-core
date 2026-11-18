@@ -10,7 +10,7 @@
 
 use bytes::Bytes;
 use mono_move_core::{
-    memory::Obj,
+    memory::HeapObject,
     nominal_tag,
     storage::resource_provider::{
         InMemoryStorageKey, ResourceProvider, ResourceProviderError, StorageRead,
@@ -39,7 +39,7 @@ struct Materialized {
     /// Holds decoded values and is never reset. Each storage read retains an
     /// `Arc` to keep the arena alive while its values are in use.
     arena: Arc<SharedArena>,
-    cache: HashMap<InMemoryStorageKey, Obj>,
+    cache: HashMap<InMemoryStorageKey, HeapObject>,
 }
 
 impl<'guard, 'ctx, L> LazyResourceProvider<'guard, 'ctx, L>
@@ -128,7 +128,7 @@ fn materialize_one(
     guard: &ExecutionGuard,
     ty: InternedType,
     blob: &[u8],
-) -> Result<Obj, ResourceProviderError> {
+) -> Result<HeapObject, ResourceProviderError> {
     let layout = guard.layout_by_ty(ty).ok_or_else(|| {
         ResourceProviderError::InvariantViolation("no layout for a stored value's type".to_string())
     })?;

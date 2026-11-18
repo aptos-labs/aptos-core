@@ -1,13 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::memory::{FatRef, MemAddr, Obj};
+use crate::memory::{FatRef, HeapObject, MemAddr};
 use smallvec::SmallVec;
 use std::cell::UnsafeCell;
-
-/// A rooted pointer the GC tracks: a Move reference, or an object pointer
-/// stored as a reference with offset `0`. A freed slot holds a null base.
-type Entry = FatRef;
 
 /// Pool of GC roots for pointers that must survive a GC without being reachable
 /// from a frame slot. Needed by micro-ops and native functions that allocate
@@ -33,7 +29,10 @@ const INLINE_CAPACITY: usize = 16;
 
 /// Backing store of a [`RootPool`].
 struct RootPoolInner {
-    entries: SmallVec<[Entry; INLINE_CAPACITY]>,
+    /// The rooted pointers the GC tracks: each a Move reference, or an object
+    /// pointer stored as a reference with offset `0`. A freed slot holds a
+    /// null base.
+    entries: SmallVec<[FatRef; INLINE_CAPACITY]>,
     /// Indices of freed slots, recycled by the next root.
     free: SmallVec<[usize; INLINE_CAPACITY]>,
 }
@@ -48,20 +47,20 @@ impl RootPool {
         }
     }
 
-    /// Roots the Move reference `fat`.
+    /// Roots the Move reference `fat_ref`.
     /// Returns a handle that can be used to access the reference safely across GC, and
     /// and frees its slot on drop.
     ///
     /// # Safety
     ///
-    /// `fat` must be a valid Move reference (fat pointer) pointing to a Move
+    /// `fat_ref` must be a valid Move reference (fat pointer) pointing to a Move
     /// value.
     ///
     /// A null or non-heap base is technically sound but effectively tracks nothing.
-    pub unsafe fn root_reference(&self, fat: FatRef) -> ReferenceHandle<'_> {
+    pub unsafe fn root_reference(&self, fat_ref: FatRef) -> ReferenceHandle<'_> {
         ReferenceHandle {
             pool: self,
-            idx: self.alloc(fat),
+            idx: self.alloc(fat_ref),
         }
     }
 
@@ -112,7 +111,7 @@ impl RootPool {
     }
 
     /// Allocates a slot for `entry`, recycling a freed index when one exists.
-    fn alloc(&self, entry: Entry) -> usize {
+    fn alloc(&self, entry: FatRef) -> usize {
         // SAFETY: short, exclusive reborrow; single-threaded, leaf call.
         let inner = unsafe { &mut *self.inner.get() };
         match inner.free.pop() {
@@ -137,8 +136,8 @@ impl RootPool {
     }
 
     #[inline]
-    fn entry(&self, idx: usize) -> Entry {
-        // SAFETY: short shared reborrow; `idx` is a live slot and `Entry: Copy`.
+    fn entry(&self, idx: usize) -> FatRef {
+        // SAFETY: short shared reborrow; `idx` is a live slot and `FatRef: Copy`.
         let inner = unsafe { &*self.inner.get() };
         inner.entries[idx]
     }
@@ -187,12 +186,12 @@ impl<'a> ReferenceHandle<'a> {
     pub fn addr(&self) -> MemAddr {
         // SAFETY: `root_reference` was given a valid Move reference, so `base`
         // is a live (GC-relocated) object or slot and `offset` lies within it.
-        unsafe { self.fat().target() }
+        unsafe { self.fat_ref().target() }
     }
 
     /// Returns the current `(base, offset)` fat pointer.
     #[inline]
-    pub fn fat(&self) -> FatRef {
+    pub fn fat_ref(&self) -> FatRef {
         self.pool.entry(self.idx)
     }
 }
@@ -232,10 +231,10 @@ impl<'a> ObjectHandle<'a> {
     ///
     /// The rooted pointer must be non-null (not an empty vector).
     #[inline]
-    pub unsafe fn obj(&self) -> Obj {
+    pub unsafe fn obj(&self) -> HeapObject {
         // SAFETY: `root_object` was given a live heap object that the GC keeps
         // current, and the caller excludes null.
-        unsafe { Obj::new(self.addr()) }
+        unsafe { HeapObject::new(self.addr()) }
     }
 }
 
@@ -282,7 +281,7 @@ mod tests {
         let pool = RootPool::new();
         let handle = unsafe { pool.root_reference(FatRef::new(addrs.at(0x1000), 24)) };
         assert_eq!(handle.addr(), addrs.at(0x1000 + 24));
-        assert_eq!(handle.fat(), FatRef::new(addrs.at(0x1000), 24));
+        assert_eq!(handle.fat_ref(), FatRef::new(addrs.at(0x1000), 24));
     }
 
     #[test]

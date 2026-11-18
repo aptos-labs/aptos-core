@@ -143,7 +143,7 @@ pub(crate) fn point_handle(point: &Ref<u64>) -> u64 {
     // SAFETY: `handle` is the 0th (and only) field of `RistrettoPoint`, so the
     // reference points at that `u64`, live for the call. The referent is not
     // necessarily 8-aligned, so the load is unaligned.
-    unsafe { point.addr().load_unaligned::<u64>() }
+    unsafe { point.addr().read_unaligned::<u64>() }
 }
 
 /// `0x1::ristretto255::point_identity_internal(): u64`

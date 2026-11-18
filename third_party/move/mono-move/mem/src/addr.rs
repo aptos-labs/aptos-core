@@ -67,8 +67,9 @@ impl MemAddr {
         MemAddr(ptr::from_mut(r).cast::<u8>())
     }
 
-    /// Views the address as a `&T`. There is deliberately no method that
-    /// yields a raw byte pointer.
+    /// Views the address as a `&T`: a cast followed by `NonNull::<T>::as_ref`,
+    /// so unlike `<*mut T>::as_ref` there is no null check. There is
+    /// deliberately no method that yields a raw byte pointer.
     ///
     /// # Safety
     ///
@@ -80,23 +81,26 @@ impl MemAddr {
         unsafe { &*self.0.cast::<T>() }
     }
 
-    /// The address as an integer, for comparisons and bounds. There is no
-    /// inverse: an address is never rebuilt from an integer.
+    /// The address as an integer, for comparisons and bounds. Same as
+    /// `<*mut u8>::addr`. There is no inverse: an address is never rebuilt
+    /// from an integer.
     #[inline(always)]
-    pub fn as_usize(self) -> usize {
+    pub fn addr(self) -> usize {
         self.0.addr()
     }
 
+    /// Same as `<*mut u8>::is_null`.
     #[inline(always)]
     pub fn is_null(self) -> bool {
         self.0.is_null()
     }
 
-    /// Whether the address is a multiple of `align` (a power of two).
+    /// Whether the address is a multiple of `align` (a power of two). Same as
+    /// `<*mut u8>::is_aligned_to`.
     #[inline(always)]
     pub fn is_aligned_to(self, align: usize) -> bool {
         debug_assert!(align.is_power_of_two());
-        self.as_usize() & (align - 1) == 0
+        self.addr() & (align - 1) == 0
     }
 }
 
@@ -130,6 +134,7 @@ impl MemAddr {
     }
 
     /// `self + bytes` without the in-bounds requirement of [`MemAddr::add`].
+    /// Same as `<*mut u8>::wrapping_add`.
     /// For computing bounds that are compared but never dereferenced, such
     /// as a region's one-past-the-end address.
     #[inline(always)]
@@ -137,7 +142,8 @@ impl MemAddr {
         MemAddr(self.0.wrapping_add(bytes))
     }
 
-    /// `self - bytes` without the in-bounds requirement; see [`MemAddr::wrapping_add`].
+    /// `self - bytes` without the in-bounds requirement; see
+    /// [`MemAddr::wrapping_add`]. Same as `<*mut u8>::wrapping_sub`.
     #[inline(always)]
     pub fn wrapping_sub(self, bytes: usize) -> MemAddr {
         MemAddr(self.0.wrapping_sub(bytes))
@@ -147,13 +153,13 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// Both must be within the same allocation, with `self >= origin`.
+    /// Same as `<*mut u8>::offset_from_unsigned`: both must be within the
+    /// same allocation, with `self >= origin`.
     #[inline(always)]
-    pub unsafe fn offset_from(self, origin: MemAddr) -> usize {
+    pub unsafe fn offset_from_unsigned(self, origin: MemAddr) -> usize {
         debug_assert!(self >= origin);
-        // SAFETY: forwarded to the caller; `self >= origin` makes the result
-        // non-negative.
-        unsafe { self.0.offset_from(origin.0) as usize }
+        // SAFETY: forwarded to the caller.
+        unsafe { self.0.offset_from_unsigned(origin.0) }
     }
 }
 
@@ -169,15 +175,19 @@ const fn aligned_access<T: Scalar>() -> bool {
 }
 
 impl MemAddr {
-    /// Loads a `T`. Aligned when `T::ALIGN <= MAX_ALIGN`, unaligned otherwise.
+    /// Reads a `T`, stored little-endian.
     ///
     /// # Safety
     ///
-    /// The bytes must be readable and initialized, aligned to `T::ALIGN` when
-    /// that is within [`MAX_ALIGN`], and not a pointer slot (see
-    /// [`MemAddr::load_ptr`]).
+    /// Same as `<*mut T>::read`, with one difference: the alignment required
+    /// is capped at [`MAX_ALIGN`]. VM memory is never aligned beyond that, so
+    /// a `T` with a larger Rust alignment (`u128`, `U256`) is read unaligned.
+    ///
+    /// The bytes must be readable and initialized, aligned to
+    /// `min(T::ALIGN, MAX_ALIGN)`, and not a pointer slot (see
+    /// [`MemAddr::read_ptr`]).
     #[inline(always)]
-    pub unsafe fn load<T: Scalar>(self) -> T {
+    pub unsafe fn read<T: Scalar>(self) -> T {
         let p = self.0.cast::<T>();
         // SAFETY: forwarded to the caller; the alignment branch is a
         // compile-time constant.
@@ -191,14 +201,16 @@ impl MemAddr {
         T::from_le(v)
     }
 
-    /// Stores a `T`. Aligned when `T::ALIGN <= MAX_ALIGN`, unaligned otherwise.
+    /// Writes a `T`, stored little-endian.
     ///
     /// # Safety
     ///
-    /// The bytes must be writable and aligned to `T::ALIGN` when that is
-    /// within [`MAX_ALIGN`].
+    /// Same as `<*mut T>::write`, with the alignment required capped at
+    /// [`MAX_ALIGN`] as for [`MemAddr::read`].
+    ///
+    /// The bytes must be writable and aligned to `min(T::ALIGN, MAX_ALIGN)`.
     #[inline(always)]
-    pub unsafe fn store<T: Scalar>(self, v: T) {
+    pub unsafe fn write<T: Scalar>(self, v: T) {
         let p = self.0.cast::<T>();
         let v = T::to_le(v);
         // SAFETY: forwarded to the caller; the alignment branch is a
@@ -212,75 +224,80 @@ impl MemAddr {
         }
     }
 
-    /// Loads a `T` with no alignment requirement.
+    /// Reads a `T` with no alignment requirement.
     ///
     /// # Safety
     ///
-    /// The bytes must be readable and initialized, and not a pointer slot.
+    /// Same as `<*mut T>::read_unaligned`: the bytes must be readable and
+    /// initialized. They must also not be a pointer slot.
     #[inline(always)]
-    pub unsafe fn load_unaligned<T: Scalar>(self) -> T {
+    pub unsafe fn read_unaligned<T: Scalar>(self) -> T {
         // SAFETY: forwarded to the caller.
         T::from_le(unsafe { self.0.cast::<T>().read_unaligned() })
     }
 
-    /// Stores a `T` with no alignment requirement.
+    /// Writes a `T` with no alignment requirement.
     ///
     /// # Safety
     ///
-    /// The bytes must be writable.
+    /// Same as `<*mut T>::write_unaligned`: the bytes must be writable.
     #[inline(always)]
-    pub unsafe fn store_unaligned<T: Scalar>(self, v: T) {
+    pub unsafe fn write_unaligned<T: Scalar>(self, v: T) {
         // SAFETY: forwarded to the caller.
         unsafe { self.0.cast::<T>().write_unaligned(T::to_le(v)) }
     }
 
-    /// Loads a pointer slot. Pointers must be loaded this way, not as
+    /// Reads a pointer slot. Pointers must be read this way, not as
     /// integers, so they keep their provenance.
     ///
     /// # Safety
     ///
-    /// The word must be readable, initialized, and pointer-aligned.
+    /// Same as `<*mut *mut u8>::read`: the word must be readable,
+    /// initialized, and pointer-aligned.
     #[inline(always)]
-    pub unsafe fn load_ptr(self) -> MemAddr {
+    pub unsafe fn read_ptr(self) -> MemAddr {
         // SAFETY: forwarded to the caller.
         MemAddr(unsafe { self.0.cast::<*mut u8>().read() })
     }
 
-    /// Stores into a pointer slot; see [`MemAddr::load_ptr`].
+    /// Writes a pointer slot; see [`MemAddr::read_ptr`].
     ///
     /// # Safety
     ///
-    /// The word must be writable and pointer-aligned.
+    /// Same as `<*mut *mut u8>::write`: the word must be writable and
+    /// pointer-aligned.
     #[inline(always)]
-    pub unsafe fn store_ptr(self, p: MemAddr) {
+    pub unsafe fn write_ptr(self, p: MemAddr) {
         // SAFETY: forwarded to the caller.
         unsafe { self.0.cast::<*mut u8>().write(p.0) }
     }
 
-    /// Loads a boolean. A boolean slot holds `0` or `1`: every writer
-    /// (compiler immediates, [`MemAddr::store_bool`], BCS deserialization)
+    /// Reads a boolean. A boolean slot holds `0` or `1`: every writer
+    /// (compiler immediates, [`MemAddr::write_bool`], BCS deserialization)
     /// establishes that, and this is checked in debug builds.
     ///
     /// # Safety
     ///
-    /// The byte must be readable and initialized.
+    /// Same as `<*mut u8>::read`: the byte must be readable and initialized.
+    /// Unlike `<*mut bool>::read`, a byte other than `0` or `1` is not
+    /// undefined behaviour.
     #[inline(always)]
-    pub unsafe fn load_bool(self) -> bool {
+    pub unsafe fn read_bool(self) -> bool {
         // SAFETY: forwarded to the caller.
-        let byte = unsafe { self.load::<u8>() };
+        let byte = unsafe { self.read::<u8>() };
         debug_assert!(byte <= 1, "boolean slot holds non-boolean byte {byte}");
         byte != 0
     }
 
-    /// Stores a boolean as `0` or `1`.
+    /// Writes a boolean as `0` or `1`.
     ///
     /// # Safety
     ///
-    /// The byte must be writable.
+    /// Same as `<*mut u8>::write`: the byte must be writable.
     #[inline(always)]
-    pub unsafe fn store_bool(self, v: bool) {
+    pub unsafe fn write_bool(self, v: bool) {
         // SAFETY: forwarded to the caller.
-        unsafe { self.store::<u8>(v as u8) }
+        unsafe { self.write::<u8>(v as u8) }
     }
 }
 
@@ -310,19 +327,21 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// `self` must be readable and `dst` writable for `n` bytes, and the
-    /// ranges must not overlap.
+    /// Same as `<*mut u8>::copy_to_nonoverlapping`: `self` must be readable
+    /// and `dst` writable for `n` bytes, and the ranges must not overlap.
     #[inline(always)]
     pub unsafe fn copy_to_nonoverlapping(self, dst: MemAddr, n: usize) {
         debug_assert!(
-            self.as_usize().abs_diff(dst.as_usize()) >= n,
+            self.addr().abs_diff(dst.addr()) >= n,
             "copy_to_nonoverlapping ranges overlap"
         );
         // SAFETY: forwarded to the caller.
         unsafe { ptr::copy_nonoverlapping(self.0, dst.0, n) }
     }
 
-    /// `memcpy` from a borrowed Rust slice.
+    /// `memcpy` from a borrowed Rust slice. Named after
+    /// `<[u8]>::copy_from_slice`, but `self` is an address, so the length is
+    /// `src`'s and the call is `unsafe`.
     ///
     /// # Safety
     ///
@@ -340,7 +359,8 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// `self` must be readable and `dst` writable for `n` bytes.
+    /// Same as `<*mut u8>::copy_to`: `self` must be readable and `dst`
+    /// writable for `n` bytes.
     #[inline(always)]
     pub unsafe fn copy_to(self, dst: MemAddr, n: usize) {
         // SAFETY: forwarded to the caller.
@@ -351,36 +371,37 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// Both ranges must be readable and writable for `n` bytes, and must not
-    /// overlap.
+    /// Same as `ptr::swap_nonoverlapping`: both ranges must be readable and
+    /// writable for `n` bytes, and must not overlap.
     #[inline(always)]
-    pub unsafe fn swap_nonoverlapping_with(self, other: MemAddr, n: usize) {
+    pub unsafe fn swap_nonoverlapping(self, other: MemAddr, n: usize) {
         debug_assert!(
-            self.as_usize().abs_diff(other.as_usize()) >= n,
-            "swap_nonoverlapping_with ranges overlap"
+            self.addr().abs_diff(other.addr()) >= n,
+            "swap_nonoverlapping ranges overlap"
         );
         // SAFETY: forwarded to the caller.
         unsafe { ptr::swap_nonoverlapping(self.0, other.0, n) }
     }
 
-    /// Writes `n` zero bytes.
+    /// Writes `n` zero bytes: `write_bytes(0, n)`.
     ///
     /// # Safety
     ///
-    /// `self` must be writable for `n` bytes.
+    /// Same as [`MemAddr::write_bytes`].
     #[inline(always)]
     pub unsafe fn zero(self, n: usize) {
         // SAFETY: forwarded to the caller.
-        unsafe { self.fill(0, n) }
+        unsafe { self.write_bytes(0, n) }
     }
 
     /// Writes `n` copies of `byte`.
     ///
     /// # Safety
     ///
-    /// `self` must be writable for `n` bytes.
+    /// Same as `<*mut u8>::write_bytes`: `self` must be writable for `n`
+    /// bytes.
     #[inline(always)]
-    pub unsafe fn fill(self, byte: u8, n: usize) {
+    pub unsafe fn write_bytes(self, byte: u8, n: usize) {
         // SAFETY: forwarded to the caller.
         unsafe { ptr::write_bytes(self.0, byte, n) }
     }
@@ -395,7 +416,7 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// The bytes must be readable, initialized, free of pointer slots, and not
+    /// Same as `slice::from_raw_parts`. The bytes must be readable, initialized, free of pointer slots, and not
     /// written through any other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_bytes<'a>(self, n: usize) -> &'a [u8] {
@@ -407,8 +428,8 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// As [`MemAddr::as_bytes`], plus writable and not accessed through any
-    /// other path for `'a`.
+    /// Same as `slice::from_raw_parts_mut`: as [`MemAddr::as_bytes`], plus
+    /// writable and not accessed through any other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_bytes_mut<'a>(self, n: usize) -> &'a mut [u8] {
         // SAFETY: forwarded to the caller.
@@ -419,24 +440,12 @@ impl MemAddr {
     ///
     /// # Safety
     ///
-    /// The bytes must be readable and not written through any other path
-    /// for `'a`.
+    /// Same as `slice::from_raw_parts` over `MaybeUninit<u8>`: the bytes must
+    /// be readable and not written through any other path for `'a`.
     #[inline(always)]
     pub unsafe fn as_uninit_bytes<'a>(self, n: usize) -> &'a [MaybeUninit<u8>] {
         // SAFETY: forwarded to the caller; `MaybeUninit<u8>` permits any byte.
         unsafe { std::slice::from_raw_parts(self.0.cast(), n) }
-    }
-
-    /// Mutable variant of [`MemAddr::as_uninit_bytes`].
-    ///
-    /// # Safety
-    ///
-    /// As [`MemAddr::as_uninit_bytes`], plus writable and not accessed
-    /// through any other path for `'a`.
-    #[inline(always)]
-    pub unsafe fn as_uninit_bytes_mut<'a>(self, n: usize) -> &'a mut [MaybeUninit<u8>] {
-        // SAFETY: forwarded to the caller; `MaybeUninit<u8>` permits any byte.
-        unsafe { std::slice::from_raw_parts_mut(self.0.cast(), n) }
     }
 }
 
@@ -468,25 +477,25 @@ mod tests {
         let mut buf = Buf::<64>::zeroed();
         let base = buf.addr();
         unsafe {
-            base.store::<u64>(0x0102_0304_0506_0708);
-            assert_eq!(base.load::<u64>(), 0x0102_0304_0506_0708);
+            base.write::<u64>(0x0102_0304_0506_0708);
+            assert_eq!(base.read::<u64>(), 0x0102_0304_0506_0708);
             // Little-endian in memory regardless of host.
-            assert_eq!(base.load::<u8>(), 0x08);
-            assert_eq!(base.add(7).load::<u8>(), 0x01);
+            assert_eq!(base.read::<u8>(), 0x08);
+            assert_eq!(base.add(7).read::<u8>(), 0x01);
 
-            base.add(8).store::<u128>(u128::MAX - 1);
-            assert_eq!(base.add(8).load::<u128>(), u128::MAX - 1);
+            base.add(8).write::<u128>(u128::MAX - 1);
+            assert_eq!(base.add(8).read::<u128>(), u128::MAX - 1);
 
-            base.add(1).store_unaligned::<u32>(0xDEAD_BEEF);
-            assert_eq!(base.add(1).load_unaligned::<u32>(), 0xDEAD_BEEF);
+            base.add(1).write_unaligned::<u32>(0xDEAD_BEEF);
+            assert_eq!(base.add(1).read_unaligned::<u32>(), 0xDEAD_BEEF);
 
-            base.add(40).store_bool(true);
-            assert!(base.add(40).load_bool());
-            base.add(40).store_bool(false);
-            assert!(!base.add(40).load_bool());
+            base.add(40).write_bool(true);
+            assert!(base.add(40).read_bool());
+            base.add(40).write_bool(false);
+            assert!(!base.add(40).read_bool());
 
-            base.add(48).store::<[u8; 3]>([1, 2, 3]);
-            assert_eq!(base.add(48).load::<[u8; 3]>(), [1, 2, 3]);
+            base.add(48).write::<[u8; 3]>([1, 2, 3]);
+            assert_eq!(base.add(48).read::<[u8; 3]>(), [1, 2, 3]);
         }
     }
 
@@ -497,10 +506,10 @@ mod tests {
         let p = MemAddr::from_mut(&mut target);
         let s = slot.addr();
         unsafe {
-            s.store_ptr(p);
-            let q = s.load_ptr();
+            s.write_ptr(p);
+            let q = s.read_ptr();
             assert_eq!(q, p);
-            q.store::<u64>(9);
+            q.write::<u64>(9);
         }
         assert_eq!(target, 9);
     }
@@ -523,11 +532,11 @@ mod tests {
             assert_eq!(bytes(4, 8), &[0, 1, 2, 3, 4, 5, 6, 7]);
             base.add(24).copy_word(base);
             assert_eq!(bytes(0, 8), &[24, 25, 26, 27, 28, 29, 30, 31]);
-            base.swap_nonoverlapping_with(base.add(16), 8);
+            base.swap_nonoverlapping(base.add(16), 8);
             assert_eq!(bytes(16, 8), &[24, 25, 26, 27, 28, 29, 30, 31]);
             base.zero(4);
             assert_eq!(bytes(0, 4), &[0, 0, 0, 0]);
-            base.fill(0xAA, 2);
+            base.write_bytes(0xAA, 2);
             assert_eq!(bytes(0, 2), &[0xAA, 0xAA]);
         }
     }
@@ -537,12 +546,12 @@ mod tests {
         let mut buf = Buf::<16>::zeroed();
         let base = buf.addr();
         let end = base.wrapping_add(16);
-        assert_eq!(end.as_usize() - base.as_usize(), 16);
+        assert_eq!(end.addr() - base.addr(), 16);
         assert_eq!(end.wrapping_sub(16), base);
         unsafe {
             assert_eq!(base.add(16), end);
             assert_eq!(end.sub(16), base);
-            assert_eq!(end.offset_from(base), 16);
+            assert_eq!(end.offset_from_unsigned(base), 16);
         }
         assert!(base.is_aligned_to(1));
         assert!(MemAddr::NULL.is_null());

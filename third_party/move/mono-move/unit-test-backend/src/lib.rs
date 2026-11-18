@@ -15,7 +15,7 @@ use bytes::Bytes;
 use legacy_move_compiler::unit_test::{NamedOrBytecodeModule, TestCase, TestPlan};
 pub use module_provider::{InMemoryModuleProvider, ModuleProviderError};
 use mono_move_core::{
-    memory::Obj,
+    memory::HeapObject,
     native::NativeExtensions,
     nominal_tag,
     storage::resource_provider::InMemoryStorageKey,
@@ -430,7 +430,7 @@ static NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
 fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<TestEffects> {
     let mut test_effects = TestEffects::new(ChangeSet::new());
     for (key, class, _group) in effects.read_write_set().writes_unordered() {
-        let written = |ptr: Obj| -> Result<Bytes> {
+        let written = |ptr: HeapObject| -> Result<Bytes> {
             // SAFETY: written pointers refer to live values in the effects'
             // frozen heap, and `guard` is the guard that described them.
             Ok(unsafe { serialize(guard, ptr.addr(), key.value_ty()) }?.into())

@@ -51,7 +51,7 @@ declare_lint! {
     ///
     /// ```rust,ignore
     /// let a = MemAddr::from_mut(&mut buf);
-    /// unsafe { a.add(8).store::<u8>(0) };
+    /// unsafe { a.add(8).write::<u8>(0) };
     /// ```
     pub RAW_MEMORY_ACCESS,
     Deny,

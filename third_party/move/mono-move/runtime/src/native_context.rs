@@ -18,7 +18,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::{view_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId},
-    memory::{vec_elem_offset, vec_len_or_zero, FatRef, Frame, MemAddr, MemoryRegion, Obj},
+    memory::{vec_elem_offset, vec_len_or_zero, FatRef, Frame, HeapObject, MemAddr, MemoryRegion},
     native::{
         native_invariant_violation, Boxed, Dispatch, FunctionResolutionError, NativeABI,
         NativeContext, NativeContextFamily, NativeExtension, NativeExtensions, NativeFunction,
@@ -214,8 +214,8 @@ impl<'a> ProductionNativeContext<'a> {
         &self,
         rws: &mut ResourceReadWriteSet,
         entry: EntryPtr,
-        commit: impl FnOnce(&mut ResourceReadWriteSet, Obj),
-    ) -> VMResult<Obj> {
+        commit: impl FnOnce(&mut ResourceReadWriteSet, HeapObject),
+    ) -> VMResult<HeapObject> {
         match entry {
             EntryPtr::Writable(obj) => Ok(obj),
             EntryPtr::NonWritable(obj) => {
@@ -512,7 +512,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         unsafe {
             vec.set_vec_len(inner.len() as u64);
             for (i, elem) in inner.iter().enumerate() {
-                vec.vec_elem(i as u64, 8).store_ptr(elem.addr());
+                vec.vec_elem(i as u64, 8).write_ptr(elem.addr());
             }
         }
         // SAFETY: `vec` is the freshly allocated vector.
@@ -678,7 +678,7 @@ impl NativeContext for ProductionNativeContext<'_> {
 
         // SAFETY: null was excluded above, so `ptr` is the rooted vector's live
         // heap object, with an allocator-written header.
-        let vec = unsafe { Obj::new(ptr) };
+        let vec = unsafe { HeapObject::new(ptr) };
         let header = vec.header();
         let descriptor = DescriptorId(header.descriptor);
         let desc = self.guard.descriptor(descriptor).ok_or_else(|| {
@@ -745,13 +745,13 @@ impl NativeContext for ProductionNativeContext<'_> {
                 let at = vec_elem_offset(index as u64, elem_size) + offset as usize;
                 // SAFETY: `at` is within the `data.len()` bytes just written, and
                 // the descriptor says this slot holds a heap pointer.
-                let src = unsafe { vec.field(at).load_ptr() };
+                let src = unsafe { vec.field(at).read_ptr() };
                 if !src.is_null() {
                     slots.push(at);
                     // SAFETY: by this function's contract every pointer in
                     // `data` is a live object, and the copy above did not
                     // change that.
-                    sources.push(unsafe { Obj::new(src) });
+                    sources.push(unsafe { HeapObject::new(src) });
                 }
             }
         }
@@ -768,10 +768,10 @@ impl NativeContext for ProductionNativeContext<'_> {
         // The vector is rooted, so re-reading its base picks up any relocation
         // the batch caused; it stays non-null.
         // SAFETY: as above.
-        let vec = unsafe { Obj::new(vector.addr()) };
+        let vec = unsafe { HeapObject::new(vector.addr()) };
         for (at, copy) in slots.into_iter().zip(copies) {
             // SAFETY: `at` is a pointer slot inside the vector's data (as above).
-            unsafe { vec.field(at).store_ptr(copy.addr()) };
+            unsafe { vec.field(at).write_ptr(copy.addr()) };
         }
         Ok(())
     }
@@ -790,8 +790,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         // Vector pointers behind the rooted references (null when empty); re-read
         // after the grow, the only point a GC can relocate them.
         // SAFETY: the references hold `vector<elem_ty>` pointers.
-        let mut from_ptr = unsafe { from.addr().load_ptr() };
-        let mut to_ptr = unsafe { to.addr().load_ptr() };
+        let mut from_ptr = unsafe { from.addr().read_ptr() };
+        let mut to_ptr = unsafe { to.addr().read_ptr() };
 
         // Reject aliasing before any other work -- a defensive measure against
         // bytecode verifier bugs. The null guard is required to avoid a false positive
@@ -827,7 +827,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         } else {
             // SAFETY: null was excluded, so `to_ptr` is a live vector object
             // with an allocator-written header.
-            unsafe { Obj::new(to_ptr) }.vec_capacity(elem_size)
+            unsafe { HeapObject::new(to_ptr) }.vec_capacity(elem_size)
         };
         if required > to_cap {
             // SAFETY: distinct fields, reborrowed exclusively (the aliasing rule).
@@ -848,7 +848,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                     self.frame,
                     TopFrame::Native(self.abi),
                     to_ptr,
-                    DescriptorId(Obj::new(from_ptr).header().descriptor),
+                    DescriptorId(HeapObject::new(from_ptr).header().descriptor),
                     elem_size,
                     required,
                 )
@@ -858,8 +858,8 @@ impl NativeContext for ProductionNativeContext<'_> {
             // SAFETY: the rooted references yield live pointers to the vectors'
             // pointer slots.
             unsafe {
-                to.addr().store_ptr(new_ptr);
-                from_ptr = from.addr().load_ptr();
+                to.addr().write_ptr(new_ptr);
+                from_ptr = from.addr().read_ptr();
             }
             to_ptr = new_ptr;
         }
@@ -873,8 +873,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         // grown to hold `required >= 1` elements). The bounds check and grow
         // keep every range in-allocation; no allocation runs past this point.
         unsafe {
-            let from_vec = Obj::new(from_ptr);
-            let to_vec = Obj::new(to_ptr);
+            let from_vec = HeapObject::new(from_ptr);
+            let to_vec = HeapObject::new(to_ptr);
             to_vec.vec_elem(insert_position, elem_size).copy_to(
                 to_vec.vec_elem(insert_position + length, elem_size),
                 bytes(to_len - insert_position),
@@ -1201,7 +1201,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         }
         // SAFETY: `value` is a boxed value, so its address is a live object
         // (null was excluded above).
-        let obj = unsafe { Obj::new(ptr) };
+        let obj = unsafe { HeapObject::new(ptr) };
         // SAFETY: `rws` is reborrowed exclusively here.
         let rws = unsafe { &mut **self.rws.get() };
         // Table items never belong to a resource group.

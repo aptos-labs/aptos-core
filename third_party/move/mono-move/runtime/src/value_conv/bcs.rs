@@ -8,7 +8,7 @@
 //!
 //! Host endianness: the memcpy fast paths copy a value's in-memory bytes to
 //! and from its BCS encoding verbatim. This holds on any host by construction
-//! because every integer store goes through `MemAddr::store`, which writes
+//! because every integer write goes through `MemAddr::write`, which writes
 //! little-endian bytes, so the in-memory image of a pointer-free, padding-free
 //! value is exactly its BCS encoding.
 //!
@@ -26,7 +26,7 @@ use crate::{
 };
 use mono_move_core::{
     interner::view_module_id,
-    memory::{vec_len_or_zero, MemAddr, Obj},
+    memory::{vec_len_or_zero, HeapObject, MemAddr},
     types::{view_name, view_type, view_type_list, InternedType, InternedTypeList, Type},
     LayoutKind, LayoutProvider, VMInternalError, VMResult, ValueLayout, ENUM_DATA_OFFSET,
 };
@@ -104,7 +104,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
     if layout.has_no_pointers_no_padding() {
         // For values with no padding and no pointers, the value's in-memory
         // bytes are its BCS encoding (little-endian on every host, since all
-        // integer stores go through `MemAddr::store`).
+        // integer writes go through `MemAddr::write`).
         // SAFETY: `base` holds `layout.size` initialized bytes with no pointer
         // slots and no padding, by the flag.
         unsafe { out.extend_from_slice(base.as_bytes(layout.size as usize)) };
@@ -138,7 +138,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             // SAFETY: vector value holds an 8-byte heap pointer pointing to
             // its data for any well-typed value (null for the empty vector).
             // The length is stored in the data pointed to.
-            let vec_ptr = unsafe { base.load_ptr() };
+            let vec_ptr = unsafe { base.read_ptr() };
             let len = unsafe { vec_len_or_zero(vec_ptr) };
             if len > bcs::MAX_SEQUENCE_LENGTH as u64 {
                 return Err(VMInternalError::new(RuntimeError::BCSSequenceTooLong {
@@ -154,7 +154,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
             let elem_size = elem_layout.size;
             // SAFETY: the vector is a live heap object: the empty (null) case
             // was excluded above.
-            let vec = unsafe { Obj::new(vec_ptr) };
+            let vec = unsafe { HeapObject::new(vec_ptr) };
             if elem_layout.has_no_pointers_no_padding() {
                 // Element bytes are their BCS bytes, as in the scalar fast
                 // path above.
@@ -178,7 +178,7 @@ unsafe fn serialize_impl<T: LayoutProvider + ?Sized>(
         LayoutKind::FrozenEnum { variants, .. } => {
             // SAFETY: an enum value holds a non-null heap pointer to an object
             // storing the tag followed by the variant body.
-            let obj = unsafe { Obj::new(base.load_ptr()) };
+            let obj = unsafe { HeapObject::new(base.read_ptr()) };
             let tag = unsafe { obj.enum_tag() };
             let variant_id = variants
                 .get(tag as usize)
@@ -446,7 +446,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 return Err(RuntimeError::BCSInvalidBool { byte }.into());
             }
             // SAFETY: caller ensures one byte can be written to `dst`.
-            unsafe { dst.store::<u8>(byte) };
+            unsafe { dst.write::<u8>(byte) };
             Ok(())
         },
         LayoutKind::UnsignedInt | LayoutKind::SignedInt | LayoutKind::Address => Err(
@@ -491,7 +491,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
                 // The empty vector is the null pointer.
                 // SAFETY: `dst` has size to write the null pointer as
                 // guaranteed by the caller.
-                unsafe { dst.store_ptr(MemAddr::NULL) };
+                unsafe { dst.write_ptr(MemAddr::NULL) };
                 return Ok(());
             }
 
@@ -548,7 +548,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
 
             // SAFETY: `dst` has size to write the vector pointer as
             // guaranteed by the caller.
-            unsafe { dst.store_ptr(vec.addr()) };
+            unsafe { dst.write_ptr(vec.addr()) };
             Ok(())
         },
         LayoutKind::FrozenEnum {
@@ -587,7 +587,7 @@ unsafe fn deserialize_impl<T: LayoutProvider + ?Sized>(
             unsafe { deserialize_impl(layouts, heap, variant_layout, bytes, cursor, body, hooks)? };
             // SAFETY: `dst` has space to write the 8-byte enum pointer as
             // guaranteed by the caller.
-            unsafe { dst.store_ptr(obj.addr()) };
+            unsafe { dst.write_ptr(obj.addr()) };
             Ok(())
         },
         // TODO(completeness): function values are not yet supported.

@@ -31,8 +31,8 @@ use mono_move_core::{
         InternedModuleId,
     },
     memory::{
-        vec_bytes_or_empty, vec_elem_offset, vec_len_or_zero, FatRef, Frame, FrameMeta, MemAddr,
-        MemoryRegion, Obj,
+        vec_bytes_or_empty, vec_elem_offset, vec_len_or_zero, FatRef, Frame, FrameMeta, HeapObject,
+        MemAddr, MemoryRegion,
     },
     native::{
         FunctionResolutionError, NativeABI, NativeExtension, NativeExtensions, NativeIdx,
@@ -345,13 +345,13 @@ impl<'a, 'guard> CallBuilder<'a, 'guard> {
         }
         if matches!(view_type(ty), Type::Signer) {
             // SAFETY: the slot is 32 bytes wide per its type.
-            unsafe { dst.store(*addr) };
+            unsafe { dst.write(*addr) };
         } else {
             // `&signer`, per the predicate. The fat pointer's base is the
             // caller's `AccountAddress`, host memory outside the VM heap.
             // SAFETY: the slot is a reference slot per its type, and the
             // address outlives the call.
-            unsafe { FatRef::new(MemAddr::from_ref(addr), 0).store_to(dst) };
+            unsafe { FatRef::new(MemAddr::from_ref(addr), 0).write_to(dst) };
         }
         Ok(())
     }
@@ -932,7 +932,7 @@ impl<'guard> InterpreterContext<'guard> {
         &mut self,
         address: AccountAddress,
         ty: InternedType,
-    ) -> VMResult<Option<Obj>> {
+    ) -> VMResult<Option<HeapObject>> {
         self.loader
             .publish_resource_type(&mut self.read_set, &mut self.gas_meter, ty)?;
         let group = self.resource_group_of(ty)?;
@@ -1155,7 +1155,7 @@ impl<'guard> InterpreterContext<'guard> {
         // SAFETY: the caller guarantees a completed call that wrote an 8-byte
         // result to slot 0, so every byte read is initialized; the slot lies
         // just above the root frame's metadata, inside the stack.
-        unsafe { root_frame_base(&self.stack).load::<u64>() }
+        unsafe { root_frame_base(&self.stack).read::<u64>() }
     }
 
     /// Read `size` raw bytes from the root frame at the given byte offset. For
@@ -1224,9 +1224,9 @@ unsafe fn binop_u64<F: FnOnce(u64, u64) -> u64>(
     // SAFETY: `frame` is the current frame and `lhs`/`rhs`/`dst` are
     // in-bounds 8-byte slots within it (enforced by the verifier).
     unsafe {
-        let a = frame.slot(lhs).load::<u64>();
-        let b = frame.slot(rhs).load::<u64>();
-        frame.slot(dst).store::<u64>(op(a, b));
+        let a = frame.slot(lhs).read::<u64>();
+        let b = frame.slot(rhs).read::<u64>();
+        frame.slot(dst).write::<u64>(op(a, b));
     }
 }
 
@@ -1242,10 +1242,10 @@ unsafe fn checked_binop_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     // SAFETY: `frame` is the current frame and `lhs`/`rhs`/`dst` are
     // in-bounds 8-byte slots within it (enforced by the verifier).
     unsafe {
-        let a = frame.slot(lhs).load::<u64>();
-        let b = frame.slot(rhs).load::<u64>();
+        let a = frame.slot(lhs).read::<u64>();
+        let b = frame.slot(rhs).read::<u64>();
         let v = op(a, b)?;
-        frame.slot(dst).store::<u64>(v);
+        frame.slot(dst).write::<u64>(v);
         Some(())
     }
 }
@@ -1262,8 +1262,8 @@ unsafe fn imm_op_u64<F: FnOnce(u64, u64) -> u64>(
     // SAFETY: `frame` is the current frame and `src`/`dst` are in-bounds
     // 8-byte slots within it (enforced by the verifier).
     unsafe {
-        let a = frame.slot(src).load::<u64>();
-        frame.slot(dst).store::<u64>(op(a, imm));
+        let a = frame.slot(src).read::<u64>();
+        frame.slot(dst).write::<u64>(op(a, imm));
     }
 }
 
@@ -1279,9 +1279,9 @@ unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     // SAFETY: `frame` is the current frame and `src`/`dst` are in-bounds
     // 8-byte slots within it (enforced by the verifier).
     unsafe {
-        let a = frame.slot(src).load::<u64>();
+        let a = frame.slot(src).read::<u64>();
         let v = op(a, imm)?;
-        frame.slot(dst).store::<u64>(v);
+        frame.slot(dst).write::<u64>(v);
         Some(())
     }
 }
@@ -1301,12 +1301,12 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     // 8-byte slots and `rhs` is an in-bounds 1-byte slot within it
     // (enforced by the verifier).
     unsafe {
-        let shift = frame.slot(rhs).load::<u8>();
+        let shift = frame.slot(rhs).read::<u8>();
         if shift >= 64 {
             return Err(shift);
         }
-        let v = frame.slot(lhs).load::<u64>();
-        frame.slot(dst).store::<u64>(op(v, shift as u64));
+        let v = frame.slot(lhs).read::<u64>();
+        frame.slot(dst).write::<u64>(op(v, shift as u64));
         Ok(())
     }
 }
@@ -1339,10 +1339,10 @@ unsafe fn variant_field_loc(
     frame: Frame,
     enum_ref: FrameOffset,
     offsets: &[Option<u32>],
-) -> VMResult<(Obj, u32)> {
+) -> VMResult<(HeapObject, u32)> {
     // SAFETY: forwarded from this function's contract: the slot holds a
     // reference to a slot or field that holds a live enum object pointer.
-    let obj = unsafe { Obj::new(frame.ref_target(enum_ref).load_ptr()) };
+    let obj = unsafe { HeapObject::new(frame.ref_target(enum_ref).read_ptr()) };
     // SAFETY: the object is an enum per the contract.
     let tag = unsafe { obj.enum_tag() };
     let Some(variant_offset) = offsets.get(tag as usize) else {
@@ -1377,22 +1377,22 @@ unsafe fn variant_field_loc(
 macro_rules! dispatch_int_operand {
     ($frame:expr, $rhs:expr, $action:ident) => {
         match $rhs {
-            IntOperand::SlotU8(off) => $action!(u8, unsigned, $frame.slot(*off).load::<u8>()),
-            IntOperand::SlotU16(off) => $action!(u16, unsigned, $frame.slot(*off).load::<u16>()),
-            IntOperand::SlotU32(off) => $action!(u32, unsigned, $frame.slot(*off).load::<u32>()),
-            IntOperand::SlotU64(off) => $action!(u64, unsigned, $frame.slot(*off).load::<u64>()),
+            IntOperand::SlotU8(off) => $action!(u8, unsigned, $frame.slot(*off).read::<u8>()),
+            IntOperand::SlotU16(off) => $action!(u16, unsigned, $frame.slot(*off).read::<u16>()),
+            IntOperand::SlotU32(off) => $action!(u32, unsigned, $frame.slot(*off).read::<u32>()),
+            IntOperand::SlotU64(off) => $action!(u64, unsigned, $frame.slot(*off).read::<u64>()),
             IntOperand::SlotU128(off) => {
-                $action!(u128, unsigned, $frame.slot(*off).load::<u128>())
+                $action!(u128, unsigned, $frame.slot(*off).read::<u128>())
             },
             IntOperand::SlotU256(off) => {
-                $action!(U256, unsigned, $frame.slot(*off).load::<U256>())
+                $action!(U256, unsigned, $frame.slot(*off).read::<U256>())
             },
-            IntOperand::SlotI8(off) => $action!(i8, signed, $frame.slot(*off).load::<i8>()),
-            IntOperand::SlotI16(off) => $action!(i16, signed, $frame.slot(*off).load::<i16>()),
-            IntOperand::SlotI32(off) => $action!(i32, signed, $frame.slot(*off).load::<i32>()),
-            IntOperand::SlotI64(off) => $action!(i64, signed, $frame.slot(*off).load::<i64>()),
-            IntOperand::SlotI128(off) => $action!(i128, signed, $frame.slot(*off).load::<i128>()),
-            IntOperand::SlotI256(off) => $action!(I256, signed, $frame.slot(*off).load::<I256>()),
+            IntOperand::SlotI8(off) => $action!(i8, signed, $frame.slot(*off).read::<i8>()),
+            IntOperand::SlotI16(off) => $action!(i16, signed, $frame.slot(*off).read::<i16>()),
+            IntOperand::SlotI32(off) => $action!(i32, signed, $frame.slot(*off).read::<i32>()),
+            IntOperand::SlotI64(off) => $action!(i64, signed, $frame.slot(*off).read::<i64>()),
+            IntOperand::SlotI128(off) => $action!(i128, signed, $frame.slot(*off).read::<i128>()),
+            IntOperand::SlotI256(off) => $action!(I256, signed, $frame.slot(*off).read::<I256>()),
             IntOperand::ImmU8(v) => $action!(u8, unsigned, *v),
             IntOperand::ImmU16(v) => $action!(u16, unsigned, *v),
             IntOperand::ImmU32(v) => $action!(u32, unsigned, *v),
@@ -1431,11 +1431,11 @@ macro_rules! impl_int_arith {
             unsafe {
                 macro_rules! exec {
                     ($ty: ty,$_sign: tt,$rhs: expr) => {{
-                        let lhs_val: $ty = frame.slot(op.lhs).load::<$ty>();
+                        let lhs_val: $ty = frame.slot(op.lhs).read::<$ty>();
                         let rhs_val: $ty = $rhs;
                         let result: $ty = <$ty>::$method(lhs_val, rhs_val)
                             .ok_or_else(|| VMInternalError::new(RuntimeError::$variant $body))?;
-                        frame.slot(op.dst).store(result);
+                        frame.slot(op.dst).write(result);
                     }};
                 }
                 dispatch_int_operand!(frame, &op.rhs, exec);
@@ -1480,7 +1480,7 @@ macro_rules! impl_int_div {
             unsafe {
                 macro_rules! exec {
                     ($ty: ty,$_sign: tt,$rhs: expr) => {{
-                        let lhs_val: $ty = frame.slot(op.lhs).load::<$ty>();
+                        let lhs_val: $ty = frame.slot(op.lhs).read::<$ty>();
                         let rhs_val: $ty = $rhs;
                         let result: $ty = <$ty>::$method(lhs_val, rhs_val)
                             .ok_or_else(|| {
@@ -1490,7 +1490,7 @@ macro_rules! impl_int_div {
                                     RuntimeError::DivisionOverflow { op: $op }
                                 })
                             })?;
-                        frame.slot(op.dst).store(result);
+                        frame.slot(op.dst).write(result);
                     }};
                 }
                 dispatch_int_operand!(frame, &op.rhs, exec);
@@ -1522,10 +1522,10 @@ macro_rules! impl_int_bitwise {
             unsafe {
                 macro_rules! exec {
                     ($ty:ty, unsigned, $rhs:expr) => {{
-                        let lhs_val: $ty = frame.slot(op.lhs).load::<$ty>();
+                        let lhs_val: $ty = frame.slot(op.lhs).read::<$ty>();
                         let rhs_val: $ty = $rhs;
                         let result: $ty = lhs_val $bop rhs_val;
-                        frame.slot(op.dst).store(result);
+                        frame.slot(op.dst).write(result);
                     }};
                     ($ty:ty, signed, $rhs:expr) => {{
                         let _ = $rhs;
@@ -1592,7 +1592,7 @@ macro_rules! impl_int_shift {
             // SAFETY: forwarded from this function's contract.
             unsafe {
                 let shift_amount: u8 = match &op.rhs {
-                    ShiftOperand::SlotU8(off) => frame.slot(*off).load::<u8>(),
+                    ShiftOperand::SlotU8(off) => frame.slot(*off).read::<u8>(),
                     ShiftOperand::ImmU8(v) => *v,
                 };
                 let bit_width = op.ty.bit_width() as u32;
@@ -1606,9 +1606,9 @@ macro_rules! impl_int_shift {
                 }
                 macro_rules! exec {
                     ($ty:ty, unsigned, $shift_val:expr) => {{
-                        let lhs_val: $ty = frame.slot(op.lhs).load::<$ty>();
+                        let lhs_val: $ty = frame.slot(op.lhs).read::<$ty>();
                         let result: $ty = lhs_val $bop $shift_val;
-                        frame.slot(op.dst).store(result);
+                        frame.slot(op.dst).write(result);
                     }};
                     ($_ty:ty, signed, $_shift_val:expr) => {{
                         invariant_violation!(OperationNotSupportedForType {
@@ -1635,11 +1635,11 @@ unsafe fn exec_int_negate(frame: Frame, op: &IntNegateOp) -> VMResult<()> {
     unsafe {
         macro_rules! exec {
             ($ty:ty) => {{
-                let src_val: $ty = frame.slot(op.src).load::<$ty>();
+                let src_val: $ty = frame.slot(op.src).read::<$ty>();
                 let result: $ty = <$ty>::checked_neg(src_val).ok_or_else(|| {
                     VMInternalError::new(RuntimeError::NegateMinOverflow { ty: op.ty })
                 })?;
-                frame.slot(op.dst).store(result);
+                frame.slot(op.dst).write(result);
             }};
         }
         match op.ty {
@@ -1691,7 +1691,7 @@ unsafe fn exec_int_cast(frame: Frame, op: &IntCastOp) -> VMResult<()> {
     unsafe {
         macro_rules! cast_from {
             ($src_ty:ty) => {{
-                let src_val: $src_ty = frame.slot(op.src).load::<$src_ty>();
+                let src_val: $src_ty = frame.slot(op.src).read::<$src_ty>();
                 macro_rules! cast_to {
                     ($dst_ty: ty) => {{
                         let result: $dst_ty = <$dst_ty>::try_from(src_val).map_err(|_| {
@@ -1701,7 +1701,7 @@ unsafe fn exec_int_cast(frame: Frame, op: &IntCastOp) -> VMResult<()> {
                                 value: ReportedIntValue::from(src_val),
                             }
                         })?;
-                        frame.slot(op.dst).store(result);
+                        frame.slot(op.dst).write(result);
                     }};
                 }
                 dispatch_int_ty!(op.to, cast_to);
@@ -1723,7 +1723,7 @@ unsafe fn int_cmp_bool(frame: Frame, lhs: FrameOffset, op: CmpKind, rhs: &IntOpe
     unsafe {
         macro_rules! exec {
             ($ty:ty, $_sign:tt, $rhs:expr) => {{
-                let lhs_val: $ty = frame.slot(lhs).load::<$ty>();
+                let lhs_val: $ty = frame.slot(lhs).read::<$ty>();
                 let rhs_val: $ty = $rhs;
                 match op {
                     CmpKind::Lt => lhs_val < rhs_val,
@@ -1963,7 +1963,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(src).load::<u64>() != 0,
+                            frame.slot(src).read::<u64>() != 0,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -1981,7 +1981,7 @@ impl InterpreterContext<'_> {
                         // Read as `u8` only to test against zero; the byte's sign is
                         // irrelevant.
                         self.cond_branch(
-                            frame.slot(src).load::<u8>() != 0,
+                            frame.slot(src).read::<u8>() != 0,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -1999,7 +1999,7 @@ impl InterpreterContext<'_> {
                         // Read as `u8` only to test against zero; the byte's sign is
                         // irrelevant.
                         self.cond_branch(
-                            frame.slot(src).load::<u8>() == 0,
+                            frame.slot(src).read::<u8>() == 0,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2059,7 +2059,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(src).load::<u64>() >= imm,
+                            frame.slot(src).read::<u64>() >= imm,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2076,7 +2076,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(src).load::<u64>() < imm,
+                            frame.slot(src).read::<u64>() < imm,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2093,7 +2093,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(src).load::<u64>() > imm,
+                            frame.slot(src).read::<u64>() > imm,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2110,7 +2110,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(src).load::<u64>() <= imm,
+                            frame.slot(src).read::<u64>() <= imm,
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2127,7 +2127,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(lhs).load::<u64>() < frame.slot(rhs).load::<u64>(),
+                            frame.slot(lhs).read::<u64>() < frame.slot(rhs).read::<u64>(),
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2144,7 +2144,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(lhs).load::<u64>() >= frame.slot(rhs).load::<u64>(),
+                            frame.slot(lhs).read::<u64>() >= frame.slot(rhs).read::<u64>(),
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2161,7 +2161,7 @@ impl InterpreterContext<'_> {
                         gas_fallthrough,
                     } => {
                         self.cond_branch(
-                            frame.slot(lhs).load::<u64>() != frame.slot(rhs).load::<u64>(),
+                            frame.slot(lhs).read::<u64>() != frame.slot(rhs).read::<u64>(),
                             target,
                             gas_taken,
                             gas_fallthrough,
@@ -2193,7 +2193,7 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::Abort { code } => {
-                        let code = frame.slot(code).load::<u64>();
+                        let code = frame.slot(code).read::<u64>();
                         break RuntimeStatus::Aborted {
                             code,
                             message: None,
@@ -2203,10 +2203,10 @@ impl InterpreterContext<'_> {
                     },
 
                     MicroOp::AbortMsg { code, message } => {
-                        let code = frame.slot(code).load::<u64>();
+                        let code = frame.slot(code).read::<u64>();
                         // SAFETY: the `message` slot holds null or a heap
                         // `vector<u8>` with `len` initialized bytes.
-                        let bytes = vec_bytes_or_empty(frame.slot(message).load_ptr());
+                        let bytes = vec_bytes_or_empty(frame.slot(message).read_ptr());
                         let len = bytes.len();
                         let message = if len == 0 {
                             String::new()
@@ -2235,12 +2235,12 @@ impl InterpreterContext<'_> {
                     },
 
                     // ----- Arithmetic -----
-                    MicroOp::StoreImm1 { dst, imm } => frame.slot(dst).store::<u8>(imm),
-                    MicroOp::StoreImm2 { dst, ref imm } => frame.slot(dst).store(*imm),
-                    MicroOp::StoreImm4 { dst, ref imm } => frame.slot(dst).store(*imm),
-                    MicroOp::StoreImm8 { dst, ref imm } => frame.slot(dst).store(*imm),
-                    MicroOp::StoreImm16 { dst, ref imm } => frame.slot(dst).store(**imm),
-                    MicroOp::StoreImm32 { dst, ref imm } => frame.slot(dst).store(**imm),
+                    MicroOp::StoreImm1 { dst, imm } => frame.slot(dst).write::<u8>(imm),
+                    MicroOp::StoreImm2 { dst, ref imm } => frame.slot(dst).write(*imm),
+                    MicroOp::StoreImm4 { dst, ref imm } => frame.slot(dst).write(*imm),
+                    MicroOp::StoreImm8 { dst, ref imm } => frame.slot(dst).write(*imm),
+                    MicroOp::StoreImm16 { dst, ref imm } => frame.slot(dst).write(**imm),
+                    MicroOp::StoreImm32 { dst, ref imm } => frame.slot(dst).write(**imm),
                     MicroOp::StoreImmVec { dst, idx } => {
                         self.exec_store_imm_vec(*regs, dst, idx)?;
                     },
@@ -2376,7 +2376,7 @@ impl InterpreterContext<'_> {
 
                     MicroOp::StoreRandomU64 { dst } => {
                         let val: u64 = self.rng.r#gen();
-                        frame.slot(dst).store::<u64>(val);
+                        frame.slot(dst).write::<u64>(val);
                     },
 
                     MicroOp::ForceGC => {
@@ -2398,13 +2398,13 @@ impl InterpreterContext<'_> {
 
                     // ----- Vector instructions -----
                     MicroOp::VecNew { dst } => {
-                        frame.slot(dst).store_ptr(MemAddr::NULL);
+                        frame.slot(dst).write_ptr(MemAddr::NULL);
                     },
 
                     MicroOp::VecLen { dst, vec_ref } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
                         let len = vec_len_or_zero(vec_ptr);
-                        frame.slot(dst).store::<u64>(len);
+                        frame.slot(dst).write::<u64>(len);
                     },
 
                     MicroOp::VecPushBack {
@@ -2413,7 +2413,7 @@ impl InterpreterContext<'_> {
                         elem_size,
                         descriptor_id,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
 
                         let mut vec = if vec_ptr.is_null() {
                             let vec = alloc_vec!(
@@ -2426,11 +2426,11 @@ impl InterpreterContext<'_> {
                                 VEC_PUSHBACK_INIT_CAPACITY
                             )?;
                             // Re-read base after potential GC.
-                            frame.ref_target(vec_ref).store_ptr(vec.addr());
+                            frame.ref_target(vec_ref).write_ptr(vec.addr());
                             vec
                         } else {
                             // SAFETY: non-null was checked just above.
-                            Obj::new(vec_ptr)
+                            HeapObject::new(vec_ptr)
                         };
 
                         let len = vec.vec_len();
@@ -2460,7 +2460,7 @@ impl InterpreterContext<'_> {
                         vec_ref,
                         elem_size,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
                         let len = vec_len_or_zero(vec_ptr);
                         if len == 0 {
                             return Err(VMInternalError::new(RuntimeError::PopFromEmptyVector));
@@ -2468,7 +2468,7 @@ impl InterpreterContext<'_> {
                         let new_len = len - 1;
                         // SAFETY: `len > 0` excludes the null (empty) vector, so
                         // `vec_ptr` is a live vector with `len` elements.
-                        let vec = Obj::new(vec_ptr);
+                        let vec = HeapObject::new(vec_ptr);
                         vec.vec_elem(new_len, elem_size)
                             .copy_to_nonoverlapping(frame.slot(dst), elem_size as usize);
                         vec.set_vec_len(new_len);
@@ -2480,8 +2480,8 @@ impl InterpreterContext<'_> {
                         idx,
                         elem_size,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
-                        let idx = frame.slot(idx).load::<u64>();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
+                        let idx = frame.slot(idx).read::<u64>();
                         let len = vec_len_or_zero(vec_ptr);
                         if idx >= len {
                             return Err(VMInternalError::new(
@@ -2494,7 +2494,7 @@ impl InterpreterContext<'_> {
                         }
                         // SAFETY: `idx < len` excludes the null (empty) vector
                         // and keeps the element in bounds.
-                        Obj::new(vec_ptr)
+                        HeapObject::new(vec_ptr)
                             .vec_elem(idx, elem_size)
                             .copy_to_nonoverlapping(frame.slot(dst), elem_size as usize);
                     },
@@ -2505,8 +2505,8 @@ impl InterpreterContext<'_> {
                         src,
                         elem_size,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
-                        let idx = frame.slot(idx).load::<u64>();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
+                        let idx = frame.slot(idx).read::<u64>();
                         let len = vec_len_or_zero(vec_ptr);
                         if idx >= len {
                             return Err(VMInternalError::new(
@@ -2520,7 +2520,7 @@ impl InterpreterContext<'_> {
                         // SAFETY: `idx < len` excludes the null (empty) vector
                         // and keeps the element in bounds.
                         frame.slot(src).copy_to_nonoverlapping(
-                            Obj::new(vec_ptr).vec_elem(idx, elem_size),
+                            HeapObject::new(vec_ptr).vec_elem(idx, elem_size),
                             elem_size as usize,
                         );
                     },
@@ -2539,9 +2539,9 @@ impl InterpreterContext<'_> {
                         idx_b,
                         elem_size,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
-                        let idx_a = frame.slot(idx_a).load::<u64>();
-                        let idx_b = frame.slot(idx_b).load::<u64>();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
+                        let idx_a = frame.slot(idx_a).read::<u64>();
+                        let idx_b = frame.slot(idx_b).read::<u64>();
                         let len = vec_len_or_zero(vec_ptr);
                         // Indices are checked before the equal-indices no-op.
                         for idx in [idx_a, idx_b] {
@@ -2555,13 +2555,13 @@ impl InterpreterContext<'_> {
                                 ));
                             }
                         }
-                        // Equal pointers are UB for `swap_nonoverlapping_with`; distinct
+                        // Equal pointers are UB for `swap_nonoverlapping`; distinct
                         // in-bounds indices guarantee disjoint element ranges.
                         if idx_a != idx_b {
                             // SAFETY: both indices are `< len`, which excludes the
                             // null (empty) vector and keeps both elements in bounds.
-                            let vec = Obj::new(vec_ptr);
-                            vec.vec_elem(idx_a, elem_size).swap_nonoverlapping_with(
+                            let vec = HeapObject::new(vec_ptr);
+                            vec.vec_elem(idx_a, elem_size).swap_nonoverlapping(
                                 vec.vec_elem(idx_b, elem_size),
                                 elem_size as usize,
                             );
@@ -2575,8 +2575,8 @@ impl InterpreterContext<'_> {
                         idx,
                         elem_size,
                     } => {
-                        let vec_ptr = frame.ref_target(vec_ref).load_ptr();
-                        let idx = frame.slot(idx).load::<u64>();
+                        let vec_ptr = frame.ref_target(vec_ref).read_ptr();
+                        let idx = frame.slot(idx).read::<u64>();
                         let len = vec_len_or_zero(vec_ptr);
                         if idx >= len {
                             return Err(VMInternalError::new(
@@ -2588,11 +2588,11 @@ impl InterpreterContext<'_> {
                             ));
                         }
                         let offset = vec_elem_offset(idx, elem_size) as u64;
-                        FatRef::new(vec_ptr, offset).store_to(frame.slot(dst));
+                        FatRef::new(vec_ptr, offset).write_to(frame.slot(dst));
                     },
 
                     MicroOp::SlotBorrow { dst, local } => {
-                        FatRef::new(frame.slot(local), 0).store_to(frame.slot(dst));
+                        FatRef::new(frame.slot(local), 0).write_to(frame.slot(dst));
                     },
 
                     MicroOp::ReadRef { dst, ref_ptr, size } => {
@@ -2612,9 +2612,9 @@ impl InterpreterContext<'_> {
                         src_ref,
                         offset,
                     } => {
-                        FatRef::load_from(frame.slot(src_ref))
+                        FatRef::read_from(frame.slot(src_ref))
                             .with_added_offset(offset as u64)
-                            .store_to(frame.slot(dst_ref));
+                            .write_to(frame.slot(dst_ref));
                     },
 
                     MicroOp::ReadRefOffset {
@@ -2623,7 +2623,7 @@ impl InterpreterContext<'_> {
                         offset,
                         size,
                     } => {
-                        let target = FatRef::load_from(frame.slot(ref_ptr))
+                        let target = FatRef::read_from(frame.slot(ref_ptr))
                             .with_added_offset(offset as u64)
                             .target();
                         // Overlap-safe `copy_to`: `dst` and `*ref` may alias.
@@ -2636,7 +2636,7 @@ impl InterpreterContext<'_> {
                         src,
                         size,
                     } => {
-                        let target = FatRef::load_from(frame.slot(ref_ptr))
+                        let target = FatRef::read_from(frame.slot(ref_ptr))
                             .with_added_offset(offset as u64)
                             .target();
                         // Overlap-safe `copy_to`: `src` and `*ref` may alias.
@@ -2646,7 +2646,7 @@ impl InterpreterContext<'_> {
                     // ----- Heap object instructions (structs and enums) -----
                     MicroOp::HeapNew { dst, descriptor_id } => {
                         let obj = alloc_obj!(self, frame, regs.pc, regs.func, descriptor_id)?;
-                        frame.slot(dst).store_ptr(obj.addr());
+                        frame.slot(dst).write_ptr(obj.addr());
                     },
 
                     MicroOp::HeapMoveFrom8 {
@@ -2656,7 +2656,7 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
-                        let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(heap_ptr).read_ptr());
                         // The value may contain pointers or uninitialized
                         // padding and need not be 8-aligned.
                         obj.field(offset as usize).copy_word(frame.slot(dst));
@@ -2670,7 +2670,7 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
-                        let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(heap_ptr).read_ptr());
                         obj.field(offset as usize)
                             .copy_to_nonoverlapping(frame.slot(dst), size as usize);
                     },
@@ -2682,7 +2682,7 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
-                        let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(heap_ptr).read_ptr());
                         // The value may contain pointers or uninitialized
                         // padding and need not be 8-aligned.
                         frame.slot(src).copy_word(obj.field(offset as usize));
@@ -2695,10 +2695,10 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
-                        let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(heap_ptr).read_ptr());
                         // The destination may be unaligned. `imm` contains
                         // initialized integer bytes, so a typed store is valid.
-                        obj.field(offset as usize).store_unaligned::<u64>(imm);
+                        obj.field(offset as usize).write_unaligned::<u64>(imm);
                     },
 
                     MicroOp::HeapMoveTo {
@@ -2709,7 +2709,7 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: `heap_ptr` holds a struct object pointer, which
                         // is never null (always allocated by `HeapNew`).
-                        let obj = Obj::new(frame.slot(heap_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(heap_ptr).read_ptr());
                         frame
                             .slot(src)
                             .copy_to_nonoverlapping(obj.field(offset as usize), size as usize);
@@ -2720,11 +2720,11 @@ impl InterpreterContext<'_> {
                         obj_ref,
                         offset,
                     } => {
-                        let obj_ptr = frame.ref_target(obj_ref).load_ptr();
+                        let obj_ptr = frame.ref_target(obj_ref).read_ptr();
                         // Unlike vectors, heap objects are never null — they
                         // are always allocated by HeapNew before being borrowed.
                         debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
-                        FatRef::new(obj_ptr, offset as u64).store_to(frame.slot(dst));
+                        FatRef::new(obj_ptr, offset as u64).write_to(frame.slot(dst));
                     },
 
                     MicroOp::PackClosure(ref op) => {
@@ -2755,19 +2755,19 @@ impl InterpreterContext<'_> {
                     // the reentrancy check.
                     MicroOp::Exists { addr, ty, dst } => {
                         self.reentrancy.check_resource_access(ty)?;
-                        let address = frame.slot(addr).load::<AccountAddress>();
+                        let address = frame.slot(addr).read::<AccountAddress>();
                         let group = self.resource_group_of(ty)?;
                         let exists = self.read_write_set.exists(
                             self.resource_provider,
                             &InMemoryStorageKey::resource(address, ty),
                             group,
                         )?;
-                        frame.slot(dst).store_bool(exists);
+                        frame.slot(dst).write_bool(exists);
                     },
 
                     MicroOp::BorrowGlobal { addr, ty, dst } => {
                         self.reentrancy.check_resource_access(ty)?;
-                        let address = frame.slot(addr).load::<AccountAddress>();
+                        let address = frame.slot(addr).read::<AccountAddress>();
                         let group = self.resource_group_of(ty)?;
                         let ptr = self.read_write_set.borrow_global(
                             self.resource_provider,
@@ -2776,12 +2776,12 @@ impl InterpreterContext<'_> {
                         )?;
                         // A reference is a 16-byte fat pointer; the borrow points
                         // at the start of the resource, so the offset half is 0.
-                        FatRef::new(ptr.addr(), 0).store_to(frame.slot(dst));
+                        FatRef::new(ptr.addr(), 0).write_to(frame.slot(dst));
                     },
 
                     MicroOp::BorrowGlobalMut { addr, ty, dst } => {
                         self.reentrancy.check_resource_access(ty)?;
-                        let address = frame.slot(addr).load::<AccountAddress>();
+                        let address = frame.slot(addr).read::<AccountAddress>();
                         let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
                         let entry = self.read_write_set.try_borrow_global_mut(
@@ -2794,12 +2794,12 @@ impl InterpreterContext<'_> {
                         })?;
                         // A reference is a 16-byte fat pointer; the borrow points
                         // at the start of the resource, so the offset half is 0.
-                        FatRef::new(ptr.addr(), 0).store_to(frame.slot(dst));
+                        FatRef::new(ptr.addr(), 0).write_to(frame.slot(dst));
                     },
 
                     MicroOp::MoveFrom { addr, ty, dst } => {
                         self.reentrancy.check_resource_access(ty)?;
-                        let address = frame.slot(addr).load::<AccountAddress>();
+                        let address = frame.slot(addr).read::<AccountAddress>();
                         let group = self.resource_group_of(ty)?;
                         let key = InMemoryStorageKey::resource(address, ty);
                         let entry = self.read_write_set.try_move_from(
@@ -2809,7 +2809,7 @@ impl InterpreterContext<'_> {
                         )?;
                         let ptr =
                             self.cow_entry(*regs, entry, |rws, _| rws.commit_move_from(&key))?;
-                        frame.slot(dst).store_ptr(ptr.addr());
+                        frame.slot(dst).write_ptr(ptr.addr());
                     },
 
                     MicroOp::MoveTo {
@@ -2819,14 +2819,14 @@ impl InterpreterContext<'_> {
                     } => {
                         self.reentrancy.check_resource_access(ty)?;
                         // Dereference the `&signer` to obtain the 32-byte publishing address
-                        let address = frame.ref_target(signer_ref).load::<AccountAddress>();
-                        let ptr = frame.slot(src).load_ptr();
+                        let address = frame.ref_target(signer_ref).read::<AccountAddress>();
+                        let ptr = frame.slot(src).read_ptr();
                         if ptr.is_null() {
                             invariant_violation!(MoveToNullSource);
                         }
                         // `src` holds the value being published: a live object
                         // (null was excluded above).
-                        let ptr = Obj::new(ptr);
+                        let ptr = HeapObject::new(ptr);
                         let group = self.resource_group_of(ty)?;
 
                         self.read_write_set.move_to(
@@ -2838,7 +2838,7 @@ impl InterpreterContext<'_> {
                     },
                     MicroOp::IntCmp(ref op) => {
                         let result = int_cmp_bool(frame, op.lhs, op.op, &op.rhs);
-                        frame.slot(op.dst).store::<u8>(result as u8);
+                        frame.slot(op.dst).write::<u8>(result as u8);
                     },
                     MicroOp::ValueCmp(ref op) => {
                         // Operands are the aggregate values at their slots; a
@@ -2846,7 +2846,7 @@ impl InterpreterContext<'_> {
                         let a = frame.slot(op.lhs);
                         let b = frame.slot(op.rhs);
                         let eq = value_cmp::equals(self.loader.guard(), a, b, op.ty)?;
-                        frame.slot(op.dst).store_bool(eq ^ op.negate);
+                        frame.slot(op.dst).write_bool(eq ^ op.negate);
                     },
                     MicroOp::ValueRefCmp(ref op) => {
                         // Operands are references; read through the fat pointers to
@@ -2854,20 +2854,20 @@ impl InterpreterContext<'_> {
                         let a = frame.ref_target(op.lhs);
                         let b = frame.ref_target(op.rhs);
                         let eq = value_cmp::equals(self.loader.guard(), a, b, op.ty)?;
-                        frame.slot(op.dst).store_bool(eq ^ op.negate);
+                        frame.slot(op.dst).write_bool(eq ^ op.negate);
                     },
                     MicroOp::BoolNot { dst, src } => {
-                        frame.slot(dst).store_bool(!frame.slot(src).load_bool())
+                        frame.slot(dst).write_bool(!frame.slot(src).read_bool())
                     },
                     MicroOp::BoolAnd { dst, lhs, rhs } => {
-                        let left = frame.slot(lhs).load_bool();
-                        let right = frame.slot(rhs).load_bool();
-                        frame.slot(dst).store_bool(left && right)
+                        let left = frame.slot(lhs).read_bool();
+                        let right = frame.slot(rhs).read_bool();
+                        frame.slot(dst).write_bool(left && right)
                     },
                     MicroOp::BoolOr { dst, lhs, rhs } => {
-                        let left = frame.slot(lhs).load_bool();
-                        let right = frame.slot(rhs).load_bool();
-                        frame.slot(dst).store_bool(left || right)
+                        let left = frame.slot(lhs).read_bool();
+                        let right = frame.slot(rhs).read_bool();
+                        frame.slot(dst).write_bool(left || right)
                     },
                     MicroOp::EnumTestTag {
                         dst,
@@ -2878,9 +2878,9 @@ impl InterpreterContext<'_> {
                         //
                         // SAFETY: the reference targets a slot holding a live
                         // enum object pointer, which is never null.
-                        let obj = Obj::new(frame.ref_target(enum_ref).load_ptr());
+                        let obj = HeapObject::new(frame.ref_target(enum_ref).read_ptr());
                         let tag = obj.enum_tag();
-                        frame.slot(dst).store_bool(tag == variant);
+                        frame.slot(dst).write_bool(tag == variant);
                     },
 
                     MicroOp::EnumBorrowVariantFieldByTag {
@@ -2891,7 +2891,7 @@ impl InterpreterContext<'_> {
                         // The field reference written to `dst` is a fat pointer
                         // pairing the heap object with the tag-selected offset.
                         let (obj, offset) = variant_field_loc(frame, enum_ref, offsets)?;
-                        FatRef::new(obj.addr(), offset as u64).store_to(frame.slot(dst));
+                        FatRef::new(obj.addr(), offset as u64).write_to(frame.slot(dst));
                     },
 
                     MicroOp::EnumCheckVariant { enum_ptr, variant } => {
@@ -2900,7 +2900,7 @@ impl InterpreterContext<'_> {
                         //
                         // SAFETY: the slot holds a live enum object pointer,
                         // which is never null.
-                        let obj = Obj::new(frame.slot(enum_ptr).load_ptr());
+                        let obj = HeapObject::new(frame.slot(enum_ptr).read_ptr());
                         let tag = obj.enum_tag();
                         if tag != variant {
                             return Err(VMInternalError::new(RuntimeError::EnumVariantMismatch {
@@ -2922,7 +2922,7 @@ impl InterpreterContext<'_> {
                         // SAFETY: `alloc_obj!` returned a live object allocated
                         // under an enum descriptor.
                         obj.set_enum_tag(variant);
-                        frame.slot(dst).store_ptr(obj.addr());
+                        frame.slot(dst).write_ptr(obj.addr());
                     },
 
                     MicroOp::HeapReadOffset {
@@ -2937,7 +2937,7 @@ impl InterpreterContext<'_> {
                         //
                         // SAFETY: the reference targets a slot holding a live
                         // struct/enum object pointer, which is never null.
-                        let obj = Obj::new(frame.ref_target(obj_ref).load_ptr());
+                        let obj = HeapObject::new(frame.ref_target(obj_ref).read_ptr());
                         // Non-overlapping: `dst` is a stack-region slot, the
                         // source is heap-object bytes.
                         obj.field(offset as usize)
@@ -2952,7 +2952,7 @@ impl InterpreterContext<'_> {
                     } => {
                         // SAFETY: the reference targets a slot holding a live
                         // struct/enum object pointer, which is never null.
-                        let obj = Obj::new(frame.ref_target(obj_ref).load_ptr());
+                        let obj = HeapObject::new(frame.ref_target(obj_ref).read_ptr());
                         // Non-overlapping: `src` is a stack-region slot, the
                         // destination is heap-object bytes.
                         frame
@@ -3012,28 +3012,28 @@ impl InterpreterContext<'_> {
                             // pointer at one offset. Uses single-root `deep_copy`,
                             // avoiding the batch's per-op `Vec`s.
                             let slot = frame.at(base + off);
-                            let src = slot.load_ptr();
+                            let src = slot.read_ptr();
                             if !src.is_null() {
                                 // The descriptor says the slot holds a heap
                                 // pointer, so non-null is a live object.
-                                let new = self.deep_copy(*regs, Obj::new(src))?;
-                                slot.store_ptr(new.addr());
+                                let new = self.deep_copy(*regs, HeapObject::new(src))?;
+                                slot.write_ptr(new.addr());
                             }
                         } else {
                             let mut live_offsets: Vec<u32> = Vec::with_capacity(offsets.len());
-                            let mut sources: Vec<Obj> = Vec::with_capacity(offsets.len());
+                            let mut sources: Vec<HeapObject> = Vec::with_capacity(offsets.len());
                             for &off in offsets.iter() {
                                 let slot = frame.at(base + off);
-                                let src = slot.load_ptr();
+                                let src = slot.read_ptr();
                                 if !src.is_null() {
                                     live_offsets.push(off);
                                     // As above: non-null is a live object.
-                                    sources.push(Obj::new(src));
+                                    sources.push(HeapObject::new(src));
                                 }
                             }
                             let copies = self.deep_copy_batch(*regs, &sources)?;
                             for (off, new) in live_offsets.iter().zip(copies) {
-                                frame.at(base + *off).store_ptr(new.addr());
+                                frame.at(base + *off).write_ptr(new.addr());
                             }
                         }
                     },
@@ -3122,7 +3122,7 @@ impl InterpreterContext<'_> {
                     op.elem_size as usize,
                 );
             }
-            frame.slot(op.dst).store_ptr(vec.addr());
+            frame.slot(op.dst).write_ptr(vec.addr());
         }
         Ok(())
     }
@@ -3139,7 +3139,7 @@ impl InterpreterContext<'_> {
     unsafe fn exec_vec_unpack(&mut self, frame: Frame, op: &VecUnpackOp) -> VMResult<()> {
         // SAFETY: forwarded from this function's contract.
         unsafe {
-            let vec_ptr = frame.slot(op.src).load_ptr();
+            let vec_ptr = frame.slot(op.src).read_ptr();
             let expected = op.dsts.len() as u64;
             let actual = vec_len_or_zero(vec_ptr);
             if actual != expected {
@@ -3152,7 +3152,7 @@ impl InterpreterContext<'_> {
             }
             // `actual > 0` excludes the null (empty) vector, so `vec_ptr` is a
             // live vector with `actual` elements.
-            let vec = Obj::new(vec_ptr);
+            let vec = HeapObject::new(vec_ptr);
             for (elem_idx, dst) in op.dsts.iter().enumerate() {
                 // Non-overlapping: the source is a heap vector element, the
                 // destination is a frame slot — disjoint regions.
@@ -3169,7 +3169,7 @@ impl InterpreterContext<'_> {
     /// # Safety
     ///
     /// `regs.fp` must be the current frame pointer.
-    unsafe fn deep_copy(&mut self, regs: VMRegisters, root: Obj) -> VMResult<Obj> {
+    unsafe fn deep_copy(&mut self, regs: VMRegisters, root: HeapObject) -> VMResult<HeapObject> {
         deep_copy_or_gc(
             &mut self.heap,
             self.loader.guard(),
@@ -3198,8 +3198,8 @@ impl InterpreterContext<'_> {
         &mut self,
         regs: VMRegisters,
         entry: EntryPtr,
-        commit: impl FnOnce(&mut ResourceReadWriteSet, Obj),
-    ) -> VMResult<Obj> {
+        commit: impl FnOnce(&mut ResourceReadWriteSet, HeapObject),
+    ) -> VMResult<HeapObject> {
         match entry {
             EntryPtr::Writable(obj) => Ok(obj),
             EntryPtr::NonWritable(obj) => {
@@ -3217,7 +3217,11 @@ impl InterpreterContext<'_> {
     /// # Safety
     ///
     /// `regs.fp` must be the current frame pointer.
-    unsafe fn deep_copy_batch(&mut self, regs: VMRegisters, sources: &[Obj]) -> VMResult<Vec<Obj>> {
+    unsafe fn deep_copy_batch(
+        &mut self,
+        regs: VMRegisters,
+        sources: &[HeapObject],
+    ) -> VMResult<Vec<HeapObject>> {
         deep_copy_batch_or_gc(
             &mut self.heap,
             self.loader.guard(),
@@ -3281,7 +3285,7 @@ impl InterpreterContext<'_> {
                 let closure = alloc_obj!(self, frame, regs.pc, regs.func, CLOSURE_DESCRIPTOR_ID)?;
                 // `alloc_obj!` returned a live object under the closure descriptor.
                 closure.write_closure_func_ref_and_mask(&op.func_ref, op.mask);
-                frame.slot(op.dst).store_ptr(closure.addr());
+                frame.slot(op.dst).write_ptr(closure.addr());
                 return Ok(());
             }
 
@@ -3320,7 +3324,7 @@ impl InterpreterContext<'_> {
             // tag, size, and a `values_size`-byte values region.
             captured_data
                 .field(CAPTURED_DATA_TAG_OFFSET)
-                .store::<u8>(CAPTURED_DATA_TAG_MATERIALIZED);
+                .write::<u8>(CAPTURED_DATA_TAG_MATERIALIZED);
             // Persist the exact values-region size so `CallClosure` can validate
             // a lazily-resolved callee's captured layout against it; the header
             // records only the alignment-rounded allocation size.
@@ -3330,7 +3334,7 @@ impl InterpreterContext<'_> {
             // here to enable element-wise validation of an `Unresolved` callee.
             captured_data
                 .field(CAPTURED_DATA_VALUES_SIZE_OFFSET)
-                .store::<u32>(op.values_size);
+                .write::<u32>(op.values_size);
 
             // Captured values are laid out at their natural alignment within
             // the values region (see `next_captured_value_offset`), matching the
@@ -3350,7 +3354,7 @@ impl InterpreterContext<'_> {
             // have moved it.
             let closure = closure_root.obj();
             closure.set_closure_captured_data(captured_data.addr());
-            frame.slot(op.dst).store_ptr(closure.addr());
+            frame.slot(op.dst).write_ptr(closure.addr());
 
             Ok(())
         }
@@ -3394,12 +3398,12 @@ impl InterpreterContext<'_> {
         // data objects are live heap objects, as established at each site.
         unsafe {
             let frame = Frame::new(fp);
-            let closure_ptr = frame.slot(op.closure_src).load_ptr();
+            let closure_ptr = frame.slot(op.closure_src).read_ptr();
             if closure_ptr.is_null() {
                 invariant_violation!(NullClosure);
             }
             // Non-null was checked just above.
-            let closure = Obj::new(closure_ptr);
+            let closure = HeapObject::new(closure_ptr);
             // Guard the func-pointer cast below against a non-closure pointer.
             let descriptor_id = closure.header().descriptor;
             if descriptor_id != CLOSURE_DESCRIPTOR_ID.0 {
@@ -3440,7 +3444,7 @@ impl InterpreterContext<'_> {
             // relocated the heap, the slot holds the moved object while the
             // local `closure` above would dangle. A `Resolved` closure re-reads
             // the same pointer.
-            let closure = Obj::new(frame.slot(op.closure_src).load_ptr());
+            let closure = HeapObject::new(frame.slot(op.closure_src).read_ptr());
             let mask = closure.closure_mask();
             let captured_data = closure.closure_captured_data();
 
@@ -3466,8 +3470,8 @@ impl InterpreterContext<'_> {
                         invariant_violation!(NullCapturedData);
                     }
                     // Non-null was checked just above.
-                    let captured = Obj::new(captured_data);
-                    let cap_tag = captured.field(CAPTURED_DATA_TAG_OFFSET).load::<u8>();
+                    let captured = HeapObject::new(captured_data);
+                    let cap_tag = captured.field(CAPTURED_DATA_TAG_OFFSET).read::<u8>();
                     if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
                         // TODO(completeness): handle `CAPTURED_DATA_TAG_RAW` here once
                         // that tag has a writer. Until then only `Materialized` is ever
@@ -3496,7 +3500,7 @@ impl InterpreterContext<'_> {
                     );
                     let packed = captured
                         .field(CAPTURED_DATA_VALUES_SIZE_OFFSET)
-                        .load::<u32>();
+                        .read::<u32>();
                     if expected != packed {
                         invariant_violation!(ClosureCapturedLayoutMismatch { expected, packed });
                     }
@@ -3549,7 +3553,7 @@ impl InterpreterContext<'_> {
             // first resolution, by the verifier at pack time for `Resolved`);
             // a non-capturing closure leaves it null and never reads it.
             let captured = if mask != 0 {
-                Some(Obj::new(captured_data))
+                Some(HeapObject::new(captured_data))
             } else {
                 None
             };

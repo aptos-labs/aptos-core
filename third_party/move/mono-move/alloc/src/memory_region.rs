@@ -56,7 +56,7 @@ impl MemoryRegion {
         // SAFETY: `region.ptr` is a valid, `size`-byte allocation just returned
         // by `Self::new` above.
         unsafe {
-            region.base().fill(0xAA, size);
+            region.base().write_bytes(0xAA, size);
         }
         region
     }
@@ -89,7 +89,7 @@ impl MemoryRegion {
         // SAFETY: `ptr` is a valid allocation of `layout.size()` bytes, and
         // `&mut self` rules out a concurrent reader.
         unsafe {
-            self.base().fill(0xAA, self.layout.size());
+            self.base().write_bytes(0xAA, self.layout.size());
         }
     }
 
@@ -142,7 +142,7 @@ impl MemoryRegion {
     /// out-of-bounds or overflowing ranges without forming out-of-bounds pointers.
     #[inline(always)]
     pub fn contains_range(&self, addr: MemAddr, len: usize) -> bool {
-        addr.as_usize()
+        addr.addr()
             .wrapping_sub(self.ptr.addr())
             .saturating_add(len)
             <= self.len()

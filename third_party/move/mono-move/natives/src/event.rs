@@ -88,12 +88,12 @@ impl NativeExtension for EventStore {
                 let off = off as usize;
                 // SAFETY: `arg_ptr_offsets` provides complete, pointer-aligned
                 // slots within the aligned `msg_data` allocation, so `slot` is
-                // in bounds and pointer-aligned. `load_ptr` / `store_ptr`
+                // in bounds and pointer-aligned. `read_ptr` / `write_ptr`
                 // preserve provenance.
                 unsafe {
                     let slot = base.add(off);
-                    if let Some(new) = relocate(slot.load_ptr()) {
-                        slot.store_ptr(new);
+                    if let Some(new) = relocate(slot.read_ptr()) {
+                        slot.write_ptr(new);
                     }
                 }
             }
@@ -243,9 +243,9 @@ pub fn native_emitted_events_by_handle<C: NativeContext>(ctx: &C) -> VMResult<Na
     // address is a byte array and has no alignment requirement.
     let (creation_num, addr) = unsafe {
         (
-            base.add(GUID_CREATION_NUM_OFFSET).load_unaligned::<u64>(),
+            base.add(GUID_CREATION_NUM_OFFSET).read_unaligned::<u64>(),
             base.add(GUID_CREATION_NUM_OFFSET + std::mem::size_of::<u64>())
-                .load::<AccountAddress>(),
+                .read::<AccountAddress>(),
         )
     };
     let key = EventKey::new(creation_num, addr);
@@ -304,7 +304,7 @@ mod tests {
         let payload = MemoryRegion::new_zeroed(16);
         // SAFETY: the region is 16 bytes and `MAX_ALIGN`-aligned, so offset 8
         // is an in-bounds, pointer-aligned slot.
-        unsafe { payload.base().add(8).store_ptr(old) };
+        unsafe { payload.base().add(8).write_ptr(old) };
         let mut store = EventStore::new();
         store.emit(U64_TY, payload, vec![8], EventKind::V2);
 
@@ -312,13 +312,13 @@ mod tests {
         // are live, aligned `u64` locals.
         unsafe {
             store.relocate_roots(&mut |ptr| {
-                assert_eq!(ptr.load::<u64>(), 1);
+                assert_eq!(ptr.read::<u64>(), 1);
                 Some(new)
             })
         };
         // SAFETY: as above; the slot now holds `new`, which points at a live
         // `u64` local.
-        let relocated = unsafe { store.entries()[0].msg_data.base().add(8).load_ptr() };
-        assert_eq!(unsafe { relocated.load::<u64>() }, 2);
+        let relocated = unsafe { store.entries()[0].msg_data.base().add(8).read_ptr() };
+        assert_eq!(unsafe { relocated.read::<u64>() }, 2);
     }
 }
