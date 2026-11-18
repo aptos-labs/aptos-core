@@ -5311,21 +5311,26 @@ private def withSomeReadings (e : Lean.Expr) : MetaM (Array (Array Lean.Expr)) :
 not spell, taken at the value the option holds: the option splits, the
 empty case closed by what the context then states of it, and in the case
 that remains every reading taken at the value (`withSome_of_some`) and the
-option's other readers substituted by the equation the case states.  The
-goal that remains, `none` where the empty case does not close, since a
-split the context does not decide is the path's to take and not a leaf's.
-Taken this way rather than by generalizing the option, whose readers are
-under the dependent binder a continuation takes and so follow no
-generalization. -/
+option's other readers substituted by the equation the case states.  After
+this simplification, no full-arity `withSome` at a syntactic `some`/`none`
+argument remains in the hypotheses the producer rewrites, within its
+declared traversal scope; nothing is claimed of untouched hypotheses, the
+target or bodies under binders.  The goal that remains, `none` where the
+empty case does not close, since a split the context does not decide is the
+path's to take and not a leaf's.  Taken this way rather than by generalizing
+the option, whose readers are under the dependent binder a continuation takes
+and so follow no generalization. -/
 private def readingsAtValue?
     (goal : MVarId) (readings : Array (Array Lean.Expr)) :
     TacticM (Option MVarId) := do
   let option_ := readings[0]![2]!
   -- The readings of an option the case states a value for: the constructor
+  -- laws of `withSome` (`withSome_some`, `withSome_none`) and the constructor
   -- equations of the readers a normal form leaves of the option
   -- (`Option.map`, `Option.getD`), so that a reader states the value.
-  let readers : SimpTheorems ← [``Option.some.injEq, ``Option.map_some, ``Option.getD_some,
-      ``Option.map_none, ``Option.getD_none].foldlM (·.addConst ·) {}
+  let readers : SimpTheorems ← [``withSome_some, ``withSome_none, ``Option.some.injEq,
+      ``Option.map_some, ``Option.getD_some, ``Option.map_none, ``Option.getD_none].foldlM
+      (·.addConst ·) {}
   let rewritten (goal : MVarId) (equations : Array Lean.Expr) (kept : Array FVarId) :
       TacticM (Option MVarId) :=
     goal.withContext do
