@@ -261,6 +261,14 @@ current into an owned position (`let c = *r`, `let c = r.inner`) is certified
 at the copy — stricter than the Prover, which lets a broken value escape that
 way, and the right place.
 
+Moving a reference out through a dereference is also an exit from an open
+current. `Term.takeAt` checks the extracted reference's prophecy before
+settling its old place; the extracted reference's own current stays open.
+`takeSliceAtValue` checks both vectors of the original extracted slice before
+replacing its old place with two copies of the final vector. Checking that
+replacement would miss an invalid current vector. A path without a
+dereference extracts validity from its owner and adds no take-out check.
+
 ### A borrowed path
 
 `&mut s1.s2.s3`, where more than one level carries an invariant: the owner's

@@ -71,6 +71,7 @@ IR_TESTS=(
   VerexIR/Tests/SharedBudgets.lean
   VerexIR/Tests/PreparationCache.lean
   VerexIR/Tests/FamilyTransport.lean
+  VerexIR/Tests/TakeOwnerValidity.lean
   VerexSL/Tests/StoredTableInvariantErrors.lean
   VerexSL/Tests/LiteralMaps.lean
   VerexSL/Tests/TypedMaps.lean

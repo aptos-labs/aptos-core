@@ -4219,12 +4219,18 @@ noncomputable def takeSliceAtValue [Carriers] {State : Type} {ρ : ResultShape} 
   match x.get env with
   | some value => match path.get? env value with
     | some reference =>
-        let settled : (NTy.sliceRef σ).carrier :=
-          SpecSliceRef.ofArrays reference.final reference.final
-        match path.setOwner? env site settled value with
-        | some written =>
-            Spec.bind written fun cleared => Spec.pure (.value reference (x.set cleared env))
-        | none => mismatchOutcome mismatch
+        let body :=
+          let settled : (NTy.sliceRef σ).carrier :=
+            SpecSliceRef.ofArrays reference.final reference.final
+          match path.setOwner? env site settled value with
+          | some written =>
+              Spec.bind written fun cleared => Spec.pure (.value reference (x.set cleared env))
+          | none => mismatchOutcome mismatch
+        -- A dereference can expose an open current containing this slice.
+        -- Check both vectors of the taken value before settling its old place.
+        if path.hasDeref && !σ.invariantFree then
+          Spec.bind (checkingAt site .copyOut (.sliceRef σ) reference) fun _ => body
+        else body
     | none => mismatchOutcome mismatch
   | none => Spec.bottom
 
@@ -4472,7 +4478,7 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
                 Spec.pure (.value component env)
           | none => mismatchOutcome mismatch
       | none => Spec.bottom
-  | _, _, @Term.takeAt _ _ _ _ _ site mismatch x path, env =>
+  | _, _, @Term.takeAt _ _ _ _ σ site mismatch x path, env =>
       match x.get env with
       | some value =>
           -- Clearing the place writes the prophecy back settled, and the
@@ -4482,10 +4488,16 @@ noncomputable def Term.denoteIn {unit : Validation.ValidatedUnit} [C : Carriers]
           -- today.
           match path.get? env value with
           | some reference =>
-              match path.setOwner? env site (reference.2, reference.2) value with
-              | some written =>
-                  Spec.bind written fun owner => Spec.pure (.value reference (x.set owner env))
-              | none => mismatchOutcome mismatch
+              let body :=
+                match path.setOwner? env site (reference.2, reference.2) value with
+                | some written =>
+                    Spec.bind written fun owner => Spec.pure (.value reference (x.set owner env))
+                | none => mismatchOutcome mismatch
+              -- The taken reference becomes owned; its prophecy must be valid,
+              -- while its current remains open until that reference settles.
+              if path.hasDeref && !σ.invariantFree then
+                Spec.bind (checkingAt site .copyOut σ reference.2) fun _ => body
+              else body
           | none => mismatchOutcome mismatch
       | none => Spec.bottom
   | _, _, @Term.writePlace _ _ _ _ _ site mismatch x path value, env =>

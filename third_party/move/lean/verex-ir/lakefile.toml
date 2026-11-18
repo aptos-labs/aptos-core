@@ -24,4 +24,4 @@ roots = ["VerexIR.Tests.DeclaredFamilyPlumbing", "VerexIR.Tests.DeclaredValidity
   "VerexIR.Proofs.NominalBasis.Reads", "VerexIR.Proofs.NominalBasis.Demands",
   "VerexIR.Tests.SplitOptionReadings", "VerexIR.Tests.ContextMemoryReadDischarge",
   "VerexIR.Tests.HiddenTheoremClosure", "VerexIR.Tests.ProphecyMarkShape",
-  "VerexSL.Tests.MutationEndPrimedScope"]
+  "VerexSL.Tests.MutationEndPrimedScope", "VerexIR.Tests.TakeOwnerValidity"]

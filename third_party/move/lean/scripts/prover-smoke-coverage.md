@@ -104,6 +104,7 @@ component.
 | evidence that arrives before, and after, the read it belongs to | `VerexIR/Tests/VectorElementReads`, `VerexSL/Tests/ExecutableVectorReads`, `VerexSL/Tests/LeafOpenedFacts` |
 | a fact of the same carrier at another type, frame or owner; a raw projection or an annotated term beside the application | `VerexSL/Tests/NominalFrameObservations`, `VerexIR/Tests/StoredBehaviorFrames` |
 | an invalid value inside a chain of writes | `VerexSL/Tests/WrittenContainerHolds` |
+| taking a reference through an open current checks the original prophecy, or both original slice vectors; ordinary reference currents remain open and paths without dereference keep their behavior | `VerexIR/Tests/TakeOwnerValidity` |
 | a declaration that is imported beside one that is local | `VerexIR/Tests/OwnBridgeDeclared`, `VerexSL/Tests/DenoteCacheImport` |
 | the solver's rollback and the lifetime of its caches | `VerexIR/Tests/PreparationCache`, `VerexSL/Tests/DenoteCache` |
 | a `verify` command beside its module's own verification; the Given route | `VerexSL/Tests/GivenOwnSelection`; `shapes Closures` and `shapes KnownClosures` verify in their module what a command does not establish |
