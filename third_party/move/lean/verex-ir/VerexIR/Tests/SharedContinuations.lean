@@ -556,7 +556,8 @@ example (θ : TypeArgs) (outer : Carriers) (accepted : Prop) (b : Bool)
     assumption
 
 -- An unrelated Sorts can type the result but supplies no Holds predicate.
--- The join must reject this even though the rest of the continuation is trivial.
+-- The join must decline sharing without publishing a shared summary or premises,
+-- and verify both arrivals unshared.
 example (operations : Sorts) (b : Bool)
     (left right : @NTy.carrier operations (.param 0))
     (env : @HEnv (inferInstance : Carriers).toSorts Γ) (state : Memory unit) :
@@ -564,19 +565,25 @@ example (operations : Sorts) (b : Bool)
       (fun (_ : Flow ρ Γ (@NTy.carrier operations (.param 0))) _ => True)
       (fun (_ : Failure) => False) state := by
   run_tac do
-    let saved ← Lean.Elab.Tactic.saveState
+    let some (folded, node) ← fold? (← getMainGoal) | throwError "not a Flow continuation"
+    setGoals [folded]
     let branch := mkIdent `b
-    let failure? ← try
-      evalTactic (← `(tactic| check_shared_holds 0 :
-        cases $branch:ident <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
-        with trivial))
-      pure none
-    catch error => pure (some error)
-    saved.restore
-    let some error := failure? | throwError "sealed a join at an unrelated Sorts dictionary"
-    unless (← error.toMessageData.toString) ==
-        "a shared continuation value has no semantic family in its flow" do
-      throw error
-  cases b <;> simp [wp_pure]
+    evalTactic (← `(tactic| cases $branch:ident <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]))
+    let mut node := node
+    for goal in ← getGoals do
+      let some arrival ← arrival? node goal | throwError "not a normal arrival"
+      node := { node with arrivals := node.arrivals.push arrival }
+    let sealedNode ← sealNode (← closeArrivals (← prepareArrivals node {}))
+    unless sealedNode.sealed && sealedNode.finished && !sealedNode.certified &&
+        sealedNode.summary?.isNone && sealedNode.relation?.isNone &&
+        sealedNode.holdsProofs.isEmpty && sealedNode.pendingHolds.isEmpty &&
+        sealedNode.holdsCount == 0 && sealedNode.arrivals.size == 2 do
+      throwError "an unrelated Sorts dictionary should decline sharing without a shared certificate"
+    for arrival in sealedNode.arrivals do
+      let goal ← unfoldArrival sealedNode arrival
+      setGoals [goal]
+      evalTactic (← `(tactic| trivial))
+      unless (← getUnsolvedGoals).isEmpty do throwError "unshared suffix incomplete"
+    setGoals []
 
 end JoinHoldsTests

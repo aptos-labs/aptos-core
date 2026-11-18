@@ -250,6 +250,97 @@ example (θ : TypeArgs) (outer : Carriers) (b : Bool)
   with
     trivial
 
+-- Inside an inlined generic callee (`Flow` at `(Skolems.instantiate θ Θ).toCarriers`),
+-- `verex_canonical_families` respells a closed, parameter-free descriptor's carrier
+-- to the outer family `Θ.toCarriers.toSorts` (the `coin::initialize` shape).
+-- `sealNode` peels the induced frame off `flowFamily` to state `Holds` at `Θ.toCarriers`.
+example (θ : TypeArgs) (Θ : Skolems unit) (b : Bool)
+    (left right : @NTy.carrier Θ.toCarriers.toSorts (.struct default .nil .nil))
+    (hLeft : @NTy.Holds Θ.toCarriers (.struct default .nil .nil) left)
+    (hRight : @NTy.Holds Θ.toCarriers (.struct default .nil .nil) right)
+    (env : @HEnv (Skolems.instantiate θ Θ).toCarriers.toSorts Γ) (state : Memory unit) :
+    wp (Result := @Flow (Skolems.instantiate θ Θ).toCarriers ρ Γ
+        (@NTy.carrier Θ.toCarriers.toSorts (.struct default .nil .nil)))
+      (if b then Spec.pure (@Flow.value (Skolems.instantiate θ Θ).toCarriers ρ Γ _ left env)
+        else Spec.pure (@Flow.value (Skolems.instantiate θ Θ).toCarriers ρ Γ _ right env))
+      (fun _ _ => True) (fun (_ : Failure) => False) state := by
+  check_join_family NTy.Holds Θ.toCarriers capturing noCapture pending 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
+-- The same peeling reaches the outer family across nested induced frames for a
+-- closed, parameter-free descriptor.
+example (θ₁ θ₂ : TypeArgs) (outer : Carriers) (b : Bool)
+    (left right : @NTy.carrier outer.toSorts (.struct default .nil .nil))
+    (hLeft : @NTy.Holds outer (.struct default .nil .nil) left)
+    (hRight : @NTy.Holds outer (.struct default .nil .nil) right)
+    (env : @HEnv (Carriers.instantiate θ₁ (Carriers.instantiate θ₂ outer)).toSorts Γ)
+    (state : Memory unit) :
+    wp (Result := @Flow (Carriers.instantiate θ₁ (Carriers.instantiate θ₂ outer)) ρ Γ
+        (@NTy.carrier outer.toSorts (.struct default .nil .nil)))
+      (if b then
+          Spec.pure (@Flow.value (Carriers.instantiate θ₁ (Carriers.instantiate θ₂ outer)) ρ Γ _ left env)
+        else
+          Spec.pure (@Flow.value (Carriers.instantiate θ₁ (Carriers.instantiate θ₂ outer)) ρ Γ _ right env))
+      (fun _ _ => True) (fun (_ : Failure) => False) state := by
+  check_join_family NTy.Holds outer capturing noCapture pending 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
+private abbrev twoBoolArgs : TypeArgs :=
+  ⟨.cons .bool (.cons .bool .nil), rfl⟩
+
+private abbrev splitValidity (outer : Carriers) : Carriers :=
+  { Carriers.instantiate twoBoolArgs outer with
+    holds := fun index _ => index == 0 }
+
+private abbrev swapZeroToOne : TypeArgs :=
+  ⟨.cons (.param 1) .nil, rfl⟩
+
+-- Non-identity substitution (`θ[0] = .param 1`) with equal operational carriers
+-- (`Bool`) but distinct validity (`param 0` has `True`, `param 1` has `False`):
+-- the receiving flow `Carriers.instantiate swapZeroToOne (splitValidity outer)`
+-- gives `param 0` the `False` validity of outer `param 1`, whereas a result
+-- spelled at outer `param 0` would read `True`. Because `.param 0` is not
+-- parameter-free, `sealNode` declines sharing rather than picking the ancestor.
+example (outer : Carriers) (b : Bool)
+    (left right : @NTy.carrier (splitValidity outer).toSorts (.param 0))
+    (_hLeft : @NTy.Holds (splitValidity outer) (.param 0) left)
+    (_hRight : @NTy.Holds (splitValidity outer) (.param 0) right)
+    (env : @HEnv (Carriers.instantiate swapZeroToOne (splitValidity outer)).toSorts Γ)
+    (state : Memory unit) :
+    wp (Result := @Flow (Carriers.instantiate swapZeroToOne (splitValidity outer)) ρ Γ
+        (@NTy.carrier (splitValidity outer).toSorts (.param 0)))
+      (if b then
+          Spec.pure (@Flow.value (Carriers.instantiate swapZeroToOne (splitValidity outer)) ρ Γ _ left env)
+        else
+          Spec.pure (@Flow.value (Carriers.instantiate swapZeroToOne (splitValidity outer)) ρ Γ _ right env))
+      (fun _ _ => True) (fun (_ : Failure) => False) state := by
+  check_join_family erasedCapture (Carriers.instantiate swapZeroToOne (splitValidity outer))
+    capturing noCapture pending 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
+-- When no ancestor on `flowFamily`'s induced chain matches `sorts` (even for a
+-- closed, parameter-free descriptor), `sealNode` declines sharing, publishes no
+-- shared summary or premises, and resumes both arrivals unshared.
+example (θ : TypeArgs) (Θ : Skolems unit) (unrelated : Carriers) (b : Bool)
+    (left right : @NTy.carrier unrelated.toSorts (.struct default .nil .nil))
+    (env : @HEnv (Skolems.instantiate θ Θ).toCarriers.toSorts Γ) (state : Memory unit) :
+    wp (Result := @Flow (Skolems.instantiate θ Θ).toCarriers ρ Γ
+        (@NTy.carrier unrelated.toSorts (.struct default .nil .nil)))
+      (if b then Spec.pure (@Flow.value (Skolems.instantiate θ Θ).toCarriers ρ Γ _ left env)
+        else Spec.pure (@Flow.value (Skolems.instantiate θ Θ).toCarriers ρ Γ _ right env))
+      (fun _ _ => True) (fun (_ : Failure) => False) state := by
+  check_join_family erasedCapture (Skolems.instantiate θ Θ).toCarriers
+    capturing noCapture pending 0 :
+    cases b <;> simp only [Bool.false_eq_true, if_false, if_true, wp_pure]
+  with
+    trivial
+
 end Controls
 
 end VerexIR.Tests.StageFamilyRecovery

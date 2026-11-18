@@ -2,6 +2,7 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 import Lean
+import VerexIR.Proofs.Denote.FamilyTransport
 import VerexIR.Proofs.Denote.Join
 import VerexIR.Proofs.Denote.NominalQuote
 import VerexIR.Proofs.Denote.VectorOperations
@@ -725,19 +726,50 @@ def partitionArrivals [BEq κ] (key : Arrival → κ) (arrivals : Array Arrival)
 private def mentionsAnyBinder (binders : Array Lean.Expr) (e : Lean.Expr) : Bool :=
   e.hasAnyFVar fun id => binders.any (·.fvarId! == id)
 
+/-- Whether a type descriptor is closed and parameter-free: spelled from `NTy`
+constructors and registered nominal descriptors with no `NTy.param`, free
+variable, or metavariable. Substitution is the identity on such a descriptor,
+so its validity at `Carriers.instantiate θ outer` equals its validity at
+`outer`. -/
+private def isClosedParamFreeNTy (τ : Lean.Expr) : MetaM Bool := do
+  let τ := τ.consumeMData
+  if τ.hasFVar || τ.hasMVar || (τ.find? (·.isAppOf ``NTy.param)).isSome then return false
+  return FamilyTransport.spelledNTy τ (some (← getEnv))
+
+/-- Whether a row descriptor is closed and parameter-free (`isClosedParamFreeNTy`). -/
+private def isClosedParamFreeNRow (Γ : Lean.Expr) : MetaM Bool := do
+  let Γ := Γ.consumeMData
+  if Γ.hasFVar || Γ.hasMVar || (Γ.find? (·.isAppOf ``NTy.param)).isSome then return false
+  return FamilyTransport.spelledNRow Γ (some (← getEnv))
+
 /-- The flow owns result and local validity. A capture instead retains its
 explicit origin; an erased origin cannot be recovered from equal operations.
-Parent equality checks representation only, never which predicates to use. -/
-private def semanticFamilyAtSorts (flowFamily sorts : Lean.Expr) (flowOwned : Bool) : OptionT MetaM Lean.Expr := do
+Parent equality checks representation only, never which predicates to use.
+When `verex_canonical_families` has peeled induced `Skolems.instantiate` or
+`Carriers.instantiate` frames off a closed, parameter-free descriptor's carrier
+type, peel the same induced frames off `flowFamily` to reach the ancestor family
+that types the respelled value; when the descriptor is not closed and
+parameter-free or no ancestor matches `sorts`, decline sharing and resume the
+arrivals unshared. -/
+private partial def semanticFamilyAtSorts (flowFamily sorts : Lean.Expr)
+    (flowOwned paramFree : Bool) : OptionT MetaM Lean.Expr := do
   let sorts := sorts.consumeMData
   unless flowOwned do
     if sorts.isAppOfArity ``Carriers.toSorts 1 then return sorts.getArg! 0
     -- Without an origin, resume these arrivals separately.
     failure
-  let parent := mkApp (mkConst ``Carriers.toSorts) flowFamily
-  unless ← withNewMCtxDepth (isDefEq sorts parent) do
-    throwError "a shared continuation value has no semantic family in its flow"
-  return flowFamily
+  let mut current := flowFamily.consumeMData
+  let mut peeled := false
+  repeat
+    let parent := mkApp (mkConst ``Carriers.toSorts) current
+    if ← withNewMCtxDepth (isDefEq sorts parent) then
+      if peeled && !paramFree then failure
+      return current
+    let some (_, outer) := FamilyTransport.inducedCarriers? current
+      | failure
+    current := outer.consumeMData
+    peeled := true
+  unreachable!
 
 /-- Collect mandatory `Holds` obligations for non-`invariantFree` components
 of `shaped` that vary across arrivals (mention at least one binder in `binders`).
@@ -762,7 +794,7 @@ private partial def collectHoldsSpecs (carriers : Lean.Expr) (flowOwned : Bool)
       let restType := mkApp2 (mkConst ``HEnv) sorts rest
       return (← collectHoldsSpecs carriers flowOwned binders slotType (shaped.getArg! 2)) ++
         (← collectHoldsSpecs carriers flowOwned binders restType (shaped.getArg! 3))
-    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned
+    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned (← isClosedParamFreeNRow Γ)
     return #[mkApp3 (mkConst ``HEnv.Holds) carriers Γ shaped]
   if type.isAppOfArity ``HList 2 then
     let (sorts, Γ) := (type.getArg! 0, type.getArg! 1)
@@ -773,7 +805,7 @@ private partial def collectHoldsSpecs (carriers : Lean.Expr) (flowOwned : Bool)
       let (τ, rest) := (Γ'.getArg! 0, Γ'.getArg! 1)
       return (← collectHoldsSpecs carriers flowOwned binders (mkApp2 (mkConst ``NTy.carrier) sorts τ) (shaped.getArg! 2)) ++
         (← collectHoldsSpecs carriers flowOwned binders (mkApp2 (mkConst ``HList) sorts rest) (shaped.getArg! 3))
-    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned
+    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned (← isClosedParamFreeNRow Γ)
     return #[mkApp3 (mkConst ``HList.Holds) carriers Γ shaped]
   if type.isAppOfArity ``Option 1 then
     let elemType := (type.getArg! 0).consumeMData.headBeta
@@ -783,7 +815,7 @@ private partial def collectHoldsSpecs (carriers : Lean.Expr) (flowOwned : Bool)
     if elemType.isAppOfArity ``NTy.carrier 2 then
       let (sorts, τ) := (elemType.getArg! 0, elemType.getArg! 1)
       if ← isInvariantFreeNTy τ then return #[]
-      let carriers ← semanticFamilyAtSorts carriers sorts flowOwned
+      let carriers ← semanticFamilyAtSorts carriers sorts flowOwned (← isClosedParamFreeNTy τ)
       return #[mkApp3 (mkConst ``Slot.Holds) carriers τ shaped]
     return #[]
   if type.isAppOfArity ``ResultShape.carrier 2 then
@@ -792,7 +824,7 @@ private partial def collectHoldsSpecs (carriers : Lean.Expr) (flowOwned : Bool)
     if shape'.isAppOfArity ``ResultShape.none 0 then return #[]
     if shape'.isAppOfArity ``ResultShape.one 1 then
       return ← collectHoldsSpecs carriers flowOwned binders (mkApp2 (mkConst ``NTy.carrier) sorts (shape'.getArg! 0)) shaped
-    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned
+    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned false
     return #[mkApp3 (mkConst ``ResultShape.Holds) carriers shape shaped]
   if type.isAppOfArity ``NTy.carrier 2 then
     let (sorts, τ) := (type.getArg! 0, type.getArg! 1)
@@ -803,7 +835,7 @@ private partial def collectHoldsSpecs (carriers : Lean.Expr) (flowOwned : Bool)
       return ← collectHoldsSpecs carriers flowOwned binders (mkApp2 (mkConst ``NTy.carrier) sorts σ) (shaped.getArg! 3)
     if τ'.isAppOfArity ``NTy.tuple 1 && shaped.isAppOfArity ``Prod.mk 4 then
       return ← collectHoldsSpecs carriers flowOwned binders (mkApp2 (mkConst ``HList) sorts (τ'.getArg! 0)) shaped
-    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned
+    let carriers ← semanticFamilyAtSorts carriers sorts flowOwned (← isClosedParamFreeNTy τ)
     return #[mkApp3 (mkConst ``NTy.Holds) carriers τ shaped]
   if type.isAppOfArity ``Prod 2 && shaped.isAppOfArity ``Prod.mk 4 then
     return (← collectHoldsSpecs carriers flowOwned binders (type.getArg! 0) (shaped.getArg! 2)) ++

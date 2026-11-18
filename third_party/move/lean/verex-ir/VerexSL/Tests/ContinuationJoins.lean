@@ -253,6 +253,30 @@ verex module 0x42::continuation_joins where
     aborts_if false
     ensures result == if n == 0 then 0 else if b then 1 else 2
 
+  struct Meter has Copy, Drop, Store where
+    value : u64
+  spec Meter where
+    invariant value <= 100
+
+  fun make_meter {T}(value : u64) -> Meter := new Meter { value }
+  spec make_meter where
+    pragma opaque = true
+    pragma verify = false
+    requires value <= 100
+    aborts_if false
+    ensures result.value == value
+
+  fun select_meter_internal {T}(b : Bool, bonus : u64) -> u64 := do
+    let chosen := if b then make_meter::<T>(10) else make_meter::<T>(20)
+    chosen.value + bonus
+
+  fun select_meter {T}(b : Bool, bonus : u64) -> u64 :=
+    select_meter_internal::<T>(b, bonus)
+  spec select_meter where
+    requires bonus <= 50
+    aborts_if false
+    ensures result == (if b then 10 else 20) + bonus
+
 -- These are measurements of the current path traversal, not a target for
 -- the join scheduler. Its implementation should reduce the dynamic folds
 -- and arrivals while preserving the checked specifications.
@@ -281,6 +305,8 @@ set_option verex.sharedContinuations true in
 verify 0x42::continuation_joins::nested
 set_option verex.sharedContinuations true in
 verify 0x42::continuation_joins::call_after
+#guard_joins "nodes 1, edges 2, summaries 1, proofs 1" in
+  verify 0x42::continuation_joins::select_meter
 
 -- Both clauses use the same integer certificate, prepared once before
 -- their proof destinations split. Each receives the shared debit.

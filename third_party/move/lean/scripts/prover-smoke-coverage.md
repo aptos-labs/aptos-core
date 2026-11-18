@@ -89,6 +89,7 @@ of the fixture that fails when the class regresses.
 | | the module's invariants where a publication's write ends | `rendered condition_kinds`: `publish_flag` |
 | | one site's two conditions read by their own markers, and a condition that is no predicate | `VerexIR/Tests/GivenWalker`: `markers_of_two_kinds`, `malformed_mutation_end` (`lake test` runs it; the internal malformed-obligation error is fail-closed) |
 | R20 a match on a pair of a resource and an argument, followed by a closure invoke | the split reduces constructor readings (`withSome_some`, `withSome_none`); `process` and `plain` verify (the component-equation mechanism at the join is supported by source; individual join leaves were not traced) | `rendered split_pair_frame`: `process`, `plain`; `VerexIR/Tests/SplitOptionReadings` |
+| R21 a join inside an inlined generic callee whose branched value has a closed, parameter-free invariant-bearing type | `verex_canonical_families` respells the value's carrier to the outer family while the `Flow` stays at `Skolems.instantiate`; `sealNode` peels the induced frame off the flow family when the descriptor is closed and parameter-free, and declines sharing when the descriptor mentions type parameters | `VerexSL/Tests/ContinuationJoins`: `select_meter`; `VerexIR/Tests/StageFamilyRecovery` |
 
 Negative companions: where a class is represented by a positive rendering
 (`static_step`, `static_fnonce`, `fnonce_forward`), the `_errors` fixtures
