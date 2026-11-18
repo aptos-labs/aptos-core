@@ -94,6 +94,12 @@ pub struct RocksdbOpt {
         Required for a DB a node will run with storage.rocksdb_configs.enable_trading_native."
     )]
     enable_trading_native: bool,
+    #[clap(
+        long,
+        help = "Write only the last write to each key within a block to the state KV DB. See \
+        storage.rocksdb_configs.squash_state_kv_writes_per_block."
+    )]
+    squash_state_kv_writes_per_block: bool,
 }
 
 impl From<RocksdbOpt> for RocksdbConfigs {
@@ -126,6 +132,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
             },
             shared_block_cache_size: opt.block_cache_size,
             enable_trading_native: opt.enable_trading_native,
+            squash_state_kv_writes_per_block: opt.squash_state_kv_writes_per_block,
             ..Default::default()
         }
     }
