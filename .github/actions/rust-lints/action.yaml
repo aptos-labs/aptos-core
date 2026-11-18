@@ -13,6 +13,12 @@ runs:
     # Run the pre-commit checks
     - uses: pre-commit/action@v3.0.0
 
+    - name: Print cargo-machete version
+      shell: bash
+      run: |
+        command -v cargo-machete
+        cargo machete --version
+
     # Run the rust linters and cargo checks
     - name: Run cargo sort and rust lint checks
       shell: bash
