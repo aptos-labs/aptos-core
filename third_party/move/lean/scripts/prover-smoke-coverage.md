@@ -111,7 +111,7 @@ component.
 | the generated bridge of an own invariant | `VerexSL/Tests/OwnBridgeGenerated`, `VerexSL/Tests/OwnBridgeLeaves` |
 | the domain a call binds its result at | `VerexSL/Tests/CallResultDomains`, `VerexSL/Tests/CallResultHolds` |
 | woven behaviors under a captured row's fact | `VerexSL/Tests/GuardedWovenReadings` |
-| the theorems a rendered fixture advertises, beside its diagnostics | `VerexSL/Tests/MiniAmmPositives`, `VerexSL/Tests/MapDefaultPositives`, `VerexSL/Tests/ConditionKindPositives` |
+| the theorems a rendered fixture advertises, beside its diagnostics | `VerexSL/Tests/MiniAmmPositives`, `VerexSL/Tests/MapDefaultPositives`, `VerexSL/Tests/ConditionKindPositives`, `VerexSL/Tests/ParkedGaps` |
 | a literal map read whose default names a local family: a position inside it and a key with an entry evaluate, one outside and one without do not | `VerexSL/Tests/LiteralMaps` |
 | a clause's concatenation with a singleton vector rewrites to append; the values of a nest read push steps as well as append steps | `VerexSL/Tests/ClauseSingletonConcat` |
 | an element appended to a literal vector evaluates to the literal extended by that element | `VerexSL/Tests/LiteralVectorPush` |
@@ -127,7 +127,8 @@ Each is the rendering `scripts/prover-smoke-renderings.sh` writes, unedited.
 The generator refuses a fixture whose diagnostics the driver makes and a lone
 elaboration cannot: a failing `no panic` or `no abort` report, a refused
 function, a proof file beside the source, a verified namespace before the
-last.
+last. Four further renderings are the reproducers of the section "Parked
+gaps" below, which lists them instead of this table.
 
 | Fixture | Stands for | Why no hand-written cell |
 |---|---|---|
@@ -143,6 +144,27 @@ last.
 | `map_size_update` | a law of the library applied by name in an authored `lean` block: `SpecMap.size_update_sequence_{present,absent}` against the size an assertion owes after the owner's own `add` | the same route; the fact is of the map the executable role leaves, which only a frontend's rendering of that call produces |
 | `condition_kinds` | the conditions of more than one kind that one expression owes: a mutable borrow of a resource owes the module's invariants where its write of memory ends and the resource's data invariant where its mutation ends, with a carried and an uncarried declaration and a publication, and a negative for each kind | the sites are the Move frontend's, which keys the write and the mutation of one borrow alike; a hand-written unit cannot state that collision |
 | `mini_amm` | an automated market maker's rules as behavioural invariants of a function-typed field, quantified over every state: the pack, a caller that uses them, the pack's negatives, two named cases of the states the binder ranges over in a unit that also carries an ordinary data invariant, and the three storage observations (a reference parameter, a specification global read, the stored-invariant obligation after the call) | the wrapper is a Move tuple struct whose field is a function type and whose `spec` carries `modifies_of<self.0> *`; the positional field and the state binder are what the Move frontend writes, and `shapes KnownClosures` has no behavioural invariant |
+
+## Parked gaps
+
+Four rendered fixtures hold a target the solver does not verify, kept as the
+reproducer of a gap the user parked rather than repaired. A row here is a
+recorded failure, not a regression class the suite guards: the baseline
+records the diagnostics the gap produces today, and nothing in the suite
+says the solver ought to behave that way. Each fixture also holds a control
+that exercises the same construct without the gap, so the row distinguishes
+the gap from a broken construct; `VerexSL/Tests/ParkedGaps` asserts that
+each gap has no verified theorem and each control has one, and so fails and
+names the fixture once a repair closes the gap. The fixture is then promoted:
+its row leaves this section for the regression classes above, its target
+becomes a control in that test, and its baseline is written again.
+
+| Fixture: gap, control | Mechanism | What it stands for |
+|---|---|---|
+| `rendered split_reference_end`: `drain`, control `drain_automatic` | the end of a `&mut` of the whole vector splits on the loop's state, and the split leaves a pattern equation that is not in normal form, so the authored `compute` keeps a `data_invariant` leaf | `simple_map::add_all` of the benchmark; the same loop by the automatic route verifies |
+| `rendered split_pair_frame`: `process`, control `plain` | the same split under a match on a pair, where the closure invoke drops the equations the split left and the target stops on a residual obligation | `calculator::process` of the benchmark; a module-level `pragma verify = false` takes the target off this route, so the fixture does not disable module verification |
+| `rendered generic_join_ghost`: `settle_token`, control `pick_amount` | the unit declares a spec ghost, so a generic callee runs in its caller's walk: what the join owes of the values it abstracts is stated at the carriers the type arguments induce, while the arriving paths state their facts at the caller's | 17 rows of `coin`, `fungible_asset` and `primary_fungible_store` in the framework sample; a join of plain values owes nothing at the induced family and verifies |
+| `rendered pure_spec_map_fact`: `v_len_set` and `v_set_param`, control `v_rank_nonneg` | at a spec-only map owner, the length-update lemma and the precondition equating a parameter with an updated map do not close these authored assertions; the parameter-map rank control verifies. The failing contexts include True hypotheses, but the first lost correspondence and cause remain unlocalized. | no benchmark or framework row is attributed to it: the mechanism is recorded by this reproducer alone |
 
 ## Costs
 

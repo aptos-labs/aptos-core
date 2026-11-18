@@ -1,0 +1,77 @@
+VerexE2ETests/SourceVerify/pure_spec_map_fact.proof.lean:10:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  k v : (Proofs.Denote.NTy.int 64 false).carrier
+  m_handle : Proofs.Denote.NTy.address.carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed permitted : True
+  k_lower : 0 ≤ k
+  k_upper : k ≤ 2 ^ 64 - 1
+  v_lower : 0 ≤ v
+  v_upper : v ≤ 2 ^ 64 - 1
+  m : SpecMap Int Int
+  m_valid :
+    (0x1.pure_spec_map_fact.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (m_handle,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        PUnit.unit)
+  m_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) m) ==
+      m
+  verexInvariant : SpecMap.Valid (SpecMap.Discipline.ordered SpecMap.intOrder) m
+  m_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_size_bounds_1 : 0 ≤ spec_len(m)
+  m_size_bounds_2 : spec_len(m) < 18446744073709551616
+  ⊢ spec_len(m) ≤
+      spec_len(SpecMap.ofEntries SpecInt.val SpecInt.val
+          (SpecMap.writeBack
+            (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd))
+            spec_set(m, k, v)))
+VerexE2ETests/SourceVerify/pure_spec_map_fact.proof.lean:9:8: error: verex verification failed: the proof of `v_len_set` does not establish its specification
+VerexE2ETests/SourceVerify/pure_spec_map_fact.proof.lean:16:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  k : (Proofs.Denote.NTy.int 8 false).carrier
+  v : (Proofs.Denote.NTy.int 64 false).carrier
+  m : ((Proofs.Denote.NTy.int 8 false).table (Proofs.Denote.NTy.int 64 false)).carrier
+  n_handle : Proofs.Denote.NTy.address.carrier
+  initialState✝ : Proofs.Denote.Memory unit
+  assumed : True
+  verexInvariant✝ :
+    SpecMap.Valid (SpecMap.Discipline.ordered SpecMap.intOrder) (SpecMap.ofEntries SpecInt.val SpecInt.val m)
+  bounds : m.entries.length < 2 ^ 64
+  k_lower : 0 ≤ k
+  k_upper : k ≤ 2 ^ 8 - 1
+  v_lower : 0 ≤ v
+  v_upper : v ≤ 2 ^ 64 - 1
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  n : SpecMap Int Int
+  n_valid :
+    (0x1.pure_spec_map_fact.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 8 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (n_handle,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 8 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          n,
+        PUnit.unit)
+  n_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) n) ==
+      n
+  verexInvariant : SpecMap.Valid (SpecMap.Discipline.ordered SpecMap.intOrder) n
+  n_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 8) false) n
+  n_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) n
+  n_size_bounds_1 : 0 ≤ spec_len(n)
+  n_size_bounds_2 : spec_len(n) < 18446744073709551616
+  left✝ : 0 ≤ spec_get(n, k)
+  right✝ : spec_get(n, k) ≤ 18446744073709551615
+  ⊢ spec_get(n, k) == v
+VerexE2ETests/SourceVerify/pure_spec_map_fact.proof.lean:15:8: error: verex verification failed: the proof of `v_set_param` does not establish its specification

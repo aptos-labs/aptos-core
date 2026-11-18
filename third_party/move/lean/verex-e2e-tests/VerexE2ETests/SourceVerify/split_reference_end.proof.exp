@@ -1,0 +1,37 @@
+VerexE2ETests/SourceVerify/split_reference_end.proof.lean:10:3: error: `decide` does not close the obligation from the block's facts:
+  case data_invariant
+  Θ✝ : Proofs.Denote.Skolems unit
+  typeInstantiation✝ : Array (TypeId × TypeId)
+  frame✝¹ :
+    Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } } [BinderKind.typeArg]
+      typeInstantiation✝
+  old_v : (Proofs.Denote.NTy.param 0).vector.carrier
+  assumed permitted : True
+  v_valid : (Proofs.Denote.NTy.param 0).vector.Holds old_v
+  state✝ : Proofs.Denote.Memory unit
+  fst✝² : Option (Proofs.Denote.NTy.param 0).carrier
+  fst✝¹ : Option (Proofs.Denote.NTy.param 0).vector.carrier
+  v : (Proofs.Denote.NTy.param 0).vector.carrier
+  n : (Proofs.Denote.NTy.int 64 false).carrier
+  left✝⁴ : fst✝².elim True fun value => (Proofs.Denote.NTy.param 0).Holds value
+  left✝³ : fst✝¹.elim True fun value => (Proofs.Denote.NTy.param 0).vector.Holds value
+  frame✝ : (Proofs.Denote.NTy.param 0).vector.Holds v
+  n_upper : n ≤ 0
+  a✝ : v.values.size == 0
+  value✝ : (Proofs.Denote.NTy.param 0).carrier
+  fst✝ snd✝ : (Proofs.Denote.NTy.param 0).vector.carrier
+  left✝² : (Proofs.Denote.NTy.param 0).vector.Holds fst✝
+  right✝² : (Proofs.Denote.NTy.param 0).vector.Holds snd✝
+  w✝ : Int
+  left✝¹ : 0 ≤ w✝
+  left✝ : w✝ < ↑fst✝.values.size
+  right✝¹ : fst✝.values[w✝.toNat]? == some value✝
+  bounds✝² : old_v.values.size < 2 ^ 64
+  bounds✝¹ : fst✝.values.size < 2 ^ 64
+  bounds✝ : snd✝.values.size < 2 ^ 64
+  invariant_1 : n == ↑0
+  n_lower : 0 ≤ n
+  right✝ : n ≤ 18446744073709551615
+  bounds : True
+  ⊢ (Proofs.Denote.NTy.param 0).Holds value✝
+VerexE2ETests/SourceVerify/split_reference_end.proof.lean:9:8: error: verex verification failed: the proof of `drain` does not establish its specification

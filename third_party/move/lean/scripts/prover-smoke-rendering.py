@@ -73,10 +73,12 @@ frontend renders and what the proof file says."""
 # whose verification the driver defers to an adjacent `.proof.lean` is
 # refused as a snapshot; one named here is rendered as a single module with
 # the proofs in it, so that an authored proof is gated by the libraries
-# alone. Each named fixture gives every cell of it a block, so that no
-# message defers to the proof file by name (`DEFERRED`), which a lone
-# elaboration words differently.
-PROOF_CONSUMERS = ("map_key_default", "map_value_default", "map_size_update")
+# alone. A cell without an authored block must verify automatically, so no
+# `DEFERRED` diagnostic needs rewriting. A named fixture gives every authored
+# cell a block; cells left without one are those expected to verify on their
+# own (such as `split_reference_end`'s `drain_automatic`).
+PROOF_CONSUMERS = ("map_key_default", "map_value_default", "map_size_update",
+                   "split_reference_end", "pure_spec_map_fact")
 
 # The import a proof file of this mode carries.
 PROOF_IMPORT = "import VerexMove.Proofs"

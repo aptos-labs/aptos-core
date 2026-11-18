@@ -103,7 +103,9 @@ IR_TESTS=(
 # at, guarded woven behaviors, a nested read under a pinned budget, the
 # element a successful read of a typed literal lookup yields, a range goal
 # stated on a named result, a read of a written vector at a position the
-# write leaves alone, and the conditions of two kinds one site owes.
+# write leaves alone, the conditions of two kinds one site owes, and four
+# fixtures with nine named cells (five gaps, four controls) that the parked
+# gaps leave unverified beside the controls of their constructs.
 BOUNDARY_TESTS=(
   VerexIR/Tests/VectorElementReads.lean
   VerexSL/Tests/ExecutableVectorReads.lean
@@ -128,6 +130,7 @@ BOUNDARY_TESTS=(
   VerexSL/Tests/MapDefaultPositives.lean
   VerexSL/Tests/MapSizeUpdatePositives.lean
   VerexSL/Tests/ConditionKindPositives.lean
+  VerexSL/Tests/ParkedGaps.lean
   VerexSL/Tests/ClauseSingletonConcat.lean
   VerexSL/Tests/LiteralVectorPush.lean
   VerexSL/Tests/CanonicalMapValidity.lean
@@ -154,6 +157,10 @@ RENDERED=(
   map_value_default
   map_size_update
   condition_kinds
+  split_reference_end
+  split_pair_frame
+  generic_join_ghost
+  pure_spec_map_fact
 )
 # Check fixtures of verex-e2e-tests (VerexE2ETests/Check/<name>.lean), each
 # elaborated as the Check driver elaborates it. These print nothing.
