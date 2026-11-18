@@ -7,10 +7,12 @@ use libfuzzer_sys::{fuzz_target, Corpus};
 // mod utils;
 use move_binary_format::{
     deserializer::DeserializerConfig,
+    errors::BinaryLoaderResult,
     file_format::{CompiledModule, CompiledScript},
     file_format_common::VERSION_MAX,
 };
 use move_vm_types::natives::function::StatusCode;
+use std::fmt::Debug;
 
 #[derive(Arbitrary, Debug)]
 enum ExecVariant {
@@ -77,24 +79,66 @@ fn run_case_script(script: &CompiledScript) -> Corpus {
     }
 }
 
-fn run_case_raw(raw_data: &Vec<u8>) -> Corpus {
-    if let Ok(m) = CompiledModule::deserialize_with_config(raw_data, &DeserializerConfig::default())
-    {
+// The binary format admits several encodings of the same module or script (e.g., trailing bytes,
+// table order, version mask bits), so the round trip is checked on the deserialized value, not on
+// bytes.
+fn run_case_raw(raw_data: &[u8]) -> Corpus {
+    let config = DeserializerConfig::default();
+    let strict_config = DeserializerConfig {
+        reject_trailing_bytes: true,
+        ..config.clone()
+    };
+
+    let module = CompiledModule::deserialize_with_config(raw_data, &config);
+    check_strict_against_lenient(
+        &module,
+        &CompiledModule::deserialize_with_config(raw_data, &strict_config),
+    );
+    if let Ok(module) = module {
         let mut module_code = vec![];
-        m.serialize_for_version(Some(VERSION_MAX), &mut module_code)
+        module
+            .serialize_for_version(Some(VERSION_MAX), &mut module_code)
             .unwrap();
-        assert_eq!(*raw_data, module_code);
+        // The serializer must not emit trailing bytes, so its output is deserialized strictly.
+        let mut reserialized =
+            CompiledModule::deserialize_with_config(&module_code, &strict_config)
+                .expect("Serialized module must deserialize");
+        reserialized.version = module.version;
+        assert_eq!(module, reserialized);
         return Corpus::Keep;
     }
 
-    if let Ok(s) = CompiledScript::deserialize_with_config(raw_data, &DeserializerConfig::default())
-    {
+    let script = CompiledScript::deserialize_with_config(raw_data, &config);
+    check_strict_against_lenient(
+        &script,
+        &CompiledScript::deserialize_with_config(raw_data, &strict_config),
+    );
+    if let Ok(script) = script {
         let mut script_code = vec![];
-        s.serialize_for_version(Some(VERSION_MAX), &mut script_code)
+        script
+            .serialize_for_version(Some(VERSION_MAX), &mut script_code)
             .unwrap();
-        assert_eq!(*raw_data, script_code);
+        let mut reserialized =
+            CompiledScript::deserialize_with_config(&script_code, &strict_config)
+                .expect("Serialized script must deserialize");
+        reserialized.version = script.version;
+        assert_eq!(script, reserialized);
         return Corpus::Keep;
     }
 
     Corpus::Reject
+}
+
+/// Rejecting trailing bytes may only turn a successful deserialization into a `MALFORMED` error.
+fn check_strict_against_lenient<T: PartialEq + Debug>(
+    lenient: &BinaryLoaderResult<T>,
+    strict: &BinaryLoaderResult<T>,
+) {
+    match (lenient, strict) {
+        (Ok(lenient), Ok(strict)) => assert_eq!(lenient, strict),
+        (Ok(_), Err(err)) => assert_eq!(err.major_status(), StatusCode::MALFORMED),
+        (Err(_), Ok(_)) => panic!("Strict deserialization accepted a binary rejected leniently"),
+        // Errors may differ: the trailing-bytes check can fail before bounds checks run.
+        (Err(_), Err(_)) => {},
+    }
 }

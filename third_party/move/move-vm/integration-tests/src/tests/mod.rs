@@ -37,6 +37,7 @@ mod nested_loop_tests;
 mod regression_tests;
 mod return_value_tests;
 mod runtime_reentrancy_check_tests;
+mod trailing_bytes_tests;
 mod vm_arguments_tests;
 
 /// Given code string, compiles it, serializes and adds to storage. Natives are

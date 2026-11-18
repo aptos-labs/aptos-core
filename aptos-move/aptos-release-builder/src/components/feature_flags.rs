@@ -183,6 +183,7 @@ pub enum FeatureFlag {
     DisableEagerModuleInitialization,
     CheckPhantomParamsBehindReferences,
     CheckBorrowFieldHandleShape,
+    RejectTrailingBytesInIncomingCode,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -481,6 +482,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CheckBorrowFieldHandleShape => {
                 AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE
             },
+            FeatureFlag::RejectTrailingBytesInIncomingCode => {
+                AptosFeatureFlag::REJECT_TRAILING_BYTES_IN_INCOMING_CODE
+            },
         }
     }
 }
@@ -705,6 +709,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE => {
                 FeatureFlag::CheckBorrowFieldHandleShape
+            },
+            AptosFeatureFlag::REJECT_TRAILING_BYTES_IN_INCOMING_CODE => {
+                FeatureFlag::RejectTrailingBytesInIncomingCode
             },
         }
     }
