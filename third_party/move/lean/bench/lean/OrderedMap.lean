@@ -100,7 +100,7 @@ verex module 0x42::ordered_map where
   verify! lower_bound_loop by lean =>
     verex_obligations
     all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
-    case requires_3_of_lower_bound_loop_1 =>
+    case requires_3_of_lower_bound_loop_at_call_2 =>
       apply search_above (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (high := high.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first
@@ -108,7 +108,7 @@ verex module 0x42::ordered_map where
         | omega
         | infer_instance
         | (rw [‹(_ : Array _)[_]? = some _›]; assumption)
-    case requires_2_of_lower_bound_loop_2 =>
+    case requires_2_of_lower_bound_loop_at_call_1 =>
       apply search_below (order := VerexIR.Proofs.Denote.TypedOrder.order _ _) (i := i) (low := low.val)
         (middle := low.val + (high.val - low.val) / 2)
       all_goals first

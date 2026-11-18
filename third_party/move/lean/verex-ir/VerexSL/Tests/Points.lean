@@ -88,6 +88,38 @@ verex module 0x42::points where
     | invariant_1_step => verex_prepare values; all_goals (have _ := stepping; omega)
     | _ => verex_solve
 
+-- A generic call (`callGeneric` / `specializedMeaning`) goes through `bindStep`
+-- before `callStep`; `bindStep` preserves `callSite` so `after call 1 of ...`
+-- reaches the point after the generic call.
+/--
+trace: after generic call
+-/
+#guard_msgs in
+verex module 0x42::points_generic_call where
+  fun generic_inc {T has Copy, Drop}(_tag : T, x : u64) -> u64 := x + 1
+  spec generic_inc where
+    pragma opaque
+    aborts_if x + 1 > 18446744073709551615
+    ensures result == x + 1
+
+  fun calls_generic {T has Copy, Drop}(tag : T, x : u64, flag : Bool) -> u64 := do
+    let y := generic_inc::<T>(tag, x)
+    if flag then y else x
+  spec calls_generic where
+    requires x < 100
+    aborts_if false
+    ensures result >= x
+
+  verify calls_generic by lean =>
+    verex_obligations
+      after call 1 of generic_inc =>
+        have called : generic_inc_result.val = x.val + 1 := by
+          simp only [VerexIR.Proofs.Obligation_eq] at *; omega
+        trace "after generic call"
+    verex_on
+    | ensures_1 => verex_prepare values; all_goals (have _ := called; omega)
+    | _ => verex_solve
+
 -- A hook at a point no path reaches is an error of the proof.
 /--
 error: no path reaches the point `after op 1`

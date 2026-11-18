@@ -44,7 +44,7 @@
 pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::add 88008095
 pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::remove 67906876
 pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::borrow 42320704
-pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::lower_bound_loop 47732831
+pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::lower_bound_loop 43897059
 pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::lookup_scenario 109881098
 pin   ../bench/lean/OrderedMap.lean «0x42».ordered_map::remove_edges_scenario 185951383
 # Relative cost, not a size pair: three insertions and a borrow of a present

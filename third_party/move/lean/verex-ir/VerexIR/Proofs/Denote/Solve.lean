@@ -1804,7 +1804,7 @@ private def bindStep (ctx : SolveContext) (step : SolveStep) : SolveM Bool := do
     logInfo m!"bind {action}{if branches then " (branching)" else ""}: rule \
       {(ruled - stageStart) / 1000}k, fold {(folded - ruled) / 1000}k, normalize \
       {((← IO.getNumHeartbeats) - folded) / 1000}k{if changed then "" else " (unchanged)"}"
-  queue (← getGoals) provenance clauses
+  queue (← getGoals) provenance clauses (callSite := step.callSite)
   charge "bind" stageStart
   return true
 

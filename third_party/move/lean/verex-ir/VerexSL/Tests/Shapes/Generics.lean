@@ -357,7 +357,7 @@ verify 0x42::shapes_generics::recursive_instance_ok
 
 run_cmd do
   expectOpen `«0x42».shapes_generics.fn_ok
-    "the precondition of `apply` is not established"
+    "the precondition of `apply` at call 1 is not established"
     (← `(command| verify 0x42::shapes_generics::fn_ok))
 
 end VerexSL.Tests.Shapes.Generics
