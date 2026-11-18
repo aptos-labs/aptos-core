@@ -13,7 +13,7 @@ use aptos_types::{
 };
 use arr_macro::arr;
 use rayon::prelude::*;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 #[derive(Clone, Debug)]
 pub struct PerVersionStateUpdateRefs<'kv> {
@@ -73,6 +73,38 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
             num_versions,
         }
     }
+
+    /// Keeps only the last value write to each key in each block, in the same order. `block_ends`
+    /// are the blocks' last versions, ascending. Versions after the last one form one more block.
+    pub fn last_value_writes_per_block(&self, block_ends: &[Version]) -> Self {
+        let _timer = TIMER.timer_with(&["index_state_updates__last_value_writes_per_block"]);
+
+        let mut shards = arr![Vec::new(); 16];
+        shards
+            .par_iter_mut()
+            .zip_eq(self.shards.par_iter())
+            .for_each(|(kept, updates)| {
+                let mut seen = HashSet::new();
+                let mut block_ends = block_ends.iter().rev().peekable();
+                for (key, update) in updates.iter().rev() {
+                    if block_ends.peek().is_some_and(|end| update.version <= **end) {
+                        // Entered an earlier block.
+                        seen.clear();
+                        while block_ends.next_if(|end| update.version <= **end).is_some() {}
+                    }
+                    if update.state_op.is_value_write_op() && seen.insert(*key) {
+                        kept.push((*key, update.clone()));
+                    }
+                }
+                kept.reverse();
+            });
+
+        Self {
+            first_version: self.first_version,
+            num_versions: self.num_versions,
+            shards,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -129,7 +161,7 @@ pub struct StateUpdateRefs<'kv> {
 }
 
 impl<'kv> StateUpdateRefs<'kv> {
-    pub(crate) fn all_checkpoint_versions(&self) -> &[Version] {
+    pub fn all_checkpoint_versions(&self) -> &[Version] {
         &self.all_checkpoint_versions
     }
 
@@ -339,6 +371,63 @@ mod tests {
         let b = batched.get("B").unwrap();
         assert_eq!(b.version, 1);
         assert!(!b.state_op.is_value_write_op());
+    }
+
+    #[test]
+    fn test_last_value_writes_per_block() {
+        let key = |k: &str| StateKey::raw(k.as_bytes());
+        let v10 = write_set(&[("A", "A0"), ("B", "B0")]);
+        let mut v11 = write_set(&[("A", "A1")]);
+        v11.add_hotness([key("C")].into());
+        let v12 = WriteSetMut::from_iter([
+            (
+                key("A"),
+                WriteOp::legacy_modification(Bytes::from_static(b"A2")),
+            ),
+            (key("B"), WriteOp::legacy_deletion()),
+        ])
+        .freeze()
+        .unwrap();
+        let mut v13 = write_set(&[("B", "B3")]);
+        v13.add_hotness([key("A")].into());
+        let v14 = write_set(&[("A", "A4")]);
+        let refs =
+            StateUpdateRefs::index_write_sets(10, vec![&v10, &v11, &v12, &v13, &v14], 5, vec![
+                1, 3, 4,
+            ]);
+
+        let kept_writes = |block_ends: &[Version]| {
+            let kept = refs.per_version.last_value_writes_per_block(block_ends);
+            assert_eq!(kept.first_version, 10);
+            assert_eq!(kept.num_versions, 5);
+            let mut writes = vec![];
+            for shard in &kept.shards {
+                assert!(shard.is_sorted_by_key(|(k, u)| (u.version, *k.crypto_hash_ref())));
+                writes.extend(shard.iter().map(|(k, u)| {
+                    assert!(u.state_op.is_value_write_op());
+                    (u.version, (*k).clone())
+                }));
+            }
+            writes.sort();
+            writes
+        };
+
+        // Hotness ops are dropped, and so are B's deletion at 12 and the first write to A.
+        assert_eq!(kept_writes(refs.all_checkpoint_versions()), vec![
+            (10, key("B")),
+            (11, key("A")),
+            (12, key("A")),
+            (13, key("B")),
+            (14, key("A")),
+        ]);
+        // Versions after the last block end form one more block.
+        assert_eq!(kept_writes(&[11]), vec![
+            (10, key("B")),
+            (11, key("A")),
+            (13, key("B")),
+            (14, key("A")),
+        ]);
+        assert_eq!(kept_writes(&[]), vec![(13, key("B")), (14, key("A"))]);
     }
 
     /// Each shard's per-version vec must be ordered by `(version, key_hash)`.
