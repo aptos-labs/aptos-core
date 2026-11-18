@@ -89,6 +89,7 @@ use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
+    borrow::Cow,
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
@@ -199,6 +200,7 @@ pub(crate) struct StateStore {
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
     pub hot_state_config: HotStateConfig,
+    squash_state_kv_writes_per_block: bool,
 }
 
 /// In-memory state loaded from the latest snapshot on disk, and the pipeline persisting newer
@@ -396,6 +398,7 @@ impl StateStore {
         skip_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
+        squash_state_kv_writes_per_block: bool,
     ) -> Self {
         if mode == StateStoreMode::ReadWrite {
             Self::sync_commit_progress(
@@ -440,6 +443,7 @@ impl StateStore {
             buffered_state_target_items,
             internal_indexer_db,
             hot_state_config,
+            squash_state_kv_writes_per_block,
         }
     }
 
@@ -1047,19 +1051,22 @@ impl StateStore {
             )?;
 
         // Restore takes the checkpoints from transaction infos, so they're the block ends.
+        let block_ends = state_update_refs.all_checkpoint_versions();
+        let updates = self.state_kv_updates(&state_update_refs.per_version, block_ends);
         self.put_stats_and_indices(
             &base,
             &new_state,
-            &state_update_refs.per_version,
-            state_update_refs.all_checkpoint_versions(),
+            &updates,
+            block_ends,
             &reads,
             ledger_batch,
             sharded_state_kv_batches,
         )?;
-        self.put_state_values(&state_update_refs.per_version, sharded_state_kv_batches)
+        self.put_state_values(&updates, sharded_state_kv_batches)
     }
 
-    /// `block_ends` must be the versions whose transaction infos have a state checkpoint hash.
+    /// `block_ends` must be the versions whose transaction infos have a state checkpoint hash,
+    /// since exact reads by version find blocks that way.
     pub fn put_state_updates(
         &self,
         state: &LedgerState,
@@ -1071,18 +1078,32 @@ impl StateStore {
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
         let current_state = self.live()?.current_state_locked().state().clone();
+        let updates = self.state_kv_updates(state_update_refs, block_ends);
 
         self.put_stats_and_indices(
             &current_state,
             state,
-            state_update_refs,
+            &updates,
             block_ends,
             state_reads,
             ledger_batch,
             sharded_state_kv_batches,
         )?;
 
-        self.put_state_values(state_update_refs, sharded_state_kv_batches)
+        self.put_state_values(&updates, sharded_state_kv_batches)
+    }
+
+    /// The updates to persist to state KV.
+    fn state_kv_updates<'a, 'kv>(
+        &self,
+        state_update_refs: &'a PerVersionStateUpdateRefs<'kv>,
+        block_ends: &[Version],
+    ) -> Cow<'a, PerVersionStateUpdateRefs<'kv>> {
+        if self.squash_state_kv_writes_per_block {
+            Cow::Owned(state_update_refs.last_value_writes_per_block(block_ends))
+        } else {
+            Cow::Borrowed(state_update_refs)
+        }
     }
 
     pub fn put_state_values(
