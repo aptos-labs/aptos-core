@@ -1396,22 +1396,10 @@ visible. -/
 def hideEntries (goal : MVarId) : MetaM MVarId := goal.withContext do
     for decl in ← getLCtx do
       if !decl.isImplementationDetail &&
-          (decl.type.isAppOfArity ``ScopeEntry 4 || decl.type.isAppOfArity ``BlockFact 1) then
+          (decl.type.isAppOfArity ``ScopeEntry 4 ||
+            decl.type.isAppOfArity ``CheckedEntry 3 || decl.type.isAppOfArity ``BlockFact 1) then
         goal.setFVarKind decl.fvarId .implDetail
     return goal
-
-/-- A value with the projections of pairs it applies reduced: an entry of a
-reference holds its current value, the first of the pair a case split
-rewrites the reference to. -/
-private partial def pairProjections (value : Lean.Expr) : Lean.Expr :=
-  match value.getAppFn, value.getAppArgs with
-  | .const ``Prod.fst _, #[_, _, pair] =>
-      let pair := pairProjections pair
-      if pair.isAppOfArity ``Prod.mk 4 then pair.getArg! 2 else mkApp value.appFn! pair
-  | .const ``Prod.snd _, #[_, _, pair] =>
-      let pair := pairProjections pair
-      if pair.isAppOfArity ``Prod.mk 4 then pair.getArg! 3 else mkApp value.appFn! pair
-  | _, _ => value
 
 /-- The values of the names in scope at a goal, each its latest binding's
 (`ScopeEntry`); `old_x`, what `old(x)` reads, is the earliest binding of
@@ -5368,9 +5356,12 @@ private partial def runOnBlock (step : Syntax) (finish : Bool) (path : String) (
     let mut prepared := #[]
     for goal in ← getGoals do
       -- At an `ensures` and at the data invariants a `&mut` parameter owes
-      -- when its mutation ends, its value written back is its final value.
+      -- when its mutation ends, its value written back is its final value
+      -- (at `data invariant`, the value checked at that mutation end where
+      -- `CheckedEntry` records it).
       let (key, _) ← leafKeyOf goal
-      let goal ← if key.kind == "ensures" || key.kind == "data invariant" then bindFinals goal
+      let goal ← if key.kind == "ensures" || key.kind == "data invariant" then
+          bindFinals goal (key.kind == "data invariant")
         else pure goal
       -- An abort condition reads the entry state.
       let goal ← if key.isFailureClause || key.kind == "aborts_with" || key.isNoFailure then

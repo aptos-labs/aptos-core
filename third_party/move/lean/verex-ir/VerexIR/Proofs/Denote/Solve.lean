@@ -2312,6 +2312,13 @@ private def dataInvariantStep (ctx : SolveContext) (step : SolveStep) : SolveM B
         evalTactic (← `(tactic| all_goals verex_subst_vars))
         renormalizeCut ctx.normalization cut
         queue (← getGoals) provenance clauses
+      let mut holds := holds
+      if let some (_, _, arguments) := checking? then
+        if origin matches .mutationEnd | .exitMutationEnd then
+          if (← scopeTable?).isSome then
+            let checkedValue := arguments[5]!
+            if let some prophecy ← holds.withContext (settledProphecyOf? checkedValue arguments[6]!) then
+              holds ← assertCheckedEntry holds prophecy checkedValue
       setGoals [holds]
       -- The invariant of a value whose variant is not known is the
       -- invariant of each of its variants: split it, so that the clauses

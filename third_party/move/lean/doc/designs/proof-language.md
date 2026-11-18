@@ -639,9 +639,11 @@ mark.
    it rewrites the leaf, so an enum's value is in scope in every case, a
    variant without fields included; a renaming of the local renames its
    entry, and the latest binding of a name, by index, is the one in scope:
-   at an `ensures`, `x'` is the final value written back. `old_x` is the
-   earliest binding of `x`, its value at entry, where no binding is named
-   `old_x`. A mutable reference's entry holds its current value. Generic
+   at an `ensures`, `x'` is the final value written back, and at a
+   `data invariant` where a mutation of `x` ends, `x'` is the value checked
+   at that mutation end while other primed names keep their final values.
+   `old_x` is the earliest binding of `x`, its value at entry, where no
+   binding is named `old_x`. A mutable reference's entry holds its current value. Generic
    introductions bind no entry. A value the leaf holds only in parts has no
    entry, and its name reads the parts under the names the leaf gives them
    (`x_f`, `x_k`); a frame local the walk never binds is read by the

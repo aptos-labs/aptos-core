@@ -1156,6 +1156,14 @@ rewrites as it rewrites the leaf; an `ensures` binds it as `name'`
 structure FinalEntry (name : String) {α : Sort u} (value : α) : Prop where
   intro ::
 
+/-- The value `checked` a mutation-end data-invariant step (`checkingAt`)
+checks for the borrow whose prophecy is `prophecy`: an inert fact asserted on
+the check's obligation branch (`dataInvariantStep`), which a substitution
+rewrites as it rewrites the leaf; at a `data invariant` leaf, `bindFinals`
+binds `checked` as the borrowed owner's primed name `name'`. -/
+structure CheckedEntry {α : Sort u} (prophecy checked : α) : Prop where
+  intro ::
+
 /-- What a step proof's target owes of its returned value `value`: `holds`, a
 binding site of `result` the walk meets where the postcondition meets the
 returned value (`bindResult`). Not reducible: the normal form rewrites in it
@@ -1444,16 +1452,149 @@ def bindLet (goal : MVarId) : MetaM (Option MVarId) := goal.withContext do
   noteBindingNames (entries.map (·.1))
   return some (← addScopeEntries goal entries)
 
+/-- A value with the projections of pairs it applies reduced: an entry of a
+reference holds its current value, the first of the pair a case split
+rewrites the reference to. -/
+partial def pairProjections (value : Lean.Expr) : Lean.Expr :=
+  match value.getAppFn, value.getAppArgs with
+  | .const ``Prod.fst _, #[_, _, pair] =>
+      let pair := pairProjections pair
+      if pair.isAppOfArity ``Prod.mk 4 then pair.getArg! 2 else mkApp value.appFn! pair
+  | .const ``Prod.snd _, #[_, _, pair] =>
+      let pair := pairProjections pair
+      if pair.isAppOfArity ``Prod.mk 4 then pair.getArg! 3 else mkApp value.appFn! pair
+  | _, _ => value
+
+/-- The prophecy `prophecy` that a mutation-end check's continuation immediately
+equates `checkedValue` to (`Spec.assume (checkedValue = prophecy)`), if any,
+including after `Prod.mk.injEq` has decomposed tuple equality into component
+equalities. -/
+partial def settledProphecyOf? (checkedValue : Lean.Expr) (e : Lean.Expr) :
+    MetaM (Option Lean.Expr) := do
+  let rec peel (e : Lean.Expr) : MetaM Lean.Expr := do
+    let e := (← instantiateMVars e).consumeMData.headBeta
+    if let .fvar id := e.getAppFn then
+      if let some val ← id.getValue? then
+        return ← peel (mkAppN val e.getAppArgs)
+    if let .const name _ := e.getAppFn then
+      if (name.toString.splitOn "_verexContinuation").length > 1 then
+        if let some (.defnInfo info) := (← getEnv).find? name then
+          return ← peel (mkAppN info.value e.getAppArgs)
+    if e.isLambda then
+      return ← peel e.bindingBody!
+    if e.isAppOfArity ``VerexIR.Proofs.wp 7 then
+      return ← peel (e.getArg! 3)
+    if e.isAppOfArity ``VerexIR.Proofs.Denote.Flow.bind 8 then
+      let first := (e.getArg! 6).consumeMData.headBeta
+      if first.isAppOfArity ``VerexIR.Proofs.Spec.pure 3 then
+        let flow := (first.getArg! 2).consumeMData.headBeta
+        if flow.isAppOfArity ``VerexIR.Proofs.Denote.Flow.value 5 then
+          return ← peel ((e.getArg! 7).beta #[flow.getArg! 3, flow.getArg! 4])
+      return ← peel first
+    if e.isAppOfArity ``VerexIR.Proofs.Spec.bind 6 then
+      let first := (e.getArg! 4).consumeMData.headBeta
+      if first.isAppOfArity ``VerexIR.Proofs.Spec.pure 3 then
+        return ← peel ((e.getArg! 5).beta #[first.getArg! 2])
+      return ← peel first
+    return e
+  let rec collectEqs (p : Lean.Expr) : Array (Lean.Expr × Lean.Expr) :=
+    let p := p.consumeMData
+    if p.isAppOfArity ``And 2 then
+      collectEqs (p.getArg! 0) ++ collectEqs (p.getArg! 1)
+    else if let some (_, lhs, rhs) := p.eq? then
+      #[(pairProjections lhs.consumeMData, pairProjections rhs.consumeMData)]
+    else #[]
+  let rec rebuildProphecy (eqs : Array (Lean.Expr × Lean.Expr)) (v : Lean.Expr) :
+      Option Lean.Expr := do
+    let v := pairProjections v.consumeMData
+    if let some (_, rhs) := eqs.find? (fun (lhs, rhs) => lhs == v && rhs != v) then
+      return rhs
+    if let some (lhs, _) := eqs.find? (fun (lhs, rhs) => rhs == v && lhs != v) then
+      return lhs
+    if v.isAppOfArity ``Prod.mk 4 then
+      let fst ← rebuildProphecy eqs (v.getArg! 2)
+      let sndRaw := (v.getArg! 3).consumeMData
+      let snd ←
+        if sndRaw.isConstOf ``PUnit.unit || sndRaw.isConstOf ``Unit.unit then
+          some sndRaw
+        else
+          rebuildProphecy eqs sndRaw
+      return mkApp4 v.getAppFn (v.getArg! 0) (v.getArg! 1) fst snd
+    none
+  let first ← peel e
+  let prop? :=
+    if first.isAppOfArity ``VerexIR.Proofs.Spec.assume 3 then
+      some (first.getArg! 2).consumeMData
+    else if first.isForall then
+      some first.bindingDomain!.consumeMData
+    else none
+  let some prop := prop? | return none
+  if prop.hasLooseBVars then return none
+  let eqs := collectEqs prop
+  if eqs.isEmpty then return none
+  return rebuildProphecy eqs checkedValue
+
+/-- Record on a mutation-end data-invariant obligation (`holds`) that the
+checked value `checked` settles the borrow whose prophecy is `prophecy`
+(`CheckedEntry`). Kept visible through path preparation so `verex_unname`
+and substitution rewrite its arguments alongside `FinalEntry`; hidden once
+`bindFinals` or step-block entry consumes it. -/
+def assertCheckedEntry (goal : MVarId) (prophecy checked : Lean.Expr) : MetaM MVarId :=
+  goal.withContext do
+    unless (← scopeTable?).isSome do return goal
+    let entry ← mkAppOptM ``CheckedEntry #[none, prophecy, checked]
+    let proof ← mkAppOptM ``CheckedEntry.intro #[none, prophecy, checked]
+    let (_, next) ← (← goal.assert `checked_scope entry proof).intro1P
+    return next
+
 /-- At an obligation of the function's exit, each `&mut` parameter's value
-there, its prophecy (`FinalEntry`), bound as the value written back, `x'`. -/
-def bindFinals (goal : MVarId) : MetaM MVarId := goal.withContext do
+there, its prophecy (`FinalEntry`), bound as the value written back, `x'`.
+At a mutation-end `data invariant` leaf (`atDataInvariant`), the checked
+owner's primed name `x'` binds the value checked at that mutation end
+(`CheckedEntry`) where one was recorded, while unrelated primed names keep
+their exit prophecies. -/
+def bindFinals (goal : MVarId) (atDataInvariant : Bool := false) : MetaM MVarId := goal.withContext do
   let some (names, _) ← scopeTable? | return goal
-  let finals ← (← getLCtx).foldlM (init := #[]) fun found decl => do
+  let mut goal := goal
+  let mut checked? : Option (Lean.Expr × Lean.Expr) := none
+  if atDataInvariant then
+    for decl in ← getLCtx do
+      let type ← instantiateMVars decl.type
+      if type.isAppOfArity ``CheckedEntry 3 then
+        checked? := some (pairProjections (type.getArg! 1).consumeMData,
+          pairProjections (type.getArg! 2).consumeMData)
+        goal ← goal.withContext do goal.setFVarKind decl.fvarId .implDetail; pure goal
+  let mut matchedChecked := false
+  let mut finals := #[]
+  for decl in ← getLCtx do
     let type ← instantiateMVars decl.type
-    unless type.isAppOfArity ``FinalEntry 3 do return found
-    let .lit (.strVal name) := type.getArg! 0 | return found
+    unless type.isAppOfArity ``FinalEntry 3 do continue
+    let .lit (.strVal name) := type.getArg! 0 | continue
     let written := name ++ "'"
-    return if names.contains written then found.push (written, type.getArg! 2) else found
+    let finalVal := pairProjections (type.getArg! 2).consumeMData
+    let value ← match checked? with
+      | some (prophecy, checkedVal) =>
+          if finalVal == prophecy then do
+            matchedChecked := true
+            pure checkedVal
+          else pure (type.getArg! 2)
+      | none => pure (type.getArg! 2)
+    if names.contains written then
+      finals := finals.push (written, value)
+  if !matchedChecked then
+    if let some (prophecy, checkedVal) := checked? then
+      for decl in ← getLCtx do
+        let some (entryName, _, entryVal) := scopeEntry? (← instantiateMVars decl.type) | continue
+        let entryVal := pairProjections entryVal.consumeMData
+        if entryVal == prophecy then
+          let written? :=
+            if entryName.endsWith "'" then some entryName
+            else if entryName.endsWith "_owner" then
+              some ((entryName.dropEnd 6).toString ++ "'")
+            else none
+          if let some written := written? then
+            if names.contains written && !finals.any (·.1 == written) then
+              finals := finals.push (written, checkedVal)
   addScopeEntries goal finals
 
 /-- The components of a returned value bound as the step proof's scope names
@@ -1657,7 +1798,6 @@ partial def declareHiddenTheorems (proof : Lean.Expr) : CoreM Unit := do
       addDecl declaration
   for name in proof.getUsedConstants do
     visit name
-
 
 /-- A proof as an auxiliary theorem of the theorem being proved, as
 `mkAuxTheorem` makes one, registered with the target: of a kind of its own,
