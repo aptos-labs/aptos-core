@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Anchored borrows of `UnsafeCell` fields.
+//! Anchored borrows of `UnsafeCell` fields: borrows whose lifetime is tied
+//! to a local variable, the anchor.
 //!
 //! A reference made from `UnsafeCell::get()` comes through a raw pointer, so
 //! the compiler does not know that it should not outlive the function that
@@ -10,10 +11,10 @@
 //! a local cannot be returned, stored through a parameter, or kept by a
 //! callee.
 //!
-//! This is one half of the discipline for structs whose `&self` methods
-//! mutate through `UnsafeCell` fields. The `unsafe_cell_reborrow` lint checks
-//! the other half, and that every borrow of such a field is made this way;
-//! see `devtools/lints/docs/unsafe_cell_reborrow.md`.
+//! The anchor only stops a borrow from leaving its function. The
+//! `unsafe_cell_reborrow` lint checks that two borrows of the same field do
+//! not overlap, and that every borrow of such a field is anchored; see
+//! `devtools/lints/docs/unsafe_cell_reborrow.md`.
 
 /// A local that a cell borrow is tied to. Holds nothing.
 pub struct Anchor;

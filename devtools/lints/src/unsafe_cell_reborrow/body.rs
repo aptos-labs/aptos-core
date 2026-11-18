@@ -142,6 +142,23 @@ pub(super) fn scan_body<'tcx>(
     });
     CellPatterns { scan: &scan }.visit_body(body);
     scan.info.drops_struct = scan.check_drops(body);
+    // Check: no cell is borrowed in a coroutine (an `async` body). It can
+    // return to its caller at an `.await` with the borrow still live.
+    if tcx.is_coroutine(owner.to_def_id())
+        && let Some((_, span)) = scan.info.sites.first()
+    {
+        report(
+            cx,
+            tcx.local_def_id_to_hir_id(owner),
+            *span,
+            format!(
+                "{} is reborrowed in an `async` body or other coroutine, which can return to \
+                 its caller with the reborrow still live",
+                cells.names(tcx, &scan.info.sites)
+            ),
+            &[],
+        );
+    }
     scan.info
 }
 
@@ -370,10 +387,28 @@ impl<'tcx> BodyScan<'_, 'tcx> {
     }
 
     /// Check, in any body: a value that reaches a cell struct is not turned
-    /// into a trait object (an `as` cast to one is a coercion too). The lint
-    /// could not follow what is called on it afterwards.
+    /// into a trait object (an `as` cast to one is a coercion too), and is
+    /// not cast to a type that no longer shows the struct
+    /// (`self as *const Self as *const ()`). The lint could not follow the
+    /// value afterwards.
     fn check_not_hidden(&self, expr: &'tcx Expr<'tcx>) {
         let tcx = self.cx.tcx;
+        if let ExprKind::Cast(operand, _) = expr.kind
+            && self
+                .cells
+                .reaches(tcx, self.typeck.expr_ty_adjusted(operand))
+            && !self.cells.reaches(tcx, self.typeck.expr_ty(expr))
+        {
+            report(
+                self.cx,
+                expr.hir_id,
+                expr.span,
+                "a value that can reach a cell struct is cast to a type that hides the struct; \
+                 where it goes afterwards cannot be followed"
+                    .to_string(),
+                &[],
+            );
+        }
         let mut hidden = false;
         let mut source = self.typeck.expr_ty(expr);
         for adjustment in self.typeck.expr_adjustments(expr) {

@@ -68,5 +68,6 @@ impl<'tcx> Analysis<'_, 'tcx> {
                 erased_kind(tcx, ty).map(str::to_string)
             }
         })
+        .unwrap_or_else(|_| Some(format!("a type too large to analyse (`{ty}`)")))
     }
 }

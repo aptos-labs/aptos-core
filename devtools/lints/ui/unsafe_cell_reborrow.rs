@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+// edition:2021
+
 // Cases the `unsafe_cell_reborrow` lint must flag, and ones it must not. The
 // test's `dylint.toml` (in `src/lib.rs`) opts in `Ctx`, `Leaky`, `Adapter`
 // and `Store`, lists `anchor_borrow` as the anchor function, and names two structs that
@@ -581,4 +583,78 @@ impl Ctx<'_> {
         };
         let _ = w.to_string();
     }
+}
+
+fn apply<T>(v: T, f: fn(T) -> u64) -> u64 {
+    f(v)
+}
+
+struct Local;
+
+fn from_bound<T>(t: T) -> u64
+where
+    Local: From<T>,
+{
+    let _ = Local::from(t);
+    0
+}
+
+impl<'c, 'a> From<&'c Ctx<'a>> for Local {
+    fn from(ctx: &'c Ctx<'a>) -> Self {
+        ctx.leaf();
+        Local
+    }
+}
+
+fn shows<F: Family>(w: Assoc<F>) -> String
+where
+    Assoc<F>: std::fmt::Display,
+{
+    w.to_string()
+}
+
+impl Ctx<'_> {
+    // Flagged: a type parameter receives the struct. It needs no bound: the
+    // callee hands the value to a function value.
+    fn to_unbounded(&self) -> u64 {
+        apply(self, Ctx::leaf)
+    }
+
+    // Flagged: the bound that lets the callee use the value does not have
+    // the type parameter as its self type.
+    fn to_from_bound(&self) -> u64 {
+        from_bound(self)
+    }
+
+    // Flagged: the value reaches the struct through an associated type of
+    // the type argument, not through the argument itself.
+    fn to_generic_struct(&self) -> String {
+        shows(Assoc::<ToCtx> {
+            inner: self as *const Ctx<'_> as *const Ctx<'static>,
+        })
+    }
+
+    // Flagged: the cast leaves a pointer whose type no longer shows the
+    // struct.
+    fn erased_by_cast(&self) -> *const () {
+        self as *const Self as *const ()
+    }
+
+    // Flagged: an `async` body can return to its caller at an `.await` with
+    // the reborrow still live.
+    async fn in_async(&self) {
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        std::future::ready(()).await;
+    }
+}
+
+// Each level is a new type, so a walk of it never ends.
+struct Node<T> {
+    val: T,
+    next: *const Node<(T,)>,
+}
+
+// Flagged: the lint gives up on `Node<u64>` and assumes the worst about it.
+fn endless(ctx: &Ctx<'_>, node: &Node<u64>) {
+    borrow_cell!(let heap = unsafe { &mut **ctx.heap.get() });
 }

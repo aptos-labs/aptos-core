@@ -46,7 +46,10 @@ use crate::scope::Scope;
 use body::BodyInfo;
 use cells::{CellIdx, Cells};
 use rustc_data_structures::fx::FxHashMap;
-use rustc_hir::def_id::LocalDefId;
+use rustc_hir::{
+    def_id::{LocalDefId, CRATE_DEF_ID},
+    CRATE_HIR_ID,
+};
 use rustc_lint::{LateContext, LateLintPass};
 use rustc_session::{declare_lint, impl_lint_pass};
 use serde::Deserialize;
@@ -150,6 +153,20 @@ impl<'tcx> LateLintPass<'tcx> for UnsafeCellReborrow {
             for &owner in &owners {
                 analysis.check_calls(&bodies[&owner]);
                 analysis.check_signature(owner);
+            }
+
+            // A type the lint gave up on was treated as the worst case; say so.
+            for ty in cells.too_large.borrow().iter() {
+                util::report(
+                    cx,
+                    CRATE_HIR_ID,
+                    cx.tcx.def_span(CRATE_DEF_ID).shrink_to_lo(),
+                    format!(
+                        "the type `{ty}` is too large for this lint to analyse; it is treated as \
+                         if it could reach a cell struct and contain a trait object"
+                    ),
+                    &[],
+                );
             }
         }
     }

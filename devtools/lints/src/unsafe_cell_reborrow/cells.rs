@@ -9,7 +9,7 @@ use super::{
     util::{full_path, report, report_config},
     Config,
 };
-use rustc_data_structures::fx::FxHashMap;
+use rustc_data_structures::fx::{FxHashMap, FxIndexSet};
 use rustc_hir::{
     self as hir,
     attrs::lang_items::LangItem,
@@ -37,6 +37,9 @@ pub(super) struct Cells<'tcx> {
     pub(super) list: Vec<Cell>,
     /// Memo for [`Cells::reaches`].
     pub(super) reach: RefCell<FxHashMap<Ty<'tcx>, bool>>,
+    /// Types too large to walk, to be reported once each. See
+    /// [`find_in_ty`].
+    pub(super) too_large: RefCell<FxIndexSet<Ty<'tcx>>>,
 }
 
 impl<'tcx> Cells<'tcx> {
@@ -72,8 +75,9 @@ impl<'tcx> Cells<'tcx> {
         if let Some(known) = self.reach.borrow().get(&ty) {
             return *known;
         }
-        let reaches =
-            find_in_ty(tcx, self, false, ty, |ty| self.is_struct(ty).then_some(())).is_some();
+        // A type too large to walk is assumed to reach a cell struct.
+        let reaches = find_in_ty(tcx, self, false, ty, |ty| self.is_struct(ty).then_some(()))
+            .map_or(true, |found| found.is_some());
         self.reach.borrow_mut().insert(ty, reaches);
         reaches
     }
@@ -171,5 +175,6 @@ pub(super) fn find_cells<'tcx>(cx: &LateContext<'tcx>, config: &Config) -> Cells
     Cells {
         list,
         reach: RefCell::default(),
+        too_large: RefCell::default(),
     }
 }

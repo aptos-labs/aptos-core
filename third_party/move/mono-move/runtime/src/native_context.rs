@@ -202,7 +202,7 @@ impl<'a> ProductionNativeContext<'a> {
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
         borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
         borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
-        Ok(alloc_or_gc(
+        alloc_or_gc(
             heap,
             self.guard,
             rws,
@@ -211,7 +211,7 @@ impl<'a> ProductionNativeContext<'a> {
             self.frame_ptr,
             TopFrame::Native(self.abi),
             |h| heap_alloc(h, size, descriptor),
-        )?)
+        )
     }
 
     /// Borrows the read-write set entry at `storage_key`, rooting a reference
@@ -277,9 +277,9 @@ impl<'a> ProductionNativeContext<'a> {
 #[allow(clippy::too_many_arguments)]
 fn alloc_vector_no_pointers<'a>(
     heap: &mut Heap,
+    guard: &ExecutionGuard<'_>,
     rws: &mut ResourceReadWriteSet,
     pool: &'a RootPool,
-    guard: &ExecutionGuard<'_>,
     extensions: &NativeExtensions,
     frame_ptr: *mut u8,
     top_frame: TopFrame<'_>,
@@ -582,9 +582,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         for bytes in items {
             inner.push(alloc_vector_no_pointers(
                 heap,
+                self.guard,
                 rws,
                 &self.pool,
-                self.guard,
                 self.extensions,
                 self.frame_ptr,
                 TopFrame::Native(self.abi),
@@ -640,9 +640,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let handle = alloc_vector_no_pointers(
             heap,
+            self.guard,
             rws,
             &self.pool,
-            self.guard,
             self.extensions,
             self.frame_ptr,
             TopFrame::Native(self.abi),

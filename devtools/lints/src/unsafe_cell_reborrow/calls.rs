@@ -7,11 +7,11 @@
 
 use super::{
     body::{BodyInfo, Callee},
-    types::{has_bound, is_erased, type_of},
+    types::{is_erased, type_of},
     util::report,
     Analysis,
 };
-use rustc_hir::{attrs::lang_items::LangItem, def::DefKind, def_id::LocalDefId};
+use rustc_hir::def::DefKind;
 use rustc_middle::ty::{self, Ty};
 
 impl<'tcx> Analysis<'_, 'tcx> {
@@ -55,9 +55,9 @@ impl<'tcx> Analysis<'_, 'tcx> {
             {
                 let sig = tcx.fn_sig(callee).skip_binder().skip_binder();
                 let hidden = call.reaching.iter().any(|operand| {
-                    sig.inputs().get(operand.position).is_some_and(|declared| {
-                        self.hidden_in(callee, *declared, operand.passed_as)
-                    })
+                    sig.inputs()
+                        .get(operand.position)
+                        .is_some_and(|declared| self.hidden_in(*declared, operand.passed_as))
                 });
                 if hidden {
                     report(
@@ -128,43 +128,37 @@ impl<'tcx> Analysis<'_, 'tcx> {
         }
     }
 
-    /// Whether the part of `actual` that reaches the struct lines up, in the
-    /// parameter type `declared`, with `dyn`, `impl` or a type parameter that
-    /// has a trait bound (other than `Sized` and auto traits).
-    pub(super) fn hidden_in(
-        &self,
-        callee: LocalDefId,
-        declared: Ty<'tcx>,
-        actual: Ty<'tcx>,
-    ) -> bool {
+    /// Whether an operand of type `actual`, passed to a parameter declared
+    /// as `declared`, is hidden from the lint: the part of it that reaches
+    /// the struct lines up with a type parameter, `dyn` or `impl` in
+    /// `declared`. A type parameter needs no trait bound to count: the
+    /// callee can still hand the value to a function value.
+    pub(super) fn hidden_in(&self, declared: Ty<'tcx>, actual: Ty<'tcx>) -> bool {
         let tcx = self.cx.tcx;
         match (declared.kind(), actual.kind()) {
-            (ty::Param(_), _) => {
-                self.cells.reaches(tcx, actual)
-                    && has_bound(tcx, callee, declared, |t| {
-                        !tcx.is_lang_item(t, LangItem::Sized)
-                            && !tcx.is_lang_item(t, LangItem::MetaSized)
-                            && !tcx.trait_is_auto(t)
-                    })
-            },
+            (ty::Param(_), _) => self.cells.reaches(tcx, actual),
             (ty::Ref(_, declared, _), ty::Ref(_, actual, _))
             | (ty::RawPtr(declared, _), ty::RawPtr(actual, _))
             | (ty::Array(declared, _), ty::Array(actual, _))
-            | (ty::Slice(declared), ty::Slice(actual)) => {
-                self.hidden_in(callee, *declared, *actual)
-            },
-            (ty::Adt(declared, declared_args), ty::Adt(actual, actual_args))
-                if declared.did() == actual.did() =>
+            | (ty::Slice(declared), ty::Slice(actual)) => self.hidden_in(*declared, *actual),
+            (ty::Adt(declared_adt, declared_args), ty::Adt(actual_adt, actual_args))
+                if declared_adt.did() == actual_adt.did() =>
             {
-                declared_args
+                let through_arg = declared_args
                     .types()
                     .zip(actual_args.types())
-                    .any(|(declared, actual)| self.hidden_in(callee, declared, actual))
+                    .any(|(declared, actual)| self.hidden_in(declared, actual));
+                // The struct is reached through a field that depends on a
+                // type parameter without being one, such as `F::Out`.
+                through_arg
+                    || (is_erased(tcx, declared)
+                        && self.cells.reaches(tcx, actual)
+                        && !self.cells.reaches(tcx, declared))
             },
             (ty::Tuple(declared), ty::Tuple(actual)) if declared.len() == actual.len() => declared
                 .iter()
                 .zip(actual.iter())
-                .any(|(declared, actual)| self.hidden_in(callee, declared, actual)),
+                .any(|(declared, actual)| self.hidden_in(declared, actual)),
             // Anything else: hidden if `declared` contains anything erased.
             _ => is_erased(tcx, declared) && self.cells.reaches(tcx, actual),
         }

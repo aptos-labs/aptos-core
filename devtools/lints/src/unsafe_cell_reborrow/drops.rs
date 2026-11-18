@@ -63,10 +63,12 @@ impl<'tcx> BodyScan<'_, 'tcx> {
     /// `Guard<Callback>` or `Vec<&Ctx>`.
     pub(super) fn drop_reaching_struct(&self, ty: Ty<'tcx>) -> Option<Ty<'tcx>> {
         let tcx = self.cx.tcx;
+        // A type too large to walk is assumed to have such a destructor.
         find_in_ty(tcx, self.cells, true, ty, |ty| {
             matches!(ty.kind(), ty::Adt(adt, _)
                 if tcx.adt_destructor(adt.did()).is_some() && self.cells.reaches(tcx, ty))
             .then_some(ty)
         })
+        .unwrap_or(Some(ty))
     }
 }

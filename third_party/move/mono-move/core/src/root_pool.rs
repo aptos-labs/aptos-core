@@ -107,10 +107,14 @@ impl RootPool {
     /// new address for a live heap object, or `None` to skip — including for the
     /// null bases of freed slots and empty vectors, and for non-heap pointers.
     /// Every entry is therefore passed through unconditionally.
+    ///
+    /// `relocate` must not root or release a slot of this pool. The slots are
+    /// counted once and written back by index, so a slot rooted during the
+    /// walk would be skipped, and one released and reused would receive the
+    /// address computed for its previous entry.
     pub unsafe fn relocate_each(&self, mut relocate: impl FnMut(*mut u8) -> Option<*mut u8>) {
         // No borrow of the store is held while `relocate` runs: each slot is
-        // read and written through its own short reborrow, so the callback
-        // may use the pool itself.
+        // read and written through its own short reborrow.
         for idx in 0..self.slot_count() {
             if let Some(new) = relocate(self.entry(idx).base) {
                 self.set_base(idx, new);

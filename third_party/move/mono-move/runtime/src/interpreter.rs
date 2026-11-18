@@ -3738,13 +3738,14 @@ impl InterpreterContext<'_> {
             // it, and while an adapter method holds a cell it calls only the
             // loader, which has no reference to the adapter or the context.
             #[cfg_attr(dylint_lib = "aptos_lints", allow(unsafe_cell_reborrow))]
+            let loader: &dyn LoaderAccess = &loader;
             let ctx = ProductionNativeContext::new(
                 new_fp,
                 abi,
                 view_type_list(ty_args),
                 guard,
                 self.resource_provider,
-                &loader,
+                loader,
                 &mut self.heap,
                 &mut self.read_write_set,
                 &self.extensions,

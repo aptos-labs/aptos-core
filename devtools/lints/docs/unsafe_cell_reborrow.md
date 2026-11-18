@@ -422,7 +422,7 @@ structs = [
 
 For a listed struct, every `UnsafeCell` field is checked. These fields are the *cells* that the rules below refer to. An `UnsafeCell` in any other struct is ignored.
 
-If an entry in the list does not match a struct, the check reports an error. Otherwise, renaming a struct would silently switch the check off for it.
+If an entry in the list does not match a struct, the check reports an error. Otherwise, renaming a struct would silently switch the check off for it. The check runs on one crate at a time, so it cannot see an entry whose crate does not exist or is not one it runs on; a test in the lint crate, `listed_structs_are_in_linted_crates`, reports those.
 
 The check examines every function and closure of the crate that defines a listed struct, since cell fields are private and that is the only code able to name one.
 
@@ -467,7 +467,7 @@ takes_turns(f) =
 
 The crate passes if `takes_turns(f)` holds for every function, plus one condition that is not about a single function:
 
-- **The struct is never hidden from the check.** A value that can reach the struct is not put behind a generic parameter, a trait object or a closure argument, where the check could no longer tell what is called on it.
+- **The struct is never hidden from the check.** A value that can reach the struct is not put behind a generic parameter, a trait object or a closure argument, where the check could no longer tell what is called on it. Nor is it cast with `as` to a type that no longer shows the struct, such as `*const ()`.
 
 Part 3 has one exception: the struct's own fields. A function may call a method on a field of the struct, or pass a field to other code, while it holds a cell, even if the field is a trait object. The check assumes, without verifying it, that a field was built before the struct and so has no way to call back into it.
 
@@ -479,7 +479,11 @@ The compiler enforces the first constraint, "nothing outlives the call", through
 
 The check, as currently implemented, is not a proof. It is stricter than necessary in most places, but it has known gaps where it accepts code that could borrow a cell twice. Passing it rules out the common mistakes; it does not guarantee that a listed struct is free of undefined behaviour. The `unsafe` blocks still need review.
 
-The known gaps share one root cause. The check decides whether opaque code can reach the struct from what that code is handed in a call. It does not track a pointer to the struct that was stored earlier. A trait object that kept such a pointer can therefore be called while a cell is held, without the check seeing that it reaches the struct.
+The check decides whether opaque code can reach the struct from the types of what that code is handed in a call. The known gaps are the two ways in which that falls short.
+
+## A pointer to the struct that was stored earlier
+
+The check does not track such a pointer. A trait object that kept one can therefore be called while a cell is held, without the check seeing that it reaches the struct.
 
 This takes two forms, which differ in where the trait object comes from:
 
@@ -560,6 +564,42 @@ This takes two forms, which differ in where the trait object comes from:
       }
   }
   ```
+
+## A pointer to the struct whose type was erased
+
+The check rejects the ways in which code of this crate can erase the type: turning the value into a trait object, passing it to a generic parameter, and an `as` cast. But a function that holds no cell may hand the struct to code outside the crate, and that code can return it under another type. The pointer can then be passed to opaque code while a cell is held, without the check seeing that it reaches the struct.
+
+```rust
+impl Ctx {
+    fn erased(&self) -> *const () {
+        // accepted: `erased` borrows nothing itself, and `cast` is outside code
+        std::ptr::from_ref(self).cast()
+    }
+
+    fn outer(&self) {
+        let p = self.erased();
+        self.inner(p);
+    }
+
+    fn inner(&self, p: *const ()) {
+        let heap = unsafe { &mut **self.heap.get() };
+
+        // accepted: neither argument shows the struct, but `call` runs
+        // `poke(p)`, which calls `alloc`
+        other_crate::call(poke, p);
+    }
+}
+
+fn poke(p: *const ()) {
+    unsafe { (*(p as *const Ctx)).alloc(1) };
+}
+```
+
+## Towards a general solution
+
+Both causes start the same way: a function that holds no cell hands the struct to code outside the crate, which stores the pointer or erases its type. A more general rule is worth exploring. One candidate is to never let the struct be handed to code outside the crate, in any function. It would reject every example above. It is not adopted yet: the VM has three places today where the struct must be handed over, such as the call into a native function, and each would need an exception with its own argument.
+
+## What the check trusts
 
 The check also trusts two things it does not examine: that the anchor function has the right signature, and that code in other crates cannot name a cell, which is why cell fields must not be `pub`.
 

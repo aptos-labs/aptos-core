@@ -65,8 +65,8 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
 /// what it says.
 ///
 /// The tests run with no crate scopes, so every lint applies to every test
-/// file; the one piece of config they need is the struct, anchor-function
-/// and trait lists of `unsafe_cell_reborrow`, naming items in
+/// file; the one piece of config they need is the struct and
+/// anchor-function lists of `unsafe_cell_reborrow`, naming items in
 /// `ui/unsafe_cell_reborrow.rs`.
 #[test]
 fn ui() {
@@ -88,4 +88,51 @@ fn ui() {
             "#,
         )
         .run();
+}
+
+/// A lint pass sees one crate, so it cannot tell that an entry of the
+/// `structs` list names a crate that does not exist or that the lint is not
+/// run on. Such an entry would switch the check off without a word; this
+/// test reads the repository's `dylint.toml` and catches it.
+#[test]
+fn listed_structs_are_in_linted_crates() {
+    #[derive(serde::Deserialize)]
+    struct DylintToml {
+        aptos_lints: scope::Config,
+    }
+
+    let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
+    let toml = std::fs::read_to_string(format!("{root}/dylint.toml")).expect("read dylint.toml");
+    let config = toml::from_str::<DylintToml>(&toml)
+        .expect("parse dylint.toml")
+        .aptos_lints
+        .unsafe_cell_reborrow;
+
+    let metadata = std::process::Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(root)
+        .output()
+        .expect("run cargo metadata");
+    assert!(metadata.status.success(), "cargo metadata failed");
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&metadata.stdout).expect("parse cargo metadata");
+    let workspace_crates: Vec<String> = metadata["packages"]
+        .as_array()
+        .expect("packages")
+        .iter()
+        .map(|package| package["name"].as_str().expect("name").replace('-', "_"))
+        .collect();
+
+    for listed in &config.structs {
+        let krate = listed.split("::").next().expect("a path");
+        assert!(
+            workspace_crates.iter().any(|name| name == krate),
+            "`{listed}` is listed for `unsafe_cell_reborrow`, but `{krate}` is not a crate of \
+             this workspace"
+        );
+        assert!(
+            config.scope.applies_to(krate),
+            "`{listed}` is listed for `unsafe_cell_reborrow`, but the lint is not run on `{krate}`"
+        );
+    }
 }
