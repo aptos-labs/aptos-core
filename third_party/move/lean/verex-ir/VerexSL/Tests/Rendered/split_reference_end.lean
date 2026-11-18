@@ -67,10 +67,10 @@ verex module 0x42::split_reference_end where
 
   -- Copyright © Aptos Foundation
   -- SPDX-License-Identifier: Apache-2.0
-  -- A loop whose body takes a `&mut` of the whole vector: the reference's end
-  -- splits on the loop's state, and the split leaves a pattern equation that is
-  -- not in normal form, so `drain` is a parked gap. `drain_automatic` is the
-  -- control: the same loop, taken by the automatic route, verifies.
+  -- A loop whose body takes a `&mut` of the whole vector: `drain`'s authored
+  -- `compute` route leaves `data_invariant` unproved while a prepared leaf's
+  -- context holds that invariant fact; the first missing correspondence and
+  -- cause are unlocalized. `drain_automatic` is the control.
   fun drain {T has Drop}(mut v : Vector<T>) -> Unit := do
     let n := v.length
     while n > 0 do

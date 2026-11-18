@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// A match on a pair of a resource and an argument: the split leaves a pattern
-// equation that is not in normal form, and the closure invoke of `process`
-// loses it, so `process` is a parked gap. `plain` is the control: the same
-// pair match with no closure invoke verifies.
+// A match on a pair of a resource and an argument: the split reduces its
+// constructor reading at the matched values, and the join carries the
+// component equations to the closure invoke of `process`. `plain` is the
+// pair match with no closure invoke.
 module 0x43::split_pair_frame {
     use 0x1::signer::address_of;
 

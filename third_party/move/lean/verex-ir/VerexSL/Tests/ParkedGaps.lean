@@ -42,22 +42,25 @@ private structure Fixture where
   gaps : List Name
   controls : List Name
 
-/-- The six gaps.
+/-- The six fixtures (five parked gaps and one promoted).
 
-`split_reference_end`: the end of a `&mut` of the whole vector splits on the
-loop's state, and the split leaves a pattern equation that is not in normal
-form, so the authored `compute` of `drain` keeps a `data_invariant` leaf; the
-same loop by the automatic route verifies.
+`split_reference_end`: in a loop whose body takes a `&mut` of the whole
+vector, the authored `compute` route of `drain` keeps a `data_invariant` leaf
+while a prepared leaf's context holds the invariant fact that obligation
+needs; the first missing correspondence and cause are unlocalized, and the
+fixture is no evidence for a match-split cause. The same loop by the automatic
+route (`drain_automatic`) verifies.
 
-`split_pair_frame`: the same mechanism under a match on a pair, where the
-closure invoke drops the equations the split left, so `process` stops on a
-residual obligation; the pair match without the invoke verifies.
+`split_pair_frame`: under a match on a pair of a resource and an argument, the
+split reduces its constructor reading at the matched values and the join
+carries the component equations to the closure invoke, so both `process` and
+`plain` verify.
 
 `generic_join_ghost`: the unit declares a spec ghost, so the generic callee
-runs in its caller's walk, and what the join owes of the values it abstracts
-is stated at the carriers the type arguments induce while the arriving paths
-state their facts at the caller's; a join of plain values owes nothing there
-and verifies.
+runs in its caller's walk; automatic verification of `settle_token` fails at
+the join's induced-family premises, while the inspected authored
+`verex_decide` route verifies without forming the same join, and a join of
+plain values (`pick_amount`) owes nothing there and verifies.
 
 `pure_spec_map_fact`: at a spec-only map owner, the length-update lemma and
 the precondition equating a parameter with an updated map do not close these
@@ -75,7 +78,7 @@ takes one clause (`on assert 1 { }`), is not closed by `decide` in
 `write_read`; the same body under `on _ { }` verifies. -/
 private def fixtures : List Fixture :=
   [{ unit := `«0x42».split_reference_end, gaps := [`drain], controls := [`drain_automatic] },
-   { unit := `«0x43».split_pair_frame, gaps := [`process], controls := [`plain] },
+   { unit := `«0x43».split_pair_frame, gaps := [], controls := [`process, `plain] },
    { unit := `«0x42».generic_join_ghost, gaps := [`settle_token], controls := [`pick_amount] },
    { unit := `«0x1».pure_spec_map_fact, gaps := [`v_len_set, `v_set_param],
      controls := [`v_rank_nonneg] },

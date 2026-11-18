@@ -88,6 +88,7 @@ of the fixture that fails when the class regresses.
 | | a declaration whose invariant is carried, where the mutation end owes nothing and the certifying cut owns it | `rendered condition_kinds`: `set_interval`, with `clear_interval` |
 | | the module's invariants where a publication's write ends | `rendered condition_kinds`: `publish_flag` |
 | | one site's two conditions read by their own markers, and a condition that is no predicate | `VerexIR/Tests/GivenWalker`: `markers_of_two_kinds`, `malformed_mutation_end` (`lake test` runs it; the internal malformed-obligation error is fail-closed) |
+| R20 a match on a pair of a resource and an argument, followed by a closure invoke | the split reduces its constructor reading at the matched values (`withSome_some`, `withSome_none`), and the join carries the component equations to the closure invoke | `rendered split_pair_frame`: `process`, `plain`; `VerexIR/Tests/SplitOptionReadings` |
 
 Negative companions: where a class is represented by a positive rendering
 (`static_step`, `static_fnonce`, `fnonce_forward`), the `_errors` fixtures
@@ -127,7 +128,7 @@ Each is the rendering `scripts/prover-smoke-renderings.sh` writes, unedited.
 The generator refuses a fixture whose diagnostics the driver makes and a lone
 elaboration cannot: a failing `no panic` or `no abort` report, a refused
 function, a proof file beside the source, a verified namespace before the
-last. Six further renderings are the reproducers of the section "Parked
+last. Five further renderings are the reproducers of the section "Parked
 gaps" below, which lists them instead of this table.
 
 | Fixture | Stands for | Why no hand-written cell |
@@ -144,10 +145,11 @@ gaps" below, which lists them instead of this table.
 | `map_size_update` | a law of the library applied by name in an authored `lean` block: `SpecMap.size_update_sequence_{present,absent}` against the size an assertion owes after the owner's own `add` | the same route; the fact is of the map the executable role leaves, which only a frontend's rendering of that call produces |
 | `condition_kinds` | the conditions of more than one kind that one expression owes: a mutable borrow of a resource owes the module's invariants where its write of memory ends and the resource's data invariant where its mutation ends, with a carried and an uncarried declaration and a publication, and a negative for each kind | the sites are the Move frontend's, which keys the write and the mutation of one borrow alike; a hand-written unit cannot state that collision |
 | `mini_amm` | an automated market maker's rules as behavioural invariants of a function-typed field, quantified over every state: the pack, a caller that uses them, the pack's negatives, two named cases of the states the binder ranges over in a unit that also carries an ordinary data invariant, and the three storage observations (a reference parameter, a specification global read, the stored-invariant obligation after the call) | the wrapper is a Move tuple struct whose field is a function type and whose `spec` carries `modifies_of<self.0> *`; the positional field and the state binder are what the Move frontend writes, and `shapes KnownClosures` has no behavioural invariant |
+| `split_pair_frame` | a match on a pair of a resource and an argument followed by a closure invoke (`calculator::process` of the benchmark): the split reduces its constructor reading at the matched values, and the join carries the component equations to the closure invoke | the pair-match lowering and inferred postcondition state labels (`..S1`, `S1..`) are what the Move frontend generates |
 
 ## Parked gaps
 
-Six rendered fixtures hold a target the solver does not verify, kept as the
+Five rendered fixtures hold a target the solver does not verify, kept as the
 reproducer of a gap the user parked rather than repaired. A row here is a
 recorded failure, not a regression class the suite guards: the baseline
 records the diagnostics the gap produces today, and nothing in the suite
@@ -161,9 +163,8 @@ becomes a control in that test, and its baseline is written again.
 
 | Fixture: gap, control | Mechanism | What it stands for |
 |---|---|---|
-| `rendered split_reference_end`: `drain`, control `drain_automatic` | the end of a `&mut` of the whole vector splits on the loop's state, and the split leaves a pattern equation that is not in normal form, so the authored `compute` keeps a `data_invariant` leaf | `simple_map::add_all` of the benchmark; the same loop by the automatic route verifies |
-| `rendered split_pair_frame`: `process`, control `plain` | the same split under a match on a pair, where the closure invoke drops the equations the split left and the target stops on a residual obligation | `calculator::process` of the benchmark; a module-level `pragma verify = false` takes the target off this route, so the fixture does not disable module verification |
-| `rendered generic_join_ghost`: `settle_token`, control `pick_amount` | the unit declares a spec ghost, so a generic callee runs in its caller's walk: what the join owes of the values it abstracts is stated at the carriers the type arguments induce, while the arriving paths state their facts at the caller's | 17 rows of `coin`, `fungible_asset` and `primary_fungible_store` in the framework sample; a join of plain values owes nothing at the induced family and verifies |
+| `rendered split_reference_end`: `drain`, control `drain_automatic` | a discrepancy between the authored `compute` route and a prepared leaf: the prepared leaf's context holds the invariant fact the `data_invariant` obligation needs while under `compute` it is absent; the first missing correspondence and cause are unlocalized, and the fixture is no evidence for a match-split cause | the authored `compute` route discrepancy observed alongside `simple_map::add_all` (whose benchmark failure cause remains unlocalized); the same loop by the automatic route verifies |
+| `rendered generic_join_ghost`: `settle_token`, control `pick_amount` | the unit declares a spec ghost, so a generic callee runs in its caller's walk: automatic verification fails at the join's induced-family premises (while the inspected authored `verex_decide` route verifies without forming the same join, narrowing the issue without establishing the first lost fact) | 17 rows of `coin`, `fungible_asset` and `primary_fungible_store` in the framework sample; a join of plain values owes nothing at the induced family and verifies |
 | `rendered pure_spec_map_fact`: `v_len_set` and `v_set_param`, control `v_rank_nonneg` | at a spec-only map owner, the length-update lemma and the precondition equating a parameter with an updated map do not close these authored assertions; the parameter-map rank control verifies. The failing contexts include True hypotheses, but the first lost correspondence and cause remain unlocalized. | no benchmark or framework row is attributed to it: the mechanism is recorded by this reproducer alone |
 | `rendered requires_of_disjunct`: `call_disjunct`, control `call_plain` | a callee's precondition `skip \|\| requires_of<f>(x)`, `f` a closure taking `&mut`, is not established at the call, and the target stops on the undecided leaf `requires_1_of_modify_at_call_1`; the precondition `requires_of<f>(x)` alone holds at the same kind of call | `big_ordered_map::test_verify_iter_modify` of the framework sample, whose leaf `requires_1_of_iter_modify` is undecided in the same way; that the two share a cause is not established |
 | `rendered map_write_block`: `write_read`, control `write_read_rest` | a read of a map after one write, asserted under a block that takes one clause (`on assert 1 { }`): `decide` does not close it, and the leaf holds the write's equation `value_0 == spec_set(m, 1, 30)` beside the goal `spec_get(value_0, 1) == 30`; the same body under `on _ { }` verifies | `big_ordered_map::test_verify_upsert` of the framework sample, whose leaves after several map writes hold their equations unsubstituted; that the two share a cause is not established |

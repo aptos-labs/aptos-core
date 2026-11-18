@@ -36,9 +36,9 @@ verex module 0x42::generic_join_ghost where
   -- Copyright © Aptos Foundation
   -- SPDX-License-Identifier: Apache-2.0
   -- The unit declares a spec ghost, so a generic callee runs in its caller's
-  -- walk: a join states what it owes at the carriers the type arguments induce,
-  -- while the arriving paths state their facts at the caller's, and
-  -- `settle_token` is a parked gap. `pick_amount` is the control.
+  -- walk: automatic verification of `settle_token` fails at the join's
+  -- induced-family premises, while the inspected authored `verex_decide` route
+  -- verifies without forming that join. `pick_amount` is the control.
   struct Handle {T : phantom type} has Copy, Drop, Store where
     inner : Address
 
