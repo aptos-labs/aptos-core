@@ -383,6 +383,46 @@ verex module 0x42::row4_vector where
     aborts_if false
     ensures (v[i]).count > 0
 
+  -- Opaque `&mut` vector indexing callee with the same contract shape as
+  -- `alloc::vec::IndexMut::index_mut` (`vec.spec.lean:264-268`):
+  -- `ensures result == old(v)[i]` is a total `Option.getD` read on `old(v)`.
+  native fun index_item_mut(v : &mut Vector<Item>, i : u64) -> &mut Item
+  spec index_item_mut where
+    pragma opaque
+    pragma verify = false
+    aborts_if i >= old(v).length
+    ensures result == old(v)[i]
+    ensures v[i] == final(result)
+
+  -- Unchecked opaque `&mut` indexing callee (missing the `i >= old(v).length` abort guard)
+  -- to test that off-domain `old(v)[i]` in a call's `ensures` derives no element `Holds`.
+  native fun index_item_mut_unchecked(v : &mut Vector<Item>, i : u64) -> &mut Item
+  spec index_item_mut_unchecked where
+    pragma opaque
+    pragma verify = false
+    aborts_if false
+    ensures result == old(v)[i]
+    ensures v[i] == final(result)
+
+  -- Control 1 (Positive `borrow_mut` case): calling `index_item_mut` in bounds and
+  -- reading the returned `&mut Item`'s field succeeds from `old(v)`'s `Holds`.
+  fun pos_borrow_mut_holds(v : &mut Vector<Item>, i : u64) -> u64 :=
+    (&*index_item_mut(v, i)).count
+  spec pos_borrow_mut_holds where
+    requires i < old(v).length
+    aborts_if false
+    ensures result > 0
+
+  -- Control 2 (Negative off-domain index case): when `i >= old(v).length`,
+  -- `callElementReadFacts` / `proveLookupRead?` cannot discharge `i < v.size`,
+  -- so nothing is derived from `result == old(v)[i]`.
+  fun neg_borrow_mut_oob_holds(v : &mut Vector<Item>, i : u64) -> u64 :=
+    (&*index_item_mut_unchecked(v, i)).count
+  spec neg_borrow_mut_oob_holds where
+    requires i >= old(v).length
+    aborts_if false
+    ensures result > 0
+
 run_cmd do
   assertRejected `«0x42».row4_vector.neg_oob_u64_zero
     (← `(command| verify 0x42::row4_vector::neg_oob_u64_zero))
@@ -404,9 +444,74 @@ run_cmd do
     (← `(command| verify 0x42::row4_vector::neg_oob_holds))
     "Row 4 indexVector OOB Item .count > 0"
     "the specification clause `ensures (v[i]).count > 0` is not established"
+  assertRejected `«0x42».row4_vector.neg_borrow_mut_oob_holds
+    (← `(command| verify 0x42::row4_vector::neg_borrow_mut_oob_holds))
+    "Row 4 callElementReadFacts OOB borrow_mut Item .count > 0"
+    "the data invariant `invariant count > 0` does not hold where a value is copied out of a mutable reference"
 
 verify 0x42::row4_vector::pos_scalar
 verify 0x42::row4_vector::pos_holds
+verify 0x42::row4_vector::pos_borrow_mut_holds
+
+section CallElementReadControls
+open Lean Meta Elab Tactic VerexIR VerexIR.Proofs VerexIR.Proofs.Denote
+
+-- Positive direct control: when `0 ≤ idx`, `idx.toNat < v.values.size`, and
+-- `NTy.Holds (.vector (.param 0)) v` are available, `callElementReadFacts`
+-- asserts `NTy.Holds (.param 0) r`.
+private theorem call_element_read_accepts_nonneg_in_bounds [Carriers]
+    (v : (NTy.vector (.param 0)).carrier) (idx : Int) (r : (NTy.param 0).carrier) :
+    NTy.Holds (.vector (.param 0)) v →
+    0 ≤ idx →
+    idx.toNat < v.values.size →
+    v.values[idx.toNat]?.getD (NTy.plainFallback (.param 0) rfl) = r →
+    NTy.Holds (.param 0) r := by
+  run_tac do
+    let after ← callElementReadFacts (← getMainGoal)
+    replaceMainGoal [after]
+  intros
+  assumption
+
+-- Negative Control 2b: when `idx < 0` (negative before `Int.toNat`),
+-- `callElementReadFacts` derives nothing even though `idx.toNat = 0 < v.values.size`.
+private theorem call_element_read_rejects_negative_int_index [Carriers]
+    (v : (NTy.vector (.param 0)).carrier) (idx : Int) (r : (NTy.param 0).carrier) :
+    NTy.Holds (.vector (.param 0)) v →
+    idx < 0 →
+    0 < v.values.size →
+    v.values[idx.toNat]?.getD (NTy.plainFallback (.param 0) rfl) = r →
+    True := by
+  run_tac do
+    let goal ← getMainGoal
+    let beforeTy ← goal.withContext (instantiateMVars (← goal.getType))
+    let after ← callElementReadFacts goal
+    let afterTy ← after.withContext (instantiateMVars (← after.getType))
+    unless afterTy == beforeTy do
+      throwError "Control 2b failed: callElementReadFacts derived a fact for negative Int index"
+    replaceMainGoal [after]
+  intro _ _ _ _
+  trivial
+
+-- Negative Control 3: when `0 ≤ idx` and `idx.toNat < v.values.size` hold, but
+-- `NTy.Holds (.vector (.param 0)) v` is absent, `callElementReadFacts` derives nothing.
+private theorem call_element_read_rejects_missing_vector_holds [Carriers]
+    (v : (NTy.vector (.param 0)).carrier) (idx : Int) (r : (NTy.param 0).carrier) :
+    0 ≤ idx →
+    idx.toNat < v.values.size →
+    v.values[idx.toNat]?.getD (NTy.plainFallback (.param 0) rfl) = r →
+    True := by
+  run_tac do
+    let goal ← getMainGoal
+    let beforeTy ← goal.withContext (instantiateMVars (← goal.getType))
+    let after ← callElementReadFacts goal
+    let afterTy ← after.withContext (instantiateMVars (← after.getType))
+    unless afterTy == beforeTy do
+      throwError "Control 3 failed: callElementReadFacts derived a fact without old-vector Holds"
+    replaceMainGoal [after]
+  intro _ _ _
+  trivial
+
+end CallElementReadControls
 
 /-! ## 5. `ResultOf` (`result_of<f>(x)` when no run returns) -/
 

@@ -3014,6 +3014,56 @@ private def statedReads (goal : MVarId) : MetaM (Array (Lean.Expr × Lean.Expr))
   unless terms.any (·.hasMVar) do cache.modify (·.insert terms reads)
   return reads
 
+/-- Establish `values[position]? = some expected` from a total specification read
+`Option.getD (values[position]?) fallback` and the context's bounds (including
+`0 ≤ idx` before `Int.toNat` when `position` is `Int.toNat idx`). -/
+def proveLookupRead? (goal : MVarId) (lookup fallback expected : Lean.Expr)
+    (same? : Option Lean.Expr := none) : TacticM (Option Lean.Expr) :=
+  goal.withContext do
+    unless lookup.isAppOfArity ``GetElem?.getElem? 7 do return none
+    let values := lookup.getArg! 5
+    let position := lookup.getArg! 6
+    let saved ← saveState
+    let savedGoals ← getGoals
+    try
+      let rawPos := position.consumeMData
+      if rawPos.isAppOfArity ``Int.toNat 1 then
+        let intIdx := rawPos.getArg! 0
+        let nonneg ← mkFreshExprMVar (← mkAppM ``LE.le #[toExpr (0 : Int), intIdx])
+        setGoals [nonneg.mvarId!]
+        evalTactic (← `(tactic|
+          (try simp only [VerexIR.Proofs.Obligation_eq, not_le, not_lt] at *); verex_bounds; omega))
+        unless (← getGoals).isEmpty do
+          saved.restore
+          return none
+      let bound ← mkFreshExprMVar (← mkAppM ``LT.lt #[position, ← mkAppM ``Array.size #[values]])
+      setGoals [bound.mvarId!]
+      evalTactic (← `(tactic|
+        (try simp only [VerexIR.Proofs.Obligation_eq, not_le, not_lt] at *); verex_bounds; omega))
+      unless (← getGoals).isEmpty do
+        saved.restore
+        return none
+      let same ← match same? with
+        | some same => pure same
+        | none =>
+          let same ← mkFreshExprMVar
+            (← mkEq (← mkAppM ``Option.getD #[lookup, fallback]) expected)
+          setGoals [same.mvarId!]
+          evalTactic (← `(tactic| first
+            | verex_assumption
+            | (apply VerexIR.SpecInt.ext; (try simp only [VerexIR.Proofs.Obligation_eq] at *); omega)))
+          unless (← getGoals).isEmpty do
+            saved.restore
+            return none
+          instantiateMVars same
+      let proof ← mkAppM ``getElem?_eq_some_of_read
+        #[values, position, fallback, expected, ← instantiateMVars bound, same]
+      setGoals savedGoals
+      return some (← instantiateMVars proof)
+    catch _ =>
+      saved.restore
+      return none
+
 /-- A lookup in bounds of an element the hypotheses read: `v[k]? = some y` from `k`
 in bounds and what they state of `v[k]` and `y`. -/
 elab "verex_lookup_read" : tactic => focusGoal do
@@ -3027,28 +3077,107 @@ elab "verex_lookup_read" : tactic => focusGoal do
   for (stated, fallback) in ← statedReads goal do
     let found ← goal.withContext do
       unless ← isDefEq stated lookup do return false
-      let values := lookup.getArg! 5
-      let position := lookup.getArg! 6
-      let bound ← mkFreshExprMVar (← mkAppM ``LT.lt #[position, ← mkAppM ``Array.size #[values]])
-      let same ← mkFreshExprMVar
-        (← mkEq (← mkAppM ``Option.getD #[lookup, fallback]) expected)
-      let saved ← saveState
-      try
-        setGoals [bound.mvarId!]
-        evalTactic (← `(tactic| verex_bounds; omega))
-        setGoals [same.mvarId!]
-        evalTactic (← `(tactic| first
-          | verex_assumption
-          | (apply VerexIR.SpecInt.ext; (try simp only [VerexIR.Proofs.Obligation_eq] at *); omega)))
-        goal.assign (← mkAppM ``getElem?_eq_some_of_read
-          #[values, position, fallback, expected, bound, same])
-        setGoals []
-        return true
-      catch _ =>
-        saved.restore
-        return false
+      let some proof ← proveLookupRead? goal lookup fallback expected none | return false
+      goal.assign proof
+      setGoals []
+      return true
     if found then return
   throwError "no hypothesis states the element read"
+
+/-- Collect `(lookup, fallback, expected, sameProof)` from a proposition proof `proof : ty`,
+where `sameProof : Option.getD lookup fallback = expected` and `lookup` is `GetElem?.getElem?`. -/
+private partial def collectCallReadEqualities (proof ty : Lean.Expr) :
+    MetaM (Array (Lean.Expr × Lean.Expr × Lean.Expr × Lean.Expr)) := do
+  let ty := (← instantiateMVars ty).consumeMData
+  if ty.isAppOfArity ``VerexIR.Proofs.Obligation 4 then
+    let innerTy := ty.getArg! 3
+    let innerProof ← mkAppM ``Iff.mp #[← mkAppOptM ``VerexIR.Proofs.Obligation_iff
+      #[ty.getArg! 0, ty.getArg! 1, ty.getArg! 2, innerTy], proof]
+    return ← collectCallReadEqualities innerProof innerTy
+  if ty.isAppOfArity ``And 2 then
+    let left ← collectCallReadEqualities (← mkAppM ``And.left #[proof]) (ty.getArg! 0)
+    let right ← collectCallReadEqualities (← mkAppM ``And.right #[proof]) (ty.getArg! 1)
+    return left ++ right
+  if ty.isAppOfArity ``Eq 3 then
+    let lhs := (ty.getArg! 1).consumeMData
+    let rhs := (ty.getArg! 2).consumeMData
+    if lhs.isAppOfArity ``Option.getD 3 && (lhs.getArg! 1).isAppOfArity ``GetElem?.getElem? 7 then
+      return #[(lhs.getArg! 1, lhs.getArg! 2, rhs, proof)]
+    if rhs.isAppOfArity ``Option.getD 3 && (rhs.getArg! 1).isAppOfArity ``GetElem?.getElem? 7 then
+      return #[(rhs.getArg! 1, rhs.getArg! 2, lhs, ← mkEqSymm proof)]
+  return #[]
+
+/-- At a successful call continuation (`index == postIndex`), convert any in-bounds
+specification vector read equality `expected = (v.values[pos]?).getD fallback` from the
+callee's contract into `v.values[pos]? = some expected` via `proveLookupRead?` and assert
+`NTy.Holds carriers τ expected` from the old vector's `NTy.Holds` via `statedElementFact`. -/
+def callElementReadFacts (goal : MVarId) : TacticM MVarId := do
+  let target ← goal.withContext (do instantiateMVars (← goal.getType))
+  unless (target.find? (·.isConstOf ``GetElem?.getElem?)).isSome &&
+      (target.find? (·.isConstOf ``Option.getD)).isSome do
+    return goal
+  let mut probe := target
+  let mut count := 0
+  while probe.isForall do
+    count := count + 1
+    probe := probe.bindingBody!
+  if count == 0 then return goal
+  let (introduced, inner) ← goal.introNP count
+  let candidates ← inner.withContext do
+    let mut acc := #[]
+    for fvarId in introduced do
+      let decl ← fvarId.getDecl
+      if ← Meta.isProp decl.type then
+        acc := acc ++ (← collectCallReadEqualities (mkFVar fvarId) decl.type)
+    pure acc
+  if candidates.isEmpty then
+    let (_, reverted) ← inner.revert introduced (preserveOrder := true)
+    return reverted
+  let mut current := inner
+  let mut asserted : Array FVarId := #[]
+  for (lookup, fallback, expected, same) in candidates do
+    let (next, added) ← current.withContext do
+      let values := (lookup.getArg! 5).consumeMData.headBeta
+      let vector? :=
+        if values.isAppOfArity ``VerexIR.SpecVector.values 2 then some (values.getArg! 1)
+        else match values with
+          | .proj ``VerexIR.SpecVector 0 v => some v
+          | .proj ``Subtype 0 v => some v
+          | _ => none
+      let some vector := vector? | return (current, #[])
+      let fb := fallback.consumeMData
+      let elemTy := (lookup.getArg! 2).consumeMData
+      let carriersTau? :=
+        if fb.isAppOfArity ``NTy.plainFallback 3 then
+          some (fb.getArg! 0, fb.getArg! 1)
+        else if elemTy.isAppOfArity ``NTy.carrier 2 then
+          some (elemTy.getArg! 0, elemTy.getArg! 1)
+        else none
+      let some (rawCarriers, τ) := carriersTau? | return (current, #[])
+      let rawCarriers := rawCarriers.consumeMData
+      let carriers :=
+        if rawCarriers.isAppOfArity ``Carriers.toSorts 1 then rawCarriers.appArg!
+        else rawCarriers
+      if ← isInvariantFreeNTy τ then return (current, #[])
+      if (← trivialHoldsProof? carriers τ expected).isSome then return (current, #[])
+      let some held ← closedVectorHolds? carriers τ vector | return (current, #[])
+      let some equation ← proveLookupRead? current lookup fallback expected (some same)
+        | return (current, #[])
+      let beforeDecls ← getLCtx
+      let next ← statedElementFact current carriers τ vector (lookup.getArg! 6) held equation
+      let added ← if next != current then
+          next.withContext do
+            let mut fresh := #[]
+            for decl in ← getLCtx do
+              unless beforeDecls.contains decl.fvarId do
+                fresh := fresh.push decl.fvarId
+            pure fresh
+        else pure #[]
+      return (next, added)
+    current := next
+    asserted := asserted ++ added
+  let (_, reverted) ← current.revert (introduced ++ asserted) (preserveOrder := true)
+  return reverted
 
 /-- A premise of a witness at a position the context reads or writes: a
 premise of an instance, the lookup at the position read, or the goal

@@ -3269,6 +3269,8 @@ private def applyCallTheorem (ctx : SolveContext) (step : SolveStep) (calleeName
       timedStep "call-contract" (normalizeAround (fixedPoints := walkFixedPoints) ctx.normalization values)
     else
       timedStep "call-contract" (normalizeAround contractNormalization values)
+    if index == postIndex then
+      setGoals (← (← getGoals).mapM fun g => (callElementReadFacts g : TacticM MVarId))
     timedStep "call-release" (releaseContinuations ctx.normalization held walkFixedPoints)
     -- Speculative range search belongs to automatic verification. An authored
     -- proof receives the contract directly instead of paying for normalization
