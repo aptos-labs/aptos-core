@@ -5339,7 +5339,7 @@ private def readingsAtValue?
       let ctx ← Simp.mkContext { failIfUnchanged := false } rules (← getSimpCongrTheorems)
       -- The equation the case states is not rewritten by itself.
       let targets := (← goal.getNondepPropHyps).filter (!kept.contains ·)
-      let (result, _) ← simpGoal goal ctx #[] none (fvarIdsToSimp := targets)
+      let (result, _) ← simpGoal goal ctx #[] none (simplifyTarget := false) (fvarIdsToSimp := targets)
       return result.map (·.2)
   let saved ← saveState
   let split ← observing? do
@@ -5400,8 +5400,8 @@ private def readingsAtValue?
       next.mapM fun goal => return (← statedReadFact goal equation).1
     pure valueGoal
   match split with
-  | some next => return next
-  | none => saved.restore; return none
+  | some (some next) => return some next
+  | _ => saved.restore; return none
 
 /-- Cases replace a row with its constructor, so newly introduced equations
 must state its fields directly. Compute only literal constructor projections

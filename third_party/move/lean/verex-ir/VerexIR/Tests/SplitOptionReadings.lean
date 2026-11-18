@@ -41,7 +41,7 @@ private theorem decided_reading_reduces_without_tuple_injection [Carriers]
     let some (_, lhs, _) := hTy.eq? | throwError "expected pair equality in `h`, got: {hTy}"
     unless lhs.isAppOfArity ``Prod.mk 4 do
       throwError "expected `Prod.mk` on lhs of `h` before tuple injection, got: {lhs}"
-  exact ⟨_, rfl, h⟩
+  exact ⟨_, ‹option = some _›, h⟩
 
 -- 2. When both sides of the reduced equation are `Prod.mk`, `splitHypotheses`'s separate
 -- constructor-equation injection (`Lean.Meta.injection`) decomposes `(w, 1) = (x, y)` into
@@ -62,7 +62,7 @@ private theorem decided_dependent_reading_reduces [Carriers]
     ∃ w, option = some w ∧ (some w : Option Nat).get (by simp) = x := by
   verex_split_hypotheses
   run_tac assertNoConstructorWithSome
-  refine ⟨_, rfl, ?_⟩
+  refine ⟨_, ‹option = some _›, ?_⟩
   simpa [readBack] using h
 
 -- 4. Empty branch and `withSome_none`: the empty case (`option = none`) is refuted through
@@ -108,6 +108,61 @@ private theorem missing_validity_still_owed [Carriers]
       verex_assumption
   exact slotValid
 
+-- 7. `readingsAtValue?` rewrites only non-dependent proposition hypotheses (`simplifyTarget := false`):
+-- an `Option.getD` reading of `option` in the goal's target is left untouched.
+private theorem target_preserved_by_readings [Carriers]
+    (option : Option Nat) (x y : Nat) (nonEmpty : ¬ option = none)
+    (_h : withSome option (fun a _ => some a) none = some x)
+    (hy : option.getD 0 = y) :
+    option.getD 0 = y := by
+  verex_split_hypotheses
+  run_tac withMainContext do
+    assertNoConstructorWithSome
+    let target ← instantiateMVars (← getMainTarget)
+    let some (_, lhs, _) := target.eq? | throwError "expected equality target, got: {target}"
+    unless lhs.isAppOfArity ``Option.getD 3 do
+      throwError "`readingsAtValue?` rewrote the target: {target}"
+  verex_subst_vars
+  simp [Option.getD_some]
+
+-- 8. When the target itself would close under `option = some w` if `simplifyTarget`
+-- were true (`withSome option (fun _ _ => True) False`), `readingsAtValue?` must
+-- not close the target (`some none`), leave the goal metavariable assigned, or
+-- abort the split.
+private theorem target_closing_under_case_equation_does_not_abort_split [Carriers]
+    (option : Option Nat) (x : Nat) (nonEmpty : ¬ option = none)
+    (h : withSome option (fun a _ => some (a + 1)) none = some x) :
+    withSome option (fun _ _ => True) False := by
+  verex_split_hypotheses
+  run_tac withMainContext do
+    assertNoConstructorWithSome
+    let hTy ← instantiateMVars (← getLocalDeclFromUserName `h).type
+    if (hTy.find? (·.isAppOf ``withSome)).isSome then
+      throwError "`readingsAtValue?` aborted the split when the target closed: {hTy}"
+    let target ← instantiateMVars (← getMainTarget)
+    unless target.isAppOfArity ``withSome 5 do
+      throwError "`readingsAtValue?` rewrote the target: {target}"
+  have _ := h
+  verex_subst_vars
+  simp [withSome_some]
+
+-- 9. Even with `simplifyTarget := false`, if `rewritten` closes the held subgoal
+-- through contradictory hypotheses (`h_false : withSome option (fun _ _ => False) True`
+-- rewritten by `withSome_of_some` and `withSome_some` to `False`, producing
+-- `split = some none`), `readingsAtValue?` must run `saved.restore` so the goal
+-- metavariable is not left assigned.
+private theorem closed_held_branch_restores_saved_state [Carriers]
+    (option : Option Nat) (x : Nat)
+    (_nonEmpty : ¬ option = none)
+    (h_false : withSome option (fun _ _ => False) True)
+    (_h : withSome option (fun a _ => some a) none = some x) :
+    withSome option (fun _ _ => False) True := by
+  verex_split_hypotheses
+  run_tac withMainContext do
+    if ← (← getMainGoal).isAssigned then
+      throwError "`readingsAtValue?` returned `none` without `saved.restore`, leaving goal assigned"
+  exact h_false
+
 open Lean Elab Command in
 run_cmd do
   for name in [``decided_reading_reduces_without_tuple_injection,
@@ -115,7 +170,10 @@ run_cmd do
       ``decided_dependent_reading_reduces,
       ``empty_branch_and_none_reading_reduce,
       ``undecided_symbolic_option_unchanged,
-      ``missing_validity_still_owed] do
+      ``missing_validity_still_owed,
+      ``target_preserved_by_readings,
+      ``target_closing_under_case_equation_does_not_abort_split,
+      ``closed_held_branch_restores_saved_state] do
     let axioms ← collectAxioms name
     unless axioms.all ([``propext, ``Classical.choice, ``Quot.sound].contains ·) do
       throwError "unexpected axioms in {name}: {axioms}"
