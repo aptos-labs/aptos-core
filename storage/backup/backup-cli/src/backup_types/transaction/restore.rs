@@ -1098,9 +1098,8 @@ mod tests {
                     .unwrap(),
             );
         }
-        // Usage only matches if each chunk saw the values committed by previous chunks. The source
-        // has usage at every block end and nowhere else, so the target only matches it if every
-        // chunk is exactly one whole block.
+        // Usage only matches if each chunk saw the values committed by previous chunks. Both sides
+        // have usage at every block end and nowhere else.
         for version in 0..=target_version {
             assert_eq!(
                 target.get_state_storage_usage(Some(version)).ok(),

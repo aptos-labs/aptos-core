@@ -36,7 +36,10 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleLeafNode,
-    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
+    state_store::{
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        NUM_STATE_SHARDS,
+    },
     transaction::{
         ExecutionStatus, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
         TransactionAuxiliaryDataV1, TransactionInfo, TransactionToCommit, VMErrorDetail, Version,
@@ -46,7 +49,10 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use proptest::{collection::vec, option, prelude::*, sample::Index};
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -368,41 +374,99 @@ fn check_state_reads(
     }
 }
 
+/// Per block, per txn, writes as `(key index, value)`; `None` deletes.
+fn arb_state_kv_blocks() -> impl Strategy<Value = Vec<Vec<Vec<(u8, Option<u8>)>>>> {
+    vec(
+        vec(vec((0..3u8, option::of(any::<u8>())), 0..=2), 1..=5),
+        1..=8,
+    )
+}
+
+/// Turns the output of `arb_state_kv_blocks` into blocks of txns, returning the keys too.
+fn state_kv_blocks(
+    blocks: Vec<Vec<Vec<(u8, Option<u8>)>>>,
+) -> (Vec<StateKey>, Vec<Vec<TransactionToCommit>>) {
+    // Same shard, so seeks can run into a neighboring key's rows.
+    let keys: Vec<_> = (0..=u8::MAX)
+        .map(|i| StateKey::raw(&[i]))
+        .filter(|key| key.get_shard_id() == 0)
+        .take(3)
+        .collect();
+    assert_eq!(keys.len(), 3);
+    let blocks = blocks
+        .into_iter()
+        .map(|block| {
+            let num_txns = block.len();
+            block
+                .into_iter()
+                .enumerate()
+                .map(|(i, writes)| {
+                    let write_set =
+                        WriteSet::new_for_test(writes.into_iter().map(|(key, value)| {
+                            (
+                                keys[key as usize].clone(),
+                                value.map(|v| StateValue::from(vec![v])),
+                            )
+                        }));
+                    txn_to_commit(write_set, i + 1 == num_txns)
+                })
+                .collect()
+        })
+        .collect();
+    (keys, blocks)
+}
+
+/// Commits `blocks` starting at `first_version`, `blocks_per_chunk` blocks at a time, and returns
+/// the last version of each chunk.
+fn commit_blocks(
+    db: &AptosDB,
+    blocks: &[Vec<TransactionToCommit>],
+    first_version: Version,
+    blocks_per_chunk: usize,
+) -> Vec<Version> {
+    let mut version = first_version;
+    let mut chunk_ends = vec![];
+    for chunk in blocks.chunks(blocks_per_chunk) {
+        let chunk = chunk.concat();
+        db.save_transactions_for_test(&chunk, version, None, true)
+            .unwrap();
+        version += chunk.len() as Version;
+        chunk_ends.push(version - 1);
+    }
+    chunk_ends
+}
+
+/// Checks usage at every block end against the write sets of `txns`.
+fn check_usage_at_block_ends(db: &AptosDB, txns: &[TransactionToCommit]) {
+    let mut sizes = HashMap::new();
+    for (version, txn) in txns.iter().enumerate() {
+        for (key, write_op) in txn.write_set().write_op_iter() {
+            match write_op.as_state_value_opt() {
+                Some(value) => sizes.insert(key, key.size() + value.size()),
+                None => sizes.remove(key),
+            };
+        }
+        if txn.has_state_checkpoint_hash() {
+            assert_eq!(
+                db.get_state_storage_usage(Some(version as Version))
+                    .unwrap(),
+                StateStorageUsage::new(sizes.len(), sizes.values().sum()),
+                "version {version}",
+            );
+        }
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
 
     #[test]
     fn test_get_state_value_mid_block(
-        // Per block, per txn, writes as `(key index, value)`; `None` deletes.
-        blocks in vec(vec(vec((0..3u8, option::of(any::<u8>())), 0..=2), 1..=5), 1..=8),
+        blocks in arb_state_kv_blocks(),
         blocks_per_chunk in 1..=3usize,
         prune_index in any::<Index>(),
     ) {
-        // Same shard, so seeks can run into a neighboring key's rows.
-        let keys: Vec<_> = (0..=u8::MAX)
-            .map(|i| StateKey::raw(&[i]))
-            .filter(|key| key.get_shard_id() == 0)
-            .take(3)
-            .collect();
-        assert_eq!(keys.len(), 3);
-        let blocks: Vec<Vec<_>> = blocks
-            .into_iter()
-            .map(|block| {
-                let num_txns = block.len();
-                block
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, writes)| {
-                        let write_set = WriteSet::new_for_test(writes.into_iter().map(
-                            |(key, value)| {
-                                (keys[key as usize].clone(), value.map(|v| StateValue::from(vec![v])))
-                            },
-                        ));
-                        txn_to_commit(write_set, i + 1 == num_txns)
-                    })
-                    .collect()
-            })
-            .collect();
+        let (keys, blocks) = state_kv_blocks(blocks);
         let txns = blocks.concat();
         let mut block_starts = vec![];
         for block in &blocks {
@@ -411,12 +475,7 @@ proptest! {
 
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
-        let mut version = 0;
-        for chunk in blocks.chunks(blocks_per_chunk) {
-            let chunk = chunk.concat();
-            db.save_transactions_for_test(&chunk, version, None, true).unwrap();
-            version += chunk.len() as Version;
-        }
+        commit_blocks(&db, &blocks, 0, blocks_per_chunk);
         check_state_reads(&db, &txns, &keys, &block_starts, 0);
 
         // Drop rows as if state KV kept only the last write to a key in each block.
@@ -444,6 +503,45 @@ proptest! {
             .save_min_readable_version(prune_version)
             .unwrap();
         check_state_reads(&db, &txns, &keys, &block_starts, prune_version);
+    }
+
+    #[test]
+    fn test_usage_at_block_ends(
+        blocks in arb_state_kv_blocks(),
+        blocks_per_chunk in 1..=3usize,
+        truncate_index in any::<Index>(),
+    ) {
+        let (_keys, blocks) = state_kv_blocks(blocks);
+        let txns = blocks.concat();
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let chunk_ends = commit_blocks(&db, &blocks, 0, blocks_per_chunk);
+        check_usage_at_block_ends(&db, &txns);
+        drop(db);
+
+        // Truncate to a block end, possibly in the middle of a chunk, and commit the rest again.
+        // Truncation needs a state snapshot at or before the target, and the first one is at the
+        // end of the first chunk.
+        let num_txns_before = |num_blocks: usize| -> Version {
+            blocks[..num_blocks].iter().map(Vec::len).sum::<usize>() as Version
+        };
+        let min_blocks_kept = (1..=blocks.len())
+            .find(|num_blocks| num_txns_before(*num_blocks) == chunk_ends[0] + 1)
+            .unwrap();
+        let num_blocks_kept =
+            min_blocks_kept + truncate_index.index(blocks.len() - min_blocks_kept + 1);
+        let target_version = num_txns_before(num_blocks_kept) - 1;
+        AptosDB::truncate_to_version(&StorageDirPaths::from_path(tmp_dir.path()), target_version)
+            .unwrap();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        prop_assert_eq!(db.expect_synced_version(), target_version);
+        commit_blocks(
+            &db,
+            &blocks[num_blocks_kept..],
+            target_version + 1,
+            blocks_per_chunk,
+        );
+        check_usage_at_block_ends(&db, &txns);
     }
 }
 
