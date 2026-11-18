@@ -1,0 +1,66 @@
+VerexE2ETests/SourceVerify/map_write_block.proof.lean:10:3: error: `decide` does not close the obligation from the block's facts:
+  case assert_1
+  executable✝ : Validation.ExecutableUnit unit
+  assumed permitted : True
+  m_final_0 value_0_0 : Proofs.Denote.NTy.address.carrier
+  m_final : ((Proofs.Denote.NTy.int 64 false).table (Proofs.Denote.NTy.int 64 false)).carrier
+  final : Proofs.Denote.Memory unit
+  m_final_scope : Proofs.Denote.FinalEntry "m" (m_final_0, m_final, ())
+  verexInvariant✝¹ : SpecMap.Valid SpecMap.Discipline.sequence (SpecMap.ofEntries SpecInt.val SpecInt.val m_final)
+  bounds : m_final.entries.length < 2 ^ 64
+  left✝¹ : 0 ≤ (Proofs.Denote.NTy.int 64 false).plainFallback ⋯
+  right✝¹ : (Proofs.Denote.NTy.int 64 false).plainFallback ⋯ ≤ 2 ^ 64 - 1
+  value_0 : SpecMap Int Int
+  a✝¹ :
+    (0x1.map_write_block.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0_0,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          value_0,
+        PUnit.unit)
+  value_0_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) value_0) ==
+      value_0
+  verexInvariant✝ : SpecMap.Valid SpecMap.Discipline.sequence value_0
+  value_0_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
+  value_0_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) value_0
+  m : SpecMap Int Int
+  a✝ :
+    (0x1.map_write_block.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0_0,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        PUnit.unit)
+  invariantHolds✝ :
+    (0x1.map_write_block.unit.nominal.namespace.0.declaration✝⁻⁰ (Proofs.Denote.NTy.int 64 false)
+          (Proofs.Denote.NTy.int 64 false)).Holds
+      (value_0_0,
+        SpecMap.writeBack
+          (fun entry =>
+            ((Proofs.Denote.NTy.int 64 false).unread ⋯ entry.fst, (Proofs.Denote.NTy.int 64 false).unread ⋯ entry.snd))
+          m,
+        ())
+  m_read :
+    SpecMap.ofEntries SpecInt.val SpecInt.val
+        (SpecMap.writeBack
+          (fun entry => ({ val := 0, fits := ⋯ }.ofInt entry.fst, { val := 0, fits := ⋯ }.ofInt entry.snd)) m) ==
+      m
+  verexInvariant : SpecMap.Valid SpecMap.Discipline.sequence m
+  value_0_eq : value_0 == spec_set(m, 1, 30)
+  m_keys : SpecMap.KeysSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  m_values : SpecMap.ValuesSatisfy (IntegerValueFits (IntWidth.bits 64) false) m
+  value_0_size_bounds_1 : 0 ≤ spec_len(value_0)
+  value_0_size_bounds_2 : spec_len(value_0) < 18446744073709551616
+  m_size_bounds_1 : 0 ≤ spec_len(m)
+  m_size_bounds_2 : spec_len(m) < 18446744073709551616
+  left✝ : 0 ≤ spec_get(value_0, 1)
+  right✝ : spec_get(value_0, 1) ≤ 18446744073709551615
+  ⊢ spec_get(value_0, 1) == 30
+VerexE2ETests/SourceVerify/map_write_block.proof.lean:9:8: error: verex verification failed: the proof of `write_read` does not establish its specification

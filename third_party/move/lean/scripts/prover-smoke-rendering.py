@@ -78,7 +78,7 @@ frontend renders and what the proof file says."""
 # cell a block; cells left without one are those expected to verify on their
 # own (such as `split_reference_end`'s `drain_automatic`).
 PROOF_CONSUMERS = ("map_key_default", "map_value_default", "map_size_update",
-                   "split_reference_end", "pure_spec_map_fact")
+                   "split_reference_end", "pure_spec_map_fact", "map_write_block")
 
 # The import a proof file of this mode carries.
 PROOF_IMPORT = "import VerexMove.Proofs"

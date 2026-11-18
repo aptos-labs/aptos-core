@@ -127,7 +127,7 @@ Each is the rendering `scripts/prover-smoke-renderings.sh` writes, unedited.
 The generator refuses a fixture whose diagnostics the driver makes and a lone
 elaboration cannot: a failing `no panic` or `no abort` report, a refused
 function, a proof file beside the source, a verified namespace before the
-last. Four further renderings are the reproducers of the section "Parked
+last. Six further renderings are the reproducers of the section "Parked
 gaps" below, which lists them instead of this table.
 
 | Fixture | Stands for | Why no hand-written cell |
@@ -147,7 +147,7 @@ gaps" below, which lists them instead of this table.
 
 ## Parked gaps
 
-Four rendered fixtures hold a target the solver does not verify, kept as the
+Six rendered fixtures hold a target the solver does not verify, kept as the
 reproducer of a gap the user parked rather than repaired. A row here is a
 recorded failure, not a regression class the suite guards: the baseline
 records the diagnostics the gap produces today, and nothing in the suite
@@ -165,6 +165,8 @@ becomes a control in that test, and its baseline is written again.
 | `rendered split_pair_frame`: `process`, control `plain` | the same split under a match on a pair, where the closure invoke drops the equations the split left and the target stops on a residual obligation | `calculator::process` of the benchmark; a module-level `pragma verify = false` takes the target off this route, so the fixture does not disable module verification |
 | `rendered generic_join_ghost`: `settle_token`, control `pick_amount` | the unit declares a spec ghost, so a generic callee runs in its caller's walk: what the join owes of the values it abstracts is stated at the carriers the type arguments induce, while the arriving paths state their facts at the caller's | 17 rows of `coin`, `fungible_asset` and `primary_fungible_store` in the framework sample; a join of plain values owes nothing at the induced family and verifies |
 | `rendered pure_spec_map_fact`: `v_len_set` and `v_set_param`, control `v_rank_nonneg` | at a spec-only map owner, the length-update lemma and the precondition equating a parameter with an updated map do not close these authored assertions; the parameter-map rank control verifies. The failing contexts include True hypotheses, but the first lost correspondence and cause remain unlocalized. | no benchmark or framework row is attributed to it: the mechanism is recorded by this reproducer alone |
+| `rendered requires_of_disjunct`: `call_disjunct`, control `call_plain` | a callee's precondition `skip \|\| requires_of<f>(x)`, `f` a closure taking `&mut`, is not established at the call, and the target stops on the undecided leaf `requires_1_of_modify_at_call_1`; the precondition `requires_of<f>(x)` alone holds at the same kind of call | `big_ordered_map::test_verify_iter_modify` of the framework sample, whose leaf `requires_1_of_iter_modify` is undecided in the same way; that the two share a cause is not established |
+| `rendered map_write_block`: `write_read`, control `write_read_rest` | a read of a map after one write, asserted under a block that takes one clause (`on assert 1 { }`): `decide` does not close it, and the leaf holds the write's equation `value_0 == spec_set(m, 1, 30)` beside the goal `spec_get(value_0, 1) == 30`; the same body under `on _ { }` verifies | `big_ordered_map::test_verify_upsert` of the framework sample, whose leaves after several map writes hold their equations unsubstituted; that the two share a cause is not established |
 
 ## Costs
 

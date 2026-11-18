@@ -1,0 +1,8 @@
+VerexE2ETests/SourceVerify/requires_of_disjunct.move:15:9: error: the precondition `requires skip || requires_of<f>(x)` of `modify` does not hold at call 1
+VerexE2ETests/SourceVerify/requires_of_disjunct.move:29:5: error: verex verification failed: the automatic verification of `call_disjunct` failed; provide a proof in `VerexE2ETests/SourceVerify/requires_of_disjunct.proof.lean`:
+  verify call_disjunct by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_modify_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

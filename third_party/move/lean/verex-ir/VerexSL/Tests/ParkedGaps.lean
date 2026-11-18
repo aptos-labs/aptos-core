@@ -5,10 +5,12 @@ import VerexSL.Tests.Rendered.split_reference_end
 import VerexSL.Tests.Rendered.split_pair_frame
 import VerexSL.Tests.Rendered.generic_join_ghost
 import VerexSL.Tests.Rendered.pure_spec_map_fact
+import VerexSL.Tests.Rendered.requires_of_disjunct
+import VerexSL.Tests.Rendered.map_write_block
 
-/-! # The gaps four renderings record, and the controls beside them
+/-! # The gaps six renderings record, and the controls beside them
 
-Each of these four fixtures holds a target the solver does not verify, kept
+Each of these six fixtures holds a target the solver does not verify, kept
 as a reproducer of a gap that is parked rather than repaired, and beside it a
 control that exercises the same construct and does verify. The diagnostics of
 a gap are compared by its snapshot's `#guard_rendering`; they say nothing
@@ -23,7 +25,7 @@ fixture: the gap's row then moves to the positives, its section goes from
 the suite guards, and the fixture's baseline is written again.
 
 The snapshots are elaborated by prover-smoke on their own (`rendered
-split_reference_end` and the other three); here they are only imported, so
+split_reference_end` and the other five); here they are only imported, so
 this module costs a read of their `.olean`s.
 -/
 
@@ -40,7 +42,7 @@ private structure Fixture where
   gaps : List Name
   controls : List Name
 
-/-- The four gaps.
+/-- The six gaps.
 
 `split_reference_end`: the end of a `&mut` of the whole vector splits on the
 loop's state, and the split leaves a pattern equation that is not in normal
@@ -61,13 +63,24 @@ and verifies.
 the precondition equating a parameter with an updated map do not close these
 authored assertions; the parameter-map rank control verifies. The failing
 contexts include True hypotheses, but the first lost correspondence and cause
-remain unlocalized. -/
+remain unlocalized.
+
+`requires_of_disjunct`: a callee's precondition `skip || requires_of<f>(x)`,
+`f` a closure taking `&mut`, is not established at the call of
+`call_disjunct`; the precondition `requires_of<f>(x)` alone holds at the call
+of `call_plain`.
+
+`map_write_block`: a read of a map after a write, asserted under a block that
+takes one clause (`on assert 1 { }`), is not closed by `decide` in
+`write_read`; the same body under `on _ { }` verifies. -/
 private def fixtures : List Fixture :=
   [{ unit := `«0x42».split_reference_end, gaps := [`drain], controls := [`drain_automatic] },
    { unit := `«0x43».split_pair_frame, gaps := [`process], controls := [`plain] },
    { unit := `«0x42».generic_join_ghost, gaps := [`settle_token], controls := [`pick_amount] },
    { unit := `«0x1».pure_spec_map_fact, gaps := [`v_len_set, `v_set_param],
-     controls := [`v_rank_nonneg] }]
+     controls := [`v_rank_nonneg] },
+   { unit := `«0x42».requires_of_disjunct, gaps := [`call_disjunct], controls := [`call_plain] },
+   { unit := `«0x1».map_write_block, gaps := [`write_read], controls := [`write_read_rest] }]
 
 run_cmd do
   let env ← getEnv
