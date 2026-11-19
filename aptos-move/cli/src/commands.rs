@@ -412,6 +412,13 @@ pub struct CompilePackage {
     #[clap(long)]
     pub fetch_deps_only: bool,
 
+    /// Output compiled bytecode as hex-encoded strings
+    ///
+    /// If set, the output will include hex-encoded bytecode for each compiled module,
+    /// instead of just the module IDs.
+    #[clap(long)]
+    pub to_hex: bool,
+
     #[clap(flatten)]
     pub included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -422,12 +429,13 @@ pub struct CompilePackage {
 }
 
 #[async_trait]
-impl CliCommand<Vec<String>> for CompilePackage {
+impl CliCommand<CompilePackageOutput> for CompilePackage {
     fn command_name(&self) -> &'static str {
         "CompilePackage"
     }
 
-    async fn execute(self) -> CliTypedResult<Vec<String>> {
+    async fn execute(self) -> CliTypedResult<CompilePackageOutput> {
+        let to_hex = self.to_hex;
         let build_options = BuildOptions {
             install_dir: self.move_options.output_dir.clone(),
             ..self
@@ -440,19 +448,48 @@ impl CliCommand<Vec<String>> for CompilePackage {
         if self.fetch_deps_only {
             let config = BuiltPackage::create_build_config(&mut w.clone(), &build_options)?;
             BuiltPackage::prepare_resolution_graph(&mut w.clone(), package_path, config)?;
-            return Ok(vec![]);
+            return Ok(CompilePackageOutput::ModuleIds(vec![]));
         }
         let pack = BuiltPackage::build_to(&w, self.move_options.get_package_path()?, build_options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         if self.save_metadata {
             pack.extract_metadata_and_save()?;
         }
-        let ids = pack
-            .modules()
-            .map(|m| m.self_id().to_string())
-            .collect::<Vec<_>>();
-        // TODO: Also say how many scripts are compiled
-        Ok(ids)
+        if to_hex {
+            let hex_map: BTreeMap<String, String> = pack
+                .module_code_iter()
+                .map(|(name, bytecode)| (name, hex::encode(bytecode)))
+                .collect();
+            Ok(CompilePackageOutput::HexBytecode(hex_map))
+        } else {
+            let ids = pack
+                .modules()
+                .map(|m| m.self_id().to_string())
+                .collect::<Vec<_>>();
+            // TODO: Also say how many scripts are compiled
+            Ok(CompilePackageOutput::ModuleIds(ids))
+        }
+    }
+}
+
+/// Output of the compile package command.
+///
+/// When `--to-hex` is not used, this is a list of compiled module IDs.
+/// When `--to-hex` is used, this is a map from module name to hex-encoded bytecode.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum CompilePackageOutput {
+    ModuleIds(Vec<String>),
+    HexBytecode(BTreeMap<String, String>),
+}
+
+impl CompilePackageOutput {
+    /// Returns true if the output contains no modules.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            CompilePackageOutput::ModuleIds(ids) => ids.is_empty(),
+            CompilePackageOutput::HexBytecode(map) => map.is_empty(),
+        }
     }
 }
 
