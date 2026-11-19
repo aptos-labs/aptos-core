@@ -379,6 +379,8 @@ impl FeatureFlag {
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
             Self::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES,
             Self::CHECK_BORROW_FIELD_HANDLE_SHAPE,
+            Self::FUNCTION_VALUE_DISPATCH,
+            Self::LAZY_MODULE_INITIALIZATION,
         ];
         if mono_move_env_enabled() {
             features.push(Self::ENABLE_MONO_MOVE);
