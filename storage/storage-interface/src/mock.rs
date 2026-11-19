@@ -3,7 +3,7 @@
 
 //! This module provides mock dbreader for tests.
 
-use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
+use crate::{errors::AptosDbError, CheckpointStateReader, DbReader, DbWriter, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -17,10 +17,52 @@ use aptos_types::{
 /// This is a mock of the DbReaderWriter in tests.
 pub struct MockDbReaderWriter;
 
+impl MockDbReaderWriter {
+    /// Values don't depend on the version, so reads at any version land here.
+    fn get(&self, state_key: &StateKey, version: Version) -> Result<Option<(Version, StateValue)>> {
+        match state_key.inner() {
+            StateKeyInner::AccessPath(..) => Ok(None),
+            StateKeyInner::Raw(raw_key) => {
+                Ok(Some((version, StateValue::from(raw_key.to_owned()))))
+            },
+            _ => Err(AptosDbError::Other(format!(
+                "Not supported state key type {:?}",
+                state_key
+            ))),
+        }
+    }
+}
+
 impl DbReader for MockDbReaderWriter {
     fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
         Ok(Some(1))
+    }
+
+    fn get_state_value_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        Ok(self.get(state_key, version)?.map(|(_, value)| value))
+    }
+
+    fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get(state_key, version)
+    }
+}
+
+impl CheckpointStateReader for MockDbReaderWriter {
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        self.get(state_key, version)
     }
 
     fn get_state_proof_by_version_ext(
@@ -31,31 +73,6 @@ impl DbReader for MockDbReaderWriter {
         _use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
         Ok(SparseMerkleProofExt::new(None, vec![]))
-    }
-
-    fn get_state_value_by_version(
-        &self,
-        state_key: &StateKey,
-        _: Version,
-    ) -> Result<Option<StateValue>> {
-        match state_key.inner() {
-            StateKeyInner::AccessPath(..) => Ok(None),
-            StateKeyInner::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
-            _ => Err(AptosDbError::Other(format!(
-                "Not supported state key type {:?}",
-                state_key
-            ))),
-        }
-    }
-
-    fn get_state_value_with_version_by_version(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        Ok(self
-            .get_state_value_by_version(state_key, version)?
-            .map(|value| (version, value)))
     }
 }
 
