@@ -210,6 +210,7 @@ fn make_deriver<'a, 'env, G: ExpGenerator<'env>>(
         path: vec![],
         frame: Frame {
             store,
+            shadowed: BTreeMap::new(),
             diverged: false,
             label: LabelState::Concrete(entry_label),
         },
@@ -2184,9 +2185,10 @@ struct FunVal {
 enum Place {
     /// A local variable or parameter cell, identified by its store symbol.
     Local(Symbol),
-    /// A field of a place. Rebuilding uses the stored `Select` template
-    /// expression (with a hole at argument position 0) for reads and
-    /// `UpdateField` for writes.
+    /// A field of a place. Rebuilding uses the stored `Select` or
+    /// `SelectVariants` template expression (with a hole at argument
+    /// position 0) for reads; writes use `UpdateField` for a struct field
+    /// and pack the variant again for a variant field.
     Field(Box<Place>, FieldSel),
     /// A global resource cell `R[addr]`.
     Global(QualifiedInstId<StructId>, Exp),
@@ -2217,6 +2219,10 @@ enum LabelState {
 struct Frame {
     /// Current symbolic value per bound symbol.
     store: BTreeMap<Symbol, SymVal>,
+    /// For the name of a `&mut` parameter, the number of enclosing scopes
+    /// that bind the name again. While it is non-zero the name denotes a
+    /// local, not the parameter's cell.
+    shadowed: BTreeMap<Symbol, usize>,
     /// Whether this control path has diverged (returned or aborted).
     diverged: bool,
     /// The current memory state label.
@@ -2491,11 +2497,100 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         }
     }
 
-    /// Builds `update_field` for the field denoted by a `Select` operation.
+    /// The condition that `value` is in none of the variants carrying the
+    /// fields of a `SelectVariants` operation.
+    fn mk_not_in_variants(
+        &self,
+        mid: ModuleId,
+        sid: StructId,
+        fids: &[crate::model::FieldId],
+        value: Exp,
+    ) -> Exp {
+        let env = self.builder.global_env();
+        let struct_env = env.get_struct(mid.qualified(sid));
+        let variants = fids
+            .iter()
+            .filter_map(|fid| struct_env.get_field(*fid).get_variant())
+            .collect::<Vec<_>>();
+        let test = self.builder.mk_variant_tests(&struct_env, &variants, value);
+        self.builder.mk_not(test)
+    }
+
+    /// Builds the value of `base` with the field denoted by a variant field
+    /// selection replaced by `value`: for each variant carrying the field,
+    /// the variant packed again from the fields of `base`, with the selected
+    /// one replaced. A base in none of those variants is unchanged (the
+    /// borrow of the field has aborted).
+    fn mk_update_variant_field(
+        &mut self,
+        mid: ModuleId,
+        sid: StructId,
+        fids: &[crate::model::FieldId],
+        base: Exp,
+        value: Exp,
+    ) -> Res<Exp> {
+        let env = self.builder.global_env();
+        let Type::Struct(_, _, inst) = env
+            .get_node_type(base.as_ref().node_id())
+            .skip_reference()
+            .clone()
+        else {
+            return Err(Unsupported);
+        };
+        let struct_env = env.get_struct(mid.qualified(sid));
+        // Packing does not carry over ghost fields.
+        if struct_env.get_ghost_fields().next().is_some() {
+            return Err(Unsupported);
+        }
+        let mut branches = vec![];
+        for fid in fids {
+            let variant = struct_env
+                .get_field(*fid)
+                .get_variant()
+                .ok_or(Unsupported)?;
+            let fields = struct_env
+                .get_fields_of_variant(variant)
+                .map(|field| {
+                    if field.get_id() == *fid {
+                        value.clone()
+                    } else {
+                        self.builder.mk_field_select(&field, &inst, base.clone())
+                    }
+                })
+                .collect::<Vec<_>>();
+            let packed = self
+                .builder
+                .mk_pack_variant(mid, sid, variant, &inst, fields);
+            branches.push((variant, packed));
+        }
+        // If every variant carries the field, the last branch needs no test.
+        let total = struct_env.get_variants().count() == branches.len();
+        let mut result = if total {
+            branches.pop().ok_or(Unsupported)?.1
+        } else {
+            base.clone()
+        };
+        for (variant, packed) in branches.into_iter().rev() {
+            let test = self
+                .builder
+                .mk_variant_test(&struct_env, variant, base.clone());
+            result = self.builder.mk_ite(
+                test.as_ref().clone(),
+                packed.as_ref().clone(),
+                result.as_ref().clone(),
+            );
+        }
+        Ok(result)
+    }
+
+    /// Builds the updated value of `base` for a write to the field denoted
+    /// by a `Select` or `SelectVariants` operation.
     fn mk_update_field(&mut self, sel: &FieldSel, base: Exp, value: Exp) -> Res<Exp> {
         let (mid, sid, fid) = match &sel.oper {
             Operation::Select(mid, sid, fid) => (*mid, *sid, *fid),
-            // Writes through variant field selections are not supported.
+            Operation::SelectVariants(mid, sid, fids) => {
+                return self.mk_update_variant_field(*mid, *sid, fids, base, value);
+            },
             _ => return Err(Unsupported),
         };
         let env = self.builder.global_env();
@@ -2585,7 +2680,20 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
     // =============================================================================================
     // Evaluation
 
+    /// Evaluates an expression. A field selection over a reference is
+    /// evaluated to its place by `eval_raw`; as a value it is read at once,
+    /// so that a later write to the place does not change it.
     fn eval(&mut self, exp: &Exp) -> EvalResult {
+        let result = self.eval_raw(exp)?;
+        if let (ExpData::Call(_, Operation::Select(..), _), Some(SymVal::Ref(place))) =
+            (exp.as_ref(), &result)
+        {
+            return Ok(Some(SymVal::Value(self.read_place(place)?)));
+        }
+        Ok(result)
+    }
+
+    fn eval_raw(&mut self, exp: &Exp) -> EvalResult {
         if self.frame.diverged {
             return Ok(None);
         }
@@ -2601,12 +2709,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             Invalid(_) => Err(Unsupported),
             Value(..) => Ok(Some(SymVal::Value(exp.clone()))),
             LocalVar(_, sym) => {
-                if self
-                    .params
-                    .iter()
-                    .any(|p| p.sym == *sym && p.kind == ParamKind::MutRef)
-                    && self.frame.store.contains_key(sym)
-                {
+                if self.is_mut_param_cell(*sym) && self.frame.store.contains_key(sym) {
                     // A `&mut` parameter used as a value is the reference to
                     // its cell; the store holds the current target value.
                     Ok(Some(SymVal::Ref(Place::Local(*sym))))
@@ -2810,6 +2913,8 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                 };
                 self.frame = Frame {
                     store,
+                    // Scopes are balanced within a branch.
+                    shadowed: true_frame.shadowed.clone(),
                     diverged: false,
                     label,
                 };
@@ -2906,8 +3011,33 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         Ok(saved)
     }
 
+    /// Whether `sym` is a `&mut` parameter (or capture) of the analyzed body.
+    fn is_mut_param(&self, sym: Symbol) -> bool {
+        self.params
+            .iter()
+            .any(|p| p.sym == sym && p.kind == ParamKind::MutRef)
+    }
+
+    /// Whether `sym` denotes the cell of a `&mut` parameter: the store entry
+    /// holding the current value of the parameter's target, from which the
+    /// parameter's post-state is read. It does not while the name is bound
+    /// again in an enclosing scope.
+    fn is_mut_param_cell(&self, sym: Symbol) -> bool {
+        self.is_mut_param(sym) && self.frame.shadowed.get(&sym).copied().unwrap_or(0) == 0
+    }
+
+    /// Records that a new scope binds `sym`.
+    fn enter_binding(&mut self, sym: Symbol) {
+        if self.is_mut_param(sym) {
+            *self.frame.shadowed.entry(sym).or_default() += 1;
+        }
+    }
+
     fn restore_bindings(&mut self, saved: Vec<(Symbol, Option<SymVal>)>) {
         for (sym, old) in saved.into_iter().rev() {
+            if let Some(n) = self.frame.shadowed.get_mut(&sym) {
+                *n = n.saturating_sub(1);
+            }
             match old {
                 Some(v) => {
                     self.frame.store.insert(sym, v);
@@ -2921,6 +3051,15 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
 
     /// Assigns to an existing pattern (no new scope).
     fn assign_pattern(&mut self, pat: &Pattern, value: SymVal) -> Res<()> {
+        // Assigning to a `&mut` parameter makes it point elsewhere; its
+        // store entry would no longer hold the value of its target.
+        if pat
+            .vars()
+            .into_iter()
+            .any(|(_, sym)| self.is_mut_param_cell(sym))
+        {
+            return Err(Unsupported);
+        }
         let mut saved = vec![];
         self.bind_pattern_rec(pat, Some(value), false, &mut saved)
     }
@@ -2936,6 +3075,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             Pattern::Var(_, sym) => {
                 if scoped {
                     saved.push((*sym, self.frame.store.get(sym).cloned()));
+                    self.enter_binding(*sym);
                 } else if !self.frame.store.contains_key(sym) {
                     // An assignment to a variable of the enclosing scope:
                     // the analysis cannot express the write — the derived
@@ -3042,6 +3182,10 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         // Reference operations are handled before generic argument
         // evaluation, since they operate on places.
         match oper {
+            // Moving or copying a reference yields the same reference.
+            Copy | Move if self.builder.global_env().get_node_type(id).is_reference() => {
+                return self.eval(&args[0]);
+            },
             Borrow(kind) => return self.eval_borrow(*kind, &args[0]),
             Deref => {
                 let Some(v) = self.eval(&args[0])? else {
@@ -3199,20 +3343,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             SelectVariants(mid, sid, fids) => {
                 // Reading a field over variants aborts if the value is in
                 // none of the variants carrying the field.
-                let not_test = {
-                    let env = self.builder.global_env();
-                    let struct_env = env.get_struct(mid.qualified(*sid));
-                    let variants = fids
-                        .iter()
-                        .filter_map(|fid| struct_env.get_field(*fid).get_variant())
-                        .collect::<Vec<_>>();
-                    let test = self.builder.mk_variant_tests(
-                        &struct_env,
-                        &variants,
-                        value_args[0].clone(),
-                    );
-                    self.builder.mk_not(test)
-                };
+                let not_test = self.mk_not_in_variants(*mid, *sid, fids, value_args[0].clone());
                 self.add_abort(not_test);
                 self.rebuild(id, oper, value_args)
             },
@@ -3384,6 +3515,22 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                 if let Some(SymVal::Ref(place)) = self.frame.store.get(sym) {
                     return Ok(Some(SymVal::Ref(place.clone())));
                 }
+                // A variable of mutable reference type that holds a value
+                // and is not a `&mut` parameter cell: the target of the
+                // reference is not tracked (a field bound by destructuring
+                // or matching a reference, a reference chosen by a
+                // conditional). A write through it would update a copy and
+                // be lost.
+                if kind == ReferenceKind::Mutable
+                    && self
+                        .builder
+                        .global_env()
+                        .get_node_type(operand.node_id())
+                        .is_mutable_reference()
+                    && !self.is_mut_param_cell(*sym)
+                {
+                    return Err(Unsupported);
+                }
                 Ok(Some(SymVal::Ref(Place::Local(*sym))))
             },
             // A mutable borrow of a variable of the enclosing scope (a free
@@ -3395,13 +3542,26 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             ExpData::LocalVar(..) | ExpData::Temporary(..) if kind == ReferenceKind::Mutable => {
                 Err(Unsupported)
             },
-            ExpData::Call(id, oper @ Operation::Select(..), sel_args) => {
+            ExpData::Call(
+                id,
+                oper @ (Operation::Select(..) | Operation::SelectVariants(..)),
+                sel_args,
+                // An immutable borrow of a variant field takes the value path
+                // below: the reference denotes the value read at the borrow.
+            ) if kind == ReferenceKind::Mutable || matches!(oper, Operation::Select(..)) => {
                 let Some(base) = self.eval_borrow(kind, &sel_args[0])? else {
                     return Ok(None);
                 };
                 let SymVal::Ref(base_place) = base else {
                     return Err(Unsupported);
                 };
+                if let Operation::SelectVariants(mid, sid, fids) = oper {
+                    // Borrowing a field over variants aborts if the value
+                    // is in none of the variants carrying the field.
+                    let base_value = self.read_place(&base_place)?;
+                    let not_test = self.mk_not_in_variants(*mid, *sid, fids, base_value);
+                    self.add_abort(not_test);
+                }
                 let env = self.builder.global_env();
                 Ok(Some(SymVal::Ref(Place::Field(
                     Box::new(base_place),
@@ -3421,11 +3581,24 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
             // gets an anonymous cell (a write through it goes to a
             // temporary, as in the dynamic semantics).
             _ => {
-                let Some(v) = self.eval(operand)? else {
+                // The place is wanted here, whatever the type of the
+                // operand: evaluate without reading places.
+                let Some(v) = self.eval_raw(operand)? else {
                     return Ok(None);
                 };
                 if matches!(v, SymVal::Ref(_)) {
                     return Ok(Some(v));
+                }
+                // A mutable reference whose target is not known as a place:
+                // a write through it must not go to a temporary.
+                if kind == ReferenceKind::Mutable
+                    && self
+                        .builder
+                        .global_env()
+                        .get_node_type(operand.node_id())
+                        .is_mutable_reference()
+                {
+                    return Err(Unsupported);
                 }
                 let value = self.as_value(v)?;
                 let cell = self.fresh_sym("cell");
@@ -3723,6 +3896,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
                 let mut saved = vec![];
                 for (sym, val) in &fun_val.captures {
                     saved.push((*sym, self.frame.store.get(sym).cloned()));
+                    self.enter_binding(*sym);
                     self.frame.store.insert(*sym, val.clone());
                 }
                 let value = if arg_vals.len() == 1 {
@@ -4878,6 +5052,7 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         match pat {
             Pattern::Var(_, sym) => {
                 saved.push((*sym, self.frame.store.get(sym).cloned()));
+                self.enter_binding(*sym);
                 self.frame.store.insert(*sym, SymVal::Value(value.clone()));
                 Ok(())
             },
@@ -4933,6 +5108,11 @@ impl<'env, G: ExpGenerator<'env>> Deriver<'_, G> {
         let mut param_state = vec![];
         for info in &self.params {
             if info.kind != ParamKind::Value {
+                // A return from inside a scope that binds the parameter's
+                // name again: the store entry is the local, not the cell.
+                if self.frame.shadowed.get(&info.sym).copied().unwrap_or(0) != 0 {
+                    return Err(Unsupported);
+                }
                 match self.frame.store.get(&info.sym) {
                     Some(SymVal::Value(e)) => param_state.push((info.sym, e.clone())),
                     _ => return Err(Unsupported),
