@@ -1,0 +1,25 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/spec_var_receiver_call.move:27:9
+   │
+27 │         ensures last_f == s.f + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/spec_var_receiver_call.move:23: record_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/spec_var_receiver_call.move:24: record_incorrect
+   =     at tests/sources/functional/spec_var_receiver_call.move:27: record_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/spec_var_receiver_call.move:41:9
+   │
+41 │         ensures x.g == x.s.f + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/spec_var_receiver_call.move:37: record_ghost_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/spec_var_receiver_call.move:38: record_ghost_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/spec_var_receiver_call.move:37: record_ghost_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/spec_var_receiver_call.move:41: record_ghost_incorrect (spec)

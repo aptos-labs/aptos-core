@@ -1,0 +1,93 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/receiver_call.move:105:9
+    │
+105 │         assume [trusted] s.get_f() == 5;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/receiver_call.move:112:9
+    │
+112 │         assume [trusted] s.get_f() == 4;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/sources/functional/proof/receiver_call.move:63:9: error: the requirement of the lemma applied at `is_three(s.get_h())` does not hold
+tests/sources/functional/proof/receiver_call.move:58:5: error: verex verification failed: the automatic verification of `f_let_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_let_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | apply_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:83:13: error: the requirement of the lemma applied at `s.get_f() > 0 ==> is_three(s.f)` does not hold
+tests/sources/functional/proof/receiver_call.move:79:5: error: verex verification failed: the automatic verification of `f_if_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_if_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | apply_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:98:9: error: the assertion `s.get_f() == s.f + 1` does not hold
+tests/sources/functional/proof/receiver_call.move:95:5: error: verex verification failed: the automatic verification of `f_assert_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_assert_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:110:9: error: the specification clause `ensures result == 5` is not established
+tests/sources/functional/proof/receiver_call.move:109:5: error: verex verification failed: the automatic verification of `f_assume_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_assume_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:128:9: error: the requirement of the lemma applied at `is_three(s.get_h())` does not hold
+tests/sources/functional/proof/receiver_call.move:124:5: error: verex verification failed: the automatic verification of `f_apply_lemma_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_apply_lemma_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | apply_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:142:9: error: the assertion `is_zero(s.get_f())` does not hold
+tests/sources/functional/proof/receiver_call.move:139:5: error: verex verification failed: the automatic verification of `f_apply_spec_fun_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_apply_spec_fun_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:157:9: error: the specification clause `ensures sum(s.h) < sum(s.f)` is not established
+tests/sources/functional/proof/receiver_call.move:155:5: error: verex verification failed: the automatic verification of `f_forall_apply_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_forall_apply_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:168:9: error: the requirement of the lemma applied at `needs_three(t.s.f, t.s == t.s)` does not hold
+tests/sources/functional/proof/receiver_call.move:164:5: error: verex verification failed: the automatic verification of `f_apply_arg_order_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_apply_arg_order_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | apply_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:185:9: error: the assertion `s.get_f() == s.f + 1` does not hold
+tests/sources/functional/proof/receiver_call.move:182:5: error: verex verification failed: the automatic verification of `f_calc_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_calc_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | assert_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/proof/receiver_call.move:203:9: error: the specification clause `ensures result >= 10` is not established
+tests/sources/functional/proof/receiver_call.move:202:5: error: verex verification failed: the automatic verification of `f_split_incorrect` failed; provide a proof in `tests/sources/functional/proof/receiver_call.proof.lean`:
+  verify f_split_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

@@ -117,6 +117,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// A mapping from expression node id to associated placeholders which are to be processed
     /// after function body checking and all type inference is done.
     pub placeholder_map: BTreeMap<NodeId, ExpPlaceholder>,
+    /// Whether `post_process_body` runs for `post_process_spec_exp`.
+    in_spec_exp_post_process: bool,
     /// A flag to indicate whether to insert freeze operation
     pub insert_freeze: bool,
     /// A stack of open loops and their optional label
@@ -204,6 +206,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             spec_block_map: BTreeMap::new(),
             spec_lambda_map: BTreeMap::new(),
             placeholder_map: BTreeMap::new(),
+            in_spec_exp_post_process: false,
             insert_freeze: true,
             loop_stack: vec![],
             state_label_map: BTreeMap::new(),
@@ -2526,6 +2529,17 @@ impl ExpTranslator<'_, '_, '_> {
             .is_empty_struct
     }
 
+    /// Post-processes a specification expression at a position where placeholders were not
+    /// resolved before. There is no earlier behavior to keep at such a position, so the result
+    /// of a receiver-style call which could not be checked when it was translated is checked
+    /// when it is resolved (see `translate_receiver_call`).
+    pub fn post_process_spec_exp(&mut self, exp: Exp) -> Exp {
+        let saved = std::mem::replace(&mut self.in_spec_exp_post_process, true);
+        let exp = self.post_process_body(exp);
+        self.in_spec_exp_post_process = saved;
+        exp
+    }
+
     /// This function:
     /// 1) Post processes any placeholders which have been generated while translating expressions
     /// with this builder. This rewrites the given result expression and fills in placeholders
@@ -2545,7 +2559,7 @@ impl ExpTranslator<'_, '_, '_> {
                 if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
                     if let Some(info) = self.placeholder_map.get(&id) {
                         let loc = self.get_node_loc(id);
-                        match info {
+                        let (result, resolved_type) = match info {
                             ExpPlaceholder::SpecBlockInfo { spec_id, locals } => {
                                 let spec = if let Some(block) =
                                     self.spec_block_map.get(spec_id).cloned()
@@ -2572,28 +2586,42 @@ impl ExpTranslator<'_, '_, '_> {
                                     self.bug(&loc, "unresolved spec anchor");
                                     Spec::default()
                                 };
-                                RewriteResult::Rewritten(ExpData::SpecBlock(id, spec).into_exp())
+                                (
+                                    RewriteResult::Rewritten(
+                                        ExpData::SpecBlock(id, spec).into_exp(),
+                                    ),
+                                    None,
+                                )
                             },
                             ExpPlaceholder::FieldSelectInfo {
                                 struct_ty,
                                 field_name,
                             } => {
                                 // Resolve a field selection into the inferred struct type.
-                                if let Type::Struct(mid, sid, _) = self
+                                let field_name = *field_name;
+                                if let Type::Struct(mid, sid, inst) = self
                                     .subs
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    let oper = self.create_select_oper(
-                                        &loc,
-                                        &mid.qualified(*sid),
-                                        *field_name,
-                                    );
-                                    RewriteResult::RewrittenAndDescend(
-                                        ExpData::Call(id, oper, args).into_exp(),
+                                    let qid = mid.qualified(*sid);
+                                    let field_ty = self
+                                        .get_struct_field_decls(&qid, field_name)
+                                        .0
+                                        .first()
+                                        .map(|(_, ty)| ty.instantiate(inst));
+                                    let oper = self.create_select_oper(&loc, &qid, field_name);
+                                    (
+                                        RewriteResult::RewrittenAndDescend(
+                                            ExpData::Call(id, oper, args).into_exp(),
+                                        ),
+                                        field_ty,
                                     )
                                 } else {
-                                    RewriteResult::Rewritten(self.new_error_exp().into_exp())
+                                    (
+                                        RewriteResult::Rewritten(self.new_error_exp().into_exp()),
+                                        None,
+                                    )
                                 }
                             },
                             ExpPlaceholder::ReceiverCallInfo {
@@ -2617,21 +2645,33 @@ impl ExpTranslator<'_, '_, '_> {
                                 if let Some(inst) =
                                     self.get_receiver_function(&receiver_arg_ty, name)
                                 {
-                                    self.post_process_receiver_call(
-                                        id,
-                                        generics,
-                                        args,
-                                        arg_types,
-                                        &result_type,
-                                        &receiver_arg_ty,
-                                        inst,
+                                    let actual = inst.result_type.clone();
+                                    (
+                                        self.post_process_receiver_call(
+                                            id,
+                                            generics,
+                                            args,
+                                            arg_types,
+                                            &result_type,
+                                            &receiver_arg_ty,
+                                            inst,
+                                        ),
+                                        Some(actual),
                                     )
                                 } else {
                                     // Error reported
-                                    RewriteResult::Rewritten(self.new_error_exp().into_exp())
+                                    (
+                                        RewriteResult::Rewritten(self.new_error_exp().into_exp()),
+                                        None,
+                                    )
                                 }
                             },
+                        };
+                        // Every placeholder that is resolved into a value goes through this.
+                        if let Some(actual) = resolved_type {
+                            self.check_resolved_placeholder(id, &actual);
                         }
+                        result
                     } else {
                         // Reconstruct expression and return for traversal
                         RewriteResult::Unchanged(
@@ -2659,6 +2699,23 @@ impl ExpTranslator<'_, '_, '_> {
                 _ => None,
             },
         )
+    }
+
+    /// Checks the type of a value a placeholder has been resolved into (the result type of the
+    /// function of a receiver-style call, the type of a selected field) against the type
+    /// expected for it, as the direct form of the expression is checked when it is translated,
+    /// and records the outcome as the type of the expression. A placeholder stands for an
+    /// expression whose type was related to its context only by a constraint evaluated later,
+    /// under the variance of whatever fixed the type of the receiver or struct. This is done
+    /// only at the positions of `post_process_spec_exp`.
+    fn check_resolved_placeholder(&mut self, id: NodeId, actual: &Type) {
+        if self.in_spec_exp_post_process {
+            let loc = self.get_node_loc(id);
+            let actual = self.subs.specialize(actual);
+            let expected = self.subs.specialize(&self.get_node_type(id));
+            let ty = self.check_type(&loc, &actual, &expected, &ErrorMessageContext::General);
+            self.update_node_type(id, ty);
+        }
     }
 
     /// Post processes a receiver-style call.
@@ -5609,6 +5666,7 @@ impl ExpTranslator<'_, '_, '_> {
                 arg_types,
                 translated_args,
                 expected_type,
+                context,
             );
         }
         // Lookup candidates.
@@ -6049,11 +6107,21 @@ impl ExpTranslator<'_, '_, '_> {
         arg_types: Vec<Type>,
         args: Vec<Exp>,
         expected_type: &Type,
+        context: &ErrorMessageContext,
     ) -> ExpData {
         let generics = generics
             .as_ref()
             .map(|tys| self.translate_types_with_loc(tys));
         let receiver_type = arg_types.first().expect("at least one argument");
+        // In a specification, the result type of the resolved function is given a variable of
+        // its own, so that it can be checked against the expected type exactly as the function
+        // call form checks it. In code, the constraint relates the two with the same (shallow)
+        // variance the call form uses.
+        let result_type = if self.is_spec_mode() {
+            self.fresh_type_var()
+        } else {
+            expected_type.clone()
+        };
         self.add_constraint_and_report(
             loc,
             &ErrorMessageContext::ReceiverArgument,
@@ -6068,17 +6136,35 @@ impl ExpTranslator<'_, '_, '_> {
                     .map(|e| self.env().get_node_loc(e.node_id()))
                     .collect(),
                 arg_types.clone(),
-                expected_type.clone(),
+                result_type.clone(),
             ),
             None,
         );
-        let id = self.new_node_id_with_type_loc(expected_type, loc);
+        let node_type = if !self.is_spec_mode() {
+            expected_type.clone()
+        } else if self.subs.specialize(&result_type) != result_type {
+            // The type of the receiver is known, so the function has been resolved: check its
+            // result type as for the function call form.
+            self.check_type(loc, &result_type, expected_type, context)
+        } else {
+            // The function is resolved only once the type of the receiver is inferred. Until
+            // then its result stands for the expected type, which the constraint relates to
+            // the result type of the function when it is evaluated, as before.
+            self.check_type(
+                loc,
+                &result_type,
+                expected_type,
+                &ErrorMessageContext::General,
+            );
+            expected_type.clone()
+        };
+        let id = self.new_node_id_with_type_loc(&node_type, loc);
         self.placeholder_map
             .insert(id, ExpPlaceholder::ReceiverCallInfo {
                 name,
                 generics: generics.map(|g| g.1.clone()),
                 arg_types,
-                result_type: expected_type.clone(),
+                result_type,
             });
         ExpData::Call(id, Operation::NoOp, args)
     }
