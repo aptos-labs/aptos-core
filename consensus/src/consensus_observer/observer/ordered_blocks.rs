@@ -11,6 +11,7 @@ use crate::consensus_observer::{
 };
 use aptos_config::config::ConsensusObserverConfig;
 use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
+use aptos_crypto::HashValue;
 use aptos_logger::{debug, warn};
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use std::{collections::BTreeMap, sync::Arc};
@@ -68,6 +69,24 @@ impl OrderedBlockStore {
         self.ordered_blocks
             .get(&(epoch, round))
             .map(|(observed_ordered_block, _)| observed_ordered_block.ordered_block().clone())
+    }
+
+    /// Returns true iff an ordered block contains the given block, and it is
+    /// not the last block.
+    pub fn contains_inner_block(&self, epoch: u64, round: Round, block_id: HashValue) -> bool {
+        // Ordered blocks are contiguous and keyed by their last block, so only
+        // the first entry at or after the round can contain the block.
+        self.ordered_blocks
+            .range((epoch, round)..)
+            .next()
+            .is_some_and(|(_, (observed_ordered_block, _))| {
+                let blocks = observed_ordered_block.ordered_block().blocks();
+                blocks[..blocks.len().saturating_sub(1)]
+                    .iter()
+                    .any(|block| {
+                        block.epoch() == epoch && block.round() == round && block.id() == block_id
+                    })
+            })
     }
 
     /// Inserts the given ordered block into the ordered blocks. This function
@@ -445,6 +464,51 @@ mod test {
     }
 
     #[test]
+    fn test_contains_inner_block() {
+        let mut ordered_block_store = OrderedBlockStore::new(ConsensusObserverConfig::default());
+
+        // Insert two ordered blocks, with rounds [0, 1, 2] and [3, 4].
+        let epoch = 0;
+        let mut blocks = vec![];
+        for rounds in [0..3, 3..5] {
+            let pipelined_blocks = rounds
+                .map(|round| create_pipelined_block(epoch, round))
+                .collect::<Vec<_>>();
+            let last_round = pipelined_blocks.last().unwrap().round();
+            let ordered_block = OrderedBlock::new(
+                pipelined_blocks.clone(),
+                create_ledger_info(epoch, last_round),
+            );
+            ordered_block_store
+                .insert_ordered_block(ObservedOrderedBlock::new_for_testing(ordered_block));
+            blocks.extend(pipelined_blocks);
+        }
+
+        // Only blocks that are not the last of their ordered block are inner.
+        let inner_rounds = [0, 1, 3];
+        for block in &blocks {
+            assert_eq!(
+                ordered_block_store.contains_inner_block(epoch, block.round(), block.id()),
+                inner_rounds.contains(&block.round()),
+            );
+        }
+
+        // Verify that a mismatching id, epoch or round is not found.
+        let inner_block = &blocks[1];
+        assert!(!ordered_block_store.contains_inner_block(
+            epoch,
+            inner_block.round(),
+            HashValue::random()
+        ));
+        assert!(!ordered_block_store.contains_inner_block(
+            epoch + 1,
+            inner_block.round(),
+            inner_block.id()
+        ));
+        assert!(!ordered_block_store.contains_inner_block(epoch, 5, inner_block.id()));
+    }
+
+    #[test]
     fn test_insert_ordered_block_limit() {
         // Create a consensus observer config with a maximum of 10 pending blocks
         let max_num_pending_blocks = 10;
@@ -749,6 +813,22 @@ mod test {
         }
 
         ordered_blocks
+    }
+
+    /// Creates a pipelined block with the specified epoch and round.
+    fn create_pipelined_block(epoch: u64, round: Round) -> Arc<PipelinedBlock> {
+        let block_data = BlockData::new_for_testing(
+            epoch,
+            round,
+            round,
+            QuorumCert::dummy(),
+            BlockType::Genesis,
+        );
+        let block = Block::new_for_testing(HashValue::random(), block_data, None);
+        Arc::new(PipelinedBlock::new_ordered(
+            block,
+            OrderedBlockWindow::empty(),
+        ))
     }
 
     /// Creates and returns a new ledger info with the specified epoch and round

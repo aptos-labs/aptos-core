@@ -24,6 +24,7 @@ use aptos_consensus_types::{
     pipelined_block::{PipelineFutures, PipelinedBlock},
     wrapped_ledger_info::WrappedLedgerInfo,
 };
+use aptos_crypto::HashValue;
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, warn};
@@ -159,6 +160,18 @@ impl ObserverBlockData {
         round: aptos_consensus_types::common::Round,
     ) -> Option<OrderedBlock> {
         self.ordered_block_store.get_ordered_block(epoch, round)
+    }
+
+    /// Returns true iff an ordered block contains the given block, and it is
+    /// not the last block.
+    pub fn contains_inner_ordered_block(
+        &self,
+        epoch: u64,
+        round: Round,
+        block_id: HashValue,
+    ) -> bool {
+        self.ordered_block_store
+            .contains_inner_block(epoch, round, block_id)
     }
 
     /// Returns the parent block's pipeline futures

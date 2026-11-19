@@ -77,6 +77,45 @@ impl<T: Hashable> Buffer<T> {
         })
     }
 
+    /// Inserts `elem` right before the element at `cursor`.
+    #[allow(clippy::unwrap_used)]
+    pub fn insert_before(&mut self, cursor: &Cursor, elem: T) {
+        let key = cursor.unwrap();
+        let index = self.map.get(&key).unwrap().index;
+
+        // Shift indices from `cursor` to the tail, so they stay strictly
+        // increasing for `find_elem_by_key`.
+        let mut current = Some(key);
+        while let Some(k) = current {
+            let item = self.map.get_mut(&k).unwrap();
+            item.index = item.index.checked_add(1).unwrap();
+            current = item.next;
+        }
+        self.count = self.count.checked_add(1).unwrap();
+
+        let t_hash = elem.hash();
+        self.map.insert(t_hash, LinkedItem {
+            elem: Some(elem),
+            index,
+            next: Some(key),
+        });
+
+        if self.head == Some(key) {
+            self.head = Some(t_hash);
+            return;
+        }
+        let mut current = self.head;
+        while let Some(k) = current {
+            let item = self.map.get_mut(&k).unwrap();
+            if item.next == Some(key) {
+                item.next = Some(t_hash);
+                return;
+            }
+            current = item.next;
+        }
+        unreachable!("Cursor must be in the buffer");
+    }
+
     // utils - assuming item is not None
     #[allow(clippy::unwrap_used)]
     pub fn get_next(&self, cursor: &Cursor) -> Cursor {
@@ -257,5 +296,33 @@ mod test {
         // test take
         let head = *buffer.head_cursor();
         assert_eq!(buffer.take(&head), HashWrapper::from(1));
+    }
+
+    #[test]
+    fn insert_before() {
+        let mut buffer = Buffer::<HashWrapper>::new();
+        buffer.push_back(HashWrapper::from(2));
+        buffer.push_back(HashWrapper::from(4));
+
+        // Insert before the head, then in the middle.
+        buffer.insert_before(&Some(HashValue::from_u64(2)), HashWrapper::from(1));
+        buffer.insert_before(&Some(HashValue::from_u64(4)), HashWrapper::from(3));
+        buffer.push_back(HashWrapper::from(5));
+        assert_eq!(buffer.get(buffer.tail_cursor()), &HashWrapper::from(5));
+
+        // Every element is found from the ones before it, and not from the
+        // ones after it.
+        for i in 1..=5 {
+            for j in 1..=5 {
+                let cursor = Some(HashValue::from_u64(i));
+                let found = buffer.find_elem_by_key(cursor, HashValue::from_u64(j));
+                assert_eq!(found.is_some(), i <= j, "cursor {} key {}", i, j);
+            }
+        }
+
+        for i in 1..=5 {
+            assert_eq!(buffer.pop_front(), Some(HashWrapper::from(i)));
+        }
+        assert_eq!(buffer.pop_front(), None);
     }
 }

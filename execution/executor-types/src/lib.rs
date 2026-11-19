@@ -171,6 +171,13 @@ pub trait BlockExecutorTrait: Send + Sync {
 
     fn commit_ledger(&self, ledger_info_with_sigs: LedgerInfoWithSignatures) -> ExecutorResult<()>;
 
+    /// Whether consensus must wait for this block's commit before executing any
+    /// block on top of it. True when the block carries cache-invalidation info
+    /// (e.g., when modules are published), so that speculative execution cannot
+    /// run against a stale cache. False for genesis or already-pruned blocks not
+    /// in the tree.
+    fn block_wait_for_commit(&self, block_id: HashValue) -> ExecutorResult<bool>;
+
     /// Finishes the block executor by releasing memory held by inner data structures(SMT).
     fn finish(&self);
 

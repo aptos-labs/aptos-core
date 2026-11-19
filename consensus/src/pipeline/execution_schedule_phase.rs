@@ -7,7 +7,6 @@ use crate::pipeline::{
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use async_trait::async_trait;
-use futures::FutureExt;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -49,17 +48,11 @@ impl StatelessPipeline for ExecutionSchedulePhase {
     const NAME: &'static str = "execution_schedule";
 
     async fn process(&self, req: ExecutionRequest) -> ExecutionWaitRequest {
-        let ExecutionRequest { mut ordered_blocks } = req;
+        let ExecutionRequest { ordered_blocks } = req;
 
-        let block_id = match ordered_blocks.last() {
-            Some(block) => block.id(),
-            None => {
-                return ExecutionWaitRequest {
-                    block_id: HashValue::zero(),
-                    fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
-                }
-            },
-        };
+        let block_id = ordered_blocks
+            .last()
+            .map_or_else(HashValue::zero, |block| block.id());
 
         for b in &ordered_blocks {
             if let Some(tx) = b.pipeline_tx().lock().as_mut() {
@@ -70,15 +63,9 @@ impl StatelessPipeline for ExecutionSchedulePhase {
             }
         }
 
-        let fut = async move {
-            for b in ordered_blocks.iter_mut() {
-                let (compute_result, execution_time) = b.wait_for_compute_result().await?;
-                b.set_compute_result(compute_result, execution_time);
-            }
-            Ok(ordered_blocks)
+        ExecutionWaitRequest {
+            block_id,
+            ordered_blocks,
         }
-        .boxed();
-
-        ExecutionWaitRequest { block_id, fut }
     }
 }

@@ -17,7 +17,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
-        block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
+        block_epilogue::BlockEndInfo, CacheInvalidationInfo, ExecutionStatus, Transaction,
+        TransactionStatus, Version,
     },
 };
 use derive_more::Deref;
@@ -47,6 +48,7 @@ impl ExecutionOutput {
         hot_state_updates: HotStateUpdates,
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
+        cache_invalidation_info: Option<CacheInvalidationInfo>,
         subscribable_events: Planned<Vec<ContractEvent>>,
         transaction_info_v1: bool,
         hot_state_root_in_txn_info: bool,
@@ -77,6 +79,7 @@ impl ExecutionOutput {
             hot_state_updates,
             block_end_info,
             next_epoch_state,
+            cache_invalidation_info,
             subscribable_events,
             transaction_info_v1,
             hot_state_root_in_txn_info,
@@ -105,6 +108,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
+            cache_invalidation_info: None,
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
             hot_state_root_in_txn_info: false,
@@ -113,6 +117,17 @@ impl ExecutionOutput {
     }
 
     pub fn new_dummy_with_input_txns(txns: Vec<Transaction>) -> Self {
+        Self::new_dummy_impl(txns, None)
+    }
+
+    pub fn new_dummy_with_cache_invalidation_info(info: CacheInvalidationInfo) -> Self {
+        Self::new_dummy_impl(vec![], Some(info))
+    }
+
+    fn new_dummy_impl(
+        txns: Vec<Transaction>,
+        cache_invalidation_info: Option<CacheInvalidationInfo>,
+    ) -> Self {
         let num_txns = txns.len();
         let success_status = TransactionStatus::Keep(ExecutionStatus::Success);
         Self::new_impl(Inner {
@@ -130,6 +145,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: None,
+            cache_invalidation_info,
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: false,
             hot_state_root_in_txn_info: false,
@@ -158,6 +174,7 @@ impl ExecutionOutput {
             hot_state_updates: HotStateUpdates::new_empty(),
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
+            cache_invalidation_info: None,
             subscribable_events: Planned::ready(vec![]),
             transaction_info_v1: self.transaction_info_v1,
             hot_state_root_in_txn_info: self.hot_state_root_in_txn_info,
@@ -181,6 +198,12 @@ impl ExecutionOutput {
 
     pub fn expect_last_version(&self) -> Version {
         self.first_version + self.num_transactions_to_commit() as Version - 1
+    }
+
+    /// True if this block carries cache-invalidation info, and cross-block
+    /// caches must be synchronized or invalidated after it commits.
+    pub fn needs_invalidation(&self) -> bool {
+        self.cache_invalidation_info.is_some()
     }
 }
 
@@ -219,6 +242,9 @@ pub struct Inner {
     /// Only present if the block is the last block of an epoch, and is parsed output of the
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
+    /// Information about the cache invalidation this block requires on commit
+    /// for cache coherence. None means no cache invalidation is needed.
+    pub cache_invalidation_info: Option<CacheInvalidationInfo>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
     /// Whether to assemble `TransactionInfoV1` (instead of `TransactionInfoV0`) in the
     /// subsequent state-checkpoint / ledger-update phases.
