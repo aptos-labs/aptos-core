@@ -4,7 +4,9 @@ FROM debian-base AS faucet
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get --no-install-recommends install -y \
-        procps
+        procps \
+        libbrotli1 \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge '1.1.0-2+deb13u1'
 
 RUN mkdir -p /aptos/client/data/wallet/
 
