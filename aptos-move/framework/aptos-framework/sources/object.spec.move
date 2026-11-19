@@ -608,6 +608,12 @@ spec aptos_framework::object {
         ensures result == global<ObjectCore>(self.inner).owner;
     }
 
+    /// The end of the ownership chain is not an object.
+    spec root_owner<T: key>(self: Object<T>): address {
+        aborts_if !exists<ObjectCore>(self.inner);
+        ensures !exists<ObjectCore>(result);
+    }
+
     spec owns<T: key>(object: Object<T>, owner: address): bool {
         // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
         // `ObjectCore` on the chain) are not specified.

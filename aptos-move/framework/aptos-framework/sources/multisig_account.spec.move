@@ -198,10 +198,18 @@ spec aptos_framework::multisig_account {
         sequence_number: u64,
     ): MultisigTransaction {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        ensures result == table::spec_get(multisig_account_resource.transactions, sequence_number);
+    }
+
+    /// The account exists, `sequence_number` is in its queue range and the transaction is stored.
+    spec schema ValidSequenceNumberAbortsIf {
+        multisig_account: address;
+        sequence_number: u64;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
         aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
-        ensures result == table::spec_get(multisig_account_resource.transactions, sequence_number);
     }
 
     spec get_next_transaction_payload(
@@ -217,9 +225,9 @@ spec aptos_framework::multisig_account {
     }
 
     spec get_next_multisig_account_address(creator: address): address {
-        //pragma aborts_if_is_partial;
-        //aborts_if !exists<account::Account>(creator);
-        let owner_nonce = global<account::Account>(creator).sequence_number;
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
+        aborts_if !exists<account::Account>(creator) && !features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        ensures result == spec_next_multisig_account_address(creator);
     }
 
     spec last_resolved_sequence_number(multisig_account: address): u64 {
@@ -240,9 +248,7 @@ spec aptos_framework::multisig_account {
         owner: address
     ): (bool, bool) {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        aborts_if !exists<MultisigAccount>(multisig_account);
-        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
+        include ValidSequenceNumberAbortsIf;
         let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
         let votes = transaction.votes;
         let voted = simple_map::spec_contains_key(votes, owner);
@@ -259,12 +265,40 @@ spec aptos_framework::multisig_account {
     spec can_execute(owner: address, multisig_account: address, sequence_number: u64): bool {
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        // assert_valid_sequence_number borrows the resource and validates the range.
-        aborts_if !exists<MultisigAccount>(multisig_account);
-        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
+        include ValidSequenceNumberAbortsIf;
         // The owner-side checks must hold whenever the function returns true. The timelock and
         // approval-count parts of the conjunction depend on transaction state and the optional
         // MultisigAccountTimeLock resource — those remain abstract here.
+        ensures result ==>
+            vector::spec_contains(multisig_account_resource.owners, owner) &&
+            sequence_number == multisig_account_resource.last_executed_sequence_number + 1;
+    }
+
+    spec can_be_executed(multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count and timelock aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
+        ensures result ==> sequence_number == multisig_account_resource.last_executed_sequence_number + 1;
+    }
+
+    spec can_be_rejected(multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
+        ensures result ==> sequence_number == multisig_account_resource.last_executed_sequence_number + 1;
+    }
+
+    spec can_reject(owner: address, multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if vector::spec_contains(multisig_account_resource.owners, owner)
+            && multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
         ensures result ==>
             vector::spec_contains(multisig_account_resource.owners, owner) &&
             sequence_number == multisig_account_resource.last_executed_sequence_number + 1;
@@ -378,16 +412,79 @@ spec aptos_framework::multisig_account {
 
     ////////////////////////// Creation function specs ///////////////////////////////
 
-    spec schema CreateMultisigAccountAbortsIfAndEnsures {
+    spec schema CreateMultisigAccountAbortsIf {
         multisig_address: address;
         owners: vector<address>;
         num_signatures_required: u64;
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
         aborts_if exists<MultisigAccount>(multisig_address);
+    }
+
+    spec schema CreateMultisigAccountAbortsIfAndEnsures {
+        multisig_address: address;
+        owners: vector<address>;
+        num_signatures_required: u64;
+        include CreateMultisigAccountAbortsIf;
         let post multisig = global<MultisigAccount>(multisig_address);
         ensures exists<MultisigAccount>(multisig_address);
         ensures multisig.owners == owners;
         ensures multisig.num_signatures_required == num_signatures_required;
+    }
+
+    spec create_with_owners(
+        owner: &signer,
+        additional_owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        use std::signer;
+        // Partial: the aborts of creating the resource account and of the metadata are not specified.
+        pragma aborts_if_is_partial;
+        let owner_addr = signer::address_of(owner);
+        let owners = concat(additional_owners, vec(owner_addr));
+        let multisig_address = spec_next_multisig_account_address(owner_addr);
+        include CreateMultisigAccountAbortsIfAndEnsures;
+        aborts_if exists i in 0..len(owners), j in 0..len(owners):
+            i < j && owners[i] == owners[j];
+        aborts_if exists<account::Account>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures multisig.last_executed_sequence_number == 0;
+        ensures multisig.next_sequence_number == 1;
+        ensures option::is_some(multisig.signer_cap) && option::spec_borrow(multisig.signer_cap).account == multisig_address;
+    }
+
+    spec create_with_owners_then_remove_bootstrapper(
+        bootstrapper: &signer,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        use std::signer;
+        // Partial: the aborts of creating the resource account and of the metadata are not specified; removing
+        // the bootstrapper goes through a closure loop, so the final owner list is not specified.
+        pragma aborts_if_is_partial;
+        let bootstrapper_addr = signer::address_of(bootstrapper);
+        let all_owners = concat(owners, vec(bootstrapper_addr));
+        let multisig_address = spec_next_multisig_account_address(bootstrapper_addr);
+        include CreateMultisigAccountAbortsIf { owners: all_owners };
+        aborts_if exists i in 0..len(all_owners), j in 0..len(all_owners):
+            i < j && all_owners[i] == all_owners[j];
+        aborts_if exists<account::Account>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures exists<MultisigAccount>(multisig_address);
+        ensures multisig.num_signatures_required == num_signatures_required;
+        ensures len(multisig.owners) >= num_signatures_required;
+        ensures multisig.next_sequence_number == 1;
+    }
+
+    /// The address `create_multisig_account` uses; the seed mirrors `create_multisig_account_seed`.
+    spec fun spec_next_multisig_account_address(creator: address): address {
+        let nonce = if (exists<account::Account>(creator)) {
+            global<account::Account>(creator).sequence_number
+        } else { 0 };
+        account::spec_create_resource_address(creator, concat(concat(vec<u8>(), DOMAIN_SEPARATOR), std::bcs::to_bytes((nonce as u64))))
     }
 
     spec create_with_existing_account(
@@ -505,6 +602,55 @@ spec aptos_framework::multisig_account {
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
+    }
+
+    spec vote_transactions(
+        owner: &signer,
+        multisig_account: address,
+        starting_sequence_number: u64,
+        final_sequence_number: u64,
+        approved: bool
+    ) {
+        use std::signer;
+        use std::features;
+        // Partial: the per-transaction aborts after the first vote are not specified.
+        pragma aborts_if_is_partial;
+        let pre = global<MultisigAccount>(multisig_account);
+        let post post_r = global<MultisigAccount>(multisig_account);
+        let voting = starting_sequence_number <= final_sequence_number;
+        aborts_if !features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT);
+        aborts_if voting && !exists<MultisigAccount>(multisig_account);
+        aborts_if voting && !vector::spec_contains(pre.owners, signer::address_of(owner));
+        // Only votes change.
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
+        ensures post_r.last_executed_sequence_number == pre.last_executed_sequence_number;
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.metadata == pre.metadata;
+    }
+
+    spec execute_rejected_transactions(
+        owner: &signer,
+        multisig_account: address,
+        final_sequence_number: u64,
+    ) {
+        use std::signer;
+        use std::features;
+        // Partial: the rejection-count aborts of each removal are not specified.
+        pragma aborts_if_is_partial;
+        let pre = global<MultisigAccount>(multisig_account);
+        let post post_r = global<MultisigAccount>(multisig_account);
+        aborts_if !features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT);
+        aborts_if !exists<MultisigAccount>(multisig_account);
+        aborts_if pre.last_executed_sequence_number >= final_sequence_number;
+        aborts_if final_sequence_number >= pre.next_sequence_number;
+        aborts_if !vector::spec_contains(pre.owners, signer::address_of(owner));
+        // All transactions up to `final_sequence_number` are resolved; the owner set is unchanged.
+        ensures post_r.last_executed_sequence_number == final_sequence_number;
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
+        ensures post_r.metadata == pre.metadata;
     }
 
     ////////////////////////// VM prologue specs ///////////////////////////////
@@ -628,6 +774,22 @@ spec aptos_framework::multisig_account {
         aborts_if [abstract] exists i in 0..len(owners): owners[i] == multisig_account;
         aborts_if [abstract] exists i in 0..len(owners), j in 0..len(owners) where i < j:
             owners[i] == owners[j];
+    }
+
+    spec create_multisig_account(owner: &signer): (signer, SignerCapability) {
+        use std::signer;
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
+        use aptos_std::type_info;
+        let owner_addr = signer::address_of(owner);
+        let multisig_address = spec_next_multisig_account_address(owner_addr);
+        aborts_if !exists<account::Account>(owner_addr) && !features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        aborts_if exists<account::Account>(multisig_address);
+        include account::EnsureResourceExistsAbortsIf { addr: multisig_address };
+        aborts_if len(account::ZERO_AUTH_KEY) != 32;
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(type_info::type_of<AptosCoin>().account_address);
+        ensures signer::address_of(result_1) == multisig_address;
+        ensures result_2.account == multisig_address;
+        ensures exists<account::Account>(multisig_address);
     }
 
     spec remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {

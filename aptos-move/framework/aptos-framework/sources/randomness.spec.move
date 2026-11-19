@@ -75,6 +75,14 @@ spec aptos_framework::randomness {
         aborts_if !exists<PerBlockRandomness>(@aptos_framework);
     }
 
+    spec bytes(n: u64): vector<u8> {
+        aborts_if n > 0 && option::is_none(global<PerBlockRandomness>(@aptos_framework).seed);
+        aborts_if n > 0 && !spec_is_unbiasable();
+        aborts_if n > 0 && !exists<PerBlockRandomness>(@aptos_framework);
+        aborts_if n > MAX_U64 - 31;
+        ensures len(result) == n;
+    }
+
     spec u8_integer(): u8 {
         include NextBlobAbortsIf;
     }

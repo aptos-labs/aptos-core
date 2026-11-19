@@ -316,8 +316,6 @@ module aptos_framework::genesis {
             if (employee_group.validator.join_during_genesis) {
                 initialize_validator(pool_address, validator);
             };
-        } spec {
-            invariant exists<stake::ValidatorSet>(@aptos_framework);
         };
     }
 
