@@ -950,9 +950,10 @@ spec aptos_framework::stake {
 
     spec add_stake_with_cap {
         pragma disable_invariants_in_body;
-        include ResourceRequirement;
         let amount = coins.value;
         aborts_if reconfiguration_state::spec_is_in_progress();
+        aborts_if amount != 0 && !exists<ValidatorSet>(@aptos_framework);
+        aborts_if amount != 0 && !exists<staking_config::StakingConfig>(@aptos_framework);
         include AddStakeWithCapAbortsIfAndEnsures { amount };
     }
 
@@ -966,8 +967,10 @@ spec aptos_framework::stake {
         let plain = spec_has_apt_paired_store(owner_address)
             && fungible_asset::spec_store_no_withdraw_hook(store_addr);
         aborts_if reconfiguration_state::spec_is_in_progress();
-        include ResourceRequirement;
         aborts_if !exists<OwnerCapability>(owner_address);
+        // A withdraw hook may return a different amount, so these are only stated for a plain store.
+        aborts_if plain && amount != 0 && !exists<ValidatorSet>(@aptos_framework);
+        aborts_if plain && amount != 0 && !exists<staking_config::StakingConfig>(@aptos_framework);
         let pool_address = global<OwnerCapability>(owner_address).pool_address;
         let stake_pool = global<StakePool>(pool_address);
         let post post_stake_pool = global<StakePool>(pool_address);
@@ -987,7 +990,6 @@ spec aptos_framework::stake {
         use aptos_framework::fungible_asset;
         // Partial: the abort conditions of creating the event handles and of `coin::withdraw` beyond its summary
         // are not specified.
-        include ResourceRequirement;
         let addr = signer::address_of(owner);
         let store_addr = spec_apt_paired_store_address(addr);
         let plain = spec_has_apt_paired_store(addr)
@@ -996,6 +998,8 @@ spec aptos_framework::stake {
         include InitializeOwnerAbortsIf;
         aborts_if exists<ValidatorConfig>(addr);
         aborts_if staking && reconfiguration_state::spec_is_in_progress();
+        aborts_if staking && plain && !exists<ValidatorSet>(@aptos_framework);
+        aborts_if staking && plain && !exists<staking_config::StakingConfig>(@aptos_framework);
         aborts_if staking && plain && fungible_asset::spec_balance(store_addr) < initial_stake_amount;
         aborts_if staking && plain
             && initial_stake_amount > global<staking_config::StakingConfig>(@aptos_framework).maximum_stake;
