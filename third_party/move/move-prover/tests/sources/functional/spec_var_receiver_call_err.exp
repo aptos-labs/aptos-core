@@ -1,0 +1,12 @@
+Move prover returns: exiting with condition generation errors
+error: Move function `spec_var_receiver_call_err::get_f` cannot be called in specifications; use a spec function instead
+   ┌─ tests/sources/functional/spec_var_receiver_call_err.move:12:30
+   │
+12 │         global initial: u8 = S { f: 3 }.get_f();
+   │                              ^^^^^^^^^^^^^^^^^^
+
+error: Move function `spec_var_receiver_call_err::get_f` cannot be called in specifications; use a spec function instead
+   ┌─ tests/sources/functional/spec_var_receiver_call_err.move:21:23
+   │
+21 │         ghost g: u8 = s.get_f();
+   │                       ^^^^^^^^^

@@ -1,0 +1,56 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_call.move:18:9
+   │
+18 │         ensures r == v;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_call.move:108: applied_f_off_incorrect
+   =         s = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:18
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_call.move:18:9
+   │
+18 │         ensures r == v;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_call.move:38: f_of_incorrect
+   =         s = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:18
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_call.move:18:9
+   │
+18 │         ensures r == v;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_call.move:59: f_or_zero_if_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:59: f_or_zero_if_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:18
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_call.move:18:9
+   │
+18 │         ensures r == v;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_call.move:54: f_or_zero_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:54: f_or_zero_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:18
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_call.move:24:9
+   │
+24 │         invariant a <= b;
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_call.move:104: make_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_call.move:24
