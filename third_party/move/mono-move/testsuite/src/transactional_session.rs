@@ -151,7 +151,7 @@ impl TransactionalSession {
                 vm_config.clone(),
             )),
             module_provider: InMemoryModuleProvider::with_configs(
-                vm_config.deserializer_config.clone(),
+                vm_config.incoming_code_deserializer_config(),
                 vm_config.verifier_config.clone(),
             ),
         }

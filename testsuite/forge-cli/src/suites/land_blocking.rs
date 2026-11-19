@@ -58,6 +58,9 @@ fn compatibility_test_features() -> Features {
     // TODO: remove once `CHECK_BORROW_FIELD_HANDLE_SHAPE` is on the newest
     // `aptos-release-v*` branch.
     features.disable(FeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE);
+    // TODO: remove once `REJECT_TRAILING_BYTES_IN_INCOMING_CODE` is on the newest
+    // `aptos-release-v*` branch (v1.51 cut).
+    features.disable(FeatureFlag::REJECT_TRAILING_BYTES_IN_INCOMING_CODE);
     features
 }
 

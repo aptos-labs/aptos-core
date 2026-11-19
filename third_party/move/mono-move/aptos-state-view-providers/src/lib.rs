@@ -87,7 +87,8 @@ impl<S: StateView> ModuleProvider for StateViewModuleProvider<'_, S> {
     }
 
     fn deserializer_config(&self) -> &DeserializerConfig {
-        // TODO(correctness): return the on-chain deserializer config.
+        // TODO(correctness): return the on-chain deserializer config. Scripts additionally need
+        // `VMConfig::incoming_code_deserializer_config()` to reject trailing bytes.
         &DeserializerConfig::DEFAULT
     }
 

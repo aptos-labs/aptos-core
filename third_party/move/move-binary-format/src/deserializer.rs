@@ -87,13 +87,18 @@ fn catch_deserializer_panic<T>(
 pub struct DeserializerConfig {
     pub max_binary_format_version: u32,
     pub max_identifier_size: u64,
+    /// If true, a binary with bytes after the end of the encoded module or script is rejected.
+    /// Otherwise, those bytes are ignored.
+    pub reject_trailing_bytes: bool,
 }
 
 impl DeserializerConfig {
+    /// Returns a config that ignores trailing bytes.
     pub const fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
         Self {
             max_binary_format_version,
             max_identifier_size,
+            reject_trailing_bytes: false,
         }
     }
 }
@@ -462,6 +467,7 @@ fn deserialize_compiled_script(
         None
     };
     let code = load_code_unit(&mut cursor)?;
+    check_no_trailing_bytes(&cursor, binary_len, config)?;
     let mut script = CompiledScript {
         version: cursor.version(),
         type_parameters,
@@ -503,10 +509,29 @@ fn deserialize_compiled_module(
         self_module_handle_idx: load_module_handle_index(&mut cursor)?,
         ..Default::default()
     };
+    check_no_trailing_bytes(&cursor, binary_len, config)?;
 
     build_compiled_module(&mut module, &table_contents, &tables)?;
 
     Ok(module)
+}
+
+/// Returns an error if trailing bytes are rejected and `cursor`, which reads the whole binary,
+/// has not reached its end.
+fn check_no_trailing_bytes(
+    cursor: &VersionedCursor,
+    binary_len: usize,
+    config: &DeserializerConfig,
+) -> BinaryLoaderResult<()> {
+    let trailing_bytes = (binary_len as u64).saturating_sub(cursor.position());
+    if config.reject_trailing_bytes && trailing_bytes > 0 {
+        return Err(
+            PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                "{trailing_bytes} trailing bytes after end of binary"
+            )),
+        );
+    }
+    Ok(())
 }
 
 /// Reads all the table headers.

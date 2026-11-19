@@ -245,6 +245,9 @@ pub enum FeatureFlag {
     /// `INVALID_STRUCT_API_CODE`. Gated because it changes the recorded status of
     /// transactions that fail either way.
     CHECK_BORROW_FIELD_HANDLE_SHAPE = 132,
+    /// When enabled, publishing a module or executing a script fails if its binary has trailing
+    /// bytes. Modules published before this is enabled stay loadable.
+    REJECT_TRAILING_BYTES_IN_INCOMING_CODE = 133,
 }
 
 /// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
@@ -379,6 +382,7 @@ impl FeatureFlag {
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
             Self::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES,
             Self::CHECK_BORROW_FIELD_HANDLE_SHAPE,
+            Self::REJECT_TRAILING_BYTES_IN_INCOMING_CODE,
         ];
         if mono_move_env_enabled() {
             features.push(Self::ENABLE_MONO_MOVE);

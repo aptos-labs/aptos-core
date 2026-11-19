@@ -5,10 +5,12 @@
 
 use crate::{
     deserializer::DeserializerConfig,
-    file_format::{CompiledModule, CompiledScript},
+    errors::BinaryLoaderResult,
+    file_format::{basic_test_module, empty_script, CompiledModule, CompiledScript},
     file_format_common::*,
 };
 use move_core_types::vm_status::StatusCode;
+use std::fmt::Debug;
 
 fn malformed_simple_versioned_test(version: u32) {
     // bad uleb (more than allowed for table count)
@@ -280,4 +282,51 @@ fn deserialize_too_long_identifiers() {
             .major_status(),
         StatusCode::MALFORMED
     );
+}
+
+/// Checks that `binary`, the serialization of `value`, deserializes to `value` in both modes, and
+/// that with trailing bytes appended it only does so in lenient mode.
+fn check_trailing_bytes<T: PartialEq + Debug>(
+    value: &T,
+    binary: &[u8],
+    deserialize: fn(&[u8], &DeserializerConfig) -> BinaryLoaderResult<T>,
+) {
+    let lenient = DeserializerConfig::default();
+    let strict = DeserializerConfig {
+        reject_trailing_bytes: true,
+        ..lenient.clone()
+    };
+
+    for config in [&lenient, &strict] {
+        assert_eq!(&deserialize(binary, config).unwrap(), value);
+    }
+
+    for trailing_bytes in [&[0u8][..], b"payload"] {
+        let binary = [binary, trailing_bytes].concat();
+        assert_eq!(&deserialize(&binary, &lenient).unwrap(), value);
+        assert_eq!(
+            deserialize(&binary, &strict).unwrap_err().major_status(),
+            StatusCode::MALFORMED
+        );
+    }
+}
+
+#[test]
+fn deserialize_module_with_trailing_bytes() {
+    let module = basic_test_module();
+    let mut binary = vec![];
+    module
+        .serialize_for_version(Some(module.version), &mut binary)
+        .unwrap();
+    check_trailing_bytes(&module, &binary, CompiledModule::deserialize_with_config);
+}
+
+#[test]
+fn deserialize_script_with_trailing_bytes() {
+    let script = empty_script();
+    let mut binary = vec![];
+    script
+        .serialize_for_version(Some(script.version), &mut binary)
+        .unwrap();
+    check_trailing_bytes(&script, &binary, CompiledScript::deserialize_with_config);
 }
