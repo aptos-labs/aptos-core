@@ -94,6 +94,38 @@ impl RestoreHandler {
             .reset_position_after_fast_sync(version, expected_root_hash)
     }
 
+    /// Whether this DB keeps native-collateral state, i.e. whether a restore
+    /// must bring collateral along with the state snapshot.
+    pub fn has_collateral_store(&self) -> bool {
+        self.aptosdb.collateral.is_some()
+    }
+
+    pub fn get_collateral_restore_receiver(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
+        let collateral = self.aptosdb.collateral.as_ref().ok_or_else(|| {
+            AptosDbError::Other("native-collateral storage is not enabled on this DB".into())
+        })?;
+        new_native_snapshot_restore(
+            &collateral.store.kv_db,
+            &collateral.store.merkle_db,
+            version,
+            expected_root_hash,
+        )
+    }
+
+    /// Re-seat the collateral store on the snapshot just restored at `version`.
+    pub fn reset_collateral_store(
+        &self,
+        version: Version,
+        expected_root_hash: HashValue,
+    ) -> Result<()> {
+        self.aptosdb
+            .reset_collateral_after_fast_sync(version, expected_root_hash)
+    }
+
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         restore_utils::save_ledger_infos(self.aptosdb.ledger_db.metadata_db(), ledger_infos, None)
     }

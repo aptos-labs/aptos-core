@@ -10,6 +10,7 @@ pub(crate) mod stream;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
+use crate::backup_types::state_snapshot::manifest::SnapshotKind;
 use aptos_config::config::{
     RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -213,6 +214,10 @@ impl StateValueWriter<StateKey, StateValue> for MockStore {
     }
 }
 
+fn not_a_native_store(kind: SnapshotKind) -> AptosDbError {
+    AptosDbError::Other(format!("{kind:?} is not a native store"))
+}
+
 impl RestoreRunMode {
     pub fn name(&self) -> &'static str {
         match self {
@@ -260,23 +265,34 @@ impl RestoreRunMode {
         }
     }
 
-    /// Whether position snapshots get restored. A dry run verifies them
-    /// regardless.
-    pub fn has_position_store(&self) -> bool {
+    /// Whether snapshots of native store `kind` get restored. A dry run
+    /// verifies them regardless.
+    pub fn has_native_store(&self, kind: SnapshotKind) -> bool {
         match self {
-            Self::Restore { restore_handler } => restore_handler.has_position_store(),
+            Self::Restore { restore_handler } => match kind {
+                SnapshotKind::State => false,
+                SnapshotKind::Position => restore_handler.has_position_store(),
+                SnapshotKind::Collateral => restore_handler.has_collateral_store(),
+            },
             Self::Verify => true,
         }
     }
 
-    pub fn get_position_restore_receiver(
+    pub fn get_native_restore_receiver(
         &self,
+        kind: SnapshotKind,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<StateSnapshotRestore<StateKey, StateValue>> {
         match self {
-            Self::Restore { restore_handler } => {
-                restore_handler.get_position_restore_receiver(version, expected_root_hash)
+            Self::Restore { restore_handler } => match kind {
+                SnapshotKind::State => Err(not_a_native_store(kind)),
+                SnapshotKind::Position => {
+                    restore_handler.get_position_restore_receiver(version, expected_root_hash)
+                },
+                SnapshotKind::Collateral => {
+                    restore_handler.get_collateral_restore_receiver(version, expected_root_hash)
+                },
             },
             Self::Verify => {
                 let mock_store = Arc::new(MockStore);
@@ -291,14 +307,21 @@ impl RestoreRunMode {
         }
     }
 
-    pub fn reset_position_store(
+    pub fn reset_native_store(
         &self,
+        kind: SnapshotKind,
         version: Version,
         expected_root_hash: HashValue,
     ) -> Result<()> {
         match self {
-            Self::Restore { restore_handler } => {
-                restore_handler.reset_position_store(version, expected_root_hash)
+            Self::Restore { restore_handler } => match kind {
+                SnapshotKind::State => Err(not_a_native_store(kind)),
+                SnapshotKind::Position => {
+                    restore_handler.reset_position_store(version, expected_root_hash)
+                },
+                SnapshotKind::Collateral => {
+                    restore_handler.reset_collateral_store(version, expected_root_hash)
+                },
             },
             Self::Verify => Ok(()),
         }

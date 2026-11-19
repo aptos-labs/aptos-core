@@ -10,7 +10,10 @@ use aptos_config::{
     utils::get_available_port,
 };
 use aptos_db::{
-    db::test_helper::{arb_blocks_to_commit, arb_blocks_to_commit_with_positions},
+    db::test_helper::{
+        arb_blocks_to_commit, arb_blocks_to_commit_with_collateral,
+        arb_blocks_to_commit_with_positions,
+    },
     AptosDB,
 };
 use aptos_proptest_helpers::ValueGenerator;
@@ -52,13 +55,27 @@ pub fn tmp_db_with_random_positions() -> (
     Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
 ) {
     let tmpdir = TempPath::new();
-    let db = Arc::new(open_with_positions(tmpdir.path()));
+    let db = Arc::new(open_with_native_stores(tmpdir.path()));
     let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_positions());
     commit_blocks(&db, &blocks);
     (tmpdir, db, blocks)
 }
 
-pub fn open_with_positions(path: &Path) -> AptosDB {
+/// Like [`tmp_db_with_random_content`], on a DB with native storage whose
+/// checkpoints commit collateral state roots.
+pub fn tmp_db_with_random_collateral() -> (
+    TempPath,
+    Arc<AptosDB>,
+    Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+) {
+    let tmpdir = TempPath::new();
+    let db = Arc::new(open_with_native_stores(tmpdir.path()));
+    let blocks = ValueGenerator::new().generate(arb_blocks_to_commit_with_collateral());
+    commit_blocks(&db, &blocks);
+    (tmpdir, db, blocks)
+}
+
+pub fn open_with_native_stores(path: &Path) -> AptosDB {
     AptosDB::open(
         StorageDirPaths::from_path(path),
         false, /* readonly */
@@ -72,7 +89,7 @@ pub fn open_with_positions(path: &Path) -> AptosDB {
         None,
         HotStateConfig::default(),
     )
-    .expect("open with native-position storage")
+    .expect("open with native storage")
 }
 
 fn commit_blocks(db: &AptosDB, blocks: &[(Vec<TransactionToCommit>, LedgerInfoWithSignatures)]) {

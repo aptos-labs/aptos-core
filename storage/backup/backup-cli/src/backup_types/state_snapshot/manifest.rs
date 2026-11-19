@@ -51,16 +51,20 @@ pub struct StateSnapshotBackup {
     /// Native-position state at the same version, present when the transaction info at
     /// `version` commits a position state root. Proved by the same `proof` above.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub positions: Option<PositionSnapshotBackup>,
+    pub positions: Option<NativeSnapshotBackup>,
+    /// Native-collateral state at the same version, present when the transaction info at
+    /// `version` commits a collateral state root. Proved by the same `proof` above.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collateral: Option<NativeSnapshotBackup>,
 }
 
-/// The native-position section of a state snapshot backup.
+/// A native store's section of a state snapshot backup.
 #[derive(Deserialize, Serialize)]
-pub struct PositionSnapshotBackup {
-    /// Hash of the position tree root, as committed by the transaction info at the
+pub struct NativeSnapshotBackup {
+    /// Hash of the store's tree root, as committed by the transaction info at the
     /// snapshot's version.
     pub root_hash: HashValue,
-    /// All positions in chunks; empty for the empty tree.
+    /// All entries in chunks; empty for the empty tree.
     pub chunks: Vec<StateSnapshotChunk>,
 }
 
@@ -69,6 +73,7 @@ pub struct PositionSnapshotBackup {
 pub enum SnapshotKind {
     State,
     Position,
+    Collateral,
 }
 
 #[derive(Clone, Copy)]
@@ -87,6 +92,18 @@ impl SnapshotKind {
             (Self::Position, SnapshotEndpoint::ItemCount) => "position_state_item_count",
             (Self::Position, SnapshotEndpoint::Chunk) => "position_state_snapshot_chunk",
             (Self::Position, SnapshotEndpoint::RangeProof) => "position_state_range_proof",
+            (Self::Collateral, SnapshotEndpoint::ItemCount) => "collateral_state_item_count",
+            (Self::Collateral, SnapshotEndpoint::Chunk) => "collateral_state_snapshot_chunk",
+            (Self::Collateral, SnapshotEndpoint::RangeProof) => "collateral_state_range_proof",
+        }
+    }
+
+    /// Names the tree in logs and errors.
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::State => "state",
+            Self::Position => "position",
+            Self::Collateral => "collateral",
         }
     }
 }
