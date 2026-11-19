@@ -3,6 +3,7 @@
 
 pub mod abilities;
 pub mod align;
+pub mod cell;
 mod error;
 mod framework_symbols;
 mod function;
