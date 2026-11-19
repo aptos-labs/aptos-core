@@ -1,0 +1,33 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_evaluator_state.move:31:9
+   │
+31 │         ensures result == result_of<old(Cell[@0x42]).f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:23: step_at_entry
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:30: step_at_entry (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:23: step_at_entry
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:24: step_at_entry
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:25: step_at_entry
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:26: step_at_entry
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:23: step_at_entry
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:31: step_at_entry (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_evaluator_state.move:47:9
+   │
+47 │         ensures result == result_of<old(Cell[@0x42]).f>(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:43: client_at_entry
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:46: client_at_entry (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:43: client_at_entry
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:16: step (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:43: client_at_entry
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_evaluator_state.move:47: client_at_entry (spec)

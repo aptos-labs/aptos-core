@@ -1,0 +1,32 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater.move:21:22
+   │
+21 │     spec keeps_inl { ensures inl == old(inl); }
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:20: keeps_inl
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:20: keeps_inl
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:21: keeps_inl (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater.move:24:22
+   │
+24 │     spec keeps_dep { ensures dep == old(dep); }
+   │                      ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:23: keeps_dep
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:23: keeps_dep
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:24: keeps_dep (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_inline_updater.move:30:19
+   │
+30 │     spec direct { ensures gm::inl == old(gm::inl); }
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:29: direct
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:11: bump_inl
+   =     at tests/sources/functional/closures/unframed_field_world_inline_updater.move:30: direct (spec)

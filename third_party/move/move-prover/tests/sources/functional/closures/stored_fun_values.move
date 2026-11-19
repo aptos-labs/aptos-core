@@ -506,7 +506,8 @@ module 0x42::stored_fun_values {
         aborts_if !exists<AnyModifier>(modifier_addr);
     }
 
-    /// Claiming Counter unchanged with modifies_of * should fail
+    /// Claiming Counter unchanged with modifies_of *: verifies, as a callback run by this
+    /// module cannot access this module's resources (the VM rejects the re-entry)
     fun use_any_modifier_wrong(modifier_addr: address, s: &signer) {
         let m = &AnyModifier[modifier_addr];
         (m.f)(s)
@@ -515,7 +516,7 @@ module 0x42::stored_fun_values {
         requires exists<AnyModifier>(modifier_addr);
         aborts_if !exists<AnyModifier>(modifier_addr);
         ensures Counter[std::signer::address_of(s)]
-            == old(Counter[std::signer::address_of(s)]); // error: post-condition does not hold
+            == old(Counter[std::signer::address_of(s)]);
     }
 
     // =========================================================================

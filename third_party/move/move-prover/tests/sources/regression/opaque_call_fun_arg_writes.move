@@ -46,4 +46,7 @@ module 0x42::opaque_call_fun_arg_writes {
         requires exists<R>(a);
         ensures R[a].value == old(R[a].value);
     }
+
+    // A writer of `R`, so that the function values above may be one.
+    public fun set(a: address, v: u64) acquires R { R[a].value = v; }
 }

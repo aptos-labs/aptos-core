@@ -1,0 +1,12 @@
+Move prover returns: exiting with bytecode transformation errors
+warning: Unused value of parameter `h`. Consider removing the parameter, or prefixing with an underscore (e.g., `_h`), or binding to `_`
+   ┌─ tests/sources/functional/closures/unframed_field_world_deferral_field_clause.move:14:32
+   │
+14 │     public fun apply(f: |u64|, h: H, x: u64) { f(x) }
+   │                                ^
+
+error: function argument may modify resource `store::R`, which is not declared in `modifies_of` for `f`
+   ┌─ tests/sources/functional/closures/unframed_field_world_deferral_field_clause.move:24:9
+   │
+24 │         apply(|y| store::set(y), h, x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

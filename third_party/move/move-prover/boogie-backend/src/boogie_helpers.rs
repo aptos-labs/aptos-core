@@ -93,7 +93,45 @@ pub const TABLE_NATIVE_SPEC_ERROR: &str =
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
 const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
 
-pub use move_model::spec_derivation::behavioral_old_memory_instantiated;
+/// The memories `memory` stands for in Boogie: the world memory (`GlobalEnv::world_memory`)
+/// stands for every translated memory, itself included.
+pub fn expand_world_memory(
+    env: &GlobalEnv,
+    mut memory: BTreeSet<QualifiedInstId<StructId>>,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    if env
+        .world_memory()
+        .is_some_and(|world| memory.contains(&world))
+    {
+        memory.extend(
+            move_prover_bytecode_pipeline::mono_analysis::get_info(env).all_memory_qids(env),
+        );
+    }
+    memory
+}
+
+/// `spec_derivation::behavioral_old_memory_instantiated`, with the world memory expanded.
+pub fn behavioral_old_memory_instantiated(
+    fun_env: &FunctionEnv,
+    inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    expand_world_memory(
+        fun_env.env(),
+        spec_derivation::behavioral_old_memory_instantiated(fun_env, inst),
+    )
+}
+
+/// `spec_derivation::behavioral_target_memory`, with the world memory expanded.
+pub fn behavioral_target_memory(
+    env: &GlobalEnv,
+    fun: QualifiedId<FunId>,
+    inst: &[Type],
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    expand_world_memory(
+        env,
+        spec_derivation::behavioral_target_memory(env, fun, inst),
+    )
+}
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -114,6 +152,14 @@ pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
 
 /// Return boogie name of given structure.
 pub fn boogie_struct_name(struct_env: &StructEnv<'_>, inst: &[Type], bv_flag: bool) -> String {
+    // The world memory has a name of its own, independent of the module hosting it.
+    if struct_env
+        .module_env
+        .env
+        .is_world_memory(&struct_env.get_qualified_id())
+    {
+        return "$World".to_string();
+    }
     if struct_env.is_intrinsic_of(INTRINSIC_TYPE_MAP) {
         if struct_env.get_ghost_fields().next().is_some() {
             // Ghost-declaring intrinsic maps use a per-instance carrier
@@ -1615,6 +1661,36 @@ pub fn compute_evaluator_memory_union(
     BTreeSet<QualifiedInstId<StructId>>,
     BTreeSet<QualifiedInstId<StructId>>,
 ) {
+    evaluator_memory_union(env, fun_type, true)
+}
+
+/// `compute_evaluator_memory_union` without the variant for a value of unknown origin
+/// (`mono_analysis` gives every function type one): the memory a value of `fun_type` reads when
+/// it is one the program names -- a closure, a parameter, a field. A predicate over a parameter
+/// with a declared frame reads no other.
+pub fn compute_named_evaluator_memory_union(
+    env: &GlobalEnv,
+    fun_type: &Type,
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeSet<QualifiedInstId<StructId>>,
+) {
+    evaluator_memory_union(env, fun_type, false)
+}
+
+/// The name of the constant passed for `memory` where a predicate cannot read it.
+pub fn boogie_unread_memory_name(env: &GlobalEnv, memory: &QualifiedInstId<StructId>) -> String {
+    format!("{}_unread", boogie_resource_memory_name(env, memory, &None))
+}
+
+fn evaluator_memory_union(
+    env: &GlobalEnv,
+    fun_type: &Type,
+    with_unknown: bool,
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeSet<QualifiedInstId<StructId>>,
+) {
     use move_prover_bytecode_pipeline::mono_analysis;
 
     let mono_info = mono_analysis::get_info(env);
@@ -1630,7 +1706,7 @@ pub fn compute_evaluator_memory_union(
         }
         for info in closure_infos {
             let fun_env = env.get_function(info.fun.to_qualified_id());
-            union_used_memory.extend(spec_derivation::behavioral_target_memory(
+            union_used_memory.extend(behavioral_target_memory(
                 env,
                 info.fun.to_qualified_id(),
                 &info.fun.inst,
@@ -1648,6 +1724,15 @@ pub fn compute_evaluator_memory_union(
             let fun_env = env.get_function(info.fun.to_qualified_id());
             for access in fun_env.get_fun_param_access_of() {
                 if access.fun_param == info.param_sym {
+                    // A `*` frame reaches every memory, the world memory included.
+                    if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+                        for qid in mono_info.all_memory_qids(env) {
+                            union_used_memory.insert(qid.clone());
+                            if access.frame_spec.modifies_all {
+                                union_old_memory.insert(qid);
+                            }
+                        }
+                    }
                     for mem in &access.used_memory {
                         union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
                     }
@@ -1666,7 +1751,22 @@ pub fn compute_evaluator_memory_union(
             continue;
         }
         for info in field_infos {
+            if !with_unknown && env.is_world_memory(&info.struct_id.to_qualified_id()) {
+                continue;
+            }
             let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
+            // Unframed field: every memory, two slots (see `collect_union_memory`).
+            if struct_env
+                .get_field_access_of()
+                .iter()
+                .all(|a| a.fun_param != info.field_sym)
+            {
+                for qid in mono_info.all_memory_qids(env) {
+                    union_used_memory.insert(qid.clone());
+                    union_old_memory.insert(qid);
+                }
+                continue;
+            }
             for access in struct_env.get_field_access_of() {
                 if access.fun_param == info.field_sym {
                     if access.frame_spec.modifies_all || access.frame_spec.reads_all {

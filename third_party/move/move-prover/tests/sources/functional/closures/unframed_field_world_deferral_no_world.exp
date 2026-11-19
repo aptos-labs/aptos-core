@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:29:9
+   │
+29 │         ensures global<R>(@0x42) == old(global<R>(@0x42));
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:24: keeps_written
+   =     at tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:28: keeps_written (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:24: keeps_written
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:25: keeps_written
+   =         result = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_deferral_no_world.move:29: keeps_written (spec)

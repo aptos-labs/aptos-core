@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_module.move:29:23
+   │
+29 │     spec keeps_free { ensures free == old(free); }
+   │                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:28: keeps_free
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:28: keeps_free
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:29: keeps_free (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/unframed_field_world_ghost_module.move:40:35
+   │
+40 │     spec keeps_locked_elsewhere { ensures 0x42::gm::locked == old(0x42::gm::locked); }
+   │                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:39: keeps_locked_elsewhere
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:39: keeps_locked_elsewhere
+   =     at tests/sources/functional/closures/unframed_field_world_ghost_module.move:40: keeps_locked_elsewhere (spec)

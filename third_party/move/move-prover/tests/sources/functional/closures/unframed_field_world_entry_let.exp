@@ -1,0 +1,22 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/unframed_field_world_entry_let.move:78:9
+   │
+78 │         aborts_if !aborts_of<c.f>(x) && r0 == 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:68: let_guard_false
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:76: let_guard_false (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:68: let_guard_false
+   =         c = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:69: let_guard_false
+   =         <redacted> = <redacted>
+   =         r = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:70: let_guard_false
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:71: let_guard_false
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:68: let_guard_false
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:77: let_guard_false (spec)
+   =     at tests/sources/functional/closures/unframed_field_world_entry_let.move:78: let_guard_false (spec)
