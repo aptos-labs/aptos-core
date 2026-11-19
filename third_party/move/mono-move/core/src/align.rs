@@ -1,83 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Alignment constants and helpers.
+//! Alignment constants and helpers, re-exported from `mono-move-mem` (the
+//! crate that owns [`MAX_ALIGN`]) because most crates depend on this one.
 
-// [`MAX_ALIGN`] is defined in `mono-move-alloc` so that crate can align its
-// allocations; it is re-exported here because most crates depend on this one
-// and not on `mono-move-alloc`.
-pub use mono_move_alloc::MAX_ALIGN;
-
-// ---------------------------------------------------------------------------
-// Parametric rounding (usize)
-// ---------------------------------------------------------------------------
-
-/// Round `size` up to the next multiple of `align`. Wraps if
-/// `size + (align - 1)` overflows `usize`; use [`checked_align_up`] when
-/// the input may be attacker-controlled or otherwise unbounded.
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-#[inline(always)]
-pub const fn align_up(size: usize, align: usize) -> usize {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    (size + (align - 1)) & !(align - 1)
-}
-
-/// Overflow-checked variant of [`align_up`]. Returns `None` if rounding
-/// up would overflow `usize`.
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-#[inline(always)]
-pub const fn checked_align_up(size: usize, align: usize) -> Option<usize> {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    match size.checked_add(align - 1) {
-        Some(v) => Some(v & !(align - 1)),
-        None => None,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Specializations to MAX_ALIGN
-// ---------------------------------------------------------------------------
-
-/// Round `size` up to the next multiple of [`MAX_ALIGN`]. Wraps if `size`
-/// exceeds `usize::MAX - (MAX_ALIGN - 1)`; use [`checked_align_max`] when
-/// the input may be attacker-controlled or otherwise unbounded.
-#[inline(always)]
-pub const fn align_max(size: usize) -> usize {
-    align_up(size, MAX_ALIGN)
-}
-
-/// Overflow-checked variant of [`align_max`]. Returns `None` if rounding
-/// up would overflow `usize`.
-#[inline(always)]
-pub const fn checked_align_max(size: usize) -> Option<usize> {
-    checked_align_up(size, MAX_ALIGN)
-}
-
-// ---------------------------------------------------------------------------
-// u32 variant (specializer layout)
-// ---------------------------------------------------------------------------
-
-/// `u32` variant of [`align_up`].
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-#[inline(always)]
-pub fn align_up_u32(offset: u32, align: u32) -> u32 {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    (offset + align - 1) & !(align - 1)
-}
-
-/// Checked variant of [`align_up_u32`]: returns `None` if rounding `offset` up
-/// to `align` overflows `u32`. Use when `offset` may be untrusted or otherwise
-/// unbounded.
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-#[inline(always)]
-pub fn checked_align_up_u32(offset: u32, align: u32) -> Option<u32> {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    // TODO(cleanup): establish a systematic rule for choosing the checked vs unchecked
-    // alignment helpers. Prefer checked by default; switch a call site to the
-    // unchecked `align_up_u32` only where its bound is documented and proven.
-    u32::try_from(checked_align_up(offset as usize, align as usize)?).ok()
-}
+pub use mono_move_mem::{
+    align_max, align_up, align_up_u32, checked_align_max, checked_align_up, checked_align_up_u32,
+    MAX_ALIGN,
+};

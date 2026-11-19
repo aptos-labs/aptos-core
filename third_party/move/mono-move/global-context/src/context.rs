@@ -1162,7 +1162,7 @@ impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
     /// Returns the raw address of the allocation of the pointer. For testing
     /// purposes only.
     pub fn raw_address_for_testing(&self) -> usize {
-        self.ptr.as_raw_ptr().addr()
+        self.ptr.addr()
     }
 }
 

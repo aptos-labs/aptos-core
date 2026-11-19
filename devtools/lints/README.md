@@ -9,6 +9,7 @@ fully resolved types, HIR and MIR — everything clippy can see.
 | lint | what it flags | applies to (see `/dylint.toml`) |
 |---|---|---|
 | `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no ordered iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
+| `raw_memory_access` | raw pointer types, method calls on raw pointers (`p.add(1)`, even when the pointer is never spelled), and `core::ptr::{copy*, read*, write*, swap*}` / `slice::from_raw_parts*`; go through `mono_move_mem::MemAddr` | mono-move crates except `mem`, `alloc`, `lean-link` |
 
 ### What `no_std_hash_map` does not guarantee
 
@@ -92,7 +93,10 @@ observable behaviour, so a change to what a lint flags or says shows up as a
    `scope::Config`.
 2. `ui/<lint>.rs` (with the repo's license header, like any `.rs` file)
    with the cases it must and must not flag; run `cargo test`, review
-   `/tmp/<lint>.stage-id.stderr`, copy it to `ui/<lint>.stderr`.
+   `/tmp/<lint>.stage-id.stderr`, copy it to `ui/<lint>.stderr`. (The
+   harness rewrites every occurrence of the test directory's name, `ui`, to
+   `$DIR` in the blessed output, so avoid words containing `ui` — such as
+   "built-in" — in diagnostic text.)
 3. A scope entry in `/dylint.toml`.
 
 ## Maintenance

@@ -14,4 +14,5 @@ rust-version = { workspace = true }
 [dependencies]
 bumpalo = { workspace = true }
 crossbeam-utils = { workspace = true }
+mono-move-mem = { workspace = true }
 parking_lot = { workspace = true }

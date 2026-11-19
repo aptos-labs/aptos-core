@@ -27,6 +27,7 @@ extern crate rustc_session;
 extern crate rustc_span;
 
 mod no_std_hash_map;
+mod raw_memory_access;
 mod scope;
 
 use rustc_lint::LintStore;
@@ -40,10 +41,17 @@ pub fn register_lints(sess: &Session, lint_store: &mut LintStore) {
     dylint_linting::init_config(sess);
     let config = scope::Config::load();
 
-    lint_store.register_lints(&[no_std_hash_map::NO_STD_HASH_MAP]);
+    lint_store.register_lints(&[
+        no_std_hash_map::NO_STD_HASH_MAP,
+        raw_memory_access::RAW_MEMORY_ACCESS,
+    ]);
     let hash_map_scope = config.no_std_hash_map.clone();
     lint_store.register_late_lint_pass(Box::new(move |_| {
         Box::new(no_std_hash_map::NoStdHashMap::new(hash_map_scope.clone()))
+    }));
+    let raw_scope = config.raw_memory_access.clone();
+    lint_store.register_late_lint_pass(Box::new(move |_| {
+        Box::new(raw_memory_access::RawMemoryAccess::new(raw_scope.clone()))
     }));
 }
 
