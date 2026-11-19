@@ -39,13 +39,7 @@ impl Display for SigningRequest {
     }
 }
 
-pub trait CommitSignerProvider: Send + Sync {
-    fn sign_commit_vote(
-        &self,
-        ledger_info: LedgerInfoWithSignatures,
-        new_ledger_info: LedgerInfo,
-    ) -> Result<bls12381::Signature, Error>;
-}
+pub use crate::pipeline::commit_signer::CommitSignerProvider;
 
 pub struct SigningResponse {
     pub signature_result: Result<bls12381::Signature, Error>,

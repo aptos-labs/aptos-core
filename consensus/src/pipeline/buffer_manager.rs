@@ -110,7 +110,6 @@ pub struct BufferManager {
     signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
     signing_phase_rx: Receiver<SigningResponse>,
 
-    commit_msg_tx: Arc<NetworkSender>,
     reliable_broadcast: ReliableBroadcast<CommitMessage, ExponentialBackoff>,
     commit_proof_rb_handle: Option<DropGuard>,
 
@@ -142,6 +141,7 @@ pub struct BufferManager {
     // being updated on-chain.
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
+    #[cfg(test)]
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
     order_vote_enabled: bool,
@@ -183,7 +183,7 @@ impl BufferManager {
         reset_rx: UnboundedReceiver<ResetRequest>,
         epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
-        reset_flag: Arc<AtomicBool>,
+        _reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
         order_vote_enabled: bool,
         highest_committed_round: Round,
@@ -223,7 +223,6 @@ impl BufferManager {
                 executor.clone(),
             ),
             commit_proof_rb_handle: None,
-            commit_msg_tx,
             commit_msg_rx: Some(commit_msg_rx),
 
             persisting_phase_tx,
@@ -238,7 +237,8 @@ impl BufferManager {
             ongoing_tasks,
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
-            reset_flag,
+            #[cfg(test)]
+            reset_flag: _reset_flag,
             bounded_executor: executor,
             order_vote_enabled,
             highest_committed_round,
