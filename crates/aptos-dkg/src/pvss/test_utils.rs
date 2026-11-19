@@ -172,7 +172,7 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
 }
 
 pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfig> {
-    // [XDL+24] The Latency Price of Threshold Cryptosystem in Blockchains; by Zhuolun Xiang et al; 2024
+    // [XDL+24] The Latency Price of Threshold Cryptosystem in Blockchains; 2024
     vec![
         ThresholdConfig::new(143, 254).unwrap(), // from XDL+24
         ThresholdConfig::new(184, 254).unwrap(), // from XDL+24
