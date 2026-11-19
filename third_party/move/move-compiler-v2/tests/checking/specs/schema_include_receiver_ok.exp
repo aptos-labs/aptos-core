@@ -1,0 +1,101 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::M {
+    struct T {
+        s: S,
+        lim: u64,
+    }
+    spec {
+      invariant Le(M::$get_value(select M::T.s()), select M::T.lim());
+    }
+
+    struct S {
+        value: u64,
+    }
+    private fun get_value(self: &S): u64 {
+        select M::S.value<&S>(self)
+    }
+    private fun test_arg(s: &S): u64 {
+        select M::S.value<&S>(s)
+    }
+    spec {
+      ensures Eq<num>(result0(), M::$get_value($t0));
+    }
+
+    private fun test_if(s: &S): u64 {
+        select M::S.value<&S>(s)
+    }
+    spec {
+      ensures Implies(Gt(M::$get_value($t0), 0), Eq<num>(result0(), select M::S.value<0x42::M::S>($t0)));
+      ensures Implies(Not(Gt(M::$get_value($t0), 0)), Eq<num>(result0(), 0));
+    }
+
+    private fun test_nested(s: &S): u64 {
+        select M::S.value<&S>(s)
+    }
+    spec {
+      ensures Eq<num>(result0(), M::$get_value($t0));
+    }
+
+    private fun test_premise(s: &S): u64 {
+        select M::S.value<&S>(s)
+    }
+    spec {
+      ensures Implies(Gt(M::$get_value($t0), 0), Eq<num>(result0(), select M::S.value<0x42::M::S>($t0)));
+    }
+
+    spec fun $get_value(self: S): u64 {
+        select M::S.value<0x42::M::S>(self)
+    }
+} // end 0x42::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::M {
+    struct T has copy, drop {
+        s: S,
+        lim: u64,
+    }
+
+    spec T {
+        invariant get_value(s) <= lim;
+    }
+
+    struct S has copy, drop {
+        value: u64,
+    }
+    fun get_value(self: &S): u64 {
+        self.value
+    }
+    fun test_arg(s: &S): u64 {
+        s.value
+    }
+
+    spec test_arg(s: &S): u64 {
+        ensures result == get_value(s);
+    }
+
+    fun test_if(s: &S): u64 {
+        s.value
+    }
+
+    spec test_if(s: &S): u64 {
+        ensures get_value(s) > 0 ==> result == s.value;
+        ensures !(get_value(s) > 0) ==> result == 0;
+    }
+
+    fun test_nested(s: &S): u64 {
+        s.value
+    }
+
+    spec test_nested(s: &S): u64 {
+        ensures result == get_value(s);
+    }
+
+    fun test_premise(s: &S): u64 {
+        s.value
+    }
+
+    spec test_premise(s: &S): u64 {
+        ensures get_value(s) > 0 ==> result == s.value;
+    }
+
+}
