@@ -19,7 +19,10 @@ class WorkflowTests(unittest.TestCase):
         )
 
     def test_provider_selection(self):
-        script = self.parent["jobs"]["rust-ci-provider"]["steps"][0]["run"]
+        self.check_provider_selection(self.parent)
+
+    def check_provider_selection(self, workflow):
+        script = workflow["jobs"]["rust-ci-provider"]["steps"][0]["run"]
         import os
         import tempfile
 
@@ -51,6 +54,37 @@ class WorkflowTests(unittest.TestCase):
             capture_output=True,
         )
         self.assertNotEqual(result.returncode, 0)
+
+    def test_validation_honors_provider_and_allows_explicit_canaries(self):
+        validation = yaml.load(
+            (ROOT / ".github/workflows/validate-hosted-rust-ci.yaml").read_text(),
+            Loader=yaml.BaseLoader,
+        )
+        self.check_provider_selection(validation)
+        dispatch = validation["on"]["workflow_dispatch"]["inputs"]["rust_ci_provider"]
+        self.assertEqual(dispatch["default"], "default")
+        self.assertEqual(set(dispatch["options"]), {"default", "hosted", "aws"})
+        selection = validation["jobs"]["rust-ci-provider"]["steps"][0]
+        self.assertEqual(
+            selection["env"]["CONFIGURED_PROVIDER"], "${{ vars.RUST_CI_PROVIDER }}"
+        )
+        self.assertEqual(
+            selection["env"]["MANUAL_PROVIDER"],
+            "${{ github.event_name == 'workflow_dispatch' && inputs.rust_ci_provider || 'default' }}",
+        )
+        self.assertEqual(
+            validation["jobs"]["rust-ci-provider"]["outputs"]["provider"],
+            "${{ steps.select.outputs.provider }}",
+        )
+        suite = validation["jobs"]["full-suite"]
+        self.assertEqual(set(suite["needs"]), {"workflow-contract", "rust-ci-provider"})
+        self.assertEqual(
+            suite["uses"], "./.github/workflows/hosted-rust-unit-tests.yaml"
+        )
+        self.assertEqual(
+            suite["with"]["provider"], "${{ needs.rust-ci-provider.outputs.provider }}"
+        )
+        self.assertEqual(suite["if"], "${{ !contains(github.base_ref, '-release-') }}")
 
     def test_provider_gates_and_shard_cache(self):
         for name, job in self.reusable["jobs"].items():

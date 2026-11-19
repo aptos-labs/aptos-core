@@ -173,7 +173,7 @@ jobs:
           DETERMINATOR_MODE: ${{ vars.APTOS_TEST_DETERMINATOR || 'legacy' }}
           BASE_REF: origin/${{ github.base_ref || 'main' }}
 
-  rust-unit-tests:
+  rust-unit-tests-workflow:
     needs: [file_change_determinator, rust-ci-provider]
     if: needs.file_change_determinator.outputs.run_full_tests == 'true'
     uses: ./.github/workflows/hosted-rust-unit-tests.yaml
@@ -181,3 +181,28 @@ jobs:
       provider: ${{ needs.rust-ci-provider.outputs.provider }}
     secrets:
       TRUNK_API_TOKEN: ${{ secrets.TRUNK_API_TOKEN }}
+
+  # Preserve the required rust-unit-tests check; reusable workflows report only sub-checks.
+  rust-unit-tests:
+    needs: [file_change_determinator, rust-ci-provider, rust-unit-tests-workflow]
+    if: always()
+    runs-on: 2cpu-gh-ubuntu24-x64
+    steps:
+      - name: Check unit test results
+        env:
+          FILES_RESULT: ${{ needs.file_change_determinator.result }}
+          PROVIDER_RESULT: ${{ needs.rust-ci-provider.result }}
+          TESTS_RESULT: ${{ needs.rust-unit-tests-workflow.result }}
+        run: |
+          # A failed prerequisite also skips the unit tests.
+          if [ "$FILES_RESULT" != "success" ] || [ "$PROVIDER_RESULT" != "success" ]; then
+            echo "Unit test prerequisites failed: files $FILES_RESULT, provider $PROVIDER_RESULT"
+            exit 1
+          fi
+          # Skipped when the classifier does not select full tests.
+          if [ "$TESTS_RESULT" = "success" ] || [ "$TESTS_RESULT" = "skipped" ]; then
+            echo "Unit tests passed (result: $TESTS_RESULT)"
+          else
+            echo "Unit tests failed: $TESTS_RESULT"
+            exit 1
+          fi
