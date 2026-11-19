@@ -14,7 +14,7 @@
 ## change the trigger event from `pull_request_target` to `pull_request`.
 
 ## Additionally, because `pull_request_target` gets secrets injected for forked PRs
-## we use `https://github.com/sushichop/action-repository-permission` to ensure these
+## we check the collaborator permission of `github.actor` to ensure these
 ## jobs are only executed when a repo member with "write" permission has triggered
 ## the workflow (directly through a push or indirectly by applying a label or enabling
 ## auto_merge).
@@ -92,10 +92,17 @@ jobs:
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
       - name: Check repository permission for user which triggered workflow
-        uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
-        with:
-          required-permission: write
-          comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if ! perm=$(gh api "repos/${{ github.repository }}/collaborators/${ACTOR}/permission" --jq .permission); then
+            echo "::error::Could not look up repository permission for $ACTOR."; exit 1
+          fi
+          case "$perm" in
+            admin|maintain|write) echo "$ACTOR has $perm permission" ;;
+            *) echo "::error::Sorry, you don't have permission to trigger this workflow ($ACTOR has '$perm', write required)."; exit 1 ;;
+          esac
 
   # Because the docker build happens in a reusable workflow, have a separate job that collects the right metadata
   # for the subsequent docker builds. Reusable workflows do not currently have the "env" context: https://github.com/orgs/community/discussions/26671
