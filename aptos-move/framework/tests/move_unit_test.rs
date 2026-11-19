@@ -124,3 +124,8 @@ fn move_trading_unit_tests() {
 fn move_experimental_unit_tests() {
     run_tests_for_pkg("aptos-experimental", true);
 }
+
+#[test]
+fn move_encrypted_fungible_store_unit_tests() {
+    run_tests_for_pkg("../move-examples/encrypted_fungible_store", true);
+}

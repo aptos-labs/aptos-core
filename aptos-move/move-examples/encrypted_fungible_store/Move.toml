@@ -1,0 +1,12 @@
+[package]
+name = "EncryptedFungibleStorePrototype"
+version = "0.0.0"
+
+[addresses]
+encrypted_store = "_"
+
+[dev-addresses]
+encrypted_store = "0x123"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
