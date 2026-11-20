@@ -46,7 +46,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -80,9 +80,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     missing_apk_rx: aptos_channel::Receiver<Author, Author>,
     cert_fetch_tx: Sender<(Author, CertifiedAugData<D>)>,
     cert_fetch_rx: Receiver<(Author, CertifiedAugData<D>)>,
-    cert_fetch_in_progress: HashSet<Author>,
     // Dropped at epoch change to cancel unfinished certificate fetches.
-    cert_fetch_guards: Vec<DropGuard>,
+    cert_fetches: HashMap<Author, DropGuard>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -147,8 +146,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             missing_apk_rx,
             cert_fetch_tx,
             cert_fetch_rx,
-            cert_fetch_in_progress: HashSet::new(),
-            cert_fetch_guards: vec![],
+            cert_fetches: HashMap::new(),
         }
     }
 
@@ -370,7 +368,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     fn fetch_certified_aug_data(&mut self, author: Author) {
         if author == self.author
             || self.config.get_certified_apk(&author).is_some()
-            || !self.cert_fetch_in_progress.insert(author)
+            || self.cert_fetches.contains_key(&author)
         {
             return;
         }
@@ -424,8 +422,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        self.cert_fetches
+            .insert(author, DropGuard::new(abort_handle));
         tokio::spawn(Abortable::new(task, abort_registration));
-        self.cert_fetch_guards.push(DropGuard::new(abort_handle));
     }
 
     async fn broadcast_aug_data(&mut self) -> DropGuard {
@@ -615,7 +614,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.fetch_certified_aug_data(author);
                 }
                 Some((author, certified_data)) = self.cert_fetch_rx.next() => {
-                    self.cert_fetch_in_progress.remove(&author);
+                    self.cert_fetches.remove(&author);
                     match self.aug_data_store.add_certified_aug_data(certified_data) {
                         // The ack belongs to the proactive broadcast, which this exchange is not
                         // part of, so there is nobody to hand it to.
