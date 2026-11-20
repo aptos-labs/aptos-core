@@ -1817,6 +1817,7 @@ impl<'a> LoweringState<'a> {
                 let provided_args = self.slots_to_sized_slots(provided)?;
                 self.emit(MicroOp::CallClosure(Box::new(CallClosureOp {
                     closure_src,
+                    closure_ty: self.concrete_ty(data.closure_ty)?,
                     provided_args,
                 })))?;
                 self.bind_call_returns(&data.rets, ret_slots)?;

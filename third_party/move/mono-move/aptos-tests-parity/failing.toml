@@ -496,11 +496,11 @@ note = "TODO"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_by_ability_recheck_when_revalidation_disabled"
-note = "TODO"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::closure_stale_generic_ability::coin_duplication_prevented_when_revalidation_enabled"
-note = "TODO"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::constructor_args::constructor_args_bad_runtime"
@@ -574,7 +574,7 @@ name = "e2e-move-tests::e2e_move_tests$tests::function_type_ability_bounds::fake
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_depth::test_vm_value_too_deep_with_function_values"
-note = "TODO"
+note = "MonoMove does not bound value depth when packing a closure, so it builds closures too deep to decode."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::function_value_layout_dag::captured_layout_dag_over_cap_rejected"
@@ -680,18 +680,19 @@ note = "TODO"
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::poc_type_confusion_module_upgrade_parallel"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_kept_when_timed_feature_disabled"
-note = "TODO"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::eager_loading"
-note = "TODO"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::init_module_closure_store::stale_closure_memo_re_resolved_after_same_txn_upgrade::lazy_loading"
-note = "TODO"
+note = "MonoMove does not re-resolve a stored closure after its target's module is upgraded. Must land before package publishing."
 
 [[test]]
 name = "e2e-move-tests::e2e_move_tests$tests::keyless_feature_gating::test_feature_gating_with_zk_off"

@@ -50,8 +50,8 @@ use mono_move_core::{
     storage::resource_provider::InMemoryStorageKey,
     strip_ref,
     types::{
-        is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType, InternedTypeList,
-        Type,
+        is_assignable, is_signer_or_signer_immut_ref, view_type, view_type_list, InternedType,
+        InternedTypeList, Type,
     },
     BytecodeOffset, CallClosureOp, CallFrame, CmpKind, CodeOffset, ConstantPoolIndex,
     ErrorLocation, FrameOffset, Function, FunctionDefinitionIndex, FunctionRef, GasMeter,
@@ -274,7 +274,9 @@ pub(crate) unsafe fn saved_return_pc(fp: *mut u8) -> (usize, FrameFlag) {
 // pinned for as long as the effects are readable, and binds the value to the
 // module version it was resolved against. A later transaction reading it after
 // that module is upgraded must re-resolve the closure, as V1 does with the
-// module hash it records on resolution.
+// module hash it records on resolution. V1's `closure_stale_generic_ability`
+// and `init_module_closure_store` e2e tests cover this, and fail under
+// MonoMove. Must land before package publishing.
 pub struct SessionEffects {
     read_write_set: ResourceReadWriteSet,
     extensions: NativeExtensions,
@@ -650,6 +652,43 @@ fn stored_closure_target_not_persistent(callee: &Function) -> VMInternalError {
     ))
 }
 
+/// Checks a lazily resolved closure target against the closure's function type
+/// at the call site, as V1's runtime type checks do. Each provided argument must
+/// be assignable to the callee's parameter, and each callee result to the
+/// expected result.
+fn check_closure_signature(callee: &Function, mask: u64, closure_ty: InternedType) -> VMResult<()> {
+    let Type::Function { args, results, .. } = view_type(closure_ty) else {
+        invariant_violation!(ClosureTypeNotFunction);
+    };
+    let args = view_type_list(*args);
+    let results = view_type_list(*results);
+    let returns = view_type_list(callee.return_tys);
+    let params = callee
+        .param_tys
+        .iter()
+        .enumerate()
+        .filter(|(param_idx, _)| (mask >> param_idx) & 1 == 0)
+        .map(|(_, &ty)| ty);
+    let params_match = params.clone().count() == args.len()
+        && params
+            .zip(args)
+            .all(|(param, &arg)| is_assignable(param, arg));
+    let results_match = returns.len() == results.len()
+        && returns
+            .iter()
+            .zip(results)
+            .all(|(&ret, &result)| is_assignable(result, ret));
+    if !(params_match && results_match) {
+        return Err(VMInternalError::new(RuntimeError::InvariantViolation(
+            RuntimeInvariantViolation::ClosureSignatureMismatch {
+                module: Box::new(module_id_of(callee.module_id())),
+                function: identifier_of(view_function_ref(callee.func_ref).func_name),
+            },
+        )));
+    }
+    Ok(())
+}
+
 /// Attaches the faulting micro-op's originating instruction, or only the
 /// executing function's module when the program counter is past the end of the
 /// code.
@@ -930,6 +969,25 @@ impl<'guard> InterpreterContext<'guard> {
         ty_args: InternedTypeList,
     ) -> VMResult<&'guard Function> {
         let ptr = self.loader.load_function(
+            &mut self.read_set,
+            &mut self.gas_meter,
+            module_id,
+            name,
+            ty_args,
+        )?;
+        // SAFETY: the function lives in an arena the guard keeps alive.
+        Ok(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Like [`Self::load_function`], for the target of a closure. Also checks
+    /// the target's type-argument constraints.
+    fn load_closure_target(
+        &mut self,
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> VMResult<&'guard Function> {
+        let ptr = self.loader.load_closure_target(
             &mut self.read_set,
             &mut self.gas_meter,
             module_id,
@@ -3266,6 +3324,11 @@ impl InterpreterContext<'_> {
     // The pool is still justified for native functions but is overkill for
     // the 2-allocation case here and costs us a handle construction /
     // pointer reload.
+    //
+    // TODO(correctness): V1 fails with `VM_MAX_VALUE_DEPTH_REACHED` when the
+    // packed closure would be deeper than its value depth limit. Nothing bounds
+    // the depth here, so closures nested past it can be built, written, and
+    // then fail to decode.
     ///
     /// # Safety
     ///
@@ -3425,7 +3488,7 @@ impl InterpreterContext<'_> {
                     // Deliberately left unlocated, so the failure is blamed on
                     // this instruction rather than on the calling frame.
                     let func_ref = &*(payload as *const FunctionRef);
-                    let func = self.load_function(
+                    let func = self.load_closure_target(
                         func_ref.module_id,
                         func_ref.func_name,
                         func_ref.ty_args,
@@ -3468,6 +3531,11 @@ impl InterpreterContext<'_> {
                 if read_closure_persistent(closure) && !callee.is_persistent {
                     return Err(stored_closure_target_not_persistent(callee));
                 }
+                // A closure decoded from bytes can name a function whose
+                // signature differs from the type it was decoded as. Slots
+                // carry no type tags, so the call would then read and write
+                // values under the wrong types.
+                check_closure_signature(callee, mask, op.closure_ty)?;
             }
 
             let captured_data = if mask == 0 {
@@ -3681,10 +3749,9 @@ impl InterpreterContext<'_> {
     ) -> VMResult<*mut u8> {
         let guard = self.loader.guard();
 
-        // Both the values region and its GC trace shape come from the callee's
-        // parameters: a capture's pointer offsets are the callee's own frame
-        // pointer offsets within that parameter's slot, so the GC traces the
-        // decoded copy exactly as it traces the parameter.
+        // The values region is laid out from the callee's parameters. The GC
+        // traces exactly the pointers each capture's layout holds, as it does
+        // for a packed closure's captures.
         let mut capture_layouts = Vec::with_capacity(mask.count_ones() as usize);
         let mut pointer_offsets = vec![];
         let mut values_size = 0usize;
@@ -3713,13 +3780,11 @@ impl InterpreterContext<'_> {
             }
             let (offset, next) =
                 next_captured_value_offset(values_size, pslot.size as usize, pslot.align as usize);
-            let param_slot = pslot.offset.0..pslot.offset.0 + pslot.size;
-            for ptr_offset in &callee.frame_layout.heap_ptr_offsets {
-                if param_slot.contains(&ptr_offset.0) {
-                    pointer_offsets.push(FrameOffset(
-                        offset as u32 + (ptr_offset.0 - param_slot.start),
-                    ));
-                }
+            if guard
+                .push_pointer_offsets(layout_id, offset as u32, &mut pointer_offsets)
+                .is_none()
+            {
+                invariant_violation!(ClosureCaptureLayoutMissing { capture_idx });
             }
             capture_layouts.push(layout_id);
             values_size = next;
@@ -3729,6 +3794,10 @@ impl InterpreterContext<'_> {
                 requested: values_size,
             })
         })?;
+        let pointer_offsets = pointer_offsets
+            .into_iter()
+            .map(FrameOffset)
+            .collect::<Vec<_>>();
         // TODO(metering): each distinct trace shape is a permanent descriptor.
         // Shapes are bounded by the callees that can be loaded and lowered, so
         // this adds nothing beyond what `try_lower_function` already allows.

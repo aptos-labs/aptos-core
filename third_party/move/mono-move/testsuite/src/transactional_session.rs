@@ -151,6 +151,7 @@ impl From<VMInternalError> for RunError {
                 LoaderError::ModuleNotFound { .. }
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::TypeArgumentCountMismatch { .. }
+                | LoaderError::TypeArgumentConstraintNotSatisfied { .. }
                 | LoaderError::ScriptDeserializationFailed { .. }
                 | LoaderError::ScriptVerificationFailed { .. }
                 | LoaderError::GlobalContext(_)

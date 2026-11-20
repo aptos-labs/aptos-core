@@ -519,6 +519,10 @@ fn describe_loader_error(err: &LoaderError) -> V1Equivalent {
         L::TypeArgumentCountMismatch { .. } => {
             V1ErrorInfo::with_no_message(StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH)
         },
+        // Reachable from a function value decoded from bytes.
+        L::TypeArgumentConstraintNotSatisfied { .. } => {
+            V1ErrorInfo::with_no_message(StatusCode::CONSTRAINT_NOT_SATISFIED)
+        },
         L::ScriptDeserializationFailed { .. } => {
             V1ErrorInfo::with_mono_message(StatusCode::CODE_DESERIALIZATION_ERROR, err)
         },
@@ -992,6 +996,11 @@ mod tests {
                 expected: 0,
                 got: 1,
             },
+            LoaderError::TypeArgumentConstraintNotSatisfied {
+                address,
+                module: "m".to_string(),
+                name: "f".to_string(),
+            },
             LoaderError::NativeFunctionNotLoadable {
                 address,
                 module: "m".to_string(),
@@ -1026,6 +1035,7 @@ mod tests {
                 LoaderError::ModuleNotFound { .. }
                 | LoaderError::FunctionNotFound { .. }
                 | LoaderError::TypeArgumentCountMismatch { .. }
+                | LoaderError::TypeArgumentConstraintNotSatisfied { .. }
                 | LoaderError::NativeFunctionNotLoadable { .. }
                 | LoaderError::LoweringSkipped { .. }
                 | LoaderError::ResourceLayoutNotDerivable

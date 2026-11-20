@@ -41,9 +41,7 @@ use move_binary_format::{
     access::ModuleAccess,
     file_format::{FunctionHandleIndex, VariantFieldHandleIndex},
 };
-use move_core_types::{
-    account_address::AccountAddress, function::ClosureMask, ident_str, identifier::Identifier,
-};
+use move_core_types::{account_address::AccountAddress, function::ClosureMask, ident_str};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Alignment the frame's data region (params + locals + scratch) is rounded to.
@@ -229,9 +227,16 @@ pub struct ClosureCapturedInfo {
     pub layout_id: LayoutId,
 }
 
-/// Per-`PackClosure` outcome of the discovery pass, in IR order. Distinguishes
-/// the three cases the build pass must act on, so it needn't re-derive them
-/// from the mask.
+/// Per-`PackClosure` outcome of the discovery pass, in IR order.
+#[derive(Clone, Copy)]
+pub struct DiscoveredClosurePack {
+    pub captured: CapturedDataLayout,
+    /// Whether the target is persistent, so the closure can be serialized.
+    pub persistent: bool,
+}
+
+/// Captured-data layout of one `PackClosure`. Distinguishes the three cases the
+/// build pass must act on, so it needn't re-derive them from the mask.
 #[derive(Clone, Copy)]
 pub enum CapturedDataLayout {
     /// Closure captures nothing; no captured-data object is allocated.
@@ -335,9 +340,9 @@ pub struct LoweringDescriptors {
     pub structs: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
-    /// Captured-data layout per `PackClosure`, in IR order; consumed
-    /// positionally by the build pass.
-    pub closure_captured: Vec<CapturedDataLayout>,
+    /// Discovery outcome per `PackClosure`, in IR order; consumed positionally
+    /// by the build pass.
+    pub closure_packs: Vec<DiscoveredClosurePack>,
 }
 
 /// Frame layout for one function.
@@ -706,7 +711,10 @@ pub fn try_build_context<'a>(
                 }
                 let func_ref =
                     interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
-                let layout = descriptors.closure_captured[closure_pack_idx];
+                let DiscoveredClosurePack {
+                    captured: layout,
+                    persistent,
+                } = descriptors.closure_packs[closure_pack_idx];
                 closure_pack_idx += 1;
                 let (captured_data_descriptor_id, values_size, captured_layout_id) = match layout {
                     CapturedDataLayout::NonCapturing => (None, 0, None),
@@ -723,9 +731,7 @@ pub fn try_build_context<'a>(
                 };
                 closure_pack_sites.push(ClosurePackInfo {
                     func_ref,
-                    persistent: module_ir
-                        .module
-                        .function_handle_is_persistent(data.function_handle),
+                    persistent,
                     captured_data_descriptor_id,
                     values_size,
                     captured_layout_id,
@@ -804,8 +810,8 @@ pub fn try_build_context<'a>(
     // the end of the discovered set.
     debug_assert_eq!(
         closure_pack_idx,
-        descriptors.closure_captured.len(),
-        "PackClosure count diverged from discovered captured-data layouts"
+        descriptors.closure_packs.len(),
+        "PackClosure count diverged from discovered closure packs"
     );
 
     // 7. Place `Ret` scratch after the callee argument/return region, beyond
@@ -925,6 +931,14 @@ pub trait SpecializerContext: LayoutProvider {
         nominal_name: &InternedIdentifier,
     ) -> VMResult<Option<NominalFields>>;
 
+    /// Whether module `module_id` defines `func_name` as a persistent function:
+    /// public or `#[persistent]`.
+    fn function_is_persistent(
+        &mut self,
+        module_id: &InternedModuleId,
+        func_name: &InternedIdentifier,
+    ) -> VMResult<bool>;
+
     /// Publishes a vector descriptor for `elem_ty` (with byte width
     /// `elem_size` and intra-element heap-pointer offsets
     /// `elem_ptr_offsets`), returning the assigned [`DescriptorId`].
@@ -965,6 +979,9 @@ pub trait SpecializerContext: LayoutProvider {
     /// Publishes the layout of a closure's captured values, an anonymous struct
     /// with one field per capture, and returns its id. Idempotent on
     /// `captured`, the captured types in capture order.
+    //
+    // TODO(metering): each distinct list of captured types is a permanent
+    // layout in a global cache that nothing bounds or charges.
     fn publish_captured_values_layout(
         &self,
         captured: InternedTypeList,
@@ -1301,11 +1318,12 @@ fn try_discover_types_for_lowering_in_function_impl(
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
 
-        // `PackClosure`: resolve the captured-data layout and record it
-        // positionally, in IR order, for the build pass.
+        // `PackClosure`: resolve the captured-data layout and the target's
+        // persistence, and record them positionally, in IR order, for the build
+        // pass.
         if let Instr::PackClosure { data } = instr {
             let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
-            let layout = discover_captured_data_descriptor(
+            let captured = discover_captured_data_descriptor(
                 ctx,
                 interner,
                 module_ir,
@@ -1315,7 +1333,21 @@ fn try_discover_types_for_lowering_in_function_impl(
                 visited,
                 descriptors,
             )?;
-            descriptors.closure_captured.push(layout);
+            let persistent = match module_ir
+                .module
+                .function_handle_is_persistent(data.function_handle)
+            {
+                Some(persistent) => persistent,
+                None => {
+                    let (module_id, func_name) =
+                        callee_identity(&module_ir.module, data.function_handle);
+                    ctx.function_is_persistent(&module_id, &func_name)?
+                },
+            };
+            descriptors.closure_packs.push(DiscoveredClosurePack {
+                captured,
+                persistent,
+            });
         }
 
         // Resources accessed by global-storage ops are laid out as heap
@@ -1338,6 +1370,16 @@ fn try_discover_types_for_lowering_in_function_impl(
 
     Ok(())
 }
+
+/// Field names of a closure's captured values, by position. A mask has 64
+/// bits, so a closure captures at most 64 values.
+const CAPTURE_FIELD_NAMES: [&str; 64] = [
+    "_0", "_1", "_2", "_3", "_4", "_5", "_6", "_7", "_8", "_9", "_10", "_11", "_12", "_13", "_14",
+    "_15", "_16", "_17", "_18", "_19", "_20", "_21", "_22", "_23", "_24", "_25", "_26", "_27",
+    "_28", "_29", "_30", "_31", "_32", "_33", "_34", "_35", "_36", "_37", "_38", "_39", "_40",
+    "_41", "_42", "_43", "_44", "_45", "_46", "_47", "_48", "_49", "_50", "_51", "_52", "_53",
+    "_54", "_55", "_56", "_57", "_58", "_59", "_60", "_61", "_62", "_63",
+];
 
 /// Resolves the captured-data layout for one `PackClosure`: which of
 /// [`CapturedDataLayout`]'s cases it is and, when capturing, its GC trace
@@ -1377,14 +1419,15 @@ fn discover_captured_data_descriptor(
         let (size, align) = (layout.size, layout.align);
         let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
         // Captures have no names, so they are named by position.
-        //
-        // TODO(metering): try to avoid building and interning identifiers here.
-        let name = Identifier::new(format!("_{i}")).expect("`_<index>` is a valid identifier");
+        let name = CAPTURE_FIELD_NAMES
+            .get(i)
+            .copied()
+            .ok_or(LoweringError::CapturedValuesOverflow)?;
         fields.push(VariantFieldLayout {
             offset: u32::try_from(offset).map_err(|_| LoweringError::CapturedValuesOverflow)?,
             size,
             ty,
-            name: interner.identifier_of(&name),
+            name: InternedIdentifier::from_static(name),
         });
         field_ids.push(Some(id));
         max_align = max_align.max(align);
