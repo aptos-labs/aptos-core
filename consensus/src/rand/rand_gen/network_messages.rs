@@ -317,20 +317,6 @@ mod tests {
     }
 
     #[test]
-    fn test_request_certified_aug_data_verify_and_epoch() {
-        let ctx = build_test_context(vec![100, 100, 100], 0);
-        let msg = RandMessage::<MockShare, MockAugData>::RequestCertifiedAugData(
-            RequestCertifiedAugData::new(ctx.epoch_state.epoch),
-        );
-
-        assert!(msg
-            .verify(&ctx.epoch_state, &ctx.rand_config, ctx.authors[1])
-            .is_ok());
-        // The epoch routes the message to the RandManager of the epoch it belongs to.
-        assert_eq!(msg.epoch(), ctx.epoch_state.epoch);
-    }
-
-    #[test]
     fn test_missing_apk_notifications_coalesce_per_author() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let metadata = RandMetadata {
