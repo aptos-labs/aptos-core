@@ -30,8 +30,11 @@ spec aptos_framework::managed_coin {
     /// supply accordingly.
     /// Enforcement: Formally verified via [high-level-req-4.1](burn), [high-level-req-4.2](mint) and
     /// [high-level-req-4.3](mint) that burn and mint adjust the supply of the paired fungible asset by the amount (for
-    /// burn, when the withdrawal runs without a withdraw hook), while the tracked coin supply is unchanged
-    /// (ManagedCoinSupplyUnchanged).
+    /// burn, when the withdrawal runs without a withdraw hook), while the tracked coin supply and the value held in
+    /// coins are unchanged (coin::CoinSupplyUnchanged). Formally verified via [high-level-req-4.4](mint) and
+    /// [high-level-req-4.5](burn) that, for a tracked coin supply and an existing pairing, the coin supply plus the
+    /// paired asset supply grows by the minted amount, and drops by the burned amount when the withdrawal runs without
+    /// a withdraw hook from a store of the paired asset.
     ///
     /// No.: 5
     /// Requirement: Before burning coins, exact amount of coins are withdrawn.
@@ -60,6 +63,7 @@ spec aptos_framework::managed_coin {
     ) {
         use aptos_std::type_info;
         use aptos_framework::fungible_asset;
+        use std::option;
         // Partial: the abort conditions of the withdrawal (see `coin::withdraw`) and of the burn are not fully
         // specified.
         let account_addr = signer::address_of(account);
@@ -81,22 +85,26 @@ spec aptos_framework::managed_coin {
             fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
         // The coin's tracked supply is unchanged; the burned amount is removed from the store's asset supply.
         let fa_addr = global<fungible_asset::FungibleStore>(store_addr).metadata.inner;
-        include ManagedCoinSupplyUnchanged<CoinType>;
+        include coin::CoinSupplyUnchanged<CoinType>;
         /// [high-level-req-4.1]
         ensures plain ==> fungible_asset::spec_supply(fa_addr) == old(fungible_asset::spec_supply(fa_addr)) - amount;
+        /// [high-level-req-4.5]
+        include plain && fa_addr == option::borrow(paired).inner ==>
+            TotalSupplyChange<CoinType> { added: 0, removed: amount };
     }
 
-    /// The tracked coin supply of `CoinType` keeps its value.
-    spec schema ManagedCoinSupplyUnchanged<CoinType> {
+    /// For a tracked coin supply and an existing pairing, the coin supply plus the paired asset supply changes by
+    /// `added - removed`.
+    spec schema TotalSupplyChange<CoinType> {
         use aptos_std::type_info;
-        use aptos_framework::optional_aggregator;
         use std::option;
-        let coin_addr = type_info::type_of<CoinType>().account_address;
-        let maybe_supply = global<coin::CoinInfo<CoinType>>(coin_addr).supply;
-        let post post_maybe_supply = global<coin::CoinInfo<CoinType>>(coin_addr).supply;
-        ensures option::is_some(maybe_supply) ==> option::is_some(post_maybe_supply)
-            && optional_aggregator::optional_aggregator_value(option::borrow(post_maybe_supply))
-                == optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply));
+        added: num;
+        removed: num;
+        let coin_type = type_info::type_of<CoinType>();
+        let tracked = option::is_some(global<coin::CoinInfo<CoinType>>(coin_type.account_address).supply)
+            && option::is_some(coin::spec_paired_metadata(coin_type));
+        ensures tracked ==> coin::spec_total_supply<CoinType>(coin_type)
+            == old(coin::spec_total_supply<CoinType>(coin_type)) + added - removed;
     }
 
     /// Make sure `name` and `symbol` are legal length.
@@ -111,6 +119,7 @@ spec aptos_framework::managed_coin {
         decimals: u8,
         monitor_supply: bool,
     ) {
+        pragma aborts_if_is_partial = false;
         include coin::InitializeInternalSchema<CoinType>;
         aborts_if !string::spec_internal_check_utf8(name);
         aborts_if !string::spec_internal_check_utf8(symbol);
@@ -145,10 +154,12 @@ spec aptos_framework::managed_coin {
         /// [high-level-req-6]
         include coin::PairedDepositBalance<CoinType> { owner: dst_addr, amount };
         // The coin's tracked supply is unchanged; the minted amount is added to the paired asset's supply.
-        include ManagedCoinSupplyUnchanged<CoinType>;
+        include coin::CoinSupplyUnchanged<CoinType>;
         /// [high-level-req-4.2]
         ensures option::is_some(paired) ==> fungible_asset::spec_supply(option::borrow(paired).inner)
             == old(fungible_asset::spec_supply(option::borrow(paired).inner)) + amount;
+        /// [high-level-req-4.4]
+        include TotalSupplyChange<CoinType> { added: amount, removed: 0 };
         // On the first mint the minted amount is added to the supply of the newly paired asset.
         let post post_fa_addr = option::borrow(coin::spec_paired_metadata(type_info::type_of<CoinType>())).inner;
         /// [high-level-req-4.3]
@@ -165,12 +176,14 @@ spec aptos_framework::managed_coin {
     }
 
     spec remove_caps<CoinType>(account: &signer): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
+        pragma aborts_if_is_partial = false;
         let account_addr = signer::address_of(account);
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         ensures !exists<Capabilities<CoinType>>(account_addr);
     }
 
     spec destroy_caps <CoinType>(account: &signer) {
+        pragma aborts_if_is_partial = false;
         let account_addr = signer::address_of(account);
         aborts_if !exists<Capabilities<CoinType>>(account_addr);
         ensures !exists<Capabilities<CoinType>>(account_addr);

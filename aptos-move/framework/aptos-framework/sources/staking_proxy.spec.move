@@ -151,6 +151,7 @@ spec aptos_framework::staking_proxy {
     /// Aborts if stake_pool is exists and when OwnerCapability or stake_pool_exists
     /// One of them are not exists
     spec set_stake_pool_operator(owner: &signer, new_operator: address) {
+        pragma aborts_if_is_partial = false;
         include SetStakePoolOperator;
     }
 
@@ -166,6 +167,7 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
+        pragma aborts_if_is_partial = false;
         include SetStakingContractVoter;
         /// [high-level-req-4.2]
         include OnlyOwnerStakingContractChanged { owner_address: signer::address_of(owner) };
@@ -197,6 +199,7 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_stake_pool_voter(owner: &signer, new_voter: address) {
+        pragma aborts_if_is_partial = false;
         include SetStakePoolVoterAbortsIf;
     }
 

@@ -40,7 +40,6 @@ spec aptos_framework::voting {
     /// </high-level-req>
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_partial;
     }
 
     spec register<ProposalType: store>(account: &signer) {
@@ -48,11 +47,10 @@ spec aptos_framework::voting {
 
         // Will abort if there's already a `VotingForum<ProposalType>` under addr
         aborts_if exists<VotingForum<ProposalType>>(addr);
-        // Creation of 4 new event handles changes the account's `guid_creation_num`
-        // aborts_if !exists<account::Account>(addr);
-        // let register_account = global<account::Account>(addr);
-        // aborts_if register_account.guid_creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
-        // aborts_if register_account.guid_creation_num + 4 > MAX_U64;
+        // The forum holds four event handles of the account.
+        include account::NewEventHandleAbortsIf;
+        aborts_if exists<account::Account>(addr)
+            && global<account::Account>(addr).guid_creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
         // `type_info::type_of()` may abort if the type parameter is not a struct
         aborts_if !type_info::spec_is_struct<ProposalType>();
 
@@ -70,7 +68,6 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
 
         include CreateProposalAbortsIfAndEnsures<ProposalType>{is_multi_step_proposal: false};
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);

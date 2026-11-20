@@ -43,7 +43,6 @@ spec aptos_framework::jwks {
     spec upsert_oidc_provider(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> {
         use aptos_framework::chain_status;
         pragma opaque;
-        pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;
         aborts_if !chain_status::is_genesis();
         aborts_if !exists<SupportedOIDCProviders>(@aptos_framework);
@@ -53,7 +52,6 @@ spec aptos_framework::jwks {
     spec remove_oidc_provider(fx: &signer, name: vector<u8>): Option<vector<u8>> {
         use aptos_framework::chain_status;
         pragma opaque;
-        pragma aborts_if_is_partial;
         aborts_if std::signer::address_of(fx) != @aptos_framework;
         aborts_if !chain_status::is_genesis();
         aborts_if !exists<SupportedOIDCProviders>(@aptos_framework);
@@ -62,16 +60,27 @@ spec aptos_framework::jwks {
 
     spec upsert_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> {
         pragma opaque;
-        pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        include OidcProvidersForNextEpochAbortsIf;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
     spec remove_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>): Option<vector<u8>> {
         pragma opaque;
-        pragma aborts_if_is_partial;
-        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        include OidcProvidersForNextEpochAbortsIf;
         modifies global<config_buffer::PendingConfigs>(@aptos_framework);
+    }
+
+    /// Aborts of reading the providers from the buffer or the chain and buffering the update.
+    spec schema OidcProvidersForNextEpochAbortsIf {
+        use aptos_std::type_info;
+        fx: &signer;
+        aborts_if std::signer::address_of(fx) != @aptos_framework;
+        let buffered = config_buffer::spec_fun_does_exist<SupportedOIDCProviders>(
+            type_info::type_name<SupportedOIDCProviders>()
+        );
+        include buffered ==> config_buffer::ExtractAbortsIf<SupportedOIDCProviders>;
+        aborts_if !buffered && !exists<SupportedOIDCProviders>(@aptos_framework);
+        aborts_if !exists<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
     spec patch_federated_jwks(jwk_owner: &signer, patches: vector<Patch>) {

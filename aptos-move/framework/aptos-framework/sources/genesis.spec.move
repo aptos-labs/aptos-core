@@ -111,12 +111,19 @@ spec aptos_framework::genesis {
 
     spec initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
         use aptos_framework::reconfiguration_state;
-        // Aborts of the key validation and of joining the validator set are not specified.
-        pragma aborts_if_is_partial;
+        use aptos_std::bls12381;
+        use std::option;
+        use std::vector;
         aborts_if reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<stake::StakePool>(pool_address);
         aborts_if !exists<stake::ValidatorConfig>(pool_address);
         aborts_if validator.operator_address != global<stake::StakePool>(pool_address).operator_address;
+        aborts_if !option::is_some(bls12381::spec_public_key_from_bytes_with_pop(
+            validator.consensus_pubkey,
+            bls12381::proof_of_possession_from_bytes(validator.proof_of_possession)
+        ));
+        aborts_if vector::is_empty(validator.consensus_pubkey);
+        include stake::JoinValidatorSetStakeAbortsIf { operator_address: validator.operator_address };
         let post config = global<stake::ValidatorConfig>(pool_address);
         ensures config.consensus_pubkey == validator.consensus_pubkey;
         ensures config.network_addresses == validator.network_addresses;
