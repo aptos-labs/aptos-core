@@ -124,9 +124,9 @@ pub struct RpcRequest<S, D> {
 mod tests {
     use super::*;
     use crate::rand::rand_gen::{
-        rand_manager::Receiver,
+        rand_manager::verify_recovered_aug_data,
         rand_store::RandStore,
-        reliable_broadcast_state::{CertifiedAugDataRecoveryState, ShareAggregateState},
+        reliable_broadcast_state::ShareAggregateState,
         types::{MockAugData, MockShare, RandConfig, RandShare},
     };
     use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -291,10 +291,6 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // Recovery of a peer's certified aug data on demand. The request is answered with the
-    // responder's own `CertifiedAugData`, which `CertifiedAugDataRecoveryState` validates before
-    // handing it to the RandManager.
-
     /// Certify an aug data for `author` in `epoch` the way the proactive broadcast does: every
     /// validator signs it and the signatures are aggregated.
     fn certify_aug_data_for_epoch(
@@ -318,41 +314,6 @@ mod tests {
 
     fn certify_aug_data(ctx: &TestContext, author: Author) -> CertifiedAugData<MockAugData> {
         certify_aug_data_for_epoch(ctx, ctx.epoch_state.epoch, author)
-    }
-
-    /// Wraps the recovery state to pin the `TShare` type of the messages it broadcasts, which the
-    /// `BroadcastStatus` impl leaves free (the reliable broadcast normally pins it).
-    struct MockRecovery {
-        state: Arc<CertifiedAugDataRecoveryState<MockAugData>>,
-    }
-
-    impl MockRecovery {
-        fn add(
-            &self,
-            peer: Author,
-            certified: CertifiedAugData<MockAugData>,
-        ) -> anyhow::Result<Option<()>> {
-            <Arc<CertifiedAugDataRecoveryState<MockAugData>> as BroadcastStatus<
-                RandMessage<MockShare, MockAugData>,
-                RandMessage<MockShare, MockAugData>,
-            >>::add(&self.state, peer, certified)
-        }
-    }
-
-    fn recovery_state(
-        ctx: &TestContext,
-        peer: Author,
-    ) -> (
-        MockRecovery,
-        Receiver<(Author, CertifiedAugData<MockAugData>)>,
-    ) {
-        let (tx, rx) = unbounded();
-        let state = CertifiedAugDataRecoveryState::new(
-            ctx.epoch_state.clone(),
-            [peer].into_iter().collect(),
-            tx,
-        );
-        (MockRecovery { state }, rx)
     }
 
     #[test]
@@ -410,42 +371,34 @@ mod tests {
     fn test_cert_recovery_rejects_a_cert_for_another_author() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
-        let (state, mut rx) = recovery_state(&ctx, peer);
 
-        // Properly certified, but for a different validator: the responder is not answering the
-        // question, so the reliable broadcast must keep retrying it.
-        assert!(state
-            .add(peer, certify_aug_data(&ctx, ctx.authors[2]))
-            .is_err());
-        assert!(rx.next().now_or_never().flatten().is_none());
+        // The certificate is valid, but belongs to a different validator.
+        assert!(verify_recovered_aug_data(
+            &certify_aug_data(&ctx, ctx.authors[2]),
+            &ctx.epoch_state,
+            peer,
+        )
+        .is_err());
     }
 
     #[test]
     fn test_cert_recovery_rejects_a_cert_from_another_epoch() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
-        let (state, mut rx) = recovery_state(&ctx, peer);
 
-        // Validly signed by the current validator set, but for a previous epoch. The set is often
-        // unchanged across an epoch boundary, so the aggregate signature still verifies -- and
-        // caching that delta would give us the wrong apk for this peer for the rest of this epoch.
-        // This response never passes through `RandMessage::verify`, which is where the proactive
-        // path checks the epoch, so the recovery state has to check it itself.
+        // Same validator set across epochs: a valid signature must not admit a stale certificate.
         let stale = certify_aug_data_for_epoch(&ctx, ctx.epoch_state.epoch - 1, peer);
-        assert!(state.add(peer, stale).is_err());
-        assert!(rx.next().now_or_never().flatten().is_none());
+        assert!(verify_recovered_aug_data(&stale, &ctx.epoch_state, peer).is_err());
     }
 
     #[test]
     fn test_cert_recovery_rejects_a_cert_without_quorum() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
-        let (state, mut rx) = recovery_state(&ctx, peer);
         let aug_data = AugData::new(ctx.epoch_state.epoch, peer, MockAugData);
 
         // Right author, but no 2f+1 multi-signature behind it.
         let certified = CertifiedAugData::new(aug_data, AggregateSignature::empty());
-        assert!(state.add(peer, certified).is_err());
-        assert!(rx.next().now_or_never().flatten().is_none());
+        assert!(verify_recovered_aug_data(&certified, &ctx.epoch_state, peer).is_err());
     }
 }

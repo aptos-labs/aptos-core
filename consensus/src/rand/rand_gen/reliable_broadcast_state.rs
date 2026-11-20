@@ -8,7 +8,7 @@ use crate::{
         rand_store::RandStore,
         types::{
             AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig,
-            RandShare, RequestCertifiedAugData, RequestShare, TAugmentedData, TShare,
+            RandShare, RequestShare, TAugmentedData, TShare,
         },
     },
 };
@@ -21,7 +21,6 @@ use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
 };
-use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashSet, sync::Arc};
 
 pub struct AugDataCertBuilder<D> {
@@ -168,95 +167,5 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
             None
         };
         Ok(aggregated)
-    }
-}
-
-/// Reliable-broadcast state for recovering certified aug data on demand.
-///
-/// Unlike [`CertifiedAugDataAckState`], this drives a request that the peer answers with its own
-/// `CertifiedAugData`, and it is created for one author once we notice the gap rather than at epoch
-/// start. A response that fails verification returns `Err`, which makes the reliable broadcast keep
-/// retrying that peer with backoff until a valid cert arrives.
-pub struct CertifiedAugDataRecoveryState<D> {
-    epoch_state: Arc<EpochState>,
-    // authors whose cert we are still waiting on
-    pending: Mutex<HashSet<Author>>,
-    // hands the accepted cert to the RandManager main loop, which caches and persists it
-    recovered_tx: UnboundedSender<(Author, CertifiedAugData<D>)>,
-}
-
-impl<D> CertifiedAugDataRecoveryState<D> {
-    pub fn new(
-        epoch_state: Arc<EpochState>,
-        pending: HashSet<Author>,
-        recovered_tx: UnboundedSender<(Author, CertifiedAugData<D>)>,
-    ) -> Arc<Self> {
-        Arc::new(Self {
-            epoch_state,
-            pending: Mutex::new(pending),
-            recovered_tx,
-        })
-    }
-}
-
-impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
-    for Arc<CertifiedAugDataRecoveryState<D>>
-{
-    type Aggregated = ();
-    type Message = RequestCertifiedAugData;
-    type Response = CertifiedAugData<D>;
-
-    fn add(&self, peer: Author, certified_data: Self::Response) -> anyhow::Result<Option<()>> {
-        // Only the cert of the peer we asked for, for the epoch we asked in, is acceptable.
-        // Anything else means the responder is not answering the question, so keep retrying it.
-        //
-        // The epoch check is load-bearing here: this response never passes through
-        // `RandMessage::verify` -- it is an RPC response, not an inbound request -- and
-        // `AugDataStore::add_certified_aug_data` does not re-check the epoch either. A cert from a
-        // previous epoch can still carry an aggregate signature that validates against the current
-        // verifier when the validator set is unchanged across the boundary, and caching its delta
-        // would give us the wrong apk for that peer for the rest of this epoch.
-        ensure!(
-            certified_data.epoch() == self.epoch_state.epoch,
-            "[RandManager] requested certified aug data for epoch {}, got one for epoch {}",
-            self.epoch_state.epoch,
-            certified_data.epoch()
-        );
-        ensure!(
-            certified_data.author() == &peer,
-            "[RandManager] requested certified aug data from {}, got a cert for {}",
-            peer,
-            certified_data.author()
-        );
-
-        // The 2f+1 multi-signature over the AugData. Every signer ran the delta/pk-share pairing
-        // check before signing, so this carries the same guarantee as the proactive path.
-        certified_data.verify(&self.epoch_state.verifier)?;
-
-        info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
-            .epoch(certified_data.epoch())
-            .remote_peer(peer));
-
-        // Deliberately handed to the RandManager main loop instead of calling `augment` here.
-        // `RandKeys::add_certified_apk` is a non-atomic check-then-set on a `OnceCell`, so a second
-        // concurrent inserter for the same peer hits `set(..).unwrap()` and panics. The main loop
-        // is the only runtime writer today (the proactive `CertifiedAugData` arm) and it persists
-        // the cert as well; augmenting from this reliable-broadcast task would make it two.
-        // A closed channel means the RandManager is gone, so stop polling.
-        if self
-            .recovered_tx
-            .unbounded_send((peer, certified_data))
-            .is_err()
-        {
-            return Ok(Some(()));
-        }
-
-        let mut pending = self.pending.lock();
-        pending.remove(&peer);
-        if pending.is_empty() {
-            Ok(Some(()))
-        } else {
-            Ok(None)
-        }
     }
 }
