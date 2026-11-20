@@ -12,6 +12,7 @@
 
 pub mod error;
 pub mod events;
+pub mod gap;
 pub mod return_values;
 pub mod v1_error;
 

@@ -12,7 +12,10 @@ crates = ["mono-move-*", "specializer"]
 # Tooling: order-dependence cannot affect a committed result.
 exempt = [
     "mono-move-testsuite",
+    "mono-move-replay",
     "mono-move-replay-benchmark",
+    "mono-move-replay-common",
+    "mono-move-unit-test-backend",
     "mono-move-lean-link",
     "vm-comparison",
 ]
