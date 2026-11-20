@@ -635,6 +635,10 @@ module aptos_framework::object {
                 error::permission_denied(ENO_UNGATED_TRANSFERS),
             );
             current_address = object.owner;
+        } spec {
+            invariant count < MAXIMUM_OBJECT_NESTING;
+            invariant spec_ungated_descendant_at(owner, current_address, count)
+                == spec_ungated_descendant_at(owner, global<ObjectCore>(destination).owner, 0);
         };
     }
 
@@ -732,6 +736,12 @@ module aptos_framework::object {
 
             let object = borrow_global<ObjectCore>(current_address);
             current_address = object.owner;
+        } spec {
+            invariant count < MAXIMUM_OBJECT_NESTING;
+            invariant spec_owns_at(owner, current_address, count)
+                == spec_owns_at(owner, object.owner, 0);
+            invariant spec_owns_limit_at(owner, current_address, count)
+                == spec_owns_limit_at(owner, object.owner, 0);
         };
         true
     }

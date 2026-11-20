@@ -13,7 +13,9 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Low
     /// Implementation: The add_fungibility function initializes the Metadata and Supply resources and moves them under
     /// the metadata object.
-    /// Enforcement: Audited that the Metadata and Supply resources are initialized properly.
+    /// Enforcement: Formally verified via [high-level-req-2.1](add_fungibility) and [high-level-req-2.2](add_fungibility)
+    /// that the Metadata resource and a Supply (or ConcurrentSupply) of zero with the given maximum are published at
+    /// the object address.
     ///
     /// No.: 3
     /// Requirement: Generating mint, burn and transfer references can only be done at object creation time and if the
@@ -21,14 +23,17 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Low
     /// Implementation: The following functions generate the related references of the Metadata object: 1.
     /// generate_mint_ref 2. generate_burn_ref 3. generate_transfer_ref
-    /// Enforcement: Audited that the Metadata object exists within the constructor ref.
+    /// Enforcement: Formally verified via [high-level-req-3.1](generate_mint_ref), [high-level-req-3.2](generate_burn_ref)
+    /// and [high-level-req-3.3](generate_transfer_ref) that they abort unless the object has Metadata. Audited that
+    /// they can only be called at creation time, as a ConstructorRef is only available then.
     ///
     /// No.: 4
     /// Requirement: Only the owner of a store should be allowed to withdraw fungible assets from it.
     /// Criticality: High
     /// Implementation: The fungible_asset::withdraw function ensures that the signer owns the store by asserting that
     /// the object address matches the address of the signer.
-    /// Enforcement: Audited that the address of the signer owns the object.
+    /// Enforcement: Formally verified via [high-level-req-4](withdraw) that withdraw aborts unless the signer directly or
+    /// indirectly owns the store.
     ///
     /// No.: 5
     /// Requirement: The transfer, withdrawal and deposit operation should never change the current supply of the fungible
@@ -37,7 +42,10 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The transfer function withdraws the fungible assets from the store and deposits them to the
     /// receiver. The withdraw function extracts the fungible asset from the fungible asset store. The deposit function
     /// adds the balance to the fungible asset store.
-    /// Enforcement: Audited that the supply before and after the operation remains constant.
+    /// Enforcement: Formally verified via [high-level-req-5.1](deposit), [high-level-req-5.2](withdraw),
+    /// [high-level-req-5.3](withdraw_with_ref), [high-level-req-5.4](deposit_with_ref),
+    /// [high-level-req-5.5](transfer_with_ref) and [high-level-req-5.6](transfer) that the supply of the asset is
+    /// unchanged.
     ///
     /// No.: 6
     /// Requirement: The owner of the store should only be able to withdraw a certain amount if its store has sufficient
@@ -47,7 +55,10 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The withdraw function ensures that the store is not frozen before calling withdraw_internal
     /// which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store.
     /// The withdraw_with_ref ensures that the reference's metadata matches the store metadata.
-    /// Enforcement: Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.
+    /// Enforcement: Formally verified via [high-level-req-6.1](withdraw) that withdraw aborts if the store is frozen, via
+    /// [high-level-req-6.2](UncheckedWithdrawAbortsIf) that it aborts if the store doesn't have sufficient balance, and
+    /// via [high-level-req-6.3](UncheckedWithdraw) that the store balance is reduced by amount; withdraw_with_ref
+    /// includes the latter two and is verified not to check the frozen flag. The owner check is audited (see 4).
     ///
     /// No.: 7
     /// Requirement: Only the same type of fungible assets should be deposited in a fungible asset store, if the store is
@@ -58,7 +69,10 @@ spec aptos_framework::fungible_asset {
     /// function which validates the store's metadata and the depositing asset's metadata followed by increasing the
     /// store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the
     /// depositing asset's metadata.
-    /// Enforcement: Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store are different. Audited that the store's balance is increased by the deposited amount.
+    /// Enforcement: Formally verified via [high-level-req-7.1](deposit) that deposit aborts if the store is frozen, via
+    /// [high-level-req-7.2](UncheckedDepositAbortsIf) that it aborts if the asset and the store have different
+    /// metadata, and via [high-level-req-7.3](UncheckedDeposit) that the store balance is increased by the deposited
+    /// amount; deposit_with_ref includes the latter two and is verified not to check the frozen flag.
     ///
     /// No.: 8
     /// Requirement: An object should only be allowed to hold one store for fungible assets.
@@ -79,7 +93,7 @@ spec aptos_framework::fungible_asset {
     /// Criticality: Medium
     /// Implementation: The remove_store function validates the store's balance and removes the store under the object
     /// address.
-    /// Enforcement: Formally verified via [high-level-req-10](remove_store).
+    /// Enforcement: Formally verified via [high-level-req-10.1](remove_store) and [high-level-req-10.2](remove_store).
     ///
     /// No.: 11
     /// Requirement: Minting and burning should alter the total supply value, and the store balances.
@@ -87,14 +101,18 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The mint process increases the total supply by the amount minted using the increase_supply
     /// function. The burn process withdraws the burn amount from the given store and decreases the total supply by the
     /// amount burned using the decrease_supply function.
-    /// Enforcement: Audited the mint and burn functions that the supply was adjusted accordingly.
+    /// Enforcement: Formally verified for mint_to via [high-level-req-11.1](mint_to) (the store balance via
+    /// UncheckedDeposit), for burn via [high-level-req-11.2](burn), and for burn_from via
+    /// [high-level-req-11.3](burn_from) and [high-level-req-11.4](burn_from). Audited for mint, which returns the
+    /// minted asset and has no specification.
     ///
     /// No.: 12
     /// Requirement: It must not be possible to burn an amount of fungible assets larger than their current supply.
     /// Criticality: High
     /// Implementation: The burn process ensures that the store has enough balance to burn, by asserting that the
     /// supply.current >= amount inside the decrease_supply function.
-    /// Enforcement: Audited that it aborts if the provided store doesn't have sufficient balance.
+    /// Enforcement: Formally verified via [high-level-req-12](DecreaseSupplyAbortsIf), included by decrease_supply,
+    /// burn and burn_from, that burning a non-zero amount above the current supply aborts.
     ///
     /// No.: 13
     /// Requirement: Enabling or disabling store's frozen status should only be done with a valid transfer reference.
@@ -102,7 +120,8 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The set_frozen_flag function ensures that the TransferRef is provided via function argument and
     /// that the store's metadata matches the metadata from the reference. It then proceeds to update the frozen flag of
     /// the store.
-    /// Enforcement: Audited that it aborts if the metadata doesn't match. Audited that the frozen flag is updated properly.
+    /// Enforcement: Formally verified via [high-level-req-13.1](set_frozen_flag) and
+    /// [high-level-req-13.2](set_frozen_flag).
     ///
     /// No.: 14
     /// Requirement: Extracting a specific amount from the fungible asset should be possible only if the total amount that
@@ -228,9 +247,9 @@ spec aptos_framework::fungible_asset {
         let addr = delete_ref.self;
         aborts_if !exists<object::ObjectCore>(addr);
         aborts_if !exists<FungibleStore>(addr);
-        /// [high-level-req-10]
+        /// [high-level-req-10.1]
         aborts_if global<FungibleStore>(addr).balance != 0;
-        /// [high-level-req-10]
+        /// [high-level-req-10.2]
         aborts_if exists<ConcurrentFungibleBalance>(addr)
             && aggregator_v2::spec_get_value(global<ConcurrentFungibleBalance>(addr).balance) != 0;
         ensures !exists<FungibleStore>(addr);
@@ -275,6 +294,10 @@ spec aptos_framework::fungible_asset {
         let concurrent = features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_ASSETS);
         let post supply = global<ConcurrentSupply>(addr).current;
         include AddFungibilityAbortsIf;
+        /// [high-level-req-2.1]
+        ensures exists<Metadata>(addr) && (concurrent ==> exists<ConcurrentSupply>(addr))
+            && (!concurrent ==> exists<Supply>(addr));
+        /// [high-level-req-2.2]
         ensures global<Metadata>(addr) == Metadata { name, symbol, decimals, icon_uri, project_uri };
         ensures concurrent ==> aggregator_v2::spec_get_value(supply) == 0;
         ensures concurrent ==> aggregator_v2::spec_get_max_value(supply)
@@ -391,6 +414,7 @@ spec aptos_framework::fungible_asset {
         let store = global<FungibleStore>(store_addr);
         let concurrent = global<ConcurrentFungibleBalance>(store_addr).balance;
         aborts_if !exists<FungibleStore>(store_addr);
+        /// [high-level-req-7.2]
         aborts_if fa.metadata != store.metadata;
         aborts_if fa.amount != 0 && spec_is_concurrent_balance(store_addr)
             && aggregator_v2::spec_get_value(concurrent) + fa.amount > aggregator_v2::spec_get_max_value(concurrent);
@@ -402,6 +426,7 @@ spec aptos_framework::fungible_asset {
         fa: FungibleAsset;
         include UncheckedDepositAbortsIf;
         include StoreBalanceFrame;
+        /// [high-level-req-7.3]
         ensures spec_balance(store_addr) == old(spec_balance(store_addr)) + fa.amount;
     }
 
@@ -409,6 +434,7 @@ spec aptos_framework::fungible_asset {
         store_addr: address;
         amount: u64;
         aborts_if !exists<FungibleStore>(store_addr);
+        /// [high-level-req-6.2]
         aborts_if spec_balance(store_addr) < amount;
     }
 
@@ -418,6 +444,7 @@ spec aptos_framework::fungible_asset {
         result: FungibleAsset;
         include UncheckedWithdrawAbortsIf;
         include StoreBalanceFrame;
+        /// [high-level-req-6.3]
         ensures spec_balance(store_addr) == old(spec_balance(store_addr)) - amount;
         ensures result == FungibleAsset { metadata: old(global<FungibleStore>(store_addr).metadata), amount };
     }
@@ -469,6 +496,7 @@ spec aptos_framework::fungible_asset {
         metadata_addr: address;
         amount: u64;
         aborts_if amount != 0 && !exists<ConcurrentSupply>(metadata_addr) && !exists<Supply>(metadata_addr);
+        /// [high-level-req-12]
         aborts_if amount != 0 && spec_supply(metadata_addr) < amount;
     }
 
@@ -519,10 +547,11 @@ spec aptos_framework::fungible_asset {
 
     /// Moves the store balance into a `ConcurrentFungibleBalance`, preserving it.
     spec upgrade_store_to_concurrent<T: key>(owner: &signer, store: Object<T>) {
-        // Partial: the abort conditions of the ownership check are not specified.
-        pragma aborts_if_is_partial;
         let addr = store.inner;
         let upgrading = !exists<ConcurrentFungibleBalance>(addr);
+        let owner_address = signer::address_of(owner);
+        aborts_if upgrading && object::spec_owns_aborts(addr, owner_address);
+        aborts_if upgrading && !object::spec_owns(addr, owner_address);
         aborts_if upgrading && !exists<FungibleStore>(addr);
         aborts_if upgrading && global<FungibleStore>(addr).frozen;
         aborts_if upgrading && !features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_BALANCE);
@@ -618,18 +647,26 @@ spec aptos_framework::fungible_asset {
         pragma opaque;
         let fa_store = global<FungibleStore>(store.inner);
         aborts_if spec_has_deposit_dispatch_function(fa_store.metadata);
+        /// [high-level-req-7.1]
         aborts_if fa_store.frozen;
         include UncheckedDeposit { store_addr: store.inner };
+        /// [high-level-req-5.1]
+        ensures spec_supply(fa.metadata.inner) == old(spec_supply(fa.metadata.inner));
     }
 
     /// The owner of an unfrozen store can withdraw up to its balance.
     spec withdraw<T: key>(owner: &signer, store: Object<T>, amount: u64): FungibleAsset {
-        // Partial: the abort conditions of the ownership check are not specified.
-        pragma aborts_if_is_partial;
         let fa_store = global<FungibleStore>(store.inner);
+        let owner_address = signer::address_of(owner);
+        aborts_if object::spec_owns_aborts(store.inner, owner_address);
+        /// [high-level-req-4]
+        aborts_if !object::spec_owns(store.inner, owner_address);
         aborts_if spec_has_withdraw_dispatch_function(fa_store.metadata);
+        /// [high-level-req-6.1]
         aborts_if fa_store.frozen;
         include UncheckedWithdraw { store_addr: store.inner };
+        /// [high-level-req-5.2]
+        ensures spec_supply(fa_store.metadata.inner) == old(spec_supply(fa_store.metadata.inner));
     }
 
     /// Registration is rejected for APT, deletable objects, non-assets and assets that already have hooks.
@@ -699,11 +736,15 @@ spec aptos_framework::fungible_asset {
         aborts_if !exists<FungibleStore>(store.inner);
         aborts_if self.metadata != global<FungibleStore>(store.inner).metadata;
         include UncheckedWithdraw { store_addr: store.inner };
+        /// [high-level-req-5.3]
+        ensures spec_supply(self.metadata.inner) == old(spec_supply(self.metadata.inner));
     }
 
     spec deposit_with_ref<T: key>(self: &TransferRef, store: Object<T>, fa: FungibleAsset) {
         aborts_if self.metadata != fa.metadata;
         include UncheckedDeposit { store_addr: store.inner };
+        /// [high-level-req-5.4]
+        ensures spec_supply(fa.metadata.inner) == old(spec_supply(fa.metadata.inner));
     }
 
     /// Moves `amount` between two stores of the ref's asset, ignoring their frozen flags.
@@ -722,12 +763,42 @@ spec aptos_framework::fungible_asset {
         ensures from_addr != to_addr ==> spec_balance(from_addr) == old(spec_balance(from_addr)) - amount
             && spec_balance(to_addr) == old(spec_balance(to_addr)) + amount;
         ensures from_addr == to_addr ==> spec_balance(from_addr) == old(spec_balance(from_addr));
+        /// [high-level-req-5.5]
+        ensures spec_supply(self.metadata.inner) == old(spec_supply(self.metadata.inner));
+    }
+
+    spec generate_mint_ref(constructor_ref: &ConstructorRef): MintRef {
+        aborts_if !exists<object::ObjectCore>(constructor_ref.self);
+        /// [high-level-req-3.1]
+        aborts_if !exists<Metadata>(constructor_ref.self);
+        ensures result.metadata.inner == constructor_ref.self;
+    }
+
+    spec generate_burn_ref(constructor_ref: &ConstructorRef): BurnRef {
+        aborts_if !exists<object::ObjectCore>(constructor_ref.self);
+        /// [high-level-req-3.2]
+        aborts_if !exists<Metadata>(constructor_ref.self);
+        ensures result.metadata.inner == constructor_ref.self;
+    }
+
+    spec generate_transfer_ref(constructor_ref: &ConstructorRef): TransferRef {
+        aborts_if !exists<object::ObjectCore>(constructor_ref.self);
+        /// [high-level-req-3.3]
+        aborts_if !exists<Metadata>(constructor_ref.self);
+        ensures result.metadata.inner == constructor_ref.self;
+    }
+
+    spec transfer<T: key>(sender: &signer, from: Object<T>, to: Object<T>, amount: u64) {
+        let metadata_addr = global<FungibleStore>(from.inner).metadata.inner;
+        /// [high-level-req-5.6]
+        ensures spec_supply(metadata_addr) == old(spec_supply(metadata_addr));
     }
 
     spec burn(self: &BurnRef, fa: FungibleAsset) {
         let addr = fa.metadata.inner;
         aborts_if self.metadata != fa.metadata;
         include DecreaseSupplyAbortsIf { metadata_addr: addr, amount: fa.amount };
+        /// [high-level-req-11.2]
         ensures fa.amount != 0 ==> spec_supply(addr) == old(spec_supply(addr)) - fa.amount;
     }
 
@@ -738,7 +809,9 @@ spec aptos_framework::fungible_asset {
         include UncheckedWithdrawAbortsIf;
         aborts_if self.metadata != global<FungibleStore>(store_addr).metadata;
         include DecreaseSupplyAbortsIf { metadata_addr: addr };
+        /// [high-level-req-11.3]
         ensures spec_balance(store_addr) == old(spec_balance(store_addr)) - amount;
+        /// [high-level-req-11.4]
         ensures amount != 0 ==> spec_supply(addr) == old(spec_supply(addr)) - amount;
     }
 
@@ -749,13 +822,16 @@ spec aptos_framework::fungible_asset {
         aborts_if global<FungibleStore>(store_addr).frozen;
         include IncreaseSupplyAbortsIf { metadata_addr: addr };
         include UncheckedDeposit { fa: FungibleAsset { metadata: self.metadata, amount } };
+        /// [high-level-req-11.1]
         ensures amount != 0 ==> spec_supply(addr) == old(spec_supply(addr)) + amount;
     }
 
     spec set_frozen_flag<T: key>(self: &TransferRef, store: Object<T>, frozen: bool) {
         let addr = store.inner;
         aborts_if !exists<FungibleStore>(addr);
+        /// [high-level-req-13.1]
         aborts_if self.metadata != global<FungibleStore>(addr).metadata;
+        /// [high-level-req-13.2]
         ensures global<FungibleStore>(addr) == update_field(old(global<FungibleStore>(addr)), frozen, frozen);
     }
 }

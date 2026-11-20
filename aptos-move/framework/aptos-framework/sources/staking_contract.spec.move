@@ -56,7 +56,9 @@ spec aptos_framework::staking_contract {
     /// Implementation: The switch_operator function initiates the commission payout from the stake pool associated with
     /// the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the
     /// staker receives the appropriate commission amount and maintains the integrity of the staking process.
-    /// Enforcement: Audited that the commission is paid to the old operator.
+    /// Enforcement: Formally verified via [high-level-req-7](switch_operator) that the contract is re-keyed to the new
+    /// operator with the same pool and its principal reset to the active stake minus the old operator's commission.
+    /// Audited that the commission is paid to the old operator.
     ///
     /// No.: 8
     /// Requirement: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
@@ -350,6 +352,18 @@ spec aptos_framework::staking_contract {
         let store = global<Store>(staker_address);
         let staking_contracts = store.staking_contracts;
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
+        let pre_contract = simple_map::spec_get(staking_contracts, old_operator);
+        let pre_pool = global<stake::StakePool>(pre_contract.pool_address);
+        let pre_active = coin::value(pre_pool.active) + coin::value(pre_pool.pending_active);
+        let commission = (pre_active - pre_contract.principal) * pre_contract.commission_percentage / 100;
+        let post post_contracts = global<Store>(staker_address).staking_contracts;
+        let post post_contract = simple_map::spec_get(post_contracts, new_operator);
+        ensures !simple_map::spec_contains_key(post_contracts, old_operator);
+        ensures simple_map::spec_contains_key(post_contracts, new_operator);
+        ensures post_contract.pool_address == pre_contract.pool_address;
+        ensures post_contract.commission_percentage == new_commission_percentage;
+        /// [high-level-req-7]
+        ensures post_contract.principal == pre_active - commission;
     }
 
     /// Requires the operator beneficiary change feature.

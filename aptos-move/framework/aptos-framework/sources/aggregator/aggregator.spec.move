@@ -60,7 +60,7 @@ spec aptos_framework::aggregator {
 
     spec limit {
         pragma intrinsic;
-        /// [high-level-req-1.2]
+        /// [high-level-req-1.3]
         aborts_if [abstract] false;
     }
 
