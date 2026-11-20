@@ -98,25 +98,6 @@ impl ModuleProvider for InMemoryModuleProvider {
     fn verifier_config(&self) -> &VerifierConfig {
         &VerifierConfig::DEFAULT
     }
-
-    fn get_same_package_modules(
-        &self,
-        address: &AccountAddress,
-        module_name: &str,
-    ) -> VMResult<Vec<Identifier>> {
-        // Each compiled module is its own package, satisfying the trait's
-        // requirement that the module itself is part of the returned list.
-        match Identifier::new(module_name) {
-            Ok(identifier)
-                if self
-                    .module_bytes
-                    .contains_key(&(*address, identifier.clone())) =>
-            {
-                Ok(vec![identifier])
-            },
-            _ => Ok(vec![]),
-        }
-    }
 }
 
 /// Runs one request to its response.

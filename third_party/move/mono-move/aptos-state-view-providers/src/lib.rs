@@ -12,7 +12,6 @@
 //!   resolves resource-group placement.
 
 use anyhow::{anyhow, Result};
-use aptos_framework::natives::code::PackageRegistry;
 use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
@@ -32,9 +31,7 @@ use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::{deserialize_into, Heap, SharedArena};
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
-use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
-};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use shared_dsa::UnorderedMap;
 use std::{cell::RefCell, ptr::NonNull};
 use thiserror::Error;
@@ -94,44 +91,6 @@ impl<S: StateView> ModuleProvider for StateViewModuleProvider<'_, S> {
     fn verifier_config(&self) -> &VerifierConfig {
         // TODO(correctness): return the on-chain verifier config.
         &VerifierConfig::DEFAULT
-    }
-
-    // TODO(perf): fetches and BCS-deserializes the address's entire
-    // `PackageRegistry` (for 0x1: every framework package) on each call,
-    // uncached.
-    fn get_same_package_modules(
-        &self,
-        address: &AccountAddress,
-        module_name: &str,
-    ) -> VMResult<Vec<Identifier>> {
-        let identifier = |name: &str| {
-            Identifier::new(name)
-                .map_err(|e| provider_error(format!("invalid module name {name:?}: {e}")))
-        };
-        let key = StateKey::resource(address, &PackageRegistry::struct_tag())
-            .map_err(|e| provider_error(format!("bad state key: {e}")))?;
-        let Some(value) = self
-            .state_view
-            .get_state_value(&key)
-            .map_err(|e| provider_error(format!("package registry read failed: {e}")))?
-        else {
-            return Err(provider_error(format!("no package registry at {address}")));
-        };
-        let registry: PackageRegistry = bcs::from_bytes(value.bytes())
-            .map_err(|e| provider_error(format!("malformed package registry: {e}")))?;
-        for package in &registry.packages {
-            let names = package
-                .modules
-                .iter()
-                .map(|m| identifier(&m.name))
-                .collect::<VMResult<Vec<_>>>()?;
-            if names.iter().any(|n| n.as_str() == module_name) {
-                return Ok(names);
-            }
-        }
-        Err(provider_error(format!(
-            "module {address}::{module_name} not found in any package"
-        )))
     }
 }
 

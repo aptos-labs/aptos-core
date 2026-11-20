@@ -99,10 +99,6 @@ pub enum LoadingPolicy {
     /// Loads one module at a time. More modules can be loaded based on the
     /// lowering policy.
     Lazy(LoweringPolicy),
-    /// Loads all modules in the same package as a single atomic unit. For now,
-    /// supports only lazy lowering where functions are lowered only when the
-    /// information for lowering is accessible in the package.
-    Package,
 }
 
 /// Per-transaction code loader: loads code from the cache, charges gas on
@@ -166,7 +162,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                     Eager => self.load_lazy_with_eager_lowering(read_set, gas_meter, id),
                 }
             },
-            LoadingPolicy::Package => self.load_package(read_set, gas_meter, id),
         }
     }
 
@@ -331,10 +326,6 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         let module = match self.get_or_load_module(read_set, gas_meter, module_id) {
             Ok(module) => module,
-            // TODO(completeness): under `LoadingPolicy::Package`, a missing
-            // module fails with a provider error or an invariant violation,
-            // not a linking error. Resolution then aborts instead of returning
-            // `FunctionNotFound`, so it is only correct under the Lazy policies.
             Err(err) if err.kind() == ExecutionErrorKind::LinkingError => {
                 return Ok(Err(FunctionNotFound))
             },
@@ -525,7 +516,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let module = LoadedModule::new(
             module_ir,
             cost,
-            ModuleMandatoryDependencies::lazy_unset(),
+            ModuleMandatoryDependencies::unset(),
             self.guard,
         )
         .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
@@ -654,101 +645,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set.record_pending_loading(id)?;
         let module = match self.guard.get_module(id) {
             Some(module) => module,
-            None => {
-                self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?
-            },
+            None => self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?,
         };
 
         read_set.record_ready_for_lowering(id, module)?;
         gas_meter.charge(module.cost())?;
         Ok(module)
-    }
-
-    /// Loads the code corresponding to the specified ID and all other
-    /// modules in the same package. Gas is charged for the whole package
-    /// whether it was cache miss or hit.
-    fn load_package(
-        &self,
-        read_set: &mut ModuleReadSet<'guard>,
-        gas_meter: &mut GasMeter,
-        id: ArenaRef<'guard, ModuleId>,
-    ) -> VMResult<&'guard LoadedModule> {
-        let package = match self.guard.get_module(id) {
-            Some(module) => module.mandatory_dependencies().clone(),
-            None => self.build_mandatory_dependencies_for_id(id)?,
-        };
-
-        // If cache hit, we need to go over slots, record them in the read-set,
-        // and charge gas. If cache miss, we do the same but also fetch modules
-        // from storage on read-set cache miss and insert them into slots and
-        // read-set.
-        self.record_loaded_and_charge_slots(
-            read_set,
-            gas_meter,
-            package.slots(),
-            |read_set, slot| {
-                let id = self.guard.arena_ref_for_module_id(slot.id());
-                read_set.record_pending_loading(id)?;
-                let module = match slot.get(self.guard) {
-                    Some(module) => module,
-                    None => self.build_and_insert_module_ir(id, package.clone())?,
-                };
-                read_set.record_ready_for_lowering(id, module)?;
-                Ok(module)
-            },
-        )?;
-
-        // Promote any package member that was already in the read-set as
-        // metered (e.g., a layout-only side-load earlier in this transaction).
-        for slot in package.slots() {
-            let slot_id = self
-                .guard
-                .arena_ref_for_module_id(self.module_slot(slot).id());
-            if matches!(
-                read_set.get(slot_id),
-                Some(ModuleRead::Loaded {
-                    state: ModuleState::Metered,
-                    ..
-                })
-            ) {
-                read_set.mark_ready_for_lowering(slot_id)?;
-            }
-        }
-
-        if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
-            if !matches!(state, ModuleState::ReadyForLowering) {
-                invariant_violation!(TargetModuleNotReady);
-            }
-            Ok(module)
-        } else {
-            invariant_violation!(TargetModuleNotLoaded)
-        }
-    }
-
-    /// Builds mandatory module dependencies to add to a module that have just
-    /// been loaded.
-    fn build_mandatory_dependencies_for_id(
-        &self,
-        id: ArenaRef<'guard, ModuleId>,
-    ) -> VMResult<ModuleMandatoryDependencies> {
-        match &self.policy {
-            LoadingPolicy::Lazy(_) => Ok(ModuleMandatoryDependencies::lazy_unset()),
-            LoadingPolicy::Package => {
-                let module_names = self
-                    .module_provider
-                    .get_same_package_modules(id.address(), id.name())?;
-                let package_slots = module_names
-                    .into_iter()
-                    .map(|module_name| {
-                        let module_id = self
-                            .guard
-                            .intern_address_name(id.address(), module_name.as_ident_str());
-                        self.guard.get_or_create_module_slot(module_id)
-                    })
-                    .collect::<Vec<_>>();
-                Ok(ModuleMandatoryDependencies::package(package_slots))
-            },
-        }
     }
 
     /// Loads the code corresponding to the specified ID and all other
@@ -764,15 +666,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             None => {
                 read_set.record_pending_loading(id)?;
                 let module =
-                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?;
+                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?;
                 read_set.record_unmetered(id, module)?;
                 module
             },
             Some(module) => {
-                let Some(deps) = module.mandatory_dependencies().as_lazy() else {
-                    invariant_violation!(MandatoryDepsNotLazy);
-                };
-                if deps.get().is_some() {
+                if module.mandatory_dependencies().get().is_some() {
                     // Mandatory set is already cached - only need to charge gas.
                     self.charge_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
                     return Ok(module);
@@ -807,20 +706,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 read_set.mark_ready_for_lowering(id)?;
             },
             LoadingPolicy::Lazy(LoweringPolicy::Eager) => {
-                let Some(deps) = module.mandatory_dependencies().as_lazy() else {
-                    invariant_violation!(MandatoryDepsNotLazy);
-                };
-                if deps.get().is_some() {
+                if module.mandatory_dependencies().get().is_some() {
                     self.charge_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
                 } else {
                     self.compute_mandatory_set_for_eager_lowering(read_set, gas_meter, id, module)?;
                 }
-            },
-            LoadingPolicy::Package => {
-                // The metered state can arise from a layout-only side-load
-                // earlier in the transaction. Load the full package now to
-                // charge any missing siblings and promote them to ready.
-                self.load_package(read_set, gas_meter, id)?;
             },
         }
         Ok(())
@@ -835,10 +725,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> VMResult<()> {
-        let Some(deps) = module.mandatory_dependencies().as_lazy() else {
-            invariant_violation!(MandatoryDepsNotLazy);
-        };
-        let Some(slots) = deps.get() else {
+        let Some(slots) = module.mandatory_dependencies().get() else {
             invariant_violation!(MandatoryDepsNotSet);
         };
         self.charge_non_read_set_slots(read_set, gas_meter, slots)?;
@@ -875,10 +762,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         // Set the mandatory set for the module. Because of concurrency, it is
         // possible that other thread sets it at before, so we need to reload
         // it.
-        let Some(deps) = module.mandatory_dependencies().as_lazy() else {
-            invariant_violation!(MandatoryDepsNotLazy);
-        };
-        let _ = deps.set(walker.discovered.into());
+        let deps = module.mandatory_dependencies();
+        deps.set(walker.discovered.into());
         let Some(ms) = deps.get() else {
             invariant_violation!(MandatoryDepsNotSet);
         };
@@ -1012,7 +897,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             let module = match slot.get(self.guard) {
                 Some(module) => module,
                 None => {
-                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?
+                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?
                 },
             };
             read_set.record_metered(id, module)?;
@@ -1116,10 +1001,9 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
                 self.read_set.record_pending_loading(id)?;
                 let module = match self.loader.guard.get_module(id) {
                     Some(module) => module,
-                    None => {
-                        let deps = self.loader.build_mandatory_dependencies_for_id(id)?;
-                        self.loader.build_and_insert_module_ir(id, deps)?
-                    },
+                    None => self
+                        .loader
+                        .build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?,
                 };
                 self.read_set.record_unmetered(id, module)?;
                 module

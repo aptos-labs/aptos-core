@@ -138,12 +138,6 @@ pub enum LoaderInvariantViolation {
     #[error("All modules in the read-set must be loaded")]
     ReadSetEntryNotLoaded,
 
-    #[error("Target module is not loaded")]
-    TargetModuleNotLoaded,
-
-    #[error("Target module is not metered and ready")]
-    TargetModuleNotReady,
-
     #[error("All modules must be present in the read-set")]
     UnexpectedReadSetMiss,
 
@@ -154,9 +148,6 @@ pub enum LoaderInvariantViolation {
     // ---- mandatory dependencies ----
     #[error("Mandatory dependencies must be set")]
     MandatoryDepsNotSet,
-
-    #[error("Mandatory dependencies must always be lazy")]
-    MandatoryDepsNotLazy,
 
     // ---- lowering ----
     /// The specializer produced a function the micro-op verifier rejects.
