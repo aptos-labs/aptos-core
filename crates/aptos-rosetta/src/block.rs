@@ -179,6 +179,13 @@ impl BlockRetriever {
         }
     }
 
+    pub fn with_rest_client(&self, rest_client: Arc<aptos_rest_client::Client>) -> Self {
+        BlockRetriever {
+            page_size: self.page_size,
+            rest_client,
+        }
+    }
+
     /// Retrieves block abbreviated info by height
     pub async fn get_block_info_by_height(
         &self,

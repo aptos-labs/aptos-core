@@ -123,6 +123,7 @@ async fn setup_test(
             validator.rest_api_endpoint(),
         )),
         HashSet::new(),
+        HashSet::new(),
     )
     .await
     .unwrap();
