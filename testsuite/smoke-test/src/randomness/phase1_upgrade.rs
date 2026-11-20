@@ -5,7 +5,10 @@
 //! to use prebuilt binaries; otherwise Forge builds the pinned pre-PR revision and workspace.
 
 use crate::randomness::e2e_basic_consumption::publish_on_chain_dice_module;
-use aptos::{common::types::GasOptions, test::CliTestFramework};
+use aptos::{
+    common::types::{GasOptions, TransactionSummary},
+    test::CliTestFramework,
+};
 use aptos_forge::{
     ActiveNodesGuard, Factory, LocalFactory, LocalSwarm, LocalVersion, Node, NodeExt, Swarm,
     SwarmExt, Version,
@@ -59,7 +62,7 @@ struct UpgradeSwarm {
     peers: Vec<AccountAddress>,
     upgrade_version: Version,
     epoch: u64,
-    roll: MemberId,
+    dice_roll_function: MemberId,
 }
 
 impl UpgradeSwarm {
@@ -117,7 +120,7 @@ impl UpgradeSwarm {
             .unwrap()
             .inner()
             .epoch;
-        let roll =
+        let dice_roll_function =
             MemberId::from_str(&format!("{}::dice::roll", root_address.to_hex_literal())).unwrap();
         let mut test = Self {
             swarm,
@@ -125,11 +128,10 @@ impl UpgradeSwarm {
             peers,
             upgrade_version,
             epoch,
-            roll,
+            dice_roll_function,
         };
         // Start the rollout at a fresh epoch so the same-epoch batch has its full time budget.
         test.wait_for_next_epoch().await;
-        test.assert_randomness_commits().await;
         test
     }
 
@@ -181,9 +183,8 @@ impl UpgradeSwarm {
         info!("Phase1 rollout: reached natural epoch {}", self.epoch);
     }
 
-    async fn assert_randomness_commits(&mut self) {
-        let txn = self
-            .cli
+    async fn submit_dice_roll(&self) -> TransactionSummary {
+        self.cli
             .run_function(
                 0,
                 Some(GasOptions {
@@ -191,39 +192,69 @@ impl UpgradeSwarm {
                     max_gas: Some(10_000),
                     expiration_secs: 120,
                 }),
-                self.roll.clone(),
+                self.dice_roll_function.clone(),
                 vec![],
                 vec![],
             )
             .await
-            .unwrap();
-        assert_eq!(txn.success, Some(true));
-        self.swarm
-            .wait_for_all_nodes_to_catchup(TIMEOUT)
-            .await
-            .unwrap();
-        info!("Phase1 rollout: randomness transaction committed; all five nodes caught up in epoch {}", self.current_epoch().await);
+            .unwrap()
     }
 }
 
 #[tokio::test]
 async fn phase1_upgrade_one_validator_per_epoch_preserves_rand_db() {
     let mut test = UpgradeSwarm::new(30).await;
+    let transaction = test.submit_dice_roll().await;
+    assert_eq!(transaction.success, Some(true));
+    test.swarm
+        .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+        .await
+        .unwrap();
+
     for index in 0..4 {
         test.upgrade(index).await;
-        test.assert_randomness_commits().await;
+        let transaction = test.submit_dice_roll().await;
+        assert_eq!(transaction.success, Some(true));
+        test.swarm
+            .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+            .await
+            .unwrap();
+
         test.wait_for_next_epoch().await;
-        test.assert_randomness_commits().await;
+        let transaction = test.submit_dice_roll().await;
+        assert_eq!(transaction.success, Some(true));
+        test.swarm
+            .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+            .await
+            .unwrap();
     }
 }
 
 #[tokio::test]
 async fn phase1_upgrade_majority_in_one_epoch_preserves_rand_db() {
     let mut test = UpgradeSwarm::new(60).await;
+    let transaction = test.submit_dice_roll().await;
+    assert_eq!(transaction.success, Some(true));
+    test.swarm
+        .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+        .await
+        .unwrap();
+
     for index in 0..4 {
         test.upgrade(index).await;
     }
-    test.assert_randomness_commits().await;
+    let transaction = test.submit_dice_roll().await;
+    assert_eq!(transaction.success, Some(true));
+    test.swarm
+        .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+        .await
+        .unwrap();
+
     test.wait_for_next_epoch().await;
-    test.assert_randomness_commits().await;
+    let transaction = test.submit_dice_roll().await;
+    assert_eq!(transaction.success, Some(true));
+    test.swarm
+        .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+        .await
+        .unwrap();
 }
