@@ -19,8 +19,9 @@ spec aptos_framework::aptos_coin {
     /// Implementation: The MintCapability struct has the copy and store abilities. This means that it can be duplicated
     /// and stored in different object wrappers (such as MintCapStore). This capability is tested against the
     /// destroy_mint_cap and claim_mint_capability functions.
-    /// Enforcement: Verified via [high-level-req-3](initialize).
-
+    /// Enforcement: Formally verified via [high-level-req-3](initialize) that the mint capability is stored in
+    /// MintCapStore; the copy and store abilities are checked by the Move type system.
+    ///
     /// No.: 4
     /// Requirement: Any type of operation on the APT coin should fail if the user has not registered for the coin.
     /// Criticality: Medium

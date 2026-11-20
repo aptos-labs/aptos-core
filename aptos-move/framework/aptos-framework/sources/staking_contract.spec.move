@@ -56,7 +56,9 @@ spec aptos_framework::staking_contract {
     /// Implementation: The switch_operator function initiates the commission payout from the stake pool associated with
     /// the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the
     /// staker receives the appropriate commission amount and maintains the integrity of the staking process.
-    /// Enforcement: Audited that the commission is paid to the old operator.
+    /// Enforcement: Audited that the commission is paid to the old operator. Formally verified via
+    /// [high-level-req-7](switch_operator) that the contract moves from the old to the new operator, keeping its
+    /// stake pool.
     ///
     /// No.: 8
     /// Requirement: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
@@ -350,6 +352,14 @@ spec aptos_framework::staking_contract {
         let store = global<Store>(staker_address);
         let staking_contracts = store.staking_contracts;
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
+        let pre_contract = simple_map::spec_get(staking_contracts, old_operator);
+        let post post_contracts = global<Store>(staker_address).staking_contracts;
+        let post post_contract = simple_map::spec_get(post_contracts, new_operator);
+        ensures !simple_map::spec_contains_key(post_contracts, old_operator);
+        ensures simple_map::spec_contains_key(post_contracts, new_operator);
+        /// [high-level-req-7]
+        ensures post_contract.pool_address == pre_contract.pool_address;
+        ensures post_contract.commission_percentage == new_commission_percentage;
     }
 
     /// Requires the operator beneficiary change feature.
