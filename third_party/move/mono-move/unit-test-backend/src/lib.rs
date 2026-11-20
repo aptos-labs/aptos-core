@@ -379,6 +379,7 @@ fn classify(err: &VMInternalError) -> Classification {
             LoaderError::ModuleNotFound { .. }
             | LoaderError::FunctionNotFound { .. }
             | LoaderError::TypeArgumentCountMismatch { .. }
+            | LoaderError::TypeArgumentConstraintNotSatisfied { .. }
             | LoaderError::GlobalContext(_)
             | LoaderError::InvariantViolation(_)
             | LoaderError::NativeShadowsMoveFunction { .. }

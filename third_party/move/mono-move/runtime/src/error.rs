@@ -485,6 +485,18 @@ pub enum RuntimeInvariantViolation {
         function: Identifier,
     },
 
+    #[error("CallClosure: closure type is not a function type")]
+    ClosureTypeNotFunction,
+
+    #[error(
+        "CallClosure: closure type does not match the signature of `{}::{function}`",
+        .module.short_str_lossless()
+    )]
+    ClosureSignatureMismatch {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
+
     #[error(
         "CallClosure: capture {capture_idx} was packed under layout {packed_id} but resolved \
          callee's param {param_idx} has layout {param_id}"

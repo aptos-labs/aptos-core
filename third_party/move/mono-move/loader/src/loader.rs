@@ -274,6 +274,48 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
     }
 
+    /// Loads the target of a closure. Unlike [`Self::load_function`], also
+    /// checks `ty_args` against the target's declared constraints: the bytecode
+    /// verifier checks them for a closure that code packs, but a closure
+    /// decoded from bytes can name any type arguments.
+    pub fn load_closure_target(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut GasMeter,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> VMResult<FunctionPtr> {
+        let module = self.get_or_load_module(read_set, gas_meter, module_id)?;
+        // A missing function and a wrong type-argument count are reported by
+        // `load_function`, as V1 reports both before constraints.
+        if let Some(def_idx) = module.function_def_idx(func_name) {
+            let prepared = &module.ir().module;
+            let constraints = &prepared
+                .function_handle_at(prepared.function_def_at(def_idx).function)
+                .type_parameters;
+            let ty_arg_list = view_type_list(ty_args);
+            if constraints.len() == ty_arg_list.len()
+                && !self.ty_args_satisfy_constraints(
+                    read_set,
+                    gas_meter,
+                    constraints,
+                    ty_arg_list,
+                )?
+            {
+                let id = self.guard.arena_ref_for_module_id(module_id);
+                return Err(VMInternalError::new(
+                    LoaderError::TypeArgumentConstraintNotSatisfied {
+                        address: *id.address(),
+                        module: id.name().to_string(),
+                        name: view_name(func_name).to_string(),
+                    },
+                ));
+            }
+        }
+        self.load_function(read_set, gas_meter, module_id, func_name, ty_args)
+    }
+
     /// Publishes the layout and GC descriptor of the resource type `ty`, so a
     /// read of it can be materialized outside lowered code. Loads and charges
     /// for the modules its definition pulls in.
@@ -983,28 +1025,10 @@ impl<'a, 'guard, 'ctx> LoweringContext<'a, 'guard, 'ctx> {
             discovered_seen: UnorderedSet::new(),
         }
     }
-}
 
-impl LayoutProvider for LoweringContext<'_, '_, '_> {
-    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
-        self.loader.guard.layout(id)
-    }
-
-    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
-        self.loader.guard.layout_id(ty)
-    }
-
-    fn interner(&self) -> Option<&dyn Interner> {
-        self.loader.guard.interner()
-    }
-}
-
-impl SpecializerContext for LoweringContext<'_, '_, '_> {
-    fn get_fields(
-        &mut self,
-        module_id: &InternedModuleId,
-        nominal_name: &InternedIdentifier,
-    ) -> VMResult<Option<NominalFields>> {
+    /// Returns module `module_id`, loading it if the read-set does not have it
+    /// yet, and records it as needed for lowering this function.
+    fn discover_module(&mut self, module_id: &InternedModuleId) -> VMResult<&'guard LoadedModule> {
         let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.
@@ -1028,8 +1052,43 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
             let slot = self.loader.guard.get_or_create_module_slot(id);
             self.discovered.push(slot);
         }
+        Ok(module)
+    }
+}
 
+impl LayoutProvider for LoweringContext<'_, '_, '_> {
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.loader.guard.layout(id)
+    }
+
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.loader.guard.layout_id(ty)
+    }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.loader.guard.interner()
+    }
+}
+
+impl SpecializerContext for LoweringContext<'_, '_, '_> {
+    fn get_fields(
+        &mut self,
+        module_id: &InternedModuleId,
+        nominal_name: &InternedIdentifier,
+    ) -> VMResult<Option<NominalFields>> {
+        let module = self.discover_module(module_id)?;
         Ok(module.ir().module.interned_fields(*nominal_name).cloned())
+    }
+
+    fn function_is_persistent(
+        &mut self,
+        module_id: &InternedModuleId,
+        func_name: &InternedIdentifier,
+    ) -> VMResult<bool> {
+        let module = self.discover_module(module_id)?;
+        Ok(module
+            .function_def_idx(*func_name)
+            .is_some_and(|idx| module.ir().module.definition_is_persistent(idx)))
     }
 
     fn publish_vec_descriptor(

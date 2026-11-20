@@ -260,8 +260,9 @@ pub struct PackClosureOp {
     /// `captured`. `0` for a non-capturing closure.
     pub values_size: u32,
     /// Layout of the captured values: an anonymous struct with one field per
-    /// capture, in capture order. Serializing the closure walks it, so it never
-    /// has to resolve the target. [`None`] for a non-capturing closure.
+    /// capture, in capture order. Serialization takes each capture's layout
+    /// from here instead of from the target's parameter types, so it never has
+    /// to load the target. [`None`] for a non-capturing closure.
     pub captured_layout_id: Option<LayoutId>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
@@ -274,6 +275,10 @@ pub struct PackClosureOp {
 pub struct CallClosureOp {
     /// Frame slot holding the closure heap pointer.
     pub closure_src: FrameOffset,
+    /// The closure's function type at this call site, with type arguments
+    /// substituted. A closure decoded from bytes can name any function, so its
+    /// target is checked against this type when it is resolved.
+    pub closure_ty: InternedType,
     /// Non-captured argument sources, all within the caller's data region.
     /// Ordered by ascending parameter index `i` where `mask.is_captured(i)`
     /// is false.

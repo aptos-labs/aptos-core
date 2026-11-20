@@ -229,6 +229,15 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .cloned())
     }
 
+    // Only asked about imported functions, which are out of scope here.
+    fn function_is_persistent(
+        &mut self,
+        _module_id: &InternedModuleId,
+        _func_name: &InternedIdentifier,
+    ) -> VMResult<bool> {
+        Ok(false)
+    }
+
     fn publish_vec_descriptor(
         &self,
         elem_ty: InternedType,

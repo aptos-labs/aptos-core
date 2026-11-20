@@ -35,6 +35,15 @@ pub enum LoaderError {
         got: usize,
     },
 
+    /// A function was named with type arguments that do not satisfy its
+    /// declared constraints, as a closure decoded from bytes can.
+    #[error("Type arguments of {address}::{module}::{name} do not satisfy its constraints")]
+    TypeArgumentConstraintNotSatisfied {
+        address: AccountAddress,
+        module: String,
+        name: String,
+    },
+
     /// TODO(completeness): temporary until natives are loadable as functions.
     #[error("Function {address}::{module}::{name} is a native and cannot be loaded as code")]
     NativeFunctionNotLoadable {
@@ -85,6 +94,7 @@ impl IntoExecutionError for LoaderError {
             ModuleNotFound { .. }
             | FunctionNotFound { .. }
             | TypeArgumentCountMismatch { .. }
+            | TypeArgumentConstraintNotSatisfied { .. }
             | NativeFunctionNotLoadable { .. } => ExecutionErrorKind::LinkingError,
 
             // TODO(cleanup): delegate once GlobalContext has its own error type.

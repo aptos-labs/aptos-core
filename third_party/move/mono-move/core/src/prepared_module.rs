@@ -212,28 +212,29 @@ impl PreparedModule {
     }
 
     /// Whether the function named by `handle_idx` is persistent, so a closure
-    /// over it can be serialized.
+    /// over it can be serialized. [`None`] when this module cannot tell.
     ///
-    /// A callee in this module is read from its definition. An imported callee
-    /// is read from the handle, whose `Persistent` attribute the compiler sets
-    /// for public and `#[persistent]` functions.
-    //
-    // TODO(correctness): a callee that becomes persistent through an upgrade
-    // after this module was compiled has no `Persistent` attribute on its
-    // handle here, so a closure over it is not serializable, while V1 reads
-    // the callee's current definition and serializes it.
-    pub fn function_handle_is_persistent(&self, handle_idx: FunctionHandleIndex) -> bool {
+    /// A callee in this module is read from its definition. An imported handle
+    /// marked `Persistent` is trusted, because linking requires the callee's
+    /// definition to be persistent too. An imported handle without it says
+    /// nothing, so the caller has to read the callee's definition.
+    pub fn function_handle_is_persistent(&self, handle_idx: FunctionHandleIndex) -> Option<bool> {
         let handle = self.module.function_handle_at(handle_idx);
         if handle.module != self.module.self_handle_idx() {
-            return handle.attributes.contains(&FunctionAttribute::Persistent);
+            return handle
+                .attributes
+                .contains(&FunctionAttribute::Persistent)
+                .then_some(true);
         }
-        self.module
-            .function_defs()
-            .iter()
-            .position(|def| def.function == handle_idx)
-            .is_some_and(|idx| {
-                self.definition_is_persistent(FunctionDefinitionIndex(idx as TableIndex))
-            })
+        Some(
+            self.module
+                .function_defs()
+                .iter()
+                .position(|def| def.function == handle_idx)
+                .is_some_and(|idx| {
+                    self.definition_is_persistent(FunctionDefinitionIndex(idx as TableIndex))
+                }),
+        )
     }
 
     fn handle_has_module_lock(&self, handle_idx: FunctionHandleIndex) -> bool {

@@ -26,6 +26,15 @@ module 0x99::closure_bcs {
         b
     }
 
+    struct NoDrop has copy {
+        x: u64,
+    }
+
+    #[persistent]
+    fun who(s: signer): address {
+        std::signer::address_of(&s)
+    }
+
     #[persistent]
     fun mix(a: u8, b: u64, c: vector<u8>): u64 {
         (a as u64) + b + c.length()
@@ -159,6 +168,28 @@ module 0x99::closure_bcs {
         f(1)
     }
 
+    // The bytes instantiate `pick` with `NoDrop`, which lacks the `drop` its
+    // type parameter requires.
+    public fun call_unsatisfied_constraint(): u64 {
+        let f = 0x1::from_bcs::from_bytes<|NoDrop, u64|u64 has copy + drop>(x"05010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f626373047069636b010700000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f626373064e6f44726f70000000000000000000");
+        f(NoDrop { x: 1 }, 2)
+    }
+
+    // The bytes name `who`, which takes a `signer`, as a function taking an
+    // `address`.
+    public fun call_param_type_mismatch(): address {
+        let f = 0x1::from_bcs::from_bytes<|address|address has copy + drop>(x"05010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f6263730377686f000000000000000000");
+        f(@0x42)
+    }
+
+    // The bytes name `add`, which returns one value, as a function returning
+    // two.
+    public fun call_result_count_mismatch(): u64 {
+        let f = 0x1::from_bcs::from_bytes<|u64, u64|(u64, u64) has copy + drop>(x"05010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f62637303616464000000000000000000");
+        let (a, b) = f(1, 2);
+        a + b
+    }
+
     // `call_with_gc_while_decoding` up to the call.
     public fun decode_and_fill(): u64 {
         let f = 0x1::from_bcs::from_bytes<|u64|u64 has copy + drop>(x"07010000000000000000000000000000000000000000000000000000000000000000990b636c6f737572655f6263730574616c6c79000100000000000000050103010203");
@@ -241,6 +272,19 @@ module 0x99::closure_bcs {
 // RUN: execute 0x99::closure_bcs::call_capture_layout_mismatch
 // CHECK-V1-SUBSTR: INTERNAL_TYPE_ERROR
 // CHECK-V2-SUBSTR: capture 0 was stored under a layout the callee's parameter cannot read
+
+// RUN: execute 0x99::closure_bcs::call_unsatisfied_constraint
+// CHECK-ERROR-PARITY
+
+// Both raise an invariant violation, with different messages.
+// RUN: execute 0x99::closure_bcs::call_param_type_mismatch
+// CHECK-V1-SUBSTR: Expected type signer, got address which is not assignable
+// CHECK-V2-SUBSTR: closure type does not match the signature of `0x99::closure_bcs::who`
+
+// Both raise an invariant violation, with different messages.
+// RUN: execute 0x99::closure_bcs::call_result_count_mismatch
+// CHECK-V1-SUBSTR: Closure signature mismatch for
+// CHECK-V2-SUBSTR: closure type does not match the signature of `0x99::closure_bcs::add`
 
 // Decoding and filling fit a 288 B heap, so decoding the captures inside the
 // call is what collects.

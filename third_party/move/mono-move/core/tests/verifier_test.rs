@@ -6,7 +6,7 @@
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     interner::{FunctionRef, InternedFunctionRef, ModuleId},
-    types::{InternedType, EMPTY_TYPE_LIST, U32_TY, U64_TY},
+    types::{InternedType, Type, EMPTY_TYPE_LIST, U32_TY, U64_TY},
     value_layout::{FUNCTION_LAYOUT_ID, U32_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
     verify_function, CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, DescriptorId,
     DescriptorProvider, FieldValueLayout, FrameLayoutInfo, FrameOffset as FO, Function,
@@ -15,6 +15,7 @@ use mono_move_core::{
     SortedSafePointEntries, ValueLayout, ValueLayoutTable, POINTER_VEC_DESCRIPTOR_ID,
     TRIVIAL_DESCRIPTOR_ID,
 };
+use move_core_types::ability::AbilitySet;
 
 /// A descriptor table paired with a layout table, to satisfy the verifier's
 /// `DescriptorProvider + LayoutProvider` bound.
@@ -53,6 +54,16 @@ fn test_func_ref() -> InternedFunctionRef {
         ty_args: EMPTY_TYPE_LIST,
     };
     GlobalArenaPtr::from_static(&FUNC_REF)
+}
+
+/// Interned `||` function type for hand-built `CallClosure`s.
+fn test_closure_ty() -> InternedType {
+    static TY: Type = Type::Function {
+        args: EMPTY_TYPE_LIST,
+        results: EMPTY_TYPE_LIST,
+        abilities: AbilitySet::EMPTY,
+    };
+    GlobalArenaPtr::from_static(&TY)
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
@@ -140,7 +151,7 @@ fn valid_with_safe_point_at_call_closure() {
 
     #[rustfmt::skip]
     let code = vec![
-        CallClosure(Box::new(CallClosureOp { closure_src: FO(0), provided_args: vec![] })),
+        CallClosure(Box::new(CallClosureOp { closure_src: FO(0), closure_ty: test_closure_ty(), provided_args: vec![] })),
         Return,
     ];
     let func = Function {
@@ -711,6 +722,7 @@ fn call_closure_operands_confined_to_data_region() {
             code: Code::from_vec(vec![
                 MicroOp::CallClosure(Box::new(CallClosureOp {
                     closure_src: FO(closure_src),
+                    closure_ty: test_closure_ty(),
                     provided_args: vec![SizedSlot {
                         offset: FO(arg_offset),
                         size: 8,
