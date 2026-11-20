@@ -24,7 +24,8 @@ pub use errors::{
     NoEffectsReason, PreExecutionCheckFailure, SystemTxnFailure,
 };
 pub use executor::AptosTransactionExecutor;
+pub use materialize::TransactionOutputWithoutGroups;
 pub use mono_move_core::{InterruptSource, NoInterrupts};
 pub use natives::production_natives;
 pub use outcome::TxnOutcome;
-pub use providers::{decode_group_members, AptosDataProvider, GroupMembers};
+pub use providers::{check_group_key, decode_group_members, AptosDataProvider, GroupMembers};

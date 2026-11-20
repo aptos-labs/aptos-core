@@ -15,7 +15,9 @@ use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_types::state_store::{state_key::StateKey, StateView};
 use bytes::Bytes;
-use mono_move_aptos_transaction_executor::{decode_group_members, AptosDataProvider, GroupMembers};
+use mono_move_aptos_transaction_executor::{
+    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+};
 use mono_move_core::{
     nominal_tag,
     storage::{
@@ -25,23 +27,18 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, IntoExecutionError, LayoutProvider, VMInternalError, VMResult,
-    OBJECT_HEADER_SIZE,
+    ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult,
 };
 use mono_move_global_context::ExecutionGuard;
-use mono_move_runtime::{deserialize_into, Heap, SharedArena};
+use mono_move_runtime::SegmentedArena;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, move_resource::MoveStructType,
 };
 use shared_dsa::UnorderedMap;
-use std::{cell::RefCell, ptr::NonNull};
+use std::cell::RefCell;
 use thiserror::Error;
-
-/// Default size of the provider's value arena. Occupancy is bounded by one
-/// materialization per distinct key read, so this fits any realistic use.
-const DEFAULT_RESOURCE_ARENA_BYTES: usize = 64 * 1024 * 1024;
 
 /// Errors raised by these providers.
 #[derive(Debug, Error)]
@@ -146,11 +143,11 @@ pub struct StateViewResourceProvider<'a, 'ctx, S> {
 
 /// The provider's interior-mutable state: caches and the value arena.
 struct ProviderState {
-    /// Bump arena holding the flat values that reads hand out pointers into.
-    /// Shared so each read can pin the source heap where the read points to.
-    /// Never collected or reset; occupancy is bounded by one materialization per
-    /// distinct key, thanks to the value cache.
-    arena: std::sync::Arc<SharedArena>,
+    /// Arena holding the flat values that reads hand out pointers into. Each
+    /// read pins the segment its value is in. Never collected or reset;
+    /// occupancy is bounded by one materialization per distinct key, thanks to
+    /// the value cache.
+    arena: SegmentedArena,
     /// Materialized reads, including negative ones. Sound because execution
     /// never mutates a value through a `StorageRead` pointer (mutation copies
     /// into the transaction's own heap first).
@@ -162,30 +159,17 @@ struct ProviderState {
     /// the pair keeps a `#[resource_group_member]` add or remove between
     /// executions from serving the other placement's value.
     values: UnorderedMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
-    /// Members of each resource group read so far, keyed by the group's state key.
-    ///
-    /// Here it is safe to use a non-cryptographic hasher because `StateKey` already
-    /// gets hashed by its crypto digest.
-    groups: UnorderedMap<StateKey, Option<GroupMembers>>,
+    /// Members of each resource group read so far, keyed by the group's slot.
+    groups: UnorderedMap<InMemoryStorageKey, Option<GroupMembers>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
     pub fn new(guard: &'a ExecutionGuard<'ctx>, state_view: &'a S) -> Self {
-        Self::new_with_arena_size(guard, state_view, DEFAULT_RESOURCE_ARENA_BYTES)
-    }
-
-    /// Escape hatch for value arenas beyond the default's reach.
-    pub fn new_with_arena_size(
-        guard: &'a ExecutionGuard<'ctx>,
-        state_view: &'a S,
-        arena_size: usize,
-    ) -> Self {
         Self {
             guard,
             state_view,
             inner: RefCell::new(ProviderState {
-                #[allow(clippy::arc_with_non_send_sync)]
-                arena: std::sync::Arc::new(SharedArena::new(arena_size)),
+                arena: SegmentedArena::new(),
                 values: UnorderedMap::new(),
                 groups: UnorderedMap::new(),
             }),
@@ -209,8 +193,7 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
                     .map(|value| value.bytes().clone()))
             },
             Some(group_ty) => {
-                let tag = nominal_tag(group_ty)?;
-                let group_key = StateKey::resource_group(&key.address(), &tag);
+                let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
                     .group_members(&group_key)?
@@ -237,42 +220,21 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             .fetch_bytes(key, group)
             .map_err(|e| internal(e.to_string()))?
         else {
+            let read = StorageRead::DoesNotExist { version: None };
             self.inner
                 .borrow_mut()
                 .values
-                .insert(cache_key, StorageRead::DoesNotExist);
-            return Ok(StorageRead::DoesNotExist);
+                .insert(cache_key, read.clone());
+            return Ok(read);
         };
 
         // Materialize the value (BCS → flat) into the provider's arena.
-        let ty = key.value_ty();
-        let layout = self
-            .guard
-            .layout_by_ty(ty)
-            .ok_or_else(|| internal(format!("no layout for the value at {:?}", key.address())))?;
-        // Lowering publishes a descriptor for every resource a global-storage
-        // instruction reaches, so the read that got here has one already.
-        let descriptor = self
-            .guard
-            .struct_descriptor(ty)
-            .ok_or_else(|| internal(format!("no GC descriptor for {:?}", key.address())))?;
-
         let mut inner = self.inner.borrow_mut();
-        let arena = inner.arena.clone();
-        let obj = arena.with_heap_mut(|heap: &mut Heap| -> Result<NonNull<u8>, _> {
-            let obj = heap
-                .alloc_object(OBJECT_HEADER_SIZE + layout.size as usize, descriptor)
-                .ok_or_else(|| internal("resource arena is full".to_string()))?;
-            // SAFETY: `obj` is a freshly reserved object sized for the value's
-            // layout; `deserialize_into` writes the flat value there.
-            unsafe { deserialize_into(self.guard, heap, ty, &blob, obj.as_ptr()) }
-                .map_err(|e| internal(format!("stored value failed to deserialize: {e}")))?;
-            Ok(obj)
-        })?;
+        let (ptr, pin) = inner.arena.deserialize(self.guard, key.value_ty(), &blob)?;
         let read = StorageRead::ExternalHeap {
-            ptr: obj,
-            version: 0,
-            pin: arena,
+            ptr,
+            version: None,
+            pin,
         };
         inner.values.insert(cache_key, read.clone());
         Ok(read)
@@ -287,12 +249,16 @@ impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     //   and should avoid full copies.
     fn group_members(
         &self,
-        group_key: &StateKey,
+        group_key: &InMemoryStorageKey,
     ) -> Result<Option<GroupMembers>, ResourceProviderError> {
+        check_group_key(group_key)?;
         if let Some(members) = self.inner.borrow().groups.get(group_key) {
             return Ok(members.clone());
         }
-        let members = match self.state_view.get_state_value(group_key).map_err(|e| {
+        let state_key = group_key
+            .as_state_key()
+            .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?;
+        let members = match self.state_view.get_state_value(&state_key).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
         })? {
             Some(value) => Some(decode_group_members(value.bytes())?),
