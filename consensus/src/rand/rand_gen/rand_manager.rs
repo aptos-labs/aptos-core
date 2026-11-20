@@ -15,11 +15,15 @@ use crate::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::RandStorage,
-        types::{RandConfig, RequestShare, TAugmentedData, TShare},
+        types::{
+            CertifiedAugData, RandConfig, RequestCertifiedAugData, RequestShare, TAugmentedData,
+            TShare,
+        },
     },
 };
+use anyhow::ensure;
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::aptos_channel;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
@@ -42,7 +46,7 @@ use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -55,6 +59,9 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     config: RandConfig,
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    bounded_executor: BoundedExecutor,
+    rpc_backoff_policy: ExponentialBackoff,
+    rpc_timeout: Duration,
 
     // local channel received from rand_store for aggregation results
     decision_rx: Receiver<AggregationResult>,
@@ -67,6 +74,14 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
 
     // sender for aggregation results, shared with rand_store and skip listeners
     decision_tx: Sender<AggregationResult>,
+
+    // Fetch peer certificates lost on restart after proactive broadcasts have completed.
+    missing_apk_tx: aptos_channel::Sender<Author, Author>,
+    missing_apk_rx: aptos_channel::Receiver<Author, Author>,
+    cert_fetch_tx: Sender<(Author, CertifiedAugData<D>)>,
+    cert_fetch_rx: Receiver<(Author, CertifiedAugData<D>)>,
+    // Dropped at epoch change to cancel unfinished certificate fetches.
+    cert_fetches: HashMap<Author, DropGuard>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -81,20 +96,24 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
     ) -> Self {
-        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+        let rpc_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
+        let rpc_timeout = Duration::from_millis(rb_config.rpc_timeout_ms);
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
             "rand_manager",
             author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
-            rb_backoff_policy,
+            rpc_backoff_policy.clone(),
             TimeService::real(),
-            Duration::from_millis(rb_config.rpc_timeout_ms),
-            bounded_executor,
+            rpc_timeout,
+            bounded_executor.clone(),
         ));
         let (decision_tx, decision_rx) = unbounded();
+        // Keep at most one pending notification per author.
+        let (missing_apk_tx, missing_apk_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let (cert_fetch_tx, cert_fetch_rx) = unbounded();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
             author,
@@ -110,6 +129,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             config,
             reliable_broadcast,
             network_sender,
+            bounded_executor,
+            rpc_backoff_policy,
+            rpc_timeout,
 
             decision_rx,
             outgoing_blocks,
@@ -119,6 +141,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             block_queue: BlockQueue::new(),
 
             decision_tx,
+
+            missing_apk_tx,
+            missing_apk_rx,
+            cert_fetch_tx,
+            cert_fetch_rx,
+            cert_fetches: HashMap::new(),
         }
     }
 
@@ -299,6 +327,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             self.rand_store.clone(),
             metadata.clone(),
             self.config.clone(),
+            self.missing_apk_tx.clone(),
         ));
         let epoch_state = self.epoch_state.clone();
         let round = metadata.round;
@@ -333,6 +362,70 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
+    }
+
+    /// Fetch a missing peer certificate with backoff until it passes validation.
+    fn fetch_certified_aug_data(&mut self, author: Author) {
+        if author == self.author
+            || self.config.get_certified_apk(&author).is_some()
+            || self.cert_fetches.contains_key(&author)
+        {
+            return;
+        }
+        let network_sender = self.network_sender.clone();
+        let executor = self.bounded_executor.clone();
+        let epoch_state = self.epoch_state.clone();
+        let cert_fetch_tx = self.cert_fetch_tx.clone();
+        let mut backoff = self.rpc_backoff_policy.clone();
+        let timeout = self.rpc_timeout;
+        let request = RandMessage::<S, D>::RequestCertifiedAugData(RequestCertifiedAugData::new(
+            epoch_state.epoch,
+        ))
+        .into_network_message();
+        let task = async move {
+            let mut retry_delay = timeout;
+            loop {
+                let result = async {
+                    let response = network_sender
+                        .send_rpc(author, request.clone(), timeout)
+                        .await?;
+                    let epoch_state = epoch_state.clone();
+                    executor
+                        .spawn_blocking(move || {
+                            let response = RandMessage::<S, D>::from_network_message(response)?;
+                            let certified_data = CertifiedAugData::<D>::try_from(response)
+                                .map_err(|_| {
+                                    anyhow::anyhow!("Expected certified aug data response")
+                                })?;
+                            verify_fetched_aug_data(&certified_data, &epoch_state, author)?;
+                            Ok::<_, anyhow::Error>(certified_data)
+                        })
+                        .await
+                        .await?
+                }
+                .await;
+                match result {
+                    Ok(certified_data) => {
+                        let _ = cert_fetch_tx.unbounded_send((author, certified_data));
+                        break;
+                    },
+                    Err(e) => {
+                        debug!(
+                            epoch = epoch_state.epoch,
+                            "[RandManager] Failed to fetch certified aug data from {}: {:#}",
+                            author,
+                            e
+                        );
+                        retry_delay = backoff.next().unwrap_or(retry_delay);
+                        tokio::time::sleep(retry_delay).await;
+                    },
+                }
+            }
+        };
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        self.cert_fetches
+            .insert(author, DropGuard::new(abort_handle));
+        tokio::spawn(Abortable::new(task, abort_registration));
     }
 
     async fn broadcast_aug_data(&mut self) -> DropGuard {
@@ -459,6 +552,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
+                            // verification_task drops shares without a certified APK.
+                            // ShareAggregateState::add triggers the cert fetch on the RequestShare path.
                             if share.author() != &sender {
                                 warn!(
                                     "[RandManager] Share author {:?} does not match sender {:?}, dropping",
@@ -495,7 +590,39 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
                             }
                         }
+                        RandMessage::RequestCertifiedAugData(_) => {
+                            match self.aug_data_store.get_my_certified_aug_data() {
+                                Some(certified_data) => self.process_response(
+                                    protocol,
+                                    response_sender,
+                                    RandMessage::CertifiedAugData(certified_data),
+                                ),
+                                // Nothing to serve yet. `response_sender` is dropped at the end of
+                                // this arm, which fails the requester's RPC so it retries with backoff.
+                                None => debug!(
+                                    "[RandManager] No certified aug data to serve to {}",
+                                    sender
+                                ),
+                            }
+                        }
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
+                    }
+                }
+                Some(author) = self.missing_apk_rx.next() => {
+                    self.fetch_certified_aug_data(author);
+                }
+                Some((author, certified_data)) = self.cert_fetch_rx.next() => {
+                    self.cert_fetches.remove(&author);
+                    match self.aug_data_store.add_certified_aug_data(certified_data) {
+                        // The ack belongs to the proactive broadcast, which this exchange is not
+                        // part of, so there is nobody to hand it to.
+                        Ok(_ack) => info!(
+                            "[RandManager] Fetched certified aug data for {}", author
+                        ),
+                        Err(e) => error!(
+                            "[RandManager] Failed to persist fetched certified aug data for {}: {}",
+                            author, e
+                        ),
                     }
                 }
                 _ = interval.tick().fuse() => {
@@ -514,4 +641,25 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let queue = &self.block_queue.queue();
         RAND_QUEUE_SIZE.set(queue.len() as i64);
     }
+}
+
+pub(super) fn verify_fetched_aug_data<D: TAugmentedData>(
+    certified_data: &CertifiedAugData<D>,
+    epoch_state: &EpochState,
+    author: Author,
+) -> anyhow::Result<()> {
+    // RPC responses bypass RandMessage::verify, so check the requested epoch here.
+    ensure!(
+        certified_data.epoch() == epoch_state.epoch,
+        "[RandManager] requested certified aug data for epoch {}, got one for epoch {}",
+        epoch_state.epoch,
+        certified_data.epoch()
+    );
+    ensure!(
+        certified_data.author() == &author,
+        "[RandManager] requested certified aug data from {}, got a cert for {}",
+        author,
+        certified_data.author()
+    );
+    certified_data.verify(&epoch_state.verifier)
 }
