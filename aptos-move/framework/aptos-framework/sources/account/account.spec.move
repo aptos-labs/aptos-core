@@ -7,8 +7,8 @@ spec aptos_framework::account {
     /// Implementation: Initialization of the account module creates a valid address_map table and moves the resources
     /// to the OriginatingAddress under the aptos_framework account.
     /// Enforcement: Formally verified via [high-level-req-1.1](initialize) and [high-level-req-1.2](initialize) that
-    /// only the Aptos framework account can initialize the module and that OriginatingAddress is published under it.
-    /// Audited that the address_map table starts empty.
+    /// only the Aptos framework account can initialize the module and that OriginatingAddress is published under it,
+    /// and via [high-level-req-1.3](initialize) that its address_map table starts empty.
     ///
     /// No.: 2
     /// Requirement: After successfully creating an account, the account resources should initialize with the default data,
@@ -122,6 +122,8 @@ spec aptos_framework::account {
         aborts_if exists<OriginatingAddress>(aptos_addr);
         /// [high-level-req-1.2]
         ensures exists<OriginatingAddress>(aptos_addr);
+        /// [high-level-req-1.3]
+        ensures forall k: address: !table::spec_contains(global<OriginatingAddress>(aptos_addr).address_map, k);
     }
 
     /// Ensure that the account exists at the end of the call.
