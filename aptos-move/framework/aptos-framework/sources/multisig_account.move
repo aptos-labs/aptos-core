@@ -1279,6 +1279,19 @@ module aptos_framework::multisig_account {
         while(sequence_number <= final_sequence_number) {
             vote_transanction(owner, multisig_account, sequence_number, approved);
             sequence_number += 1;
+        } spec {
+            invariant exists<MultisigAccount>(multisig_account) == old(exists<MultisigAccount>(multisig_account));
+            invariant !old(exists<MultisigAccount>(multisig_account))
+                || !vector::spec_contains(old(MultisigAccount[multisig_account].owners), address_of(owner))
+                ==> sequence_number == starting_sequence_number;
+            invariant MultisigAccount[multisig_account].owners == old(MultisigAccount[multisig_account].owners);
+            invariant MultisigAccount[multisig_account].num_signatures_required
+                == old(MultisigAccount[multisig_account].num_signatures_required);
+            invariant MultisigAccount[multisig_account].last_executed_sequence_number
+                == old(MultisigAccount[multisig_account].last_executed_sequence_number);
+            invariant MultisigAccount[multisig_account].next_sequence_number
+                == old(MultisigAccount[multisig_account].next_sequence_number);
+            invariant MultisigAccount[multisig_account].metadata == old(MultisigAccount[multisig_account].metadata);
         }
     }
 
@@ -1327,6 +1340,18 @@ module aptos_framework::multisig_account {
         assert!(final_sequence_number < next_sequence_number(multisig_account), error::invalid_argument(EINVALID_SEQUENCE_NUMBER));
         while(last_resolved_sequence_number(multisig_account) < final_sequence_number) {
             execute_rejected_transaction(owner, multisig_account);
+        } spec {
+            invariant exists<MultisigAccount>(multisig_account);
+            invariant MultisigAccount[multisig_account].last_executed_sequence_number <= final_sequence_number;
+            invariant !vector::spec_contains(old(MultisigAccount[multisig_account].owners), address_of(owner))
+                ==> MultisigAccount[multisig_account].last_executed_sequence_number
+                    == old(MultisigAccount[multisig_account].last_executed_sequence_number);
+            invariant MultisigAccount[multisig_account].owners == old(MultisigAccount[multisig_account].owners);
+            invariant MultisigAccount[multisig_account].num_signatures_required
+                == old(MultisigAccount[multisig_account].num_signatures_required);
+            invariant MultisigAccount[multisig_account].next_sequence_number
+                == old(MultisigAccount[multisig_account].next_sequence_number);
+            invariant MultisigAccount[multisig_account].metadata == old(MultisigAccount[multisig_account].metadata);
         }
     }
 

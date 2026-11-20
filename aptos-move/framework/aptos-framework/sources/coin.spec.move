@@ -208,6 +208,12 @@ spec aptos_framework::coin {
         }
     }
 
+    spec paired_metadata<CoinType>(): Option<Object<Metadata>> {
+        pragma aborts_if_is_partial = false;
+        aborts_if exists<CoinConversionMap>(@aptos_framework) && !type_info::spec_is_struct<CoinType>();
+        ensures result == spec_paired_metadata(type_info::type_of<CoinType>());
+    }
+
     spec create_coin_conversion_map(aptos_framework: &signer) {
         pragma aborts_if_is_partial = false;
         aborts_if signer::address_of(aptos_framework) != @aptos_framework;
