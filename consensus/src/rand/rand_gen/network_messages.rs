@@ -46,8 +46,6 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
             },
-            // Nothing to authenticate: the response is a `CertifiedAugData`, which carries its
-            // own 2f+1 multi-signature and is verified on the way back in.
             RandMessage::RequestCertifiedAugData(_) => Ok(()),
             _ => bail!("[RandMessage] unexpected message type"),
         }
@@ -361,8 +359,6 @@ mod tests {
             RequestCertifiedAugData::new(ctx.epoch_state.epoch),
         );
 
-        // A request carries nothing to authenticate: the response is a `CertifiedAugData`, which
-        // brings its own 2f+1 multi-signature and is verified when it comes back.
         assert!(msg
             .verify(&ctx.epoch_state, &ctx.rand_config, ctx.authors[1])
             .is_ok());
