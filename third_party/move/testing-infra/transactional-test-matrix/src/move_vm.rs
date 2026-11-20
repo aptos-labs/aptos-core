@@ -262,6 +262,10 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/limits/vec_pack_type_too_large.masm",
         "no type depth limit",
     ),
+    MonoMoveDivergence::rendering(
+        "tests/native_functions/stdlib_natives.move",
+        "native abort reports no code offset",
+    ),
     MonoMoveDivergence::semantic(
         "tests/recursion/runtime_layout_deeply_nested.masm",
         "no value depth limit",
