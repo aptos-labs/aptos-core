@@ -7,7 +7,8 @@ spec aptos_std::pool_u64_unbound {
     // -----------------------
 
     spec Pool {
-        invariant forall addr: address:
+        // Explicit trigger: an inferred one matches every address term.
+        invariant forall addr: address {table::spec_contains(shares, addr)}:
             table::spec_contains(shares, addr) ==> (table::spec_get(shares, addr) > 0);
     }
 

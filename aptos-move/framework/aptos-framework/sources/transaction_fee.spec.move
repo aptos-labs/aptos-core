@@ -96,6 +96,7 @@ spec aptos_framework::transaction_fee {
     /// mint capability.
     spec mint_and_refund(account: address, refund: u64) {
         use std::features;
+        use std::option;
         use aptos_std::type_info;
         use aptos_framework::aptos_account;
         use aptos_framework::fungible_asset;
@@ -109,10 +110,13 @@ spec aptos_framework::transaction_fee {
         let apt_store_exists = exists<fungible_asset::FungibleStore>(apt_store);
         let coin_store_exists = coin::spec_has_paired_store(account, paired);
         aborts_if !fa_path && !exists<AptosCoinMintCapability>(@aptos_framework);
-        ensures fa_path && apt_store_exists ==>
-            fungible_asset::spec_balance(apt_store) == old(fungible_asset::spec_balance(apt_store)) + refund;
-        ensures !fa_path && coin_store_exists ==>
-            fungible_asset::spec_balance(coin_store) == old(fungible_asset::spec_balance(coin_store)) + refund;
+        // A missing store is created, except for a zero refund on the FA path.
+        ensures fa_path && (apt_store_exists || refund != 0) ==> exists<fungible_asset::FungibleStore>(apt_store)
+            && fungible_asset::spec_balance(apt_store)
+                == (if (apt_store_exists) { old(fungible_asset::spec_balance(apt_store)) } else { 0 }) + refund;
+        ensures !fa_path && option::is_some(paired) ==> exists<fungible_asset::FungibleStore>(coin_store)
+            && fungible_asset::spec_balance(coin_store)
+                == (if (coin_store_exists) { old(fungible_asset::spec_balance(coin_store)) } else { 0 }) + refund;
     }
 
     /// Ensure caller is admin.

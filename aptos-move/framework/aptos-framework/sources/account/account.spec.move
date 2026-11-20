@@ -811,14 +811,6 @@ spec aptos_framework::account {
         ensures signer::address_of(result) == addr;
     }
 
-    spec schema CreateResourceAccountAbortsIf {
-        resource_addr: address;
-        let account = global<Account>(resource_addr);
-        aborts_if exists<Account>(resource_addr)
-            && option::spec_is_some(account.signer_capability_offer.for);
-        aborts_if exists<Account>(resource_addr) && account.sequence_number != 0;
-    }
-
     spec originating_address(auth_key: address): Option<address> {
         pragma opaque;
         aborts_if !exists<OriginatingAddress>(@aptos_framework);
@@ -910,15 +902,5 @@ spec aptos_framework::account {
 
     spec set_originating_address(_account: &signer) {
         aborts_if true;
-    }
-
-    spec upsert_ed25519_backup_key_on_keyless_account {
-        // Not verified: depends on `single_key` and `multi_key` deserialization, which is not specified.
-        pragma verify = false;
-    }
-
-    spec upsert_ed25519_backup_key_and_encrypt_dk {
-        // Not verified: calls `upsert_ed25519_backup_key_on_keyless_account`.
-        pragma verify = false;
     }
 }

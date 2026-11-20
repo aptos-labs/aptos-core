@@ -290,9 +290,15 @@ spec aptos_framework::staking_contract {
         operator: address,
         staking_contract: &mut StakingContract,
     ): u64 {
-        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
-        pragma verify = false;
+        // Partial: the aborts of adding the distribution and of unlocking the commission are not specified.
+        pragma aborts_if_is_partial;
         include GetStakingContractAmountsAbortsIf;
+        let stake_pool = global<stake::StakePool>(staking_contract.pool_address);
+        let total_active_stake = coin::value(stake_pool.active) + coin::value(stake_pool.pending_active);
+        let commission_amount = (total_active_stake - staking_contract.principal)
+            * staking_contract.commission_percentage / 100;
+        ensures result == commission_amount;
+        ensures staking_contract.principal == total_active_stake - commission_amount;
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -437,7 +443,6 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>
     ): (signer, SignerCapability, OwnerCapability) {
-        pragma verify_duration_estimate = 120;
         include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);
         // postconditions account::create_resource_account()
@@ -524,18 +529,6 @@ spec aptos_framework::staking_contract {
         aborts_if !exists<stake::StakePool>(pool_address);
         aborts_if !exists<stake::StakePool>(staking_contract.owner_cap.pool_address);
         include ContractExistsAbortsIf;
-    }
-
-    spec schema WithdrawAbortsIf<CoinType> {
-        account: signer;
-        amount: u64;
-
-        let account_addr = signer::address_of(account);
-        let coin_store = global<coin::CoinStore<CoinType>>(account_addr);
-        let balance = coin_store.coin.value;
-        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr);
-        aborts_if coin_store.frozen;
-        aborts_if balance < amount;
     }
 
     spec schema GetStakingContractAmountsAbortsIf {
