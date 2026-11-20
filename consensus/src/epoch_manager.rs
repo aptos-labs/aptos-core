@@ -76,7 +76,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::{bls12381::PrivateKey, hash::HashValue};
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_dkg::{
     pvss::{traits::TranscriptCore, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -126,7 +126,6 @@ use futures::{
 };
 use itertools::Itertools;
 use mini_moka::sync::Cache;
-use rand::{prelude::StdRng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -136,8 +135,10 @@ use std::{
     time::Duration,
 };
 
+mod augmented_key;
 mod dkg_state;
 
+use augmented_key::derive_augmented_key_pair;
 use dkg_state::recover_dkg_state;
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -1228,18 +1229,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch = new_epoch_state.epoch,
                 "Generating a new augmented key"
             );
-            // Reproduce the same augmented key after losing RandDB within an epoch.
-            const AUG_KEY_SEED_DOMAIN_SEPARATOR: &str = "APTOS_RANDOMNESS_AUG_KEY_SEED_V1";
-            let seed_bytes = bcs::to_bytes(&(
-                AUG_KEY_SEED_DOMAIN_SEPARATOR,
-                &sk.main,
+            let augmented_key_pair = derive_augmented_key_pair(
+                &vuf_pp,
+                sk.main,
+                pk.main,
                 new_epoch,
                 &dkg_session.metadata,
-            ))
+            )
             .map_err(NoRandomnessReason::AugKeySeedSerializationError)?;
-            let seed = *HashValue::sha3_256_of(&seed_bytes).as_ref();
-            let mut rng = StdRng::from_seed(seed);
-            let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
             self.rand_storage
                 .save_key_pair_bytes(
                     new_epoch,
