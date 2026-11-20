@@ -31,7 +31,7 @@ mod enable_feature_1;
 mod enable_feature_2;
 mod entry_func_attrs;
 mod optimistic_verification;
-mod phase1_upgrade;
+mod rand_db_migration;
 mod randomness_stall_recovery;
 mod validator_restart_during_dkg;
 
