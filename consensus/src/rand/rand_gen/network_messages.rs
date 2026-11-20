@@ -124,7 +124,7 @@ pub struct RpcRequest<S, D> {
 mod tests {
     use super::*;
     use crate::rand::rand_gen::{
-        rand_manager::verify_recovered_aug_data,
+        rand_manager::verify_fetched_aug_data,
         rand_store::RandStore,
         reliable_broadcast_state::ShareAggregateState,
         types::{MockAugData, MockShare, RandConfig, RandShare},
@@ -368,12 +368,12 @@ mod tests {
     }
 
     #[test]
-    fn test_cert_recovery_rejects_a_cert_for_another_author() {
+    fn test_cert_fetch_rejects_a_cert_for_another_author() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
 
         // The certificate is valid, but belongs to a different validator.
-        assert!(verify_recovered_aug_data(
+        assert!(verify_fetched_aug_data(
             &certify_aug_data(&ctx, ctx.authors[2]),
             &ctx.epoch_state,
             peer,
@@ -382,23 +382,23 @@ mod tests {
     }
 
     #[test]
-    fn test_cert_recovery_rejects_a_cert_from_another_epoch() {
+    fn test_cert_fetch_rejects_a_cert_from_another_epoch() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
 
         // Same validator set across epochs: a valid signature must not admit a stale certificate.
         let stale = certify_aug_data_for_epoch(&ctx, ctx.epoch_state.epoch - 1, peer);
-        assert!(verify_recovered_aug_data(&stale, &ctx.epoch_state, peer).is_err());
+        assert!(verify_fetched_aug_data(&stale, &ctx.epoch_state, peer).is_err());
     }
 
     #[test]
-    fn test_cert_recovery_rejects_a_cert_without_quorum() {
+    fn test_cert_fetch_rejects_a_cert_without_quorum() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
         let peer = ctx.authors[1];
         let aug_data = AugData::new(ctx.epoch_state.epoch, peer, MockAugData);
 
         // Right author, but no 2f+1 multi-signature behind it.
         let certified = CertifiedAugData::new(aug_data, AggregateSignature::empty());
-        assert!(verify_recovered_aug_data(&certified, &ctx.epoch_state, peer).is_err());
+        assert!(verify_fetched_aug_data(&certified, &ctx.epoch_state, peer).is_err());
     }
 }
