@@ -28,10 +28,6 @@ pub enum RandMessage<S, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
-    // NOTE: new variants must be appended at the end. BCS encodes the variant index, so
-    // inserting one would silently re-index every later variant for nodes running an older
-    // binary. Appending keeps old nodes decoding existing variants correctly and failing
-    // (and dropping) only the ones they do not know.
     RequestCertifiedAugData(RequestCertifiedAugData),
 }
 
