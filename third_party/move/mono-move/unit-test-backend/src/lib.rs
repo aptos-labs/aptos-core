@@ -234,7 +234,19 @@ impl MonoMoveBackend {
                 }
             },
             Ok(_) => None,
-            Err(err) => return backend_error(format!("failed to finish the session: {err}")),
+            Err(err) => match classify(&err) {
+                // A write that cannot be serialized only matters when the
+                // effects are compared.
+                Classification::Unsupported if self.capture_effects && result.is_ok() => {
+                    return TestExecution::Unsupported {
+                        reason: err.to_string(),
+                    }
+                },
+                Classification::Unsupported => None,
+                Classification::BackendError | Classification::Ran => {
+                    return backend_error(format!("failed to finish the session: {err}"))
+                },
+            },
         };
 
         TestExecution::Ran(TestRun {
@@ -429,15 +441,15 @@ static NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
 /// V1's unit tests: resource groups are not packed.
 fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<TestEffects> {
     let mut test_effects = TestEffects::new(ChangeSet::new());
-    for (key, class, _group) in effects.read_write_set().writes_unordered() {
+    for (key, class, _group) in effects.writes_unordered() {
         let written = |ptr: NonNull<u8>| -> Result<Bytes> {
             // SAFETY: written pointers refer to live values in the effects'
             // frozen heap, and `guard` is the guard that described them.
             Ok(unsafe { serialize(guard, ptr.as_ptr(), key.value_ty()) }?.into())
         };
         let op = match class {
-            WriteClass::Creation(ptr) => Op::New(written(ptr)?),
-            WriteClass::Modification(ptr) => Op::Modify(written(ptr)?),
+            WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
+            WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
             WriteClass::Deletion => Op::Delete,
         };
         match key {
