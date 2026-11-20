@@ -13067,9 +13067,7 @@ name = "mono-move-aptos-state-view-providers"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-framework",
  "aptos-types",
- "bcs",
  "bytes",
  "mono-move-aptos-transaction-executor",
  "mono-move-core",

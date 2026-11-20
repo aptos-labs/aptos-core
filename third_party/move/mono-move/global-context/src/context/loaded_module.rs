@@ -75,51 +75,38 @@ impl ModuleSlot {
 /// module has not yet been cached.
 pub type LoadedModuleSlot = LeakedBoxPtr<ModuleSlot>;
 
-/// What a loaded module says about its mandatory dependencies, keyed by the
-/// loading policy that built it.
-#[derive(Clone)]
-pub enum ModuleMandatoryDependencies {
-    /// Cell that may be filled with slots at a later time. Used by all lazy
-    /// (LL and EL) policies, and for module loads for lowering (shallow).
-    ///
-    /// # Invariants
-    ///   1. Under LL the cell is always empty.
-    ///   2. For shallow layout loads, the cell is created empty.
-    ///   3. Under EL the loader fills it for module M once MS(M) has been
-    ///      computed. Shallow side-loads stay with an unset cell until they require lowering.
-    ///   4. Filled entries always include self.
-    Lazy(OnceLock<Arc<[LoadedModuleSlot]>>),
-    /// Every member of the same package as the owning module. Includes the
-    /// owning module itself. Used by package loading (PL) policy.
-    Package(Arc<[LoadedModuleSlot]>),
-}
+/// Mandatory dependencies of a loaded module. Starts empty and may be filled
+/// with slots at a later time.
+///
+/// # Invariants
+///   1. Under LL the cell is always empty.
+///   2. For shallow layout loads, the cell is created empty.
+///   3. Under EL the loader fills it for module M once MS(M) has been
+///      computed. Shallow side-loads stay with an unset cell until they require lowering.
+///   4. Filled entries always include self.
+pub struct ModuleMandatoryDependencies(OnceLock<Arc<[LoadedModuleSlot]>>);
 
 impl ModuleMandatoryDependencies {
-    /// Slots of the modules this module loaded together with.
+    /// Returns empty mandatory dependencies. This does not include self.
+    pub fn unset() -> Self {
+        Self(OnceLock::new())
+    }
+
+    /// Slots of the modules this module loaded together with. Empty if not
+    /// set.
     pub fn slots(&self) -> &[LoadedModuleSlot] {
-        match self {
-            Self::Lazy(cell) => cell.get().map(|s| s.as_ref()).unwrap_or(&[]),
-            Self::Package(slots) => slots,
-        }
+        self.0.get().map(|s| s.as_ref()).unwrap_or(&[])
     }
 
-    /// Returns the cell for lazy mandatory dependencies.
-    pub fn as_lazy(&self) -> Option<&OnceLock<Arc<[LoadedModuleSlot]>>> {
-        match self {
-            Self::Lazy(cell) => Some(cell),
-            Self::Package(_) => None,
-        }
+    /// Returns the slots, or [`None`] if not set.
+    pub fn get(&self) -> Option<&Arc<[LoadedModuleSlot]>> {
+        self.0.get()
     }
 
-    /// Returns empty mandatory dependencies for lazy module loads. This does
-    /// not include self.
-    pub fn lazy_unset() -> Self {
-        Self::Lazy(OnceLock::new())
-    }
-
-    /// Returns mandatory dependencies for the package. Always includes self.
-    pub fn package(package_slots: Vec<LoadedModuleSlot>) -> Self {
-        Self::Package(Arc::from(package_slots))
+    /// Sets the slots. Does nothing if they have already been set, e.g., by
+    /// a concurrent load.
+    pub fn set(&self, slots: Arc<[LoadedModuleSlot]>) {
+        let _ = self.0.set(slots);
     }
 }
 

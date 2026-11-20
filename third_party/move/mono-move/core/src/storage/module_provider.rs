@@ -9,7 +9,7 @@ use move_binary_format::{
     deserializer::DeserializerConfig, errors::PartialVMError, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
-use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
 
 /// Provides module bytes, package membership, and deserialization and
@@ -46,24 +46,6 @@ pub trait ModuleProvider {
     /// Returns the loader's script verification config. Module verification
     /// uses [`Self::verify_module`].
     fn verifier_config(&self) -> &VerifierConfig;
-
-    /// Returns **all** module names that belong to the same package as the
-    /// given module.
-    ///
-    /// ## Invariants
-    ///
-    /// Invariants implementors must uphold:
-    /// - Names in the returned list are unique.
-    /// - The returned list includes the given module itself.
-    ///
-    /// ## Ordering
-    ///
-    /// No ordering guarantees are made or required.
-    fn get_same_package_modules(
-        &self,
-        address: &AccountAddress,
-        module_name: &str,
-    ) -> VMResult<Vec<Identifier>>;
 }
 
 #[derive(Debug, Error)]
@@ -95,13 +77,5 @@ impl ModuleProvider for NoModuleProvider {
 
     fn verifier_config(&self) -> &VerifierConfig {
         &VerifierConfig::DEFAULT
-    }
-
-    fn get_same_package_modules(
-        &self,
-        _address: &AccountAddress,
-        _module_name: &str,
-    ) -> VMResult<Vec<Identifier>> {
-        Ok(vec![])
     }
 }
