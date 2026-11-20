@@ -1228,16 +1228,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch = new_epoch_state.epoch,
                 "Generating a new augmented key"
             );
-            // Derive the augmentation seed deterministically from the DKG secret share, so that
-            // the augmented key pair can be regenerated after a RandDB loss. Without this, a node
-            // that loses its RandDB mid-epoch draws a fresh augmentation, broadcasts a delta that
-            // differs from the one already certified for it, gets rejected as equivocating, and
-            // never recovers its own CertifiedAugData -- so it stops contributing shares.
-            //
-            // The seed is domain-separated and bound to (epoch, DKG session), so different epochs
-            // and different sessions yield different augmentations. `sk.main` is itself
-            // recoverable from the on-chain transcript plus the consensus key, which is what makes
-            // the augmented key pair reconstructible without the RandDB.
+            // Reproduce the same augmented key after losing RandDB within an epoch.
             const AUG_KEY_SEED_DOMAIN_SEPARATOR: &str = "APTOS_RANDOMNESS_AUG_KEY_SEED_V1";
             let seed_bytes = bcs::to_bytes(&(
                 AUG_KEY_SEED_DOMAIN_SEPARATOR,
