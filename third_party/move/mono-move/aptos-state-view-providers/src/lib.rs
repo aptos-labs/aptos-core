@@ -13,10 +13,10 @@
 
 use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageRegistry;
-use aptos_types::state_store::{state_key::StateKey, StateView};
+use aptos_types::state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView};
 use bytes::Bytes;
 use mono_move_aptos_transaction_executor::{
-    check_group_key, decode_group_members, AptosDataProvider, GroupMembers,
+    check_group_key, decode_group_members, AptosDataProvider, StoredGroup,
 };
 use mono_move_core::{
     nominal_tag,
@@ -27,7 +27,7 @@ use mono_move_core::{
         },
     },
     types::InternedType,
-    ExecutionErrorKind, GroupSize, IntoExecutionError, VMInternalError, VMResult,
+    ExecutionErrorKind, GroupSize, GroupSlot, IntoExecutionError, VMInternalError, VMResult,
 };
 use mono_move_global_context::ExecutionGuard;
 use mono_move_runtime::SegmentedArena;
@@ -160,7 +160,7 @@ struct ProviderState {
     /// executions from serving the other placement's value.
     values: UnorderedMap<(InMemoryStorageKey, Option<InternedType>), StorageRead>,
     /// Members of each resource group read so far, keyed by the group's slot.
-    groups: UnorderedMap<InMemoryStorageKey, Option<GroupMembers>>,
+    groups: UnorderedMap<InMemoryStorageKey, Option<StoredGroup>>,
 }
 
 impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
@@ -176,13 +176,14 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
         }
     }
 
-    /// The stored BCS bytes for a key, looked up among the group's members
-    /// for group-member keys. `None` = does not exist.
-    fn fetch_bytes(
+    /// The stored BCS bytes for a key and the metadata of its slot. A
+    /// group-member key is looked up among the group's members, and has no
+    /// metadata. `None` = does not exist.
+    fn fetch_value(
         &self,
         key: &InMemoryStorageKey,
         group: Option<InternedType>,
-    ) -> Result<Option<Bytes>> {
+    ) -> Result<Option<(StateValueMetadata, Bytes)>> {
         match group {
             None => {
                 let state_key = key.as_state_key()?;
@@ -190,14 +191,15 @@ impl<'a, 'ctx, S: StateView> StateViewResourceProvider<'a, 'ctx, S> {
                     .state_view
                     .get_state_value(&state_key)
                     .map_err(|e| anyhow!("state read failed: {e}"))?
-                    .map(|value| value.bytes().clone()))
+                    .map(|value| value.unpack()))
             },
             Some(group_ty) => {
                 let group_key = InMemoryStorageKey::resource_group(key.address(), group_ty);
                 let member_tag = nominal_tag(key.value_ty())?;
                 Ok(self
-                    .group_members(&group_key)?
-                    .and_then(|members| members.get(&member_tag).cloned()))
+                    .stored_group(&group_key)?
+                    .and_then(|group| group.members.get(&member_tag).cloned())
+                    .map(|bytes| (StateValueMetadata::none(), bytes)))
             },
         }
     }
@@ -216,8 +218,8 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
             return Ok(read.clone());
         }
         let internal = |detail: String| ResourceProviderError::InvariantViolation(detail);
-        let Some(blob) = self
-            .fetch_bytes(key, group)
+        let Some((metadata, blob)) = self
+            .fetch_value(key, group)
             .map_err(|e| internal(e.to_string()))?
         else {
             let read = StorageRead::DoesNotExist { version: None };
@@ -234,6 +236,7 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         let read = StorageRead::ExternalHeap {
             ptr,
             bcs_size: blob.len(),
+            metadata,
             version: None,
             pin,
         };
@@ -241,14 +244,15 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
         Ok(read)
     }
 
-    fn get_resource_group_size(
+    fn get_resource_group_slot(
         &self,
         group_key: &InMemoryStorageKey,
-    ) -> Result<GroupSize, ResourceProviderError> {
-        let Some(members) = self.group_members(group_key)? else {
-            return Ok(GroupSize::default());
+    ) -> Result<GroupSlot, ResourceProviderError> {
+        let Some(group) = self.stored_group(group_key)? else {
+            return Ok(GroupSlot::default());
         };
-        let members = members
+        let members = group
+            .members
             .iter()
             .map(|(tag, bytes)| {
                 let tag_len = bcs::serialized_size(tag).map_err(|e| {
@@ -259,7 +263,10 @@ impl<S: StateView> ResourceProvider for StateViewResourceProvider<'_, '_, S> {
                 Ok((tag_len, bytes.len()))
             })
             .collect::<Result<Vec<_>, ResourceProviderError>>()?;
-        Ok(GroupSize::from_members(members))
+        Ok(GroupSlot {
+            size: GroupSize::from_members(members),
+            metadata: Some(group.metadata),
+        })
     }
 }
 
@@ -269,27 +276,30 @@ impl<S: StateView> AptosDataProvider for StateViewResourceProvider<'_, '_, S> {
     // TODO(perf): Change read-API to be fine grained! We only need to get all members
     //   for materialization on the write path where copy is needed. But read-path can
     //   and should avoid full copies.
-    fn group_members(
+    fn stored_group(
         &self,
         group_key: &InMemoryStorageKey,
-    ) -> Result<Option<GroupMembers>, ResourceProviderError> {
+    ) -> Result<Option<StoredGroup>, ResourceProviderError> {
         check_group_key(group_key)?;
-        if let Some(members) = self.inner.borrow().groups.get(group_key) {
-            return Ok(members.clone());
+        if let Some(group) = self.inner.borrow().groups.get(group_key) {
+            return Ok(group.clone());
         }
         let state_key = group_key
             .as_state_key()
             .map_err(|e| ResourceProviderError::InvariantViolation(e.to_string()))?;
-        let members = match self.state_view.get_state_value(&state_key).map_err(|e| {
+        let group = match self.state_view.get_state_value(&state_key).map_err(|e| {
             ResourceProviderError::InvariantViolation(format!("group read failed: {e}"))
         })? {
-            Some(value) => Some(decode_group_members(value.bytes())?),
+            Some(value) => Some(StoredGroup {
+                members: decode_group_members(value.bytes())?,
+                metadata: value.into_metadata(),
+            }),
             None => None,
         };
         self.inner
             .borrow_mut()
             .groups
-            .insert(group_key.clone(), members.clone());
-        Ok(members)
+            .insert(group_key.clone(), group.clone());
+        Ok(group)
     }
 }

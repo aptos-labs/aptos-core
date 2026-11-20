@@ -64,7 +64,9 @@ impl<'guard> MonoRunner<'guard> {
 
     /// Ends the session, returning the most recent run's side effects.
     pub fn finish(self) -> VMResult<SessionEffects> {
-        self.interp.finish()
+        // TODO(cleanup): tests have no `0x1::timestamp`, so the slots they
+        // create are stamped with time 0.
+        self.interp.finish(0)
     }
 
     /// Run the entry function once, filling its parameters in order: signer

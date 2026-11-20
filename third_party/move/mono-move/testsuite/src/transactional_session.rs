@@ -258,7 +258,9 @@ impl TransactionalSession {
                     .with_extensions(seed_extensions(false));
             let outcome = execute(guard, &mut interp, callee, ty_args, signers, args)?;
             let changes = match &outcome {
-                RunOutcome::Success { .. } => resource_changes(guard, &interp.finish()?)?,
+                // TODO(cleanup): tests have no `0x1::timestamp`, so the slots
+                // they create are stamped with time 0.
+                RunOutcome::Success { .. } => resource_changes(guard, &interp.finish(0)?)?,
                 RunOutcome::Aborted { .. } => ChangeSet::new(),
             };
             Ok((outcome, changes))
@@ -536,7 +538,7 @@ pub(crate) fn resource_changes(
         let op = match class {
             WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
             WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
-            WriteClass::Deletion => Op::Delete,
+            WriteClass::Deletion { .. } => Op::Delete,
         };
         Ok((*address, tag, op))
     };
