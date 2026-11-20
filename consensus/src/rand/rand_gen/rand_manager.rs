@@ -23,7 +23,7 @@ use crate::{
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_channels::aptos_channel;
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
@@ -76,8 +76,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     // the proactive broadcast for this epoch already completed, so nothing re-pushes what was lost.
     // `missing_apk_*` carries "this author's share is not verifiable yet" from the share ingress
     // paths; `cert_recovery_*` carries back the certs that passed verification.
-    missing_apk_tx: Sender<Author>,
-    missing_apk_rx: Receiver<Author>,
+    missing_apk_tx: aptos_channel::Sender<Author, Author>,
+    missing_apk_rx: aptos_channel::Receiver<Author, Author>,
     cert_recovery_tx: Sender<(Author, CertifiedAugData<D>)>,
     cert_recovery_rx: Receiver<(Author, CertifiedAugData<D>)>,
     // authors with a recovery request in flight, so repeated misses do not spawn duplicate tasks
@@ -112,7 +112,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             bounded_executor,
         ));
         let (decision_tx, decision_rx) = unbounded();
-        let (missing_apk_tx, missing_apk_rx) = unbounded();
+        // Keep at most one pending notification per author.
+        let (missing_apk_tx, missing_apk_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (cert_recovery_tx, cert_recovery_rx) = unbounded();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
@@ -371,7 +372,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     /// peer apk can be derived, which means no share is verifiable and no randomness can be
     /// aggregated for the remainder of the epoch.
     fn request_certified_aug_data(&mut self, author: Author) {
-        if author == self.author || !self.cert_recovery_inflight.insert(author) {
+        if author == self.author
+            || self.config.get_certified_apk(&author).is_some()
+            || !self.cert_recovery_inflight.insert(author)
+        {
             return;
         }
         let rb = self.reliable_broadcast.clone();

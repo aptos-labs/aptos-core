@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use anyhow::ensure;
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
@@ -108,7 +109,7 @@ pub struct ShareAggregateState<S> {
     rand_config: RandConfig,
     // notifies the RandManager main loop about an author whose share we cannot verify yet, so it
     // can fetch that author's certified aug data
-    missing_apk_tx: UnboundedSender<Author>,
+    missing_apk_tx: aptos_channel::Sender<Author, Author>,
 }
 
 impl<S> ShareAggregateState<S> {
@@ -116,7 +117,7 @@ impl<S> ShareAggregateState<S> {
         rand_store: Arc<Mutex<RandStore<S>>>,
         rand_metadata: RandMetadata,
         rand_config: RandConfig,
-        missing_apk_tx: UnboundedSender<Author>,
+        missing_apk_tx: aptos_channel::Sender<Author, Author>,
     ) -> Self {
         Self {
             rand_store,
@@ -148,7 +149,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
         let has_certified_apk = self.rand_config.get_certified_apk(&peer).is_some();
         if !has_certified_apk {
             // Best effort: the main loop dedupes concurrent requests per author.
-            let _ = self.missing_apk_tx.unbounded_send(peer);
+            let _ = self.missing_apk_tx.push(peer, peer);
         }
         ensure!(
             has_certified_apk,

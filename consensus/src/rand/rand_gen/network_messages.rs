@@ -125,15 +125,18 @@ mod tests {
     use super::*;
     use crate::rand::rand_gen::{
         rand_manager::Receiver,
-        reliable_broadcast_state::CertifiedAugDataRecoveryState,
+        rand_store::RandStore,
+        reliable_broadcast_state::{CertifiedAugDataRecoveryState, ShareAggregateState},
         types::{MockAugData, MockShare, RandConfig, RandShare},
     };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, Uniform};
     use aptos_dkg::{
         pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
+    use aptos_infallible::Mutex;
     use aptos_reliable_broadcast::BroadcastStatus;
     use aptos_types::{
         aggregate_signature::{AggregateSignature, PartialSignatures},
@@ -364,6 +367,43 @@ mod tests {
             .is_ok());
         // The epoch routes the message to the RandManager of the epoch it belongs to.
         assert_eq!(msg.epoch(), ctx.epoch_state.epoch);
+    }
+
+    #[test]
+    fn test_missing_apk_notifications_coalesce_per_author() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let metadata = RandMetadata {
+            epoch: ctx.epoch_state.epoch,
+            round: 1,
+        };
+        let (decision_tx, _decision_rx) = unbounded();
+        let store = Arc::new(Mutex::new(RandStore::new(
+            metadata.epoch,
+            ctx.authors[0],
+            ctx.rand_config.clone(),
+            decision_tx,
+        )));
+        let (tx, mut rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let state = Arc::new(ShareAggregateState::new(
+            store,
+            metadata.clone(),
+            ctx.rand_config,
+            tx,
+        ));
+        for _ in 0..100 {
+            for &author in &ctx.authors[1..] {
+                let share = RandShare::new(author, metadata.clone(), MockShare);
+                assert!(BroadcastStatus::<RandMessage<MockShare, MockAugData>>::add(
+                    &state, author, share
+                )
+                .is_err());
+            }
+        }
+        let notified: std::collections::HashSet<_> = (0..2)
+            .map(|_| rx.next().now_or_never().flatten().unwrap())
+            .collect();
+        assert_eq!(notified, ctx.authors[1..].iter().copied().collect());
+        assert!(rx.next().now_or_never().flatten().is_none());
     }
 
     #[test]
