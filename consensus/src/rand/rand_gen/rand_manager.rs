@@ -552,11 +552,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
-                            // A share from an author whose certified aug data we lack never reaches
-                            // this arm: `RandMessage::verify` runs `optimistic_verify`, which needs
-                            // the apk on both of its branches, so `verification_task` drops the
-                            // message before the main loop sees it. Recovery is therefore triggered
-                            // from `ShareAggregateState::add`, on the `RequestShare` pull path.
+                            // verification_task drops shares without a certified APK.
+                            // ShareAggregateState::add triggers the cert fetch on the RequestShare path.
                             if share.author() != &sender {
                                 warn!(
                                     "[RandManager] Share author {:?} does not match sender {:?}, dropping",
