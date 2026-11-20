@@ -611,19 +611,17 @@ impl<'a, S: TStateView<Key = KeyType<[u8; 32]>>> MockSession<'a, S> {
                 )
             };
             for (tag, value) in &members {
-                let tag_len = tag_bytes(*tag).len();
                 // `group_member_op` read every written member, so each is cached.
-                if let Some(Some(before)) = self.cache.get(&MockKey::GroupMember(*group_key, *tag))
-                {
-                    size.remove_member(tag_len, before.len())
-                        .ok_or_else(inconsistent)?;
-                }
-                match value {
-                    MonoValue::Write { bcs_size, .. } => size
-                        .add_member(tag_len, *bcs_size)
-                        .ok_or_else(inconsistent)?,
-                    MonoValue::Deletion | MonoValue::GroupMetadata { .. } => {},
-                }
+                let read = self
+                    .cache
+                    .get(&MockKey::GroupMember(*group_key, *tag))
+                    .and_then(|bytes| bytes.as_ref().map(|bytes| bytes.len()));
+                let written = match value {
+                    MonoValue::Write { bcs_size, .. } => Some(*bcs_size),
+                    MonoValue::Deletion | MonoValue::GroupMetadata { .. } => None,
+                };
+                size.replace_member(tag_bytes(*tag).len(), read, written)
+                    .ok_or_else(inconsistent)?;
             }
             let group_metadata = Arc::new(GroupMetadata::from_changes(
                 members

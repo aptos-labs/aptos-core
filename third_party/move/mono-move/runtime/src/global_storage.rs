@@ -113,26 +113,49 @@ pub struct Entry {
     pub read: StorageRead,
     pub write: StorageWrite,
     /// Size of the BCS encoding of the value `write` holds. Zero until the
-    /// session ends.
-    pub write_bcs_size: usize,
+    /// session ends, so only [`SessionEffects`] expose it.
+    ///
+    /// [`SessionEffects`]: crate::SessionEffects
+    write_bcs_size: usize,
     /// Extra metadata for this entry: the resource-group container this entry
     /// belongs to. [`None`] means this is not a resource group member. Used to
     /// place the write and to fetch the read from the right storage slot.
     pub group: Option<InternedType>,
 }
 
-/// A resource group whose members the transaction touched.
+/// A resource group whose members the transaction touched. Its sizes are set
+/// when the session ends, so only [`SessionEffects`] expose them.
+///
+/// [`SessionEffects`]: crate::SessionEffects
 #[derive(Default)]
 pub struct GroupEntry {
     /// The keys of the members touched. Narrowed to the members written when
     /// the session ends.
-    pub members: Vec<InMemoryStorageKey>,
-    /// The group's size before the transaction. Zero until the session ends.
-    pub size_before: GroupSize,
-    /// The group's size after the transaction's writes. [`None`] until the
-    /// session ends, or if the written members' sizes do not add up to
-    /// `size_before`, which only reads inconsistent with each other cause.
-    pub size: Option<GroupSize>,
+    members: Vec<InMemoryStorageKey>,
+    /// The group's size before the transaction.
+    size_before: GroupSize,
+    /// The group's size after the transaction's writes, or [`None`] if the
+    /// written members' sizes do not add up to `size_before`.
+    size: Option<GroupSize>,
+}
+
+impl GroupEntry {
+    /// The keys of the members the transaction wrote.
+    pub fn members(&self) -> &[InMemoryStorageKey] {
+        &self.members
+    }
+
+    /// The group's size before the transaction.
+    pub fn size_before(&self) -> GroupSize {
+        self.size_before
+    }
+
+    /// The group's size after the transaction's writes, or [`None`] if the
+    /// written members' sizes do not add up to the size before, which only
+    /// reads inconsistent with each other cause.
+    pub fn size(&self) -> Option<GroupSize> {
+        self.size
+    }
 }
 
 /// The write an [`Entry`] contributes to the write set, by its `(read, write)`
@@ -496,8 +519,9 @@ impl ResourceReadWriteSet {
 
     /// Yields each entry that is a write, with its [`WriteClass`] and the
     /// resource-group container it belongs to (or [`None`] for an own slot).
-    /// Callers must sort before emitting.
-    pub fn writes_unordered(
+    /// The sizes are only set once the session ended. Callers must sort before
+    /// emitting.
+    pub(crate) fn writes_unordered(
         &self,
     ) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass, Option<InternedType>)> {
         self.entries
@@ -547,6 +571,9 @@ impl ResourceReadWriteSet {
     /// Terminal: a later mutation would make the sizes stale.
     ///
     /// TODO(metering): refactor this pass so it includes metadata calculation.
+    /// Charging for the write set needs these sizes before the epilogue, which
+    /// can still write, so they have to be computed before it and again after
+    /// it, ideally without serializing the same values twice.
     ///
     /// # Safety
     ///
@@ -588,7 +615,7 @@ impl ResourceReadWriteSet {
     /// key. Exact once the session ended; before that it also holds members
     /// that were only read, and no sizes. Callers must not depend on the
     /// order.
-    pub fn written_groups_unordered(
+    pub(crate) fn written_groups_unordered(
         &self,
     ) -> impl Iterator<Item = (&InMemoryStorageKey, &GroupEntry)> {
         self.groups.iter()
@@ -716,20 +743,17 @@ fn group_size_after_writes(
                 invariant_violation!(Unreachable(format!("group member has no tag: {err:#}")))
             },
         };
-        if let Some(before) = entry.read.bcs_size() {
-            if size.remove_member(tag_len, before).is_none() {
-                return Ok(None);
-            }
-        }
-        match entry.write_class() {
+        let written = match entry.write_class() {
             Some(
                 WriteClass::Creation { bcs_size, .. } | WriteClass::Modification { bcs_size, .. },
-            ) => {
-                if size.add_member(tag_len, bcs_size).is_none() {
-                    return Ok(None);
-                }
-            },
-            Some(WriteClass::Deletion) | None => {},
+            ) => Some(bcs_size),
+            Some(WriteClass::Deletion) | None => None,
+        };
+        if size
+            .replace_member(tag_len, entry.read.bcs_size(), written)
+            .is_none()
+        {
+            return Ok(None);
         }
     }
     Ok(Some(size))
@@ -786,10 +810,15 @@ mod tests {
     use crate::{heap::Heap, write_object_header};
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        storage::resource_provider::ResourceProviderError, types::Type, DescriptorId, ReadPin,
-        ValueLayoutTable, OBJECT_HEADER_SIZE,
+        intern_type_tag, storage::resource_provider::ResourceProviderError, types::Type,
+        DescriptorId, ReadPin, ValueLayoutTable, OBJECT_HEADER_SIZE,
     };
-    use move_core_types::account_address::AccountAddress;
+    use mono_move_global_context::GlobalContext;
+    use move_core_types::{
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
+    };
     use shared_dsa::UnorderedMap;
     use std::sync::Arc;
 
@@ -847,9 +876,13 @@ mod tests {
     impl ReadPin for TestPin {}
 
     fn ext_read(ptr: NonNull<u8>) -> StorageRead {
+        sized_ext_read(ptr, 0)
+    }
+
+    fn sized_ext_read(ptr: NonNull<u8>, bcs_size: usize) -> StorageRead {
         StorageRead::ExternalHeap {
             ptr,
-            bcs_size: 0,
+            bcs_size,
             version: None,
             pin: Arc::new(TestPin),
         }
@@ -1097,7 +1130,7 @@ mod tests {
         rws.retain_written_group_members();
         let groups = rws
             .written_groups_unordered()
-            .map(|(group_key, group)| (group_key.clone(), group.members.clone()))
+            .map(|(group_key, group)| (group_key.clone(), group.members().to_vec()))
             .collect::<Vec<_>>();
         assert_eq!(groups, vec![(
             InMemoryStorageKey::resource_group(addr(1), group),
@@ -1433,6 +1466,66 @@ mod tests {
             .collect::<Vec<_>>();
         sizes.sort();
         assert_eq!(sizes, vec![None, Some(8), Some(8)]);
+    }
+
+    #[test]
+    fn group_size_follows_member_writes() {
+        let ctx = GlobalContext::with_num_execution_workers(1);
+        let guard = ctx.try_execution_context(0).unwrap();
+        let [created, modified, deleted, untouched] =
+            ["Created", "Modified", "Deleted", "Untouched"].map(|name| {
+                let tag = TypeTag::Struct(Box::new(StructTag {
+                    address: AccountAddress::ONE,
+                    module: Identifier::new("m").unwrap(),
+                    name: Identifier::new(name).unwrap(),
+                    type_args: vec![],
+                }));
+                InMemoryStorageKey::Resource {
+                    address: addr(1),
+                    ty: intern_type_tag(&tag, &guard).unwrap(),
+                }
+            });
+        let tag_len = |key: &InMemoryStorageKey| {
+            bcs::serialized_size(&nominal_tag(key.value_ty()).unwrap()).unwrap()
+        };
+
+        let ptr = fake_ptr(0x80);
+        let local = StorageWrite::LocalHeap { ptr, epoch: 0 };
+        let mut rws = ResourceReadWriteSet::new();
+        rws.entries.insert(created.clone(), Entry {
+            write_bcs_size: 3,
+            ..entry(dne(), local)
+        });
+        rws.entries.insert(modified.clone(), Entry {
+            write_bcs_size: 2,
+            ..entry(sized_ext_read(ptr, 5), local)
+        });
+        rws.entries.insert(
+            deleted.clone(),
+            entry(sized_ext_read(ptr, 4), StorageWrite::Deleted { epoch: 0 }),
+        );
+        let written = [created.clone(), modified.clone(), deleted.clone()];
+
+        let before = GroupSize::from_members([
+            (tag_len(&modified), 5),
+            (tag_len(&deleted), 4),
+            (tag_len(&untouched), 6),
+        ]);
+        let after = GroupSize::from_members([
+            (tag_len(&created), 3),
+            (tag_len(&modified), 2),
+            (tag_len(&untouched), 6),
+        ]);
+        assert_eq!(
+            group_size_after_writes(&rws.entries, before, &written).unwrap(),
+            Some(after)
+        );
+
+        // A group that does not hold the members read cannot lose them.
+        assert_eq!(
+            group_size_after_writes(&rws.entries, GroupSize::default(), &written).unwrap(),
+            None
+        );
     }
 
     #[test]
