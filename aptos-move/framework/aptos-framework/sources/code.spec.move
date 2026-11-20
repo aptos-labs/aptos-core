@@ -12,7 +12,8 @@ spec aptos_framework::code {
     /// Criticality: Critical
     /// Implementation: There should never be a pass of an arbitrary upgrade policy to the
     /// request_publish native function.
-    /// Enforcement: Manually audited that it aborts if package.upgrade_policy.policy == 0.
+    /// Enforcement: Formally verified via [high-level-req-2.1](publish_package) and
+    /// [high-level-req-2.2](publish_package_to_object) that it aborts if package.upgrade_policy.policy == 0.
     ///
     /// No.: 3
     /// Requirement: Should perform accurate compatibility checks when the policy indicates
@@ -31,7 +32,9 @@ spec aptos_framework::code {
     /// Criticality: Medium
     /// Implementation: A package may only be updated using the publish_package function when the
     /// check_upgradability function returns true.
-    /// Enforcement: This is audited by a manual review of the check_upgradability patterns.
+    /// Enforcement: Formally verified via [high-level-req-4.1](check_upgradability) that it aborts if the original
+    /// policy is immutable and via [high-level-req-4.2](check_upgradability) that it aborts if the new policy is
+    /// weaker. Audited that the new package contains all modules of the old one.
     ///
     /// No.: 5
     /// Requirement: The upgrade policy of a package must not exceed the strictness level imposed by
@@ -84,6 +87,7 @@ spec aptos_framework::code {
     spec publish_package(owner: &signer, pack: PackageMetadata, code: vector<vector<u8>>) {
         let addr = signer::address_of(owner);
         modifies global<PackageRegistry>(addr);
+        /// [high-level-req-2.1]
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
     }
 
@@ -91,7 +95,9 @@ spec aptos_framework::code {
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+        /// [high-level-req-4.1]
         aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
+        /// [high-level-req-4.2]
         aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
     }
 
@@ -110,6 +116,7 @@ spec aptos_framework::code {
         code: vector<vector<u8>>
     ) {
         let pack = util::spec_from_bytes<PackageMetadata>(metadata_serialized);
+        /// [high-level-req-2.2]
         aborts_if pack.upgrade_policy.policy <= upgrade_policy_arbitrary().policy;
     }
 

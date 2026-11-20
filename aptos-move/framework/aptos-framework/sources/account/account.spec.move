@@ -6,8 +6,9 @@ spec aptos_framework::account {
     /// Criticality: High
     /// Implementation: Initialization of the account module creates a valid address_map table and moves the resources
     /// to the OriginatingAddress under the aptos_framework account.
-    /// Enforcement: Audited that the address_map table is created and populated correctly with the expected initial
-    /// values.
+    /// Enforcement: Formally verified via [high-level-req-1.1](initialize) and [high-level-req-1.2](initialize) that
+    /// only the Aptos framework account can initialize the module and that OriginatingAddress is published under it.
+    /// Audited that the address_map table starts empty.
     ///
     /// No.: 2
     /// Requirement: After successfully creating an account, the account resources should initialize with the default data,
@@ -86,9 +87,10 @@ spec aptos_framework::account {
     /// one.
     /// Criticality: High
     /// Implementation: The auth_key may only update to the provided new_auth_key after verifying the signature.
-    /// Enforcement: Formally Verified in [high-level-req-10](rotate_authentication_key_internal) that the
-    /// authentication key of an account is modified to the provided authentication key if the signature verification
-    /// was successful.
+    /// Enforcement: Formally Verified in [high-level-req-10.1](rotate_authentication_key_internal),
+    /// [high-level-req-10.2](rotate_authentication_key_call) and [high-level-req-10.3](rotate_authentication_key) that
+    /// the authentication key of an account is modified to the provided authentication key if the signature
+    /// verification was successful.
     ///
     /// No.: 11
     /// Requirement: The creation number is monotonically increasing.
@@ -100,20 +102,25 @@ spec aptos_framework::account {
     /// Requirement: The Account resource is persistent.
     /// Criticality: Low
     /// Implementation: The Account structure assigned to the address should be persistent.
-    /// Enforcement: Audited that the Account structure is persistent.
+    /// Enforcement: Formally verified via [high-level-req-12](update invariant) that a published Account resource is
+    /// never removed.
     /// </high-level-req>
     ///
 
     spec module {
         pragma verify = true;
+        /// [high-level-req-12]
+        invariant update forall a: address {exists<Account>(a)}: old(exists<Account>(a)) ==> exists<Account>(a);
     }
 
     /// Only the address `@aptos_framework` can call.
     /// OriginatingAddress does not exist under `@aptos_framework` before the call.
     spec initialize(aptos_framework: &signer) {
         let aptos_addr = signer::address_of(aptos_framework);
+        /// [high-level-req-1.1]
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<OriginatingAddress>(aptos_addr);
+        /// [high-level-req-1.2]
         ensures exists<OriginatingAddress>(aptos_addr);
     }
 
@@ -259,8 +266,8 @@ spec aptos_framework::account {
         include EnsureResourceExistsAbortsIf;
         aborts_if vector::length(new_auth_key) != 32;
         modifies global<Account>(addr);
-        /// [high-level-req-10]
         ensures exists<Account>(addr);
+        /// [high-level-req-10.1]
         ensures global<Account>(addr).authentication_key == new_auth_key;
         // Only the authentication key of an existing account changes.
         ensures old(exists<Account>(addr)) ==> global<Account>(addr)
@@ -277,7 +284,7 @@ spec aptos_framework::account {
         aborts_if vector::length(new_auth_key) != 32;
         modifies global<Account>(addr);
         ensures exists<Account>(addr);
-        /// [high-level-req-10]
+        /// [high-level-req-10.2]
         ensures global<Account>(addr).authentication_key == new_auth_key;
         // Only the authentication key of an existing account changes.
         ensures old(exists<Account>(addr)) ==> global<Account>(addr)
@@ -395,10 +402,10 @@ spec aptos_framework::account {
             new_auth_key_vector,
         };
 
-        /// [high-level-req-10]
         modifies global<Account>(addr);
         modifies global<OriginatingAddress>(@aptos_framework);
         let post auth_key = global<Account>(addr).authentication_key;
+        /// [high-level-req-10.3]
         ensures auth_key == new_auth_key_vector;
     }
 

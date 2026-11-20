@@ -28,7 +28,10 @@ spec aptos_framework::managed_coin {
     /// Criticality: High
     /// Implementation: The coin::burn and coin::mint functions, when tracking the supply, adjusts the total coin
     /// supply accordingly.
-    /// Enforcement: Audited that mint and burn change the supply only through coin::mint and coin::burn.
+    /// Enforcement: Formally verified via [high-level-req-4.1](burn), [high-level-req-4.2](mint) and
+    /// [high-level-req-4.3](mint) that burn and mint adjust the supply of the paired fungible asset by the amount (for
+    /// burn, when the withdrawal runs without a withdraw hook), while the tracked coin supply is unchanged
+    /// (ManagedCoinSupplyUnchanged).
     ///
     /// No.: 5
     /// Requirement: Before burning coins, exact amount of coins are withdrawn.
@@ -79,6 +82,7 @@ spec aptos_framework::managed_coin {
         // The coin's tracked supply is unchanged; the burned amount is removed from the store's asset supply.
         let fa_addr = global<fungible_asset::FungibleStore>(store_addr).metadata.inner;
         include ManagedCoinSupplyUnchanged<CoinType>;
+        /// [high-level-req-4.1]
         ensures plain ==> fungible_asset::spec_supply(fa_addr) == old(fungible_asset::spec_supply(fa_addr)) - amount;
     }
 
@@ -142,10 +146,12 @@ spec aptos_framework::managed_coin {
         include coin::PairedDepositBalance<CoinType> { owner: dst_addr, amount };
         // The coin's tracked supply is unchanged; the minted amount is added to the paired asset's supply.
         include ManagedCoinSupplyUnchanged<CoinType>;
+        /// [high-level-req-4.2]
         ensures option::is_some(paired) ==> fungible_asset::spec_supply(option::borrow(paired).inner)
             == old(fungible_asset::spec_supply(option::borrow(paired).inner)) + amount;
         // On the first mint the minted amount is added to the supply of the newly paired asset.
         let post post_fa_addr = option::borrow(coin::spec_paired_metadata(type_info::type_of<CoinType>())).inner;
+        /// [high-level-req-4.3]
         ensures option::is_none(paired) ==> fungible_asset::spec_supply(post_fa_addr)
             == (if (old(exists<fungible_asset::ConcurrentSupply>(post_fa_addr))) {
                 old(fungible_asset::spec_supply(post_fa_addr))
