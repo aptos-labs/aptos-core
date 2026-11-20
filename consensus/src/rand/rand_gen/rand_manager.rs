@@ -12,8 +12,7 @@ use crate::{
         network_messages::{RandMessage, RpcRequest},
         rand_store::{AggregationResult, RandCheckFuture, RandStore},
         reliable_broadcast_state::{
-            AugDataCertBuilder, CertifiedAugDataAckState, CertifiedAugDataRecoveryState,
-            ShareAggregateState,
+            AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::RandStorage,
         types::{
@@ -22,6 +21,7 @@ use crate::{
         },
     },
 };
+use anyhow::ensure;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::ReliableBroadcastConfig;
@@ -59,6 +59,9 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     config: RandConfig,
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
+    bounded_executor: BoundedExecutor,
+    rpc_backoff_policy: ExponentialBackoff,
+    rpc_timeout: Duration,
 
     // local channel received from rand_store for aggregation results
     decision_rx: Receiver<AggregationResult>,
@@ -98,18 +101,19 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         bounded_executor: BoundedExecutor,
         rb_config: &ReliableBroadcastConfig,
     ) -> Self {
-        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+        let rpc_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
+        let rpc_timeout = Duration::from_millis(rb_config.rpc_timeout_ms);
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
             "rand_manager",
             author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
-            rb_backoff_policy,
+            rpc_backoff_policy.clone(),
             TimeService::real(),
-            Duration::from_millis(rb_config.rpc_timeout_ms),
-            bounded_executor,
+            rpc_timeout,
+            bounded_executor.clone(),
         ));
         let (decision_tx, decision_rx) = unbounded();
         // Keep at most one pending notification per author.
@@ -130,6 +134,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             config,
             reliable_broadcast,
             network_sender,
+            bounded_executor,
+            rpc_backoff_policy,
+            rpc_timeout,
 
             decision_rx,
             outgoing_blocks,
@@ -363,14 +370,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         DropGuard::new(abort_handle)
     }
 
-    /// Ask `author` for its own certified aug data, and keep asking until it answers with one that
-    /// passes verification.
-    ///
-    /// Recovery path for a node that lost its RandDB mid-epoch. The proactive `CertifiedAugData`
-    /// broadcast stops once every validator has acked, and this node's previous instance already
-    /// acked before it restarted, so no peer will re-push the certs that were lost. Without them no
-    /// peer apk can be derived, which means no share is verifiable and no randomness can be
-    /// aggregated for the remainder of the epoch.
+    /// Fetch a missing peer certificate with backoff until it passes validation.
     fn request_certified_aug_data(&mut self, author: Author) {
         if author == self.author
             || self.config.get_certified_apk(&author).is_some()
@@ -378,20 +378,53 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         {
             return;
         }
-        let rb = self.reliable_broadcast.clone();
-        let state = CertifiedAugDataRecoveryState::new(
-            self.epoch_state.clone(),
-            [author].into_iter().collect(),
-            self.cert_recovery_tx.clone(),
-        );
-        let epoch = self.epoch_state.epoch;
+        let network_sender = self.network_sender.clone();
+        let executor = self.bounded_executor.clone();
+        let epoch_state = self.epoch_state.clone();
+        let recovered_tx = self.cert_recovery_tx.clone();
+        let mut backoff = self.rpc_backoff_policy.clone();
+        let timeout = self.rpc_timeout;
+        let request = RandMessage::<S, D>::RequestCertifiedAugData(RequestCertifiedAugData::new(
+            epoch_state.epoch,
+        ))
+        .into_network_message();
         let task = async move {
-            let request = RequestCertifiedAugData::new(epoch);
-            if let Err(e) = rb.multicast(request, state, vec![author]).await {
-                warn!(
-                    epoch = epoch,
-                    "[RandManager] Failed to recover certified aug data from {}: {}", author, e
-                );
+            loop {
+                let result = async {
+                    let response = network_sender
+                        .send_rpc(author, request.clone(), timeout)
+                        .await?;
+                    let epoch_state = epoch_state.clone();
+                    executor
+                        .spawn_blocking(move || {
+                            let response = RandMessage::<S, D>::from_network_message(response)?;
+                            let certified_data = CertifiedAugData::<D>::try_from(response)
+                                .map_err(|_| {
+                                    anyhow::anyhow!("Expected certified aug data response")
+                                })?;
+                            verify_recovered_aug_data(&certified_data, &epoch_state, author)?;
+                            Ok::<_, anyhow::Error>(certified_data)
+                        })
+                        .await
+                        .await?
+                }
+                .await;
+                match result {
+                    Ok(certified_data) => {
+                        let _ = recovered_tx.unbounded_send((author, certified_data));
+                        break;
+                    },
+                    Err(e) => {
+                        debug!(
+                            epoch = epoch_state.epoch,
+                            "[RandManager] Failed to recover certified aug data from {}: {:#}",
+                            author,
+                            e
+                        );
+                        tokio::time::sleep(backoff.next().expect("backoff must not terminate"))
+                            .await;
+                    },
+                }
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -574,8 +607,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                     RandMessage::CertifiedAugData(certified_data),
                                 ),
                                 // Nothing to serve yet. `response_sender` is dropped at the end of
-                                // this arm, which fails the requester's RPC so that its reliable
-                                // broadcast retries us with backoff.
+                                // this arm, which fails the requester's RPC so it retries with backoff.
                                 None => debug!(
                                     "[RandManager] No certified aug data to serve to {}",
                                     sender
@@ -618,4 +650,25 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let queue = &self.block_queue.queue();
         RAND_QUEUE_SIZE.set(queue.len() as i64);
     }
+}
+
+pub(super) fn verify_recovered_aug_data<D: TAugmentedData>(
+    certified_data: &CertifiedAugData<D>,
+    epoch_state: &EpochState,
+    author: Author,
+) -> anyhow::Result<()> {
+    // RPC responses bypass RandMessage::verify, so check the requested epoch here.
+    ensure!(
+        certified_data.epoch() == epoch_state.epoch,
+        "[RandManager] requested certified aug data for epoch {}, got one for epoch {}",
+        epoch_state.epoch,
+        certified_data.epoch()
+    );
+    ensure!(
+        certified_data.author() == &author,
+        "[RandManager] requested certified aug data from {}, got a cert for {}",
+        author,
+        certified_data.author()
+    );
+    certified_data.verify(&epoch_state.verifier)
 }
