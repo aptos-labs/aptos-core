@@ -27,6 +27,9 @@ use std::{env, fs, num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc, ti
 
 const NUM_VALIDATORS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(120);
+// Leave time for five sequential restarts without crossing the epoch boundary.
+const EPOCH_DURATION_SECS: u64 = 180;
+const EPOCH_TIMEOUT: Duration = Duration::from_secs(EPOCH_DURATION_SECS + TIMEOUT.as_secs());
 const LEGACY_REVISION: &str = "7b23ba0a947166c6c2fccc32608a345942f209a3";
 
 static FACTORY: Lazy<LocalFactory> = Lazy::new(|| {
@@ -67,7 +70,7 @@ struct MigrationSwarm {
 }
 
 impl MigrationSwarm {
-    async fn new(epoch_duration_secs: u64) -> Self {
+    async fn new() -> Self {
         aptos_logger::Logger::new().init();
         let old_version = FACTORY.versions().min().unwrap();
         let upgrade_version = FACTORY.versions().max().unwrap();
@@ -86,8 +89,8 @@ impl MigrationSwarm {
                 Some(Arc::new(|_, stake| {
                     *stake = 100_000_000_000_000;
                 })),
-                Some(Arc::new(move |conf| {
-                    conf.epoch_duration_secs = epoch_duration_secs;
+                Some(Arc::new(|conf| {
+                    conf.epoch_duration_secs = EPOCH_DURATION_SECS;
                     conf.consensus_config.enable_validator_txns();
                     conf.consensus_config.disable_rand_check();
                     conf.randomness_config_override =
@@ -100,7 +103,7 @@ impl MigrationSwarm {
             .await
             .unwrap();
         swarm
-            .wait_for_all_nodes_to_catchup_to_epoch(2, TIMEOUT)
+            .wait_for_all_nodes_to_catchup_to_epoch(2, EPOCH_TIMEOUT)
             .await
             .unwrap();
         let peers: Vec<_> = swarm.validators().map(|node| node.peer_id()).collect();
@@ -177,7 +180,7 @@ impl MigrationSwarm {
     async fn wait_for_next_epoch(&mut self) {
         self.epoch += 1;
         self.swarm
-            .wait_for_all_nodes_to_catchup_to_epoch(self.epoch, TIMEOUT)
+            .wait_for_all_nodes_to_catchup_to_epoch(self.epoch, EPOCH_TIMEOUT)
             .await
             .unwrap();
         assert_eq!(self.current_epoch().await, self.epoch);
@@ -218,7 +221,7 @@ impl MigrationSwarm {
 
 #[tokio::test]
 async fn one_upgrade_per_epoch_then_retire_rand_db() {
-    let mut test = MigrationSwarm::new(60).await;
+    let mut test = MigrationSwarm::new().await;
     let transaction = test.submit_dice_roll().await;
     assert_eq!(transaction.success, Some(true));
     test.swarm
@@ -277,7 +280,7 @@ async fn one_upgrade_per_epoch_then_retire_rand_db() {
 
 #[tokio::test]
 async fn majority_upgrade_in_one_epoch_then_retire_rand_db() {
-    let mut test = MigrationSwarm::new(60).await;
+    let mut test = MigrationSwarm::new().await;
     let transaction = test.submit_dice_roll().await;
     assert_eq!(transaction.success, Some(true));
     test.swarm
