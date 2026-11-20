@@ -13211,6 +13211,7 @@ dependencies = [
  "libsecp256k1",
  "merlin",
  "mono-move-core",
+ "move-binary-format",
  "move-core-types",
  "num-traits",
  "once_cell",
