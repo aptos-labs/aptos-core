@@ -496,12 +496,7 @@ impl RequestShare {
     }
 }
 
-/// Ask a peer for its own `CertifiedAugData`.
-///
-/// Recovery path for a node that lost its RandDB mid-epoch: the proactive `CertifiedAugData`
-/// broadcast for this epoch already completed (it stops once every validator has acked), so
-/// nothing will re-push the certs that were lost. The requester keeps asking until the peer
-/// replies with a cert that passes verification.
+/// Fetch a peer's certificate after its proactive broadcast has completed.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RequestCertifiedAugData {
     epoch: u64,
