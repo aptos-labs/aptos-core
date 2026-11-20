@@ -1,8 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Phase-1 upgrades retain RandDB. Set RANDDB_UPGRADE_OLD_BIN and RANDDB_UPGRADE_NEW_BIN
-//! to use prebuilt binaries; otherwise Forge builds the pinned pre-PR revision and workspace.
+//! Upgrade with RandDB retained, then retire each validator's old RandDB after a fresh epoch.
+//! Set RANDDB_UPGRADE_OLD_BIN and RANDDB_UPGRADE_NEW_BIN to use prebuilt binaries;
+//! otherwise Forge builds the pinned pre-PR revision and workspace.
 
 use crate::randomness::e2e_basic_consumption::publish_on_chain_dice_module;
 use aptos::{
@@ -22,7 +23,7 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::{env, num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
+use std::{env, fs, num::NonZeroUsize, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 const NUM_VALIDATORS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(120);
@@ -56,7 +57,7 @@ static FACTORY: Lazy<LocalFactory> = Lazy::new(|| {
     }
 });
 
-struct UpgradeSwarm {
+struct MigrationSwarm {
     swarm: LocalSwarm,
     cli: CliTestFramework,
     peers: Vec<AccountAddress>,
@@ -65,7 +66,7 @@ struct UpgradeSwarm {
     dice_roll_function: MemberId,
 }
 
-impl UpgradeSwarm {
+impl MigrationSwarm {
     async fn new(epoch_duration_secs: u64) -> Self {
         aptos_logger::Logger::new().init();
         let old_version = FACTORY.versions().min().unwrap();
@@ -183,6 +184,20 @@ impl UpgradeSwarm {
         info!("Phase1 rollout: reached natural epoch {}", self.epoch);
     }
 
+    async fn restart_validator_without_rand_db(&mut self, index: usize) {
+        assert_eq!(self.current_epoch().await, self.epoch);
+        let node = self.swarm.validator(self.peers[index]).unwrap();
+        assert_eq!(node.version(), self.upgrade_version);
+        node.stop();
+        fs::remove_dir_all(node.config().storage.dir().join("rand_db")).unwrap();
+        node.start().unwrap();
+        self.swarm.wait_all_alive(TIMEOUT).await.unwrap();
+        info!(
+            "RandDB retirement: validator {} restarted without RandDB in epoch {}",
+            index, self.epoch
+        );
+    }
+
     async fn submit_dice_roll(&self) -> TransactionSummary {
         self.cli
             .run_function(
@@ -202,8 +217,8 @@ impl UpgradeSwarm {
 }
 
 #[tokio::test]
-async fn phase1_upgrade_one_validator_per_epoch_preserves_rand_db() {
-    let mut test = UpgradeSwarm::new(30).await;
+async fn one_upgrade_per_epoch_then_retire_rand_db() {
+    let mut test = MigrationSwarm::new(60).await;
     let transaction = test.submit_dice_roll().await;
     assert_eq!(transaction.success, Some(true));
     test.swarm
@@ -228,11 +243,41 @@ async fn phase1_upgrade_one_validator_per_epoch_preserves_rand_db() {
             .await
             .unwrap();
     }
+
+    // The last validator retains RandDB during its binary upgrade too.
+    test.upgrade(4).await;
+    test.wait_for_next_epoch().await;
+    assert!(test
+        .swarm
+        .validators()
+        .all(|node| node.version() == test.upgrade_version));
+
+    // Other validators retain their certificates while each old RandDB is discarded.
+    for index in 0..NUM_VALIDATORS {
+        test.restart_validator_without_rand_db(index).await;
+        let transaction = test.submit_dice_roll().await;
+        assert_eq!(transaction.success, Some(true));
+        test.swarm
+            .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+            .await
+            .unwrap();
+        assert_eq!(
+            test.current_epoch().await,
+            test.epoch,
+            "RandDB recovery waited for another epoch"
+        );
+        info!(
+            "RandDB retirement: validator {} recovered; all nodes committed version {} in epoch {}",
+            index,
+            transaction.version.unwrap(),
+            test.epoch
+        );
+    }
 }
 
 #[tokio::test]
-async fn phase1_upgrade_majority_in_one_epoch_preserves_rand_db() {
-    let mut test = UpgradeSwarm::new(60).await;
+async fn majority_upgrade_in_one_epoch_then_retire_rand_db() {
+    let mut test = MigrationSwarm::new(60).await;
     let transaction = test.submit_dice_roll().await;
     assert_eq!(transaction.success, Some(true));
     test.swarm
@@ -257,4 +302,34 @@ async fn phase1_upgrade_majority_in_one_epoch_preserves_rand_db() {
         .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
         .await
         .unwrap();
+
+    // The last validator retains RandDB during its binary upgrade too.
+    test.upgrade(4).await;
+    test.wait_for_next_epoch().await;
+    assert!(test
+        .swarm
+        .validators()
+        .all(|node| node.version() == test.upgrade_version));
+
+    // Other validators retain their certificates while each old RandDB is discarded.
+    for index in 0..NUM_VALIDATORS {
+        test.restart_validator_without_rand_db(index).await;
+        let transaction = test.submit_dice_roll().await;
+        assert_eq!(transaction.success, Some(true));
+        test.swarm
+            .wait_for_all_nodes_to_catchup_to_version(transaction.version.unwrap(), TIMEOUT)
+            .await
+            .unwrap();
+        assert_eq!(
+            test.current_epoch().await,
+            test.epoch,
+            "RandDB recovery waited for another epoch"
+        );
+        info!(
+            "RandDB retirement: validator {} recovered; all nodes committed version {} in epoch {}",
+            index,
+            transaction.version.unwrap(),
+            test.epoch
+        );
+    }
 }
