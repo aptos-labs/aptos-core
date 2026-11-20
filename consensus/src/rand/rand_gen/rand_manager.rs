@@ -383,6 +383,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         ))
         .into_network_message();
         let task = async move {
+            let mut retry_delay = timeout;
             loop {
                 let result = async {
                     let response = network_sender
@@ -415,8 +416,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             author,
                             e
                         );
-                        tokio::time::sleep(backoff.next().expect("backoff must not terminate"))
-                            .await;
+                        retry_delay = backoff.next().unwrap_or(retry_delay);
+                        tokio::time::sleep(retry_delay).await;
                     },
                 }
             }
