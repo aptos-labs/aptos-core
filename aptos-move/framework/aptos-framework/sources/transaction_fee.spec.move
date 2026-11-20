@@ -132,6 +132,8 @@ spec aptos_framework::transaction_fee {
         include coin::PairedRefsAbortsIf<AptosCoin>;
         aborts_if option::is_none(refs.burn_ref_opt);
         aborts_if exists<AptosFABurnCapabilities>(addr);
+        modifies global<AptosFABurnCapabilities>(addr);
+        modifies global<coin::PairedFungibleAssetRefs>(metadata.inner);
         ensures exists<AptosFABurnCapabilities>(addr);
         ensures global<AptosFABurnCapabilities>(addr).burn_ref == option::borrow(refs.burn_ref_opt);
     }
@@ -145,6 +147,8 @@ spec aptos_framework::transaction_fee {
         include PairedMintRefAbortsIf;
         aborts_if exists<AptosFAMintCapabilities>(addr);
         aborts_if exists<AptosCoinMintCapability>(addr);
+        modifies global<AptosFAMintCapabilities>(addr);
+        modifies global<AptosCoinMintCapability>(addr);
         ensures exists<AptosFAMintCapabilities>(addr);
         ensures exists<AptosCoinMintCapability>(addr);
     }

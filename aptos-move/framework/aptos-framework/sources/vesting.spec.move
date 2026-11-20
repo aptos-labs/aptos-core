@@ -108,7 +108,6 @@ spec aptos_framework::vesting {
     /// </high-level-req>
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_partial;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
         // Explicit trigger: an inferred one matches every address term.
@@ -158,6 +157,7 @@ spec aptos_framework::vesting {
     }
 
     spec total_accumulated_rewards(vesting_contract_address: address): u64 {
+        pragma aborts_if_is_partial;
         include TotalAccumulatedRewardsAbortsIf;
     }
 
@@ -190,6 +190,7 @@ spec aptos_framework::vesting {
     }
 
     spec accumulated_rewards(vesting_contract_address: address, shareholder_or_beneficiary: address): u64 {
+        pragma aborts_if_is_partial;
         // Partial: the result and the aborts of converting the shares to an amount are not specified.
         include TotalAccumulatedRewardsAbortsIf;
     }
@@ -219,6 +220,7 @@ spec aptos_framework::vesting {
     }
 
     spec create_vesting_contract {
+        pragma aborts_if_is_partial;
         // TODO: Data invariant does not hold.
         pragma verify = false;
         /// [high-level-req-10]
@@ -232,6 +234,7 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards(contract_address: address) {
+        pragma aborts_if_is_partial;
         include UnlockRewardsAbortsIf;
     }
 
@@ -243,10 +246,12 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
+        pragma aborts_if_is_partial;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec vest(contract_address: address) {
+        pragma aborts_if_is_partial;
         include UnlockRewardsAbortsIf;
         let pre = global<VestingContract>(contract_address);
         let post post_vc = global<VestingContract>(contract_address);
@@ -262,10 +267,12 @@ spec aptos_framework::vesting {
     }
 
     spec vest_many(contract_addresses: vector<address>) {
+        pragma aborts_if_is_partial;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec distribute(contract_address: address) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loops and of depositing the coins are not specified.
         include ActiveVestingContractAbortsIf;
 
@@ -274,10 +281,12 @@ spec aptos_framework::vesting {
     }
 
     spec distribute_many(contract_addresses: vector<address>) {
+        pragma aborts_if_is_partial;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loop, of reading the stake and of unlocking it are not specified.
         include ActiveVestingContractAbortsIf;
 
@@ -290,6 +299,7 @@ spec aptos_framework::vesting {
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loop and of moving the coins to the withdrawal address are not
         // specified.
         let vesting_contract = global<VestingContract>(contract_address);
@@ -305,6 +315,7 @@ spec aptos_framework::vesting {
         new_operator: address,
         commission_percentage: u64,
     ) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loop and of paying the commission are not specified.
         include VerifyAdminAbortsIf;
 
@@ -318,7 +329,7 @@ spec aptos_framework::vesting {
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
 
         let staking_contract = simple_map::spec_get(staking_contracts, old_operator);
-        include DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract };
+        include staking_contract::DistributeInternalAbortsIf { staker: acc, operator: old_operator, staking_contract };
 
         let post post_vesting_contract = global<VestingContract>(contract_address);
         ensures post_vesting_contract.staking.operator == new_operator;
@@ -330,6 +341,7 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_commission_percentage: u64,
     ) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of distributing the unlocked stake and of paying the commission are not specified.
         include VerifyAdminAbortsIf;
         aborts_if new_commission_percentage > 100;
@@ -385,6 +397,7 @@ spec aptos_framework::vesting {
         new_beneficiary: address,
     ) {
         aborts_if !account::spec_exists_at(new_beneficiary);
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(@aptos_framework);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
         ensures simple_map::spec_contains_key(vesting_contract.beneficiaries,shareholder);
@@ -436,7 +449,6 @@ spec aptos_framework::vesting {
 
     spec get_vesting_account_signer(admin: &signer, contract_address: address): signer {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         include VerifyAdminAbortsIf;
         ensures signer::address_of(result)
             == global<VestingContract>(contract_address).signer_cap.account;
@@ -489,11 +501,11 @@ spec aptos_framework::vesting {
 
     spec assert_active_vesting_contract(contract_address: address) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         include ActiveVestingContractAbortsIf;
     }
 
     spec unlock_stake(vesting_contract: &VestingContract, amount: u64) {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loop, of paying the commission and of unlocking the stake are not
         // specified.
         include UnlockStakeAbortsIf;
@@ -511,10 +523,11 @@ spec aptos_framework::vesting {
         // verify staking_contract::distribute_internal()
         let store = global<staking_contract::Store>(acc);
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
-        include amount != 0 ==> DistributeInternalAbortsIf { staker: acc, operator, staking_contract };
+        include amount != 0 ==> staking_contract::DistributeInternalAbortsIf { staker: acc, operator, staking_contract };
     }
 
     spec withdraw_stake(vesting_contract: &VestingContract, contract_address: address): Coin<AptosCoin> {
+        pragma aborts_if_is_partial;
         // Partial: the aborts of the distribution loop and of withdrawing the coins are not specified.
         include WithdrawStakeAbortsIf;
     }
@@ -529,36 +542,7 @@ spec aptos_framework::vesting {
         // verify staking_contract::distribute_internal()
         let store = global<staking_contract::Store>(contract_address);
         let staking_contract = simple_map::spec_get(store.staking_contracts, operator);
-        include DistributeInternalAbortsIf { staker: contract_address, operator, staking_contract };
-    }
-
-    spec schema DistributeInternalAbortsIf {
-        staker: address;    // The verification below does not contain the loop in staking_contract::update_distribution_pool().
-        operator: address;
-        staking_contract: staking_contract::StakingContract;
-
-        let pool_address = staking_contract.pool_address;
-        aborts_if !exists<stake::StakePool>(pool_address);
-        let stake_pool = global<stake::StakePool>(pool_address);
-        let inactive = stake_pool.inactive.value;
-        let pending_inactive = stake_pool.pending_inactive.value;
-        aborts_if inactive + pending_inactive > MAX_U64;
-
-        // verify stake::withdraw_with_cap()
-        let total_potential_withdrawable = inactive + pending_inactive;
-        let pool_address_1 = staking_contract.owner_cap.pool_address;
-        aborts_if !exists<stake::StakePool>(pool_address_1);
-        let stake_pool_1 = global<stake::StakePool>(pool_address_1);
-        aborts_if !exists<stake::ValidatorSet>(@aptos_framework);
-        let validator_set = global<stake::ValidatorSet>(@aptos_framework);
-        let inactive_state = !stake::spec_contains(validator_set.pending_active, pool_address_1)
-            && !stake::spec_contains(validator_set.active_validators, pool_address_1)
-            && !stake::spec_contains(validator_set.pending_inactive, pool_address_1);
-        let inactive_1 = stake_pool_1.inactive.value;
-        let pending_inactive_1 = stake_pool_1.pending_inactive.value;
-        let new_inactive_1 = inactive_1 + pending_inactive_1;
-        aborts_if inactive_state && timestamp::spec_now_seconds() >= stake_pool_1.locked_until_secs
-            && inactive_1 + pending_inactive_1 > MAX_U64;
+        include staking_contract::DistributeInternalAbortsIf { staker: contract_address, operator, staking_contract };
     }
 
     spec get_beneficiary(contract: &VestingContract, shareholder: address): address {
@@ -571,8 +555,11 @@ spec aptos_framework::vesting {
         admin: signer;
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
-        // aborts_if !exists<VestingAccountManagement>(contract_address) ==> exists<VestingAccountManagement>(vesting_contract.signer_cap.account);
         aborts_if signer::address_of(admin) != vesting_contract.admin;
+        // A missing role store is created at the account of the signer capability.
+        let cap_account = vesting_contract.signer_cap.account;
+        aborts_if !exists<VestingAccountManagement>(contract_address)
+            && (exists<VestingAccountManagement>(cap_account) || cap_account != contract_address);
     }
 
     spec schema VerifyAdminAbortsIf {

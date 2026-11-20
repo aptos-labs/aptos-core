@@ -158,6 +158,7 @@ spec aptos_framework::object {
     spec create_named_object(creator: &signer, seed: vector<u8>): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let obj_addr = spec_create_object_address(creator_address, seed);
+        modifies global<ObjectCore>(obj_addr);
         aborts_if exists<ObjectCore>(obj_addr);
 
         ensures exists<ObjectCore>(obj_addr);
@@ -333,6 +334,7 @@ spec aptos_framework::object {
 
     spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
         /// [high-level-req-1.2]
+        modifies global<ObjectCore>(object_address);
         aborts_if exists<ObjectCore>(object_address);
         ensures exists<ObjectCore>(object_address);
         ensures global<ObjectCore>(object_address).guid_creation_num == INIT_GUID_CREATION_NUM + 1;
