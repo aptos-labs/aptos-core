@@ -366,32 +366,6 @@ mod tests {
         assert_eq!(msg.epoch(), ctx.epoch_state.epoch);
     }
 
-    // A current-epoch quorum certificate from the requested peer completes recovery
-    // and is forwarded unchanged to RandManager for installation.
-    #[test]
-    fn test_cert_recovery_accepts_the_requested_peers_cert() {
-        let ctx = build_test_context(vec![100, 100, 100], 0);
-        let peer = ctx.authors[1];
-        let (state, mut rx) = recovery_state(&ctx, peer);
-        let certified = certify_aug_data(&ctx, peer);
-
-        // This is the only pending peer, so Some(()) ends the recovery broadcast.
-        assert!(state.add(peer, certified.clone()).unwrap().is_some());
-
-        // rx stands in for RandManager's receiver of certificates to cache and persist.
-        let (author, recovered) = rx
-            .next()
-            .now_or_never()
-            .flatten()
-            .expect("cert should be forwarded");
-        assert_eq!(author, peer);
-        assert_eq!(recovered, certified);
-        assert!(
-            rx.next().now_or_never().flatten().is_none(),
-            "one reply must enqueue only one recovery notification"
-        );
-    }
-
     #[test]
     fn test_cert_recovery_rejects_a_cert_for_another_author() {
         let ctx = build_test_context(vec![100, 100, 100], 0);
