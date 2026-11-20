@@ -453,6 +453,9 @@ module aptos_framework::multisig_account {
         while (i < next_sequence_number) {
             pending_transactions.push_back(*multisig_account.transactions.borrow(i));
             i += 1;
+        } spec {
+            invariant multisig_account.last_executed_sequence_number < i && i <= next_sequence_number;
+            invariant len(pending_transactions) == i - multisig_account.last_executed_sequence_number - 1;
         };
         pending_transactions
     }

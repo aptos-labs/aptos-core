@@ -37,7 +37,8 @@ spec aptos_framework::vesting {
     /// Implementation: The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs.
     /// The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff
     /// period.
-    /// Enforcement: Audited the check for the end of vesting cliff: [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566](vest) module.
+    /// Enforcement: Formally verified via [high-level-req-4](vest) that before the cliff ends or before the next period
+    /// completes, vest leaves the vesting schedule and the remaining grant unchanged.
     ///
     /// No.: 5
     /// Requirement: In order to retrieve the total accumulated rewards that have not been distributed, the accumulated
@@ -64,8 +65,8 @@ spec aptos_framework::vesting {
     /// Criticality: High
     /// Implementation: When vesting, the last_completed_period is checked against the next period to vest. This allows
     /// to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.
-    /// Enforcement: Audited that vesting doesn't skip periods, but gradually increments to allow shareholders to
-    /// retrieve all the vested tokens.
+    /// Enforcement: Formally verified via [high-level-req-7](vest) that each vest advances last_vested_period by exactly
+    /// one once a period is due, so no period is skipped.
     ///
     /// No.: 8
     /// Requirement: Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing
@@ -91,7 +92,9 @@ spec aptos_framework::vesting {
     /// Implementation: The create_vesting_contract function ensures that the withdrawal_address is not a reserved
     /// address, that it is registered for apt, that the list of shareholders is non-empty, and that the amount of
     /// shareholders matches the amount of buy_ins.
-    /// Enforcement: Formally verified via [high-level-req-10](create_vesting_contract).
+    /// Enforcement: Audited that create_vesting_contract performs these checks. Its
+    /// [high-level-req-10](create_vesting_contract) spec is not verified: the grant pool built by the shareholder loop
+    /// is not tracked, so the pool's shareholder limit cannot be established for the new contract.
     ///
     /// No.: 11
     /// Requirement: Creating a vesting contract account should require the signer (admin) to own an admin store and should
@@ -245,6 +248,17 @@ spec aptos_framework::vesting {
 
     spec vest(contract_address: address) {
         include UnlockRewardsAbortsIf;
+        let pre = global<VestingContract>(contract_address);
+        let post post_vc = global<VestingContract>(contract_address);
+        let schedule = pre.vesting_schedule;
+        let now = timestamp::spec_now_seconds();
+        let not_due = schedule.start_timestamp_secs > now
+            || (now - schedule.start_timestamp_secs) / schedule.period_duration < schedule.last_vested_period + 1;
+        /// [high-level-req-4]
+        ensures not_due ==> post_vc.vesting_schedule == schedule && post_vc.remaining_grant == pre.remaining_grant;
+        /// [high-level-req-7]
+        ensures !not_due ==> post_vc.vesting_schedule.last_vested_period == schedule.last_vested_period + 1;
+        ensures post_vc.remaining_grant <= pre.remaining_grant;
     }
 
     spec vest_many(contract_addresses: vector<address>) {

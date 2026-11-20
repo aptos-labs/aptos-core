@@ -22,7 +22,8 @@ spec aptos_framework::optional_aggregator {
     /// parallelizable or vice versa.
     /// Criticality: High
     /// Implementation: The switch function run, if successful, should always change the aggregator type.
-    /// Enforcement: Formally verified via [high-level-req-3](switch_and_zero_out).
+    /// Enforcement: Formally verified via [high-level-req-3.1](switch) and [high-level-req-3.2](switch): only a
+    /// parallelizable aggregator can be switched, and it ends non-parallelizable.
     /// </high-level-req>
     spec module {
         pragma verify = true;
@@ -118,7 +119,9 @@ spec aptos_framework::optional_aggregator {
 
     /// Only a parallelizable aggregator can be switched; the value and limit are preserved.
     spec switch(optional_aggregator: &mut OptionalAggregator) {
+        /// [high-level-req-3.1]
         aborts_if !is_parallelizable(optional_aggregator);
+        /// [high-level-req-3.2]
         ensures !is_parallelizable(optional_aggregator);
         ensures optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator));
         ensures optional_aggregator_limit(optional_aggregator) == optional_aggregator_limit(old(optional_aggregator));
