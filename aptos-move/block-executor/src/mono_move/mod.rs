@@ -13,7 +13,6 @@ use crate::{
     types::InputOutputKey,
 };
 use aptos_aggregator::delayed_change::DelayedChange;
-use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         Incarnation, MVDataError, MVDataOutput, StorageVersion, TxnIndex, Version as MVVersion,
@@ -35,7 +34,6 @@ use aptos_types::{
     write_set::{WriteOpKind, WriteSet},
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_vm_logging::{alert, prelude::*};
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
 use group_chain::{
@@ -128,9 +126,8 @@ impl<K> MonoValue<K> {
 impl<K: Clone + Send + Sync> SpeculativeValue for MonoValue<K> {
     fn eq_value(&self, other: &Self) -> bool {
         match (self, other) {
-            // A group's slot is only read for the group's size.
             (MonoValue::GroupMetadata { group }, MonoValue::GroupMetadata { group: other }) => {
-                group.size() == other.size()
+                group.eq_for_readers(other)
             },
             // False here only forces re-validation, so safe to use.
             // TODO(perf): carry layouts so that structs can be validated as a single memcmp?
@@ -380,10 +377,10 @@ impl std::fmt::Debug for MonoTxnOutput {
 }
 
 impl MonoTxnOutput {
-    /// The output of an executed transaction, or [`None`] if the size of a
-    /// group it wrote does not add up, which only inconsistent speculative
-    /// reads cause.
-    fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Option<Self> {
+    /// The output of an executed transaction. Fails with the key of a group it
+    /// wrote whose size does not add up, which only reads inconsistent with
+    /// each other cause.
+    fn executed(outcome: Arc<TxnOutcome>, skips_rest: bool) -> Result<Self, InMemoryStorageKey> {
         let mut output = MonoTxnOutput::Executed {
             outcome,
             skips_rest,
@@ -392,21 +389,22 @@ impl MonoTxnOutput {
         let written_groups = output
             .effects()
             .into_iter()
-            .flat_map(|effects| effects.read_write_set().written_groups_unordered())
+            .flat_map(|effects| effects.written_groups_unordered())
             .map(|(group_key, group)| {
+                let size = group.size().ok_or_else(|| group_key.clone())?;
                 let metadata = GroupMetadata::from_changes(
-                    group.members.clone(),
-                    group.size_before,
-                    group.size?,
+                    group.members().to_vec(),
+                    group.size_before(),
+                    size,
                 );
-                Some((group_key.clone(), Arc::new(metadata)))
+                Ok((group_key.clone(), Arc::new(metadata)))
             })
-            .collect::<Option<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, InMemoryStorageKey>>()?;
         match &mut output {
             MonoTxnOutput::Executed { group_metadata, .. } => *group_metadata = written_groups,
             MonoTxnOutput::SkippedToRetry => {},
         }
-        Some(output)
+        Ok(output)
     }
 
     /// The frozen effects of a committed, executed transaction, or `None` for a
@@ -457,7 +455,6 @@ impl TxnOutput for MonoTxnOutput {
 
         let pin: Arc<dyn ReadPin> = effects.frozen_heap();
         effects
-            .read_write_set()
             .writes_unordered()
             .map(|(key, class, _group)| {
                 let value = match class {
@@ -509,12 +506,11 @@ impl TxnOutput for MonoTxnOutput {
         &self,
         callback: &mut dyn FnMut(&Self::Key) -> Result<(), PanicError>,
     ) -> Result<(), PanicError> {
-        for key in self.effects().into_iter().flat_map(|effects| {
-            effects
-                .read_write_set()
-                .writes_unordered()
-                .map(|(key, _, _)| key)
-        }) {
+        for key in self
+            .effects()
+            .into_iter()
+            .flat_map(|effects| effects.writes_unordered().map(|(key, _, _)| key))
+        {
             callback(key)?;
         }
         for (group_key, _) in self.group_metadata() {
@@ -851,13 +847,24 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
         // both vouch for that.
         #[allow(clippy::arc_with_non_send_sync)]
         let outcome = Arc::new(outcome);
-        let Some(output) = MonoTxnOutput::executed(outcome.clone(), skips_rest) else {
-            // The transaction read a group and its members at different
-            // versions, so its group sizes are wrong and it must re-execute.
-            return Ok((
-                ExecutionStatus::SpeculativeFailure,
-                MonoReads::empty(incarnation),
-            ));
+        let output = match MonoTxnOutput::executed(outcome.clone(), skips_rest) {
+            Ok(output) => output,
+            Err(group_key) => {
+                return match incarnation {
+                    // The transaction read a group and its members at different
+                    // versions, so its group sizes are wrong and it must
+                    // re-execute.
+                    Some(_) => Ok((
+                        ExecutionStatus::SpeculativeFailure,
+                        MonoReads::empty(incarnation),
+                    )),
+                    // Sequential execution reads consistently.
+                    None => Err(code_invariant_error(format!(
+                        "Sizes of resource group {group_key:?} do not add up in sequential \
+                         execution"
+                    ))),
+                };
+            },
         };
         let reads = match incarnation {
             Some(incarnation) => {
@@ -966,13 +973,15 @@ impl SingleTransactionExecutor for MonoTransactionExecutor {
                     (prev, view)
                 },
             };
+            // A committed transaction validated the size it built on, so a
+            // mismatch is a bug in the accounting.
             if view.size() != metadata.size() {
-                alert!(
+                return Err(code_invariant_error(format!(
                     "Resource group {group_key:?} has size {:?}, recorded size {:?}",
                     view.size(),
                     metadata.size(),
-                );
-                return Err(PanicOr::Or(ResourceGroupSerializationError));
+                ))
+                .into());
             }
             let state_key = group_key
                 .as_state_key()

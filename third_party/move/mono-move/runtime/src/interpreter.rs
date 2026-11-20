@@ -9,7 +9,7 @@ use crate::{
         ArithOp, ReportedIntValue, RuntimeError, RuntimeInvariantViolation, RuntimeStatus,
         Signedness, VecOp,
     },
-    global_storage::{EntryPtr, ResourceReadWriteSet},
+    global_storage::{EntryPtr, GroupEntry, ResourceReadWriteSet, WriteClass},
     heap::{
         alloc_or_gc, deep_copy_batch_or_gc, deep_copy_or_gc, deserialize_or_gc,
         evacuate_session_roots,
@@ -290,6 +290,23 @@ impl SessionEffects {
     /// The transaction's global-storage read-write set.
     pub fn read_write_set(&self) -> &ResourceReadWriteSet {
         &self.read_write_set
+    }
+
+    /// Yields each write, with its [`WriteClass`] and the resource-group
+    /// container it belongs to (or [`None`] for an own slot). Callers must sort
+    /// before emitting.
+    pub fn writes_unordered(
+        &self,
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, WriteClass, Option<InternedType>)> {
+        self.read_write_set.writes_unordered()
+    }
+
+    /// Yields each resource group the transaction wrote, by the group's own
+    /// key. Callers must not depend on the order.
+    pub fn written_groups_unordered(
+        &self,
+    ) -> impl Iterator<Item = (&InMemoryStorageKey, &GroupEntry)> {
+        self.read_write_set.written_groups_unordered()
     }
 
     /// Returns the frozen heap allocation backing the written values.
@@ -1135,8 +1152,11 @@ impl<'guard> InterpreterContext<'guard> {
     /// so the caller must keep the global arena alive until the effects are
     /// dropped.
     ///
-    /// Fails only on a VM bug. The copy leaves the session heap half-forwarded,
-    /// so nothing is recoverable afterwards and the block has to be aborted.
+    /// Fails on a VM bug, on a written value that cannot be serialized, or if
+    /// reading the size of a resource group the transaction wrote fails, which
+    /// a speculative read can cause. A VM bug during the copy leaves the
+    /// session heap half-forwarded, so nothing is recoverable afterwards and
+    /// the block has to be aborted.
     pub fn finish(self) -> VMResult<SessionEffects> {
         let Self {
             loader,
@@ -1169,8 +1189,6 @@ impl<'guard> InterpreterContext<'guard> {
         // SAFETY: every read-write-set entry holds initialized values of the
         // type at its key, and no rollback can follow the session's end.
         unsafe { read_write_set.drop_unchanged_writes(guard) }?;
-        // SAFETY: as above, and nothing mutates a written value from here on.
-        unsafe { read_write_set.compute_write_sizes(guard, resource_provider) }?;
         // TODO(perf): the undo journal and checkpoints are dead from here on,
         // but the read-write set keeps them for as long as the effects live,
         // which Block-STM extends to the end of the block. Clear them here.
@@ -1183,6 +1201,14 @@ impl<'guard> InterpreterContext<'guard> {
             evacuate_session_roots(&heap, to_space, guard, &mut read_write_set, &extensions)?;
         guard.return_region(heap.into_region());
         guard.return_region(stack);
+
+        // After the regions are back in the pool, so a speculative failure here
+        // does not lose them.
+        //
+        // SAFETY: every read-write-set entry holds initialized values of the
+        // type at its key, now in the evacuated heap, and nothing mutates a
+        // written value from here on.
+        unsafe { read_write_set.compute_write_sizes(guard, resource_provider) }?;
 
         Ok(SessionEffects {
             read_write_set,

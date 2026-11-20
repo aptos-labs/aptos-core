@@ -179,6 +179,23 @@ impl<K> GroupMetadata<K> {
         self.size
     }
 
+    /// Whether a transaction that read this entry would read the same from
+    /// `other`. The only recorded read of a group's slot is of the group's
+    /// size, so two entries of equal size look the same to every reader. A
+    /// read of anything else at the slot needs this revisited.
+    pub(crate) fn eq_for_readers(&self, other: &Self) -> bool {
+        // Every field is listed, so a new one has to be classified here.
+        let Self {
+            changes: _,
+            size_before: _,
+            size,
+            current: _,
+            pending_post_commits: _,
+            before: _,
+        } = self;
+        *size == other.size
+    }
+
     /// Records the group's members before this entry's changes.
     pub(crate) fn set_before(&self, before: Arc<GroupView>) -> Result<(), PanicError> {
         self.before

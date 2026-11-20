@@ -187,7 +187,7 @@ fn resource_writes(
     //   - Are we concerned about too many writes here?
     let mut writes = vec![];
     let mut failures = vec![];
-    for (key, class, group) in effects.read_write_set().writes_unordered() {
+    for (key, class, group) in effects.writes_unordered() {
         if group.is_some() {
             continue;
         }
@@ -240,7 +240,7 @@ pub(crate) fn group_writes(
             .insert(member_tag, member_op);
         Ok(())
     };
-    for (key, class, group) in effects.read_write_set().writes_unordered() {
+    for (key, class, group) in effects.writes_unordered() {
         if let Some(group_ty) = group {
             if let Err(e) = collect(key, class, group_ty) {
                 failures.push(e);

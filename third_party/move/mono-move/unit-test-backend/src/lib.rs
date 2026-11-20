@@ -462,7 +462,7 @@ static NATIVES: LazyLock<ProductionNativeRegistry> = LazyLock::new(|| {
 /// V1's unit tests: resource groups are not packed.
 fn test_effects(guard: &ExecutionGuard<'_>, effects: &SessionEffects) -> Result<TestEffects> {
     let mut test_effects = TestEffects::new(ChangeSet::new());
-    for (key, class, _group) in effects.read_write_set().writes_unordered() {
+    for (key, class, _group) in effects.writes_unordered() {
         let written = |ptr: NonNull<u8>| -> Result<Bytes> {
             // SAFETY: written pointers refer to live values in the effects'
             // frozen heap, and `guard` is the guard that described them.

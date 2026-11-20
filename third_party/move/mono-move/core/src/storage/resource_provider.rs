@@ -295,6 +295,27 @@ impl GroupSize {
         Some(())
     }
 
+    /// Replaces a member whose tag encodes to `tag_len` bytes: counts out its
+    /// value as read, `old_len` bytes or [`None`] if it did not exist, and
+    /// counts in its value as written, `new_len` bytes or [`None`] if it was
+    /// deleted. Returns [`None`] if the sizes do not add up.
+    pub fn replace_member(
+        &mut self,
+        tag_len: usize,
+        old_len: Option<usize>,
+        new_len: Option<usize>,
+    ) -> Option<()> {
+        let mut size = *self;
+        if let Some(old_len) = old_len {
+            size.remove_member(tag_len, old_len)?;
+        }
+        if let Some(new_len) = new_len {
+            size.add_member(tag_len, new_len)?;
+        }
+        *self = size;
+        Some(())
+    }
+
     /// The length of the encoded group. Zero for a group with no members,
     /// which is not stored.
     pub fn bcs_size(&self) -> usize {
