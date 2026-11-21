@@ -316,6 +316,9 @@ spec aptos_framework::multisig_account {
     /// at every call site. Its preconditions and result are therefore captured here via the
     /// `can_execute` spec rather than via a standalone spec block.
     spec can_execute(owner: address, multisig_account: address, sequence_number: u64): bool {
+        // Opaque, so that callers use the vote-count summary instead of the counting loop.
+        pragma opaque;
+        // Partial: the vote-count and timelock aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         include ValidSequenceNumberAbortsIf;
@@ -331,6 +334,8 @@ spec aptos_framework::multisig_account {
     }
 
     spec can_be_executed(multisig_account: address, sequence_number: u64): bool {
+        // Opaque, so that callers use the vote-count summary instead of the counting loop.
+        pragma opaque;
         // Partial: the vote-count and timelock aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);

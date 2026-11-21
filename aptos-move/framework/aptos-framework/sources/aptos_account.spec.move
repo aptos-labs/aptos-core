@@ -243,9 +243,19 @@ spec aptos_framework::aptos_account {
         include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain };
     }
 
+    /// Creates the APT primary store of the signer if missing.
     spec register_apt(account_signer: &signer) {
-        // Partial: the abort conditions of creating the store are not specified.
-        pragma aborts_if_is_partial;
+        pragma aborts_if_is_partial = false;
+        let store_addr = spec_apt_store_address(signer::address_of(account_signer));
+        let m = @aptos_fungible_asset;
+        let missing = !exists<fungible_asset::FungibleStore>(store_addr);
+        aborts_if missing && (!exists<object::ObjectCore>(m) || !exists<fungible_asset::Metadata>(m));
+        aborts_if missing && !exists<primary_fungible_store::DeriveRefPod>(m);
+        aborts_if missing && exists<object::ObjectCore>(store_addr);
+        aborts_if missing && exists<object::Untransferable>(store_addr);
+        aborts_if missing && std::features::spec_is_enabled(std::features::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+            && exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
+        ensures exists<fungible_asset::FungibleStore>(store_addr);
     }
 
     spec fungible_transfer_only(source: &signer, to: address, amount: u64) {
