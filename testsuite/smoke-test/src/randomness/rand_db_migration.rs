@@ -1,9 +1,17 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Upgrade with RandDB retained, then retire each validator's old RandDB after a fresh epoch.
-//! Set RANDDB_UPGRADE_OLD_BIN and RANDDB_UPGRADE_NEW_BIN to use prebuilt binaries;
-//! otherwise Forge builds the pinned pre-PR revision and workspace.
+//! Manual migration validation; remove after the follow-up release's rollout.
+//!
+//! ```sh
+//! RANDDB_UPGRADE_OLD_BIN=/path/to/legacy/aptos-node \
+//! RANDDB_UPGRADE_NEW_BIN=/path/to/new/aptos-node \
+//! RUST_MIN_STACK=67108864 \
+//! cargo test -p smoke-test randomness::rand_db_migration --locked -- \
+//!     --ignored --test-threads=1 --nocapture
+//! ```
+//!
+//! Without both binary overrides, Forge builds the pinned revision and workspace from a full checkout.
 
 use crate::randomness::e2e_basic_consumption::publish_on_chain_dice_module;
 use aptos::{
@@ -220,6 +228,7 @@ impl MigrationSwarm {
 }
 
 #[tokio::test]
+#[ignore = "manual cross-version RandDB migration validation"]
 async fn one_upgrade_per_epoch_then_retire_rand_db() {
     let mut test = MigrationSwarm::new().await;
     let transaction = test.submit_dice_roll().await;
@@ -279,6 +288,7 @@ async fn one_upgrade_per_epoch_then_retire_rand_db() {
 }
 
 #[tokio::test]
+#[ignore = "manual cross-version RandDB migration validation"]
 async fn majority_upgrade_in_one_epoch_then_retire_rand_db() {
     let mut test = MigrationSwarm::new().await;
     let transaction = test.submit_dice_roll().await;
