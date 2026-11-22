@@ -581,12 +581,16 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
+                            let author = *certified_aug_data.author();
                             info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
                                 .author(self.author)
                                 .epoch(certified_aug_data.epoch())
-                                .remote_peer(*certified_aug_data.author()));
+                                .remote_peer(author));
                             match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
-                                Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
+                                Ok(ack) => {
+                                    self.cert_fetches.remove(&author);
+                                    self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack));
+                                },
                                 Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
                             }
                         }
