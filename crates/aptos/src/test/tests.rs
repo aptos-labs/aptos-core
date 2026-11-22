@@ -1,10 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use super::IsolatedConfigDir;
 use crate::{CliResult, Tool};
+use aptos_crypto::{PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_keygen::KeyGen;
 use aptos_move_cli::{ArgWithType, FunctionArgType};
 use clap::Parser;
-use std::str::FromStr;
+use std::{path::Path, str::FromStr};
 
 /// In order to ensure that there aren't duplicate input arguments for untested CLI commands,
 /// we call help on every command to ensure it at least runs
@@ -116,6 +119,53 @@ async fn ensure_can_parse_args_with_urls() {
     assert_eq!(
         result.arg(),
         bcs::to_bytes(&"https://aptoslabs.com".to_string()).unwrap()
+    );
+}
+
+/// `rotate-key --save-to-profile` must not require an existing config file.
+///
+/// With no `.aptos/config.yaml` anywhere, the command has to proceed past the
+/// profile check; it can only fail later, when it talks to the node. An
+/// unreachable node is used so the failure happens after the profile check.
+#[tokio::test]
+async fn rotate_key_save_to_profile_without_config() {
+    let _isolated = IsolatedConfigDir::new();
+    assert!(!Path::new(".aptos").exists());
+
+    let mut keygen = KeyGen::from_seed([0; 32]);
+    let current_key = keygen.generate_ed25519_private_key();
+    let new_key = keygen.generate_ed25519_private_key();
+    assert_ne!(
+        current_key.public_key(),
+        new_key.public_key(),
+        "test keys must differ so the rotation is not rejected as a no-op"
+    );
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let url = format!("http://127.0.0.1:{port}");
+
+    let result = run_cmd(&[
+        "aptos",
+        "account",
+        "rotate-key",
+        "--private-key",
+        &current_key.to_encoded_string().unwrap(),
+        "--new-private-key",
+        &new_key.to_encoded_string().unwrap(),
+        "--url",
+        &url,
+        "--save-to-profile",
+        "rotated",
+        "--assume-yes",
+    ])
+    .await;
+
+    let err = result.expect_err("rotate-key should fail without a reachable node");
+    assert!(
+        err.contains(&format!("127.0.0.1:{port}")) && err.to_lowercase().contains("connection"),
+        "rotate-key must fail talking to the unreachable node, got: {err}"
     );
 }
 

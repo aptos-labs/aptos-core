@@ -100,6 +100,74 @@ impl RotateKey {
             self.new_auth_key_options.new_private_key.clone(),
         )
     }
+
+    fn load_or_default_config() -> CliTypedResult<CliConfig> {
+        match CliConfig::load(ConfigSearchMode::CurrentDirAndParents) {
+            Ok(config) => Ok(config),
+            Err(CliError::ConfigNotFoundError(_)) => Ok(CliConfig::default()),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn ensure_new_profile_name_available(new_profile_name: &str) -> CliTypedResult<()> {
+        Self::ensure_profile_name_available(&Self::load_or_default_config()?, new_profile_name)
+    }
+
+    fn ensure_profile_name_available(
+        config: &CliConfig,
+        new_profile_name: &str,
+    ) -> CliTypedResult<()> {
+        if config
+            .profiles
+            .as_ref()
+            .is_some_and(|profiles| profiles.contains_key(new_profile_name))
+        {
+            return Err(CliError::CommandArgumentError(format!(
+                "Profile {} already exists",
+                new_profile_name
+            )));
+        }
+        Ok(())
+    }
+
+    fn base_profile_config(&self) -> CliTypedResult<ProfileConfig> {
+        match self.txn_options.profile_options.profile() {
+            Ok(profile) => Ok(profile),
+            Err(CliError::ConfigNotFoundError(_))
+                if self.txn_options.profile_options.profile.is_none() =>
+            {
+                Ok(ProfileConfig::default())
+            },
+            Err(err) => Err(err),
+        }
+    }
+
+    fn save_new_profile(
+        &self,
+        new_profile_name: &str,
+        new_public_key: Ed25519PublicKey,
+        current_address: AccountAddress,
+        new_private_key: Option<Ed25519PrivateKey>,
+        new_derivation_path: Option<String>,
+    ) -> CliTypedResult<()> {
+        let mut config = Self::load_or_default_config()?;
+        Self::ensure_profile_name_available(&config, new_profile_name)?;
+        let mut new_profile_config = ProfileConfig {
+            public_key: Some(new_public_key),
+            account: Some(current_address),
+            private_key: new_private_key,
+            derivation_path: new_derivation_path,
+            ..self.base_profile_config()?
+        };
+        if let Some(url) = self.txn_options.rest_options.url.clone() {
+            new_profile_config.rest_url = Some(url.into());
+        }
+        config
+            .profiles
+            .get_or_insert_with(BTreeMap::new)
+            .insert(new_profile_name.to_string(), new_profile_config);
+        config.save()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -124,18 +192,7 @@ impl CliCommand<RotateSummary> for RotateKey {
                 ));
             };
 
-            // Verify that config exists by attempting to load it.
-            let config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-
-            // Verify that the new profile name does not already exist in the config.
-            if let Some(profiles) = config.profiles {
-                if profiles.contains_key(new_profile_name) {
-                    return Err(CliError::CommandArgumentError(format!(
-                        "Profile {} already exists",
-                        new_profile_name
-                    )));
-                };
-            }
+            Self::ensure_new_profile_name_available(new_profile_name)?;
         };
 
         // Get current signer options.
@@ -290,34 +347,15 @@ impl CliCommand<RotateSummary> for RotateKey {
         // Can safe unwrap here since NewProfileOptions arg group requires either that
         // skip_saving_profile is set, or that a new profile name is specified. If a new profile is
         // specified, then it will have already been error checked above.
-        let new_profile_name = self.new_profile_options.save_to_profile.unwrap();
+        let new_profile_name = self.new_profile_options.save_to_profile.as_ref().unwrap();
 
-        // If no config exists, then the error should've been caught earlier during the profile
-        // name verification step.
-        let mut config = CliConfig::load(ConfigSearchMode::CurrentDirAndParents)?;
-        if config.profiles.is_none() {
-            config.profiles = Some(BTreeMap::new());
-        }
-
-        // Create new config.
-        let mut new_profile_config = ProfileConfig {
-            public_key: Some(new_public_key),
-            account: Some(current_address),
-            private_key: new_private_key,
-            derivation_path: new_derivation_path,
-            ..self.txn_options.profile_options.profile()?
-        };
-
-        if let Some(url) = self.txn_options.rest_options.url {
-            new_profile_config.rest_url = Some(url.into());
-        }
-
-        config
-            .profiles
-            .as_mut()
-            .unwrap()
-            .insert(new_profile_name.clone(), new_profile_config);
-        config.save()?;
+        self.save_new_profile(
+            new_profile_name,
+            new_public_key,
+            current_address,
+            new_private_key,
+            new_derivation_path,
+        )?;
 
         Ok(RotateSummary {
             transaction: txn_summary,
@@ -392,4 +430,242 @@ pub async fn lookup_address(
         .lookup_address(address_key, must_exist)
         .await?
         .into_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NewAuthKeyOptions, NewProfileOptions, RotateKey};
+    use crate::{
+        common::types::{
+            account_address_from_public_key, CliConfig, CliError, ConfigSearchMode, ProfileConfig,
+            TransactionOptions,
+        },
+        test::IsolatedConfigDir,
+    };
+    use aptos_crypto::{
+        ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+        PrivateKey,
+    };
+    use aptos_keygen::KeyGen;
+    use aptos_types::account_address::AccountAddress;
+    use std::{collections::BTreeMap, path::Path};
+
+    fn rotate_key() -> RotateKey {
+        RotateKey {
+            txn_options: TransactionOptions::default(),
+            new_auth_key_options: NewAuthKeyOptions {
+                new_private_key_file: None,
+                new_private_key: None,
+                new_derivation_path: None,
+                new_derivation_index: None,
+            },
+            new_profile_options: NewProfileOptions {
+                skip_saving_profile: false,
+                save_to_profile: None,
+            },
+        }
+    }
+
+    fn keypair(seed: u8) -> (Ed25519PrivateKey, Ed25519PublicKey, AccountAddress) {
+        let mut keygen = KeyGen::from_seed([seed; 32]);
+        let private_key = keygen.generate_ed25519_private_key();
+        let public_key = private_key.public_key();
+        let address = account_address_from_public_key(&public_key);
+        (private_key, public_key, address)
+    }
+
+    fn load_profiles() -> BTreeMap<String, ProfileConfig> {
+        CliConfig::load(ConfigSearchMode::CurrentDirAndParents)
+            .unwrap()
+            .profiles
+            .unwrap()
+    }
+
+    #[test]
+    fn ensure_new_profile_name_available_without_config() {
+        let _isolated = IsolatedConfigDir::new();
+        assert!(RotateKey::ensure_new_profile_name_available("rotated").is_ok());
+    }
+
+    #[test]
+    fn ensure_new_profile_name_available_rejects_existing() {
+        let _isolated = IsolatedConfigDir::new();
+        let (private_key, public_key, address) = keypair(0);
+        rotate_key()
+            .save_new_profile("rotated", public_key, address, Some(private_key), None)
+            .unwrap();
+        let err = RotateKey::ensure_new_profile_name_available("rotated").unwrap_err();
+        assert!(err.to_string().contains("Profile rotated already exists"));
+        assert!(RotateKey::ensure_new_profile_name_available("other").is_ok());
+    }
+
+    #[test]
+    fn ensure_new_profile_name_available_rejects_corrupt_config() {
+        let _isolated = IsolatedConfigDir::new();
+        std::fs::create_dir_all(".aptos").unwrap();
+        std::fs::write(".aptos/config.yaml", "[").unwrap();
+        let err = RotateKey::ensure_new_profile_name_available("rotated").unwrap_err();
+        assert!(matches!(err, CliError::UnexpectedError(_)));
+    }
+
+    fn write_malformed_global_config() {
+        std::fs::create_dir_all(".aptos").unwrap();
+        std::fs::write(".aptos/global_config.yaml", "[").unwrap();
+    }
+
+    #[test]
+    fn ensure_new_profile_name_available_rejects_malformed_global_config() {
+        let _isolated = IsolatedConfigDir::new();
+        write_malformed_global_config();
+        let err = RotateKey::ensure_new_profile_name_available("rotated").unwrap_err();
+        assert!(matches!(err, CliError::UnexpectedError(_)));
+    }
+
+    #[test]
+    fn save_new_profile_rejects_malformed_global_config() {
+        let _isolated = IsolatedConfigDir::new();
+        write_malformed_global_config();
+        let (private_key, public_key, address) = keypair(0);
+        let err = rotate_key()
+            .save_new_profile("rotated", public_key, address, Some(private_key), None)
+            .unwrap_err();
+        assert!(matches!(err, CliError::UnexpectedError(_)));
+    }
+
+    #[test]
+    fn base_profile_config_without_config_is_default() {
+        let _isolated = IsolatedConfigDir::new();
+        let profile = rotate_key().base_profile_config().unwrap();
+        assert!(profile.public_key.is_none());
+        assert!(profile.account.is_none());
+        assert!(profile.rest_url.is_none());
+    }
+
+    #[test]
+    fn base_profile_config_returns_default_profile() {
+        let _isolated = IsolatedConfigDir::new();
+        let (private_key, public_key, address) = keypair(0);
+        let mut txn_options = TransactionOptions::default();
+        txn_options.rest_options.url = Some("http://127.0.0.1:8080".parse().unwrap());
+        let key = RotateKey {
+            txn_options,
+            ..rotate_key()
+        };
+        key.save_new_profile("default", public_key, address, Some(private_key), None)
+            .unwrap();
+        let profile = key.base_profile_config().unwrap();
+        assert!(profile
+            .rest_url
+            .as_deref()
+            .unwrap()
+            .starts_with("http://127.0.0.1:8080"));
+        assert_eq!(profile.account, Some(address));
+    }
+
+    #[test]
+    fn base_profile_config_propagates_missing_explicit_profile() {
+        let _isolated = IsolatedConfigDir::new();
+        let mut txn_options = TransactionOptions::default();
+        txn_options.profile_options.profile = Some("missing".to_string());
+        let key = RotateKey {
+            txn_options,
+            ..rotate_key()
+        };
+        let err = key.base_profile_config().unwrap_err();
+        assert!(matches!(err, CliError::ConfigNotFoundError(_)));
+        assert!(err.to_string().contains("Unable to find config"));
+    }
+
+    #[test]
+    fn base_profile_config_propagates_missing_explicit_profile_with_config() {
+        let _isolated = IsolatedConfigDir::new();
+        let (private_key, public_key, address) = keypair(0);
+        rotate_key()
+            .save_new_profile("default", public_key, address, Some(private_key), None)
+            .unwrap();
+        let mut txn_options = TransactionOptions::default();
+        txn_options.profile_options.profile = Some("missing".to_string());
+        let key = RotateKey {
+            txn_options,
+            ..rotate_key()
+        };
+        let err = key.base_profile_config().unwrap_err();
+        assert!(matches!(err, CliError::CommandArgumentError(_)));
+        assert!(err.to_string().contains("Profile missing not found"));
+    }
+
+    #[test]
+    fn save_new_profile_creates_config_without_config_dir() {
+        let _isolated = IsolatedConfigDir::new();
+        assert!(!Path::new(".aptos").exists());
+        let (private_key, public_key, address) = keypair(0);
+        rotate_key()
+            .save_new_profile(
+                "rotated",
+                public_key.clone(),
+                address,
+                Some(private_key),
+                None,
+            )
+            .unwrap();
+        assert!(Path::new(".aptos/config.yaml").exists());
+        let saved = load_profiles().remove("rotated").unwrap();
+        assert_eq!(saved.account, Some(address));
+        assert_eq!(saved.public_key, Some(public_key));
+    }
+
+    #[test]
+    fn save_new_profile_rejects_name_created_after_precheck() {
+        let _isolated = IsolatedConfigDir::new();
+        let (first_key, first_public, first_address) = keypair(0);
+        rotate_key()
+            .save_new_profile(
+                "rotated",
+                first_public,
+                first_address,
+                Some(first_key),
+                None,
+            )
+            .unwrap();
+        let (second_key, second_public, second_address) = keypair(1);
+        let err = rotate_key()
+            .save_new_profile(
+                "rotated",
+                second_public,
+                second_address,
+                Some(second_key),
+                None,
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("Profile rotated already exists"));
+        assert_eq!(
+            load_profiles().get("rotated").unwrap().account,
+            Some(first_address)
+        );
+    }
+
+    #[test]
+    fn save_new_profile_preserves_existing_profiles() {
+        let _isolated = IsolatedConfigDir::new();
+        let (first_key, first_public, first_address) = keypair(0);
+        rotate_key()
+            .save_new_profile("first", first_public, first_address, Some(first_key), None)
+            .unwrap();
+        let (second_key, second_public, second_address) = keypair(1);
+        rotate_key()
+            .save_new_profile(
+                "second",
+                second_public,
+                second_address,
+                Some(second_key),
+                None,
+            )
+            .unwrap();
+        let profiles = load_profiles();
+        assert_eq!(profiles.get("first").unwrap().account, Some(first_address));
+        assert_eq!(
+            profiles.get("second").unwrap().account,
+            Some(second_address)
+        );
+    }
 }
