@@ -45,6 +45,8 @@ mod tests {
 
     #[test]
     fn augmentation_derivation_golden() {
+        // Pin RandDB-less same-epoch restart recovery; do not refresh constants for dependency updates.
+        // While this derivation is required, changing it needs an epoch-gated migration.
         const EXPECTED_SEED: &str =
             "2042a98ca46a2ad9dc35e99e377f2d944e0a072236b32efbb64973b187e9d2ee";
         const EXPECTED_ASK_BCS_SHA3_256: &str =
