@@ -7,12 +7,12 @@ authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
-python = ">=3.8.1,<=4"
-aptos-sdk = "^0.10.0"
-requests = "^2.31.0"
+python = ">=3.12,<4"
+aptos-sdk = "^0.12.3"
+requests = "^2.33.0"
 
 [tool.poetry.dev-dependencies]
-black = "^22.6.0"
+black = "^26.10.1"
 isort = "^5.10.1"
 
 [build-system]
