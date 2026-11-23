@@ -16,8 +16,13 @@
     "find-git-root": "^1.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.19.17",
+    "@types/node": "^22.20.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
