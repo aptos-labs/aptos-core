@@ -19,7 +19,7 @@ use crate::{
         },
     },
     constant_folder::ConstantFolder,
-    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    exp_rewriter::{BinderRenamer, ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
@@ -5216,6 +5216,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         // Done with expression build; ensure all types are inferred correctly.
         et.finalize_types(true);
+        // A function parameter in an argument is a temporary, which has no name in the
+        // expression. Its name still matters for capture: a backend may print it by name.
+        let temp_names: BTreeMap<TempIndex, Symbol> = et
+            .extract_var_map()
+            .into_iter()
+            .filter_map(|(name, entry)| entry.temp_index.map(|idx| (idx, name)))
+            .collect();
 
         // Go over all conditions in the schema, rewrite them, and add to the inclusion conditions.
         for Condition {
@@ -5237,10 +5244,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     None
                 }
             };
+            let mut exps = vec![exp.to_owned()];
+            exps.extend(additional_exps.iter().cloned());
+            let mut exps =
+                rename_capturing_binders(self.parent.env, &argument_map, &temp_names, exps);
             let mut rewriter =
                 ExpRewriter::new(self.parent.env, &mut replacer).set_type_args(type_arguments);
-            let mut exp = rewriter.rewrite_exp(exp.to_owned());
-            let mut additional_exps = rewriter.rewrite_vec(additional_exps);
+            let mut additional_exps = rewriter.rewrite_vec(&exps.split_off(1));
+            let mut exp = rewriter.rewrite_exp(exps.pop().expect("condition expression"));
             if let Some(cond) = &path_cond {
                 // There is a path condition to be added.
                 if kind == &ConditionKind::Emits {
@@ -5336,13 +5347,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         None
                     }
                 };
+                let targets = rename_capturing_binders(
+                    self.parent.env,
+                    &argument_map,
+                    &temp_names,
+                    frame.modifies_targets.clone(),
+                );
                 let mut rewriter =
                     ExpRewriter::new(self.parent.env, &mut replacer).set_type_args(type_arguments);
-                let rewritten_targets: Vec<Exp> = frame
-                    .modifies_targets
-                    .iter()
-                    .map(|t| rewriter.rewrite_exp(t.clone()))
-                    .collect();
+                let rewritten_targets: Vec<Exp> = rewriter.rewrite_vec(&targets);
                 let target_frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
                 target_frame.modifies_targets.extend(rewritten_targets);
                 target_frame
@@ -5919,6 +5932,42 @@ impl ModuleBuilder<'_, '_> {
             std::mem::take(&mut self.spec_block_infos),
         );
     }
+}
+
+/// Prepares expressions of a schema for the substitution of the schema's variables by the
+/// arguments of an include, which happens wherever a variable occurs, also under binders.
+/// A binder which has the name of a free variable or of a parameter of an argument, and has
+/// that argument's schema variable in its scope, would capture it; such binders are renamed.
+/// `temp_names` gives the names of parameters, which are temporaries in an expression.
+fn rename_capturing_binders(
+    env: &crate::model::GlobalEnv,
+    argument_map: &BTreeMap<Symbol, Exp>,
+    temp_names: &BTreeMap<TempIndex, Symbol>,
+    exps: Vec<Exp>,
+) -> Vec<Exp> {
+    let capturing: BTreeMap<Symbol, BTreeSet<Symbol>> = argument_map
+        .iter()
+        .map(|(schema_var, arg)| {
+            let params = arg
+                .used_temporaries()
+                .into_iter()
+                .filter_map(|idx| temp_names.get(&idx).copied());
+            (
+                *schema_var,
+                arg.free_vars().into_iter().chain(params).collect(),
+            )
+        })
+        .collect();
+    if capturing.values().all(|names| names.is_empty()) {
+        return exps;
+    }
+    // Fresh names differ from every name of the expressions, of the arguments, and of the
+    // parameters.
+    let mut avoid: BTreeSet<Symbol> = temp_names.values().copied().collect();
+    for e in exps.iter().chain(argument_map.values()) {
+        avoid.append(&mut BinderRenamer::all_var_names(e));
+    }
+    BinderRenamer::new(env, &capturing, avoid).rewrite_vec(&exps)
 }
 
 /// Whether `exp` contains a bitvector-producing operation anywhere in its

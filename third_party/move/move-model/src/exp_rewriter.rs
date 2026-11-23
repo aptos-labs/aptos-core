@@ -129,6 +129,238 @@ impl ExpRewriterFunctions for ExpRewriter<'_, '_> {
 }
 
 // ======================================================================================
+// Renaming of binders
+
+/// Makes a later substitution of free variables capture-avoiding.
+///
+/// `capturing` maps each variable `x` which will be substituted to the names occurring in
+/// its replacement. A binder of a quantifier, lambda, block or match arm is renamed, together
+/// with the uses it scopes, exactly if it would capture: `x` occurs free in the binder's
+/// scope and the binder's name is among the names of the replacement of `x`. Every other
+/// binder keeps its name, so an expression in which nothing would be captured is returned
+/// unchanged. `ExpRewriter` does not avoid capture; run this renamer first.
+pub struct BinderRenamer<'env, 'names> {
+    env: &'env GlobalEnv,
+    capturing: &'names BTreeMap<Symbol, BTreeSet<Symbol>>,
+    /// Names a fresh name must differ from.
+    avoid: BTreeSet<Symbol>,
+    /// The pattern variables to rename, decided when their binding expression is entered.
+    to_rename: BTreeSet<NodeId>,
+    /// Fresh name to original name, for binders renamed in a pattern whose scope has not
+    /// been entered yet. A pattern is rewritten before its scope is entered.
+    pending: BTreeMap<Symbol, Symbol>,
+    /// One map per entered scope, from the original name of each of its binders to the
+    /// fresh name, if it was renamed.
+    scopes: Vec<BTreeMap<Symbol, Option<Symbol>>>,
+    counter: usize,
+}
+
+impl<'env, 'names> BinderRenamer<'env, 'names> {
+    /// `avoid` should contain every variable name of the expressions to rewrite and of the
+    /// replacements; see `all_var_names`.
+    pub fn new(
+        env: &'env GlobalEnv,
+        capturing: &'names BTreeMap<Symbol, BTreeSet<Symbol>>,
+        avoid: BTreeSet<Symbol>,
+    ) -> Self {
+        BinderRenamer {
+            env,
+            capturing,
+            avoid,
+            to_rename: BTreeSet::new(),
+            pending: BTreeMap::new(),
+            scopes: Vec::new(),
+            counter: 0,
+        }
+    }
+
+    /// The names of all variables used or bound in `exp`.
+    pub fn all_var_names(exp: &ExpData) -> BTreeSet<Symbol> {
+        let mut names = BTreeSet::new();
+        exp.visit_pre_order(&mut |e| {
+            let mut add_pattern = |pat: &Pattern| names.extend(pat.vars().into_iter().map(|v| v.1));
+            match e {
+                ExpData::LocalVar(_, sym) => {
+                    names.insert(*sym);
+                },
+                ExpData::Quant(_, _, ranges, ..) => ranges.iter().for_each(|r| add_pattern(&r.0)),
+                ExpData::Lambda(_, pat, ..) | ExpData::Block(_, pat, ..) => add_pattern(pat),
+                ExpData::Match(_, _, arms) => arms.iter().for_each(|a| add_pattern(&a.pattern)),
+                _ => {},
+            }
+            true
+        });
+        names
+    }
+
+    /// A legal identifier which is not in use.
+    fn fresh_name(&mut self, sym: Symbol) -> Symbol {
+        let pool = self.env.symbol_pool();
+        loop {
+            self.counter += 1;
+            let fresh = pool.make(&format!("{}_{}", sym.display(pool), self.counter));
+            if self.avoid.insert(fresh) {
+                return fresh;
+            }
+        }
+    }
+
+    /// The innermost entered binder of `sym`, with its fresh name if it was renamed.
+    fn binder_of(&self, sym: Symbol) -> Option<Option<Symbol>> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|scope| scope.get(&sym).copied())
+    }
+
+    /// The names which a binder scoping `part` must not have: those of the replacements of
+    /// the substituted variables free in `part`. A variable of that name bound by an
+    /// entered binder, or by one in `also_bound`, is not a substituted variable.
+    fn names_to_keep_free(&self, part: &Exp, also_bound: &BTreeSet<Symbol>) -> BTreeSet<Symbol> {
+        part.free_vars()
+            .into_iter()
+            .filter(|x| !also_bound.contains(x) && self.binder_of(*x).is_none())
+            .filter_map(|x| self.capturing.get(&x))
+            .flatten()
+            .copied()
+            .collect()
+    }
+
+    /// Marks the variables of `pat` that would capture in one of `parts`.
+    fn mark(&mut self, pat: &Pattern, parts: &[(&Exp, &BTreeSet<Symbol>)]) {
+        let keep_free: BTreeSet<Symbol> = parts
+            .iter()
+            .flat_map(|(part, also_bound)| self.names_to_keep_free(part, also_bound))
+            .collect();
+        for (id, sym) in pat.vars() {
+            if keep_free.contains(&sym) {
+                self.to_rename.insert(id);
+            }
+        }
+    }
+
+    /// Decides for each binder of the expression node `exp` whether it is renamed.
+    fn mark_binders(&mut self, exp: &ExpData) {
+        let bound_by =
+            |pat: &Pattern| -> BTreeSet<Symbol> { pat.vars().into_iter().map(|v| v.1).collect() };
+        match exp {
+            ExpData::Quant(_, _, ranges, triggers, cond, body) => {
+                // A range sees the binders of the ranges before it; triggers, condition and
+                // body see all of them. A state-domain binder names a state, not a local,
+                // scopes no local variable, and is left alone.
+                let is_state = |range: &Exp| {
+                    matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _))
+                };
+                let mut bound_before = vec![BTreeSet::new()];
+                for (pat, range) in ranges {
+                    let mut bound = bound_before.last().unwrap().clone();
+                    if !is_state(range) {
+                        bound.extend(bound_by(pat));
+                    }
+                    bound_before.push(bound);
+                }
+                let all_bound = bound_before.last().unwrap().clone();
+                for (i, (pat, range)) in ranges.iter().enumerate() {
+                    if is_state(range) {
+                        continue;
+                    }
+                    let mut parts: Vec<(&Exp, &BTreeSet<Symbol>)> = vec![];
+                    for (j, (_, later_range)) in ranges.iter().enumerate().skip(i + 1) {
+                        parts.push((later_range, &bound_before[j]));
+                    }
+                    for trigger in triggers.iter().flatten() {
+                        parts.push((trigger, &all_bound));
+                    }
+                    if let Some(cond) = cond {
+                        parts.push((cond, &all_bound));
+                    }
+                    parts.push((body, &all_bound));
+                    self.mark(pat, &parts);
+                }
+            },
+            ExpData::Lambda(_, pat, body, _, spec_opt) => {
+                let bound = bound_by(pat);
+                let mut parts = vec![(body, &bound)];
+                if let Some(spec) = spec_opt {
+                    parts.push((spec, &bound));
+                }
+                self.mark(pat, &parts);
+            },
+            ExpData::Block(_, pat, _, body) => {
+                let bound = bound_by(pat);
+                self.mark(pat, &[(body, &bound)]);
+            },
+            ExpData::Match(_, _, arms) => {
+                for arm in arms {
+                    let bound = bound_by(&arm.pattern);
+                    let mut parts = vec![(&arm.body, &bound)];
+                    if let Some(cond) = &arm.condition {
+                        parts.push((cond, &bound));
+                    }
+                    self.mark(&arm.pattern, &parts);
+                }
+            },
+            _ => {},
+        }
+    }
+}
+
+impl ExpRewriterFunctions for BinderRenamer<'_, '_> {
+    fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // The decision needs the scope of a binder, which is not at hand when its pattern
+        // is rewritten; it is taken here, before the descent into the binding expression.
+        self.mark_binders(exp.as_ref());
+        self.rewrite_exp_descent(exp)
+    }
+
+    fn rewrite_enter_scope<'a>(
+        &mut self,
+        _id: NodeId,
+        vars: impl Iterator<Item = &'a (NodeId, Symbol)>,
+    ) {
+        // A binder which keeps its name is recorded too: it shadows an outer binder of the
+        // same name, renamed or not.
+        let scope = vars
+            .map(|(_, name)| match self.pending.remove(name) {
+                Some(orig) => (orig, Some(*name)),
+                None => (*name, None),
+            })
+            .collect();
+        self.scopes.push(scope)
+    }
+
+    fn rewrite_exit_scope(&mut self, _id: NodeId) {
+        self.scopes.pop();
+    }
+
+    fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
+        self.binder_of(sym)
+            .flatten()
+            .map(|fresh| ExpData::LocalVar(id, fresh).into_exp())
+    }
+
+    fn rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> Option<Pattern> {
+        let Pattern::Var(id, sym) = pat else {
+            return None;
+        };
+        if creating_scope {
+            if self.to_rename.contains(id) {
+                let fresh = self.fresh_name(*sym);
+                self.pending.insert(fresh, *sym);
+                Some(Pattern::Var(*id, fresh))
+            } else {
+                None
+            }
+        } else {
+            // The target of an assignment is a use of the variable.
+            self.binder_of(*sym)
+                .flatten()
+                .map(|fresh| Pattern::Var(*id, fresh))
+        }
+    }
+}
+
+// ======================================================================================
 // Expression rewriting trait
 
 /// A general trait for expression rewriting.

@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture_shadow.move:12:9
+   │
+12 │         ensures forall oid: u64: (forall oid: u64: oid >= 0) && oid >= target;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture_shadow.move:21: shadow_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture_shadow.move:19: shadow_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture_shadow.move:12

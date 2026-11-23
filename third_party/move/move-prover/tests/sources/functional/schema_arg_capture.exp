@@ -1,0 +1,154 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:62: compound_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:60: compound_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:25: let_other_name_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:24: let_other_name_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:22: let_same_name_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:20: let_same_name_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:27: param_same_name_incorrect
+   =     at tests/sources/functional/schema_arg_capture.move:28: param_same_name_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:27: param_same_name_incorrect
+   =         oid = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:121: post_let_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:122: post_let_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:10:36
+   │
+10 │     spec schema Ens { target: u64; ensures forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:104: through_two_schemas_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:103: through_two_schemas_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:10
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:13:9
+   │
+13 │         ensures forall oid: u64 where oid > target: oid > 7;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:43: let_same_name_premise_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:40: let_same_name_premise_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:13
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/schema_arg_capture.move:15:36
+   │
+15 │     spec schema Abt { target: u64; aborts_if exists oid: u64: oid != target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:50: aborts_other_name_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:49: aborts_other_name_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:15
+
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/schema_arg_capture.move:15:36
+   │
+15 │     spec schema Abt { target: u64; aborts_if exists oid: u64: oid != target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:47: aborts_same_name_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:45: aborts_same_name_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:15
+
+error: precondition does not hold at this call
+   ┌─ tests/sources/functional/schema_arg_capture.move:16:36
+   │
+16 │     spec schema Req { target: u64; requires forall oid: u64: oid >= target; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:54: callee (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:16
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:68:9
+   │
+68 │         ensures forall oid: u64: (exists oid: u64: oid == target) && oid >= target;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:74: nested_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:71: nested_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:68
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:78:9
+   │
+78 │         ensures forall oid: u64, other: u64: oid + other >= target;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:82: two_ranges_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:81: two_ranges_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:78
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_arg_capture.move:88:9
+   │
+88 │         ensures { let oid = 1; oid + target } == 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_arg_capture.move:93: inner_let_incorrect (spec)
+   =     at tests/sources/functional/schema_arg_capture.move:91: inner_let_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_arg_capture.move:88
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/schema_arg_capture.move:111:9
+    │
+111 │         ensures forall oid: u64: oid >= target;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/schema_arg_capture.move:117: unrelated_arg_incorrect (spec)
+    =     at tests/sources/functional/schema_arg_capture.move:114: unrelated_arg_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/schema_arg_capture.move:111

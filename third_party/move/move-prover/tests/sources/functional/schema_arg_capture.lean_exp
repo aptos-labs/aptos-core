@@ -1,0 +1,129 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 >= oid` is not established
+tests/sources/functional/schema_arg_capture.move:22:5: error: verex verification failed: the automatic verification of `let_same_name_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify let_same_name_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid : u64), oid >= t` is not established
+tests/sources/functional/schema_arg_capture.move:25:5: error: verex verification failed: the automatic verification of `let_other_name_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify let_other_name_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 >= oid` is not established
+tests/sources/functional/schema_arg_capture.move:28:5: error: verex verification failed: the automatic verification of `param_same_name_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify param_same_name_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:13:9: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 > oid ==> oid_1 > 7` is not established
+tests/sources/functional/schema_arg_capture.move:43:5: error: verex verification failed: the automatic verification of `let_same_name_premise_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify let_same_name_premise_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:47:5: error: verification failed with a residual obligation:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+⊢ ¬∃ oid_1, 0 ≤ oid_1 ∧ oid_1 ≤ 18446744073709551615 ∧ ¬oid_1 = 7
+tests/sources/functional/schema_arg_capture.move:47:5: error: verex verification failed: the automatic verification of `aborts_same_name_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify aborts_same_name_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:50:5: error: verification failed with a residual obligation:
+registry✝ : VerexIR.Validation.SemanticsRegistry
+executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
+args✝ : VerexIR.Proofs.Denote.HList params
+initialState✝ : VerexIR.Proofs.Denote.Memory unit
+assumed permitted : True
+⊢ ¬∃ oid, 0 ≤ oid ∧ oid ≤ 18446744073709551615 ∧ ¬oid = 7
+tests/sources/functional/schema_arg_capture.move:50:5: error: verex verification failed: the automatic verification of `aborts_other_name_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify aborts_other_name_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | leaf => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 >= oid + 4` is not established
+tests/sources/functional/schema_arg_capture.move:62:5: error: verex verification failed: the automatic verification of `compound_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify compound_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:68:9: error: the specification clause `ensures ∀ (oid_1 : u64), ∃ (oid_2 : u64), oid_2 == oid && oid_1 >= oid` is not established
+tests/sources/functional/schema_arg_capture.move:74:5: error: verex verification failed: the automatic verification of `nested_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify nested_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:78:9: error: the specification clause `ensures ∀ (oid : u64; other_1 : u64), oid + other_1 >= other` is not established
+tests/sources/functional/schema_arg_capture.move:82:5: error: verex verification failed: the automatic verification of `two_ranges_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify two_ranges_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:88:9: error: the specification clause `ensures (do
+        let oid_1 := 1
+        oid_1 + oid) == 2` is not established
+tests/sources/functional/schema_arg_capture.move:93:5: error: verex verification failed: the automatic verification of `inner_let_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify inner_let_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 >= oid` is not established
+tests/sources/functional/schema_arg_capture.move:104:5: error: verex verification failed: the automatic verification of `through_two_schemas_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify through_two_schemas_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:111:9: error: the specification clause `ensures ∀ (oid : u64), oid >= 7` is not established
+tests/sources/functional/schema_arg_capture.move:117:5: error: verex verification failed: the automatic verification of `unrelated_arg_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify unrelated_arg_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:10:36: error: the specification clause `ensures ∀ (oid_1 : u64), oid_1 >= oid` is not established
+tests/sources/functional/schema_arg_capture.move:122:5: error: verex verification failed: the automatic verification of `post_let_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify post_let_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_arg_capture.move:16:36: error: the precondition `requires ∀ (oid_1 : u64), oid_1 >= oid` of `callee` does not hold at call 1
+tests/sources/functional/schema_arg_capture.move:56:5: error: verex verification failed: the automatic verification of `caller_incorrect` failed; provide a proof in `tests/sources/functional/schema_arg_capture.proof.lean`:
+  verify caller_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | requires_1_of_callee_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
