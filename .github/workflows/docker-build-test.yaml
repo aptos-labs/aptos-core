@@ -19,6 +19,12 @@
 ## the workflow (directly through a push or indirectly by applying a label or enabling
 ## auto_merge).
 
+## Even with that check, these jobs build and run the PR head commit with secrets and
+## an OIDC token, so a maintainer labeling an unreviewed fork PR would hand that code
+## our credentials. `permission-check` therefore fails for PRs whose head lives in a
+## fork. To run these jobs for a fork PR, a maintainer must review it and push its
+## head commit to a branch in this repository (e.g. by opening a PR from that branch).
+
 name: "Build+Test Docker Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
   # Allow us to run this specific workflow without a PR
@@ -68,11 +74,10 @@ env:
   # On push, build and push to all remote registries
   TARGET_REGISTRY: ${{ github.event_name == 'pull_request_target' && 'remote' || 'remote-all' }}
 
+# Jobs that need GCP Workload Identity federation (id-token) or PR comments
+# (pull-requests) request them individually.
 permissions:
   contents: read
-  id-token: write #required for GCP Workload Identity federation which we use to login into Google Artifact Registry
-  issues: write
-  pull-requests: write
 
 # Note on the job-level `if` conditions:
 # This workflow is designed such that:
@@ -91,6 +96,11 @@ jobs:
       contains(github.event.pull_request.body, '#e2e')
     runs-on: 2cpu-gh-ubuntu24-x64
     steps:
+      - name: Reject pull requests from forks
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::This workflow does not run fork PR code with repository secrets. A maintainer must review the PR and push its head commit to a branch in ${GITHUB_REPOSITORY} to run these jobs."
+          exit 1
       - name: Check repository permission for user which triggered workflow
         uses: sushichop/action-repository-permission@13d208f5ae7a6a3fc0e5a7c2502c214983f0241c
         with:
@@ -128,6 +138,9 @@ jobs:
   # This is a PR required job. A PR skips the build only when the E2E selection
   # needs no images and no label requests an image build or an image consumer.
   rust-images:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, determine-docker-build-metadata, e2e-test-determinator]
     if: |
       !cancelled() &&
@@ -144,6 +157,9 @@ jobs:
       SKIP_JOB: ${{ github.event_name == 'pull_request_target' && needs.e2e-test-determinator.outputs.docker_images == 'false' && !contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') && !contains(github.event.pull_request.labels.*.name, 'CICD:non-required-tests') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-consensus-only-perf-test') && !contains(github.event.pull_request.labels.*.name, 'CICD:run-multiregion-test') }}
 
   rust-images-failpoints:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
@@ -160,6 +176,9 @@ jobs:
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-performance:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     if: |
@@ -175,6 +194,9 @@ jobs:
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
   rust-images-consensus-only-perf-test:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, determine-docker-build-metadata]
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:build-consensus-only-image') ||
@@ -210,6 +232,9 @@ jobs:
 
   # This is a PR required job.
   node-api-compatibility-tests:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
       !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
@@ -229,6 +254,9 @@ jobs:
 
   # This is a PR required job.
   cli-e2e-tests:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator, e2e-test-determinator] # runs with the default release docker build variant "rust-images"
     if: |
       !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
@@ -247,6 +275,9 @@ jobs:
       SKIP_JOB: ${{ (needs.file_change_determinator.outputs.only_docs_changed == 'true' && !contains(github.event.pull_request.labels.*.name, 'CICD:run-all-e2e-tests')) || !contains(fromJSON(needs.e2e-test-determinator.outputs.selected_e2e_tests || '[]'), 'cli-e2e') }}
 
   faucet-tests-main:
+    permissions:
+      contents: read
+      id-token: write
     needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
     if: |
       !cancelled() && needs.permission-check.result == 'success' && needs.determine-docker-build-metadata.result == 'success' && needs.file_change_determinator.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.rust-images.result) && (
@@ -265,6 +296,10 @@ jobs:
 
   # This is a PR required job.
   forge-e2e-test:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     needs:
       - e2e-test-determinator
       - permission-check
@@ -309,6 +344,9 @@ jobs:
 
   # This job determines the last released docker image tag, which is used by forge compat test.
   fetch-last-released-docker-image-tag:
+    permissions:
+      contents: read
+      id-token: write
     needs:
       - permission-check
       - e2e-test-determinator
@@ -365,6 +403,10 @@ jobs:
 
   # Run e2e compat test against testnet branch. This is a PR required job.
   forge-compat-test:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     needs:
       - e2e-test-determinator
       - permission-check
@@ -413,6 +455,10 @@ jobs:
   # PR labels, so SKIP_JOB would always be true and the job would only ever skip. Manual and
   # scheduled runs live in .github/workflows/forge-framework-upgrade.yaml instead.
   forge-framework-upgrade-test:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     needs:
       - permission-check
       - fetch-last-released-docker-image-tag
@@ -450,6 +496,10 @@ jobs:
       SEND_RESULTS_TO_TRUNK: true
 
   forge-consensus-only-perf-test:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     needs:
       - permission-check
       - determine-docker-build-metadata
@@ -478,6 +528,10 @@ jobs:
 
   # Run forge multiregion test. This test uses the multiregion forge cluster that deploys pods in three GCP regions.
   forge-multiregion-test:
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
     needs:
       - permission-check
       - determine-docker-build-metadata
