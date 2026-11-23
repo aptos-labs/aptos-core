@@ -1,0 +1,24 @@
+=== stackless ===
+// module 0x1::abort_msg_golden
+
+fun abort_with(r0) {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: vector<u8>
+  code:
+  L0:
+    0: r1 := ld_const #0 @1
+    1: abort_msg r0, r1 @2
+}
+=== micro-ops ===
+// module 0x1::abort_msg_golden
+
+fun abort_with() {
+  frame_data_size: 16
+  entry_gas: 7
+  code:
+    0: StoreImmVec [8] <- const[0] @1
+    1: AbortMsg code=[0] msg=[8] @2
+  safe_point_layouts:
+    0: []
+}

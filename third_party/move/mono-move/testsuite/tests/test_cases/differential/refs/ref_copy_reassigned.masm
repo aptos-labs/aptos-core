@@ -1,0 +1,73 @@
+// Copying a reference into a second local, then reassigning the first local while the
+// copy is still in use. Reads and writes through the copy must reach the original
+// referent; the golden pins that the copy lowers without copying the referenced value.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::ref_copy_reassigned
+
+fun two_reads(first: u64, second: u64): u64
+    local current: &u64
+    local saved: &u64
+    borrow_loc first
+    st_loc current
+    copy_loc current
+    st_loc saved
+    borrow_loc second
+    st_loc current
+    move_loc saved
+    read_ref
+    ld_u64 100
+    mul
+    move_loc current
+    read_ref
+    add
+    ret
+
+// Writes 9 at index 0 through the copied `&mut`, then reads the original
+// vector: a deep copy of the referenced vector would leave it unchanged.
+fun write_through_copy(): u64
+    local first: vector<u64>
+    local second: vector<u64>
+    local current: &mut vector<u64>
+    local saved: &mut vector<u64>
+    ld_u64 1
+    ld_u64 2
+    vec_pack <u64>, 2
+    st_loc first
+    ld_u64 5
+    vec_pack <u64>, 1
+    st_loc second
+    mut_borrow_loc first
+    st_loc current
+    copy_loc current
+    st_loc saved
+    mut_borrow_loc second
+    st_loc current
+    ld_u64 9
+    move_loc saved
+    ld_u64 0
+    vec_mut_borrow <u64>
+    write_ref
+    ld_u64 6
+    move_loc current
+    ld_u64 0
+    vec_mut_borrow <u64>
+    write_ref
+    borrow_loc first
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ld_u64 10
+    mul
+    borrow_loc second
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    add
+    ret
+
+// RUN: execute 0x66::ref_copy_reassigned::two_reads --args 3, 40
+// CHECK: results: 340
+
+// RUN: execute 0x66::ref_copy_reassigned::write_through_copy
+// CHECK: results: 96

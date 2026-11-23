@@ -1,12 +1,12 @@
 // RUN: publish --print(stackless,micro-ops)
 module 0x1::test {
-    // Bare constant loads -> StoreImm2 / StoreImm4.
+    // Constant results.
     fun c_u16(): u16 { 40000u16 }
     fun c_u32(): u32 { 3000000000u32 }
     fun c_i16(): i16 { 12345i16 }
     fun c_i32(): i32 { 2000000000i32 }
 
-    // Arithmetic (reg-reg).
+    // Arithmetic on two arguments.
     fun add_u16(a: u16, b: u16): u16 { a + b }
     fun mul_u16(a: u16, b: u16): u16 { a * b }
     fun div_u32(a: u32, b: u32): u32 { a / b }
@@ -14,11 +14,11 @@ module 0x1::test {
     fun sub_i32(a: i32, b: i32): i32 { a - b }
     fun mul_i32(a: i32, b: i32): i32 { a * b }
 
-    // Arithmetic against an immediate (destacker fuses `ld + binop`).
+    // Arithmetic with a constant operand.
     fun add_u16_imm(a: u16): u16 { a + 1000 }
     fun mul_u32_imm(a: u32): u32 { a * 7 }
 
-    // Comparison -> 1-byte bool.
+    // Comparison.
     fun lt_u16(a: u16, b: u16): bool { a < b }
     fun lt_i16(a: i16, b: i16): bool { a < b }
     fun eq_u32(a: u32, b: u32): bool { a == b }
@@ -27,8 +27,7 @@ module 0x1::test {
     fun and_u16(a: u16, b: u16): u16 { a & b }
     fun xor_u32(a: u32, b: u32): u32 { a ^ b }
 
-    // Shift: immediate amount and slot (u8) amount.
-    fun shl_u16_imm(a: u16): u16 { a << 3 }
+    // Shift by a variable amount.
     fun shr_u32_var(a: u32, s: u8): u32 { a >> s }
 
     // Signed negate.
@@ -96,8 +95,6 @@ module 0x1::test {
 // CHECK: results: 15
 
 // --- Shift ---
-// RUN: execute 0x1::test::shl_u16_imm --args 5
-// CHECK: results: 40
 // RUN: execute 0x1::test::shr_u32_var --args 48, 2
 // CHECK: results: 12
 

@@ -1,6 +1,37 @@
 === stackless ===
 // module 0x99::chained_variant_field_fusion
 
+fun bump_via_mut_ref(r0, r1): u8 {
+  slots: params(2), locals(2), temps(1), transfer(2)
+    r0: u64
+    r1: u8
+    r2: 0x99::chained_variant_field_fusion::E
+    r3: &mut u8
+    r4: u8
+  code:
+  L0:
+    0: [r2] := call_exempt mk_e, [r0, r1] @2
+    1: x0 := mut_borrow_loc r2 @4
+    2: [r3] := call_exempt mut_ref, [x0] @5
+    3: r4 := read_ref r3 @8
+    4: r4 := add r4, #1u8 @10
+    5: write_ref r3, r4 @12
+    6: r4 := read_ref r3 @14
+    7: ret [r4] @15
+}
+
+fun imm_ref(r0): &u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: &0x99::chained_variant_field_fusion::E
+    r1: &0x99::chained_variant_field_fusion::Inner
+    r2: &u8
+  code:
+  L0:
+    0: r1 := imm_borrow_variant_field E::P0::p, r0 @1
+    1: r2 := imm_borrow_field Inner::b, r1 @2
+    2: ret [r2] @3
+}
+
 fun mk_e(r0, r1): E {
   slots: params(2), locals(0), temps(5)
     r0: u64
@@ -49,6 +80,18 @@ fun mk_u(r0, r1): U {
     8: ret [r4] @13
 }
 
+fun mut_ref(r0): &mut u8 {
+  slots: params(1), locals(0), temps(2)
+    r0: &mut 0x99::chained_variant_field_fusion::E
+    r1: &mut 0x99::chained_variant_field_fusion::Inner
+    r2: &mut u8
+  code:
+  L0:
+    0: r1 := mut_borrow_variant_field E::P0::p, r0 @1
+    1: r2 := mut_borrow_field Inner::b, r1 @2
+    2: ret [r2] @3
+}
+
 fun read_e(r0): u8 {
   slots: params(1), locals(0), temps(2)
     r0: &0x99::chained_variant_field_fusion::E
@@ -83,6 +126,21 @@ fun read_u(r0): u8 {
     0: r1 := imm_borrow_variant_field U::Ua::p, r0 @1
     1: r2 := read_field Inner::b, r1 @2
     2: ret [r2] @4
+}
+
+fun read_via_imm_ref(r0, r1): u8 {
+  slots: params(2), locals(1), temps(1), transfer(2)
+    r0: u64
+    r1: u8
+    r2: 0x99::chained_variant_field_fusion::E
+    r3: u8
+  code:
+  L0:
+    0: [r2] := call_exempt mk_e, [r0, r1] @2
+    1: x0 := imm_borrow_loc r2 @4
+    2: [x0] := call_exempt imm_ref, [x0] @5
+    3: r3 := read_ref x0 @6
+    4: ret [r3] @7
 }
 
 fun run_read_e(r0, r1): u8 {
@@ -170,6 +228,35 @@ fun write_e(r0, r1) {
 === micro-ops ===
 // module 0x99::chained_variant_field_fusion
 
+fun bump_via_mut_ref() {
+  frame_data_size: 48
+  entry_gas: 211
+  code:
+    0: Move(1) [80] <- [8] @2
+    1: Move8 [72] <- [0] @2
+    2: CallByNameExempt 0x99::chained_variant_field_fusion::mk_e @2
+    3: Move8 [16] <- [72] @2
+    4: SlotBorrow [72] <- &[16] @4
+    5: CallByNameExempt 0x99::chained_variant_field_fusion::mut_ref @5
+    6: Move(16) [24] <- [72] @5
+    7: ReadRef [40] <- *[24] (size=1) @8
+    8: IntAdd [40] <- [40] + u8 #1 @10
+    9: WriteRef *[24] <- [40] (size=1) @12
+    10: ReadRef [40] <- *[24] (size=1) @14
+    11: Move(1) [0] <- [40] @15
+    12: Return @15
+}
+
+fun imm_ref() {
+  frame_data_size: 48
+  entry_gas: 106
+  code:
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)] @1
+    1: DeriveRefOffsetImm [32] <- [16]+1 @2
+    2: Move(16) [0] <- [32] @3
+    3: Return @3
+}
+
 fun mk_e() {
   frame_data_size: 40
   entry_gas: 3
@@ -222,6 +309,16 @@ fun mk_u() {
     11: []
 }
 
+fun mut_ref() {
+  frame_data_size: 48
+  entry_gas: 106
+  code:
+    0: EnumBorrowVariantFieldByTag [16] <- &(*[0]) by tag [Some(9), Some(10)] @1
+    1: DeriveRefOffsetImm [32] <- [16]+1 @2
+    2: Move(16) [0] <- [32] @3
+    3: Return @3
+}
+
 fun read_e() {
   frame_data_size: 40
   entry_gas: 19
@@ -250,6 +347,21 @@ fun read_u() {
     1: ReadRefOffset [32] <- *([16]+1) (size=1) @2
     2: Move(1) [0] <- [32] @4
     3: Return @4
+}
+
+fun read_via_imm_ref() {
+  frame_data_size: 32
+  entry_gas: 146
+  code:
+    0: Move(1) [64] <- [8] @2
+    1: Move8 [56] <- [0] @2
+    2: CallByNameExempt 0x99::chained_variant_field_fusion::mk_e @2
+    3: Move8 [16] <- [56] @2
+    4: SlotBorrow [56] <- &[16] @4
+    5: CallByNameExempt 0x99::chained_variant_field_fusion::imm_ref @5
+    6: ReadRef [24] <- *[56] (size=1) @6
+    7: Move(1) [0] <- [24] @7
+    8: Return @7
 }
 
 fun run_read_e() {

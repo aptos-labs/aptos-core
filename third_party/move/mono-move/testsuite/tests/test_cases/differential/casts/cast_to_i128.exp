@@ -1,0 +1,61 @@
+=== stackless ===
+// module 0x1::test
+
+fun from_i256(r0): i128 {
+  slots: params(1), locals(0), temps(1)
+    r0: i256
+    r1: i128
+  code:
+  L0:
+    0: r1 := cast_i128 r0 @1
+    1: ret [r1] @2
+}
+
+fun from_i64(r0): i128 {
+  slots: params(1), locals(0), temps(1)
+    r0: i64
+    r1: i128
+  code:
+  L0:
+    0: r1 := cast_i128 r0 @1
+    1: ret [r1] @2
+}
+
+fun from_u128(r0): i128 {
+  slots: params(1), locals(0), temps(1)
+    r0: u128
+    r1: i128
+  code:
+  L0:
+    0: r1 := cast_i128 r0 @1
+    1: ret [r1] @2
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun from_i256() {
+  frame_data_size: 48
+  entry_gas: 107
+  code:
+    0: IntCast.i256->i128 [32] <- [0] @1
+    1: Move(16) [0] <- [32] @2
+    2: Return @2
+}
+
+fun from_i64() {
+  frame_data_size: 24
+  entry_gas: 107
+  code:
+    0: IntCast.i64->i128 [8] <- [0] @1
+    1: Move(16) [0] <- [8] @2
+    2: Return @2
+}
+
+fun from_u128() {
+  frame_data_size: 32
+  entry_gas: 107
+  code:
+    0: IntCast.u128->i128 [16] <- [0] @1
+    1: Move(16) [0] <- [16] @2
+    2: Return @2
+}

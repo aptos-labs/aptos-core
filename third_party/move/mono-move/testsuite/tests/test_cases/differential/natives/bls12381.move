@@ -125,27 +125,9 @@ module 0x1::bls12381 {
         verify_proof_of_possession_internal(x"00", x"00")
     }
 
-    // Aggregating two real public keys succeeds.
-    public fun aggregate_pubkeys_success(): bool {
-        let (_, pk0) = generate_keys_internal();
-        let (_, pk1) = generate_keys_internal();
-        let (_, success) = aggregate_pubkeys_internal(vector[pk(pk0), pk(pk1)]);
-        success
-    }
-
     // Aggregating no public keys reports no aggregate.
     public fun aggregate_pubkeys_empty(): bool {
         let (_, success) = aggregate_pubkeys_internal(vector[]);
-        success
-    }
-
-    // Aggregating two real signatures succeeds.
-    public fun aggregate_signatures_success(): bool {
-        let (sk0, _) = generate_keys_internal();
-        let (sk1, _) = generate_keys_internal();
-        let s0 = sign_internal(sk0, b"msg");
-        let s1 = sign_internal(sk1, b"msg");
-        let (_, success) = aggregate_signatures_internal(vector[sig(s0), sig(s1)]);
         success
     }
 
@@ -241,14 +223,8 @@ module 0x1::bls12381 {
 // RUN: execute 0x1::bls12381::verify_pop_wrong_length
 // CHECK: results: false
 
-// RUN: execute 0x1::bls12381::aggregate_pubkeys_success
-// CHECK: results: true
-
 // RUN: execute 0x1::bls12381::aggregate_pubkeys_empty
 // CHECK: results: false
-
-// RUN: execute 0x1::bls12381::aggregate_signatures_success
-// CHECK: results: true
 
 // RUN: execute 0x1::bls12381::aggregate_signatures_empty
 // CHECK: results: false

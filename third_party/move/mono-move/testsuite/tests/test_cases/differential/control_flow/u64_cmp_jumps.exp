@@ -1,0 +1,290 @@
+=== stackless ===
+// module 0x1::u64_cmp_jumps
+
+fun eq_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_neq L0, r0, #10 @1
+  L1:
+    1: r1 := ld_u64 1 @4
+    2: ret [r1] @5
+  L0:
+    3: r1 := ld_u64 2 @6
+    4: ret [r1] @7
+}
+
+fun eq_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_neq L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+
+fun ge_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_lt L0, r0, #10 @1
+  L1:
+    1: r1 := ld_u64 1 @4
+    2: ret [r1] @5
+  L0:
+    3: r1 := ld_u64 2 @6
+    4: ret [r1] @7
+}
+
+fun ge_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_lt L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+
+fun gt_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_le L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+
+fun le_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_gt L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+
+fun lt_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_ge L0, r0, #10 @1
+  L1:
+    1: r1 := ld_u64 1 @4
+    2: ret [r1] @5
+  L0:
+    3: r1 := ld_u64 2 @6
+    4: ret [r1] @7
+}
+
+fun lt_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_ge L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+
+fun ne_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_eq L0, r0, #10 @1
+  L1:
+    1: r1 := ld_u64 1 @4
+    2: ret [r1] @5
+  L0:
+    3: r1 := ld_u64 2 @6
+    4: ret [r1] @7
+}
+
+fun ne_rr(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L2:
+    0: br_eq L0, r0, r1 @2
+  L1:
+    1: r2 := ld_u64 1 @4
+    2: ret [r2] @5
+  L0:
+    3: r2 := ld_u64 2 @6
+    4: ret [r2] @7
+}
+=== micro-ops ===
+// module 0x1::u64_cmp_jumps
+
+fun eq_imm() {
+  frame_data_size: 16
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @4 [0] != u64 #10 gas_taken=56 gas_fallthrough=56 @1
+    1: StoreImm8 [8] <- #1 @4
+    2: Move8 [0] <- [8] @5
+    3: Return @5
+    4: StoreImm8 [8] <- #2 @6
+    5: Move8 [0] <- [8] @7
+    6: Return @7
+}
+
+fun eq_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpNotEqualU64 @4 [0] != [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
+
+fun ge_imm() {
+  frame_data_size: 16
+  entry_gas: 3
+  code:
+    0: JumpLessU64Imm @4 [0] < #10 gas_taken=56 gas_fallthrough=56 @1
+    1: StoreImm8 [8] <- #1 @4
+    2: Move8 [0] <- [8] @5
+    3: Return @5
+    4: StoreImm8 [8] <- #2 @6
+    5: Move8 [0] <- [8] @7
+    6: Return @7
+}
+
+fun ge_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpLessU64 @4 [0] < [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
+
+fun gt_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpGreaterEqualU64 @4 [8] >= [0] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
+
+fun le_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpLessU64 @4 [8] < [0] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
+
+fun lt_imm() {
+  frame_data_size: 16
+  entry_gas: 3
+  code:
+    0: JumpGreaterEqualU64Imm @4 [0] >= #10 gas_taken=56 gas_fallthrough=56 @1
+    1: StoreImm8 [8] <- #1 @4
+    2: Move8 [0] <- [8] @5
+    3: Return @5
+    4: StoreImm8 [8] <- #2 @6
+    5: Move8 [0] <- [8] @7
+    6: Return @7
+}
+
+fun lt_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpGreaterEqualU64 @4 [0] >= [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
+
+fun ne_imm() {
+  frame_data_size: 16
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @4 [0] == u64 #10 gas_taken=56 gas_fallthrough=56 @1
+    1: StoreImm8 [8] <- #1 @4
+    2: Move8 [0] <- [8] @5
+    3: Return @5
+    4: StoreImm8 [8] <- #2 @6
+    5: Move8 [0] <- [8] @7
+    6: Return @7
+}
+
+fun ne_rr() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @4 [0] == u64 [8] gas_taken=56 gas_fallthrough=56 @2
+    1: StoreImm8 [16] <- #1 @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [16] <- #2 @6
+    5: Move8 [0] <- [16] @7
+    6: Return @7
+}
