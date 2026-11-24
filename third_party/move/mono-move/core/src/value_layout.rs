@@ -145,8 +145,10 @@ pub enum LayoutKind {
     /// A `signer` (32 bytes). Distinct from `Address` so it can be rejected on
     /// deserialization.
     Signer,
-    /// An inline struct: fields laid out flat in the parent's payload.
-    /// TODO(completeness): for non-inline structs (resources), we need a descriptor ID.
+    /// An inline struct: fields laid out flat in the parent's payload. Structs
+    /// nested in values are always inline. A resource's heap-object
+    /// descriptor is not stored here: it is published per type during
+    /// lowering.
     Struct {
         /// Byte offsets, names and IDs of each field within the struct payload.
         fields: Box<[FieldValueLayout]>,
@@ -162,7 +164,7 @@ pub enum LayoutKind {
     /// pointing at an enum object. Each variant body has its own published
     /// layout, which may itself contain enums, vectors, or structs.
     ///
-    /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
+    /// TODO(completeness): revisit whether the variant set needs to be frozen.
     FrozenEnum {
         descriptor_id: DescriptorId,
         /// One entry per variant body, indexed by variant tag.
