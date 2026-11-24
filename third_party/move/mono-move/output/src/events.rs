@@ -59,7 +59,7 @@ pub unsafe fn to_contract_events_from_store<L: LayoutProvider + ?Sized>(
         .map(|entry| {
             let type_tag = type_tag_of(entry.msg_ty).ok_or(OutputError::InvalidEventType)?;
             // SAFETY: forwarded from this function's contract.
-            let data = unsafe { serialize(layouts, entry.msg_data.as_ptr(), entry.msg_ty) }?;
+            let data = unsafe { serialize(layouts, entry.msg_data.base(), entry.msg_ty) }?;
             let event = match &entry.kind {
                 EventKind::V2 => ContractEvent::new_v2(type_tag, data),
                 EventKind::V1 {

@@ -13,7 +13,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, Copy)]
 pub struct FrameSlot {
     /// Byte offset from the start of the native function's frame.
-    pub offset: u32,
+    pub offset: FrameOffset,
     /// Byte size of the slot.
     pub size: u32,
 }
@@ -82,8 +82,12 @@ impl NativeABI {
                 return_types: return_types.len(),
             });
         }
-        let args_end = args.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
-        let returns_end = returns.iter().map(|s| s.offset + s.size).max().unwrap_or(0);
+        let args_end = args.iter().map(|s| s.offset.0 + s.size).max().unwrap_or(0);
+        let returns_end = returns
+            .iter()
+            .map(|s| s.offset.0 + s.size)
+            .max()
+            .unwrap_or(0);
         Ok(Self {
             args,
             returns,
@@ -130,10 +134,10 @@ fn check_well_formed(slots: &[FrameSlot], kind: &'static str) -> Result<(), Nati
     for i in 1..slots.len() {
         let prev = &slots[i - 1];
         let curr = &slots[i];
-        if curr.offset <= prev.offset {
+        if curr.offset.0 <= prev.offset.0 {
             return Err(NativeABIError::Unsorted { kind, idx: i });
         }
-        if prev.offset + prev.size > curr.offset {
+        if prev.offset.0 + prev.size > curr.offset.0 {
             return Err(NativeABIError::Overlap { kind, idx: i });
         }
     }

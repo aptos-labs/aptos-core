@@ -7,7 +7,6 @@ pub mod error;
 pub(crate) mod global_storage;
 pub(crate) mod heap;
 mod interpreter;
-pub(crate) mod memory;
 mod native_context;
 mod reentrancy;
 mod types;
@@ -21,13 +20,9 @@ pub use heap::{FrozenHeap, Heap, SharedArena};
 pub use interpreter::{
     CallBuilder, CallError, CompletedCall, InterpreterContext, InterpreterOptions, SessionEffects,
 };
-pub use memory::{
-    read_ptr, read_u32, read_u64, vec_elem_ptr, write_object_header, write_ptr, write_u32,
-    write_u64, MemoryRegion,
-};
 pub use mono_move_core::{
-    assert_verified, verify_function, verify_program, ObjectDescriptor, ObjectDescriptorTable,
-    VerificationError,
+    assert_verified, memory::MemoryRegion, verify_function, verify_program, ObjectDescriptor,
+    ObjectDescriptorTable, VerificationError,
 };
 pub use native_context::{
     LoaderAccess, ProductionContextFamily, ProductionNativeContext, ProductionNativeFunction,

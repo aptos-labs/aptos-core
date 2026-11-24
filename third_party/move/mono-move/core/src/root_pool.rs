@@ -1,16 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::memory::{FatRef, HeapObject, MemAddr};
 use smallvec::SmallVec;
-use std::{cell::UnsafeCell, ptr};
-
-/// A rooted pointer the GC tracks.
-#[derive(Clone, Copy)]
-struct Entry {
-    base: *mut u8,
-    /// Byte offset into `base`; `0` for a direct object pointer.
-    offset: u64,
-}
+use std::cell::UnsafeCell;
 
 /// Pool of GC roots for pointers that must survive a GC without being reachable
 /// from a frame slot. Needed by micro-ops and native functions that allocate
@@ -36,7 +29,10 @@ const INLINE_CAPACITY: usize = 16;
 
 /// Backing store of a [`RootPool`].
 struct RootPoolInner {
-    entries: SmallVec<[Entry; INLINE_CAPACITY]>,
+    /// The rooted pointers the GC tracks: each a Move reference, or an object
+    /// pointer stored as a reference with offset `0`. A freed slot holds a
+    /// null base.
+    entries: SmallVec<[FatRef; INLINE_CAPACITY]>,
     /// Indices of freed slots, recycled by the next root.
     free: SmallVec<[usize; INLINE_CAPACITY]>,
 }
@@ -51,20 +47,20 @@ impl RootPool {
         }
     }
 
-    /// Roots the Move reference `base + offset`.
+    /// Roots the Move reference `fat_ref`.
     /// Returns a handle that can be used to access the reference safely across GC, and
     /// and frees its slot on drop.
     ///
     /// # Safety
     ///
-    /// (base, offset) must be a valid Move reference (fat pointer) pointing to a
-    /// Move value.
+    /// `fat_ref` must be a valid Move reference (fat pointer) pointing to a Move
+    /// value.
     ///
-    /// A null or non-heap `base` is technically sound but effectively tracks nothing.
-    pub unsafe fn root_reference(&self, base: *mut u8, offset: u64) -> ReferenceHandle<'_> {
+    /// A null or non-heap base is technically sound but effectively tracks nothing.
+    pub unsafe fn root_reference(&self, fat_ref: FatRef) -> ReferenceHandle<'_> {
         ReferenceHandle {
             pool: self,
-            idx: self.alloc(Entry { base, offset }),
+            idx: self.alloc(fat_ref),
         }
     }
 
@@ -83,13 +79,10 @@ impl RootPool {
     // for a uniform representation. We could reserve a placeholder (e.g.
     // `usize::MAX`) for "nothing to track", but the exact rule needs thought —
     // exclude only null, or all non-heap pointers?
-    pub unsafe fn root_object(&self, ptr: *mut u8) -> ObjectHandle<'_> {
+    pub unsafe fn root_object(&self, ptr: MemAddr) -> ObjectHandle<'_> {
         ObjectHandle {
             pool: self,
-            idx: self.alloc(Entry {
-                base: ptr,
-                offset: 0,
-            }),
+            idx: self.alloc(FatRef::new(ptr, 0)),
         }
     }
 
@@ -106,7 +99,7 @@ impl RootPool {
     /// It must also guarantee that it does NOT call any other methods on this pool,
     /// as that kind of re-entrancy breaks interior mutability -- only one mutable
     /// borrow is allowed at a time.
-    pub unsafe fn relocate_each(&self, mut relocate: impl FnMut(*mut u8) -> Option<*mut u8>) {
+    pub unsafe fn relocate_each(&self, mut relocate: impl FnMut(MemAddr) -> Option<MemAddr>) {
         // SAFETY: short, exclusive reborrow; the caller guarantees `relocate`
         // does not re-enter, and GC is stop-the-world, so no handle read overlaps.
         let inner = unsafe { &mut *self.inner.get() };
@@ -118,7 +111,7 @@ impl RootPool {
     }
 
     /// Allocates a slot for `entry`, recycling a freed index when one exists.
-    fn alloc(&self, entry: Entry) -> usize {
+    fn alloc(&self, entry: FatRef) -> usize {
         // SAFETY: short, exclusive reborrow; single-threaded, leaf call.
         let inner = unsafe { &mut *self.inner.get() };
         match inner.free.pop() {
@@ -138,12 +131,13 @@ impl RootPool {
     fn release(&self, idx: usize) {
         // SAFETY: short, exclusive reborrow; single-threaded.
         let inner = unsafe { &mut *self.inner.get() };
-        inner.entries[idx].base = ptr::null_mut();
+        inner.entries[idx] = FatRef::new(MemAddr::NULL, 0);
         inner.free.push(idx);
     }
 
-    fn entry(&self, idx: usize) -> Entry {
-        // SAFETY: short shared reborrow; `idx` is a live slot and `Entry: Copy`.
+    #[inline]
+    fn entry(&self, idx: usize) -> FatRef {
+        // SAFETY: short shared reborrow; `idx` is a live slot and `FatRef: Copy`.
         let inner = unsafe { &*self.inner.get() };
         inner.entries[idx]
     }
@@ -184,23 +178,21 @@ impl<'a> ReferenceHandle<'a> {
         self.pool
     }
 
-    /// Reads the current pointer to the referenced value.
+    /// Reads the current address of the referenced value.
     ///
-    /// # Safety
-    ///
-    /// The returned pointer is invalidated by any GC; the caller must use it only
+    /// The returned address is invalidated by any GC; the caller must use it only
     /// transiently, before any allocation that could trigger collection.
-    pub fn ptr(&self) -> *mut u8 {
-        let entry = self.pool.entry(self.idx);
-        // SAFETY: `base` is a live (possibly relocated) pointer and `offset`
-        // lies within the referenced allocation.
-        unsafe { entry.base.add(entry.offset as usize) }
+    #[inline]
+    pub fn addr(&self) -> MemAddr {
+        // SAFETY: `root_reference` was given a valid Move reference, so `base`
+        // is a live (GC-relocated) object or slot and `offset` lies within it.
+        unsafe { self.fat_ref().target() }
     }
 
-    /// Returns the raw `(base, offset)` fat pointer.
-    pub fn fat(&self) -> (*mut u8, u64) {
-        let entry = self.pool.entry(self.idx);
-        (entry.base, entry.offset)
+    /// Returns the current `(base, offset)` fat pointer.
+    #[inline]
+    pub fn fat_ref(&self) -> FatRef {
+        self.pool.entry(self.idx)
     }
 }
 
@@ -224,14 +216,25 @@ impl<'a> ObjectHandle<'a> {
         self.pool
     }
 
-    /// Reads the current pointer to the object.
+    /// Reads the current address of the object (null for an empty vector).
+    ///
+    /// The returned address is invalidated by any GC; the caller must use it only
+    /// transiently, before any allocation that could trigger collection.
+    #[inline]
+    pub fn addr(&self) -> MemAddr {
+        self.pool.entry(self.idx).base
+    }
+
+    /// The rooted object, with the same transient validity as [`addr`](Self::addr).
     ///
     /// # Safety
     ///
-    /// The returned pointer is invalidated by any GC; the caller must use it only
-    /// transiently, before any allocation that could trigger collection.
-    pub fn ptr(&self) -> *mut u8 {
-        self.pool.entry(self.idx).base
+    /// The rooted pointer must be non-null (not an empty vector).
+    #[inline]
+    pub unsafe fn obj(&self) -> HeapObject {
+        // SAFETY: `root_object` was given a live heap object that the GC keeps
+        // current, and the caller excludes null.
+        unsafe { HeapObject::new(self.addr()) }
     }
 }
 
@@ -255,12 +258,12 @@ mod tests {
         }
 
         /// Address 0 maps to null, the pool's freed-slot marker.
-        fn at(&self, addr: usize) -> *mut u8 {
+        fn at(&self, addr: usize) -> MemAddr {
             if addr == 0 {
-                return std::ptr::null_mut();
+                return MemAddr::NULL;
             }
-            // SAFETY: every test address is within the buffer.
-            unsafe { self.0.as_ptr().add(addr) as *mut u8 }
+            // SAFETY: every test address is within the 0x8000-byte buffer.
+            unsafe { MemAddr::from_const_ptr(self.0.as_ptr()).add(addr) }
         }
     }
 
@@ -269,16 +272,16 @@ mod tests {
         let addrs = Addrs::new();
         let pool = RootPool::new();
         let handle = unsafe { pool.root_object(addrs.at(0x1000)) };
-        assert_eq!(handle.ptr(), addrs.at(0x1000));
+        assert_eq!(handle.addr(), addrs.at(0x1000));
     }
 
     #[test]
     fn reference_handle_adds_offset() {
         let addrs = Addrs::new();
         let pool = RootPool::new();
-        let handle = unsafe { pool.root_reference(addrs.at(0x1000), 24) };
-        assert_eq!(handle.ptr(), addrs.at(0x1000 + 24));
-        assert_eq!(handle.fat(), (addrs.at(0x1000), 24));
+        let handle = unsafe { pool.root_reference(FatRef::new(addrs.at(0x1000), 24)) };
+        assert_eq!(handle.addr(), addrs.at(0x1000 + 24));
+        assert_eq!(handle.fat_ref(), FatRef::new(addrs.at(0x1000), 24));
     }
 
     #[test]
@@ -286,11 +289,11 @@ mod tests {
         let addrs = Addrs::new();
         let pool = RootPool::new();
         let first = unsafe { pool.root_object(addrs.at(0x1000)) };
-        let second = unsafe { pool.root_reference(addrs.at(0x2000), 8) };
+        let second = unsafe { pool.root_reference(FatRef::new(addrs.at(0x2000), 8)) };
         let third = unsafe { pool.root_object(addrs.at(0x3000)) };
-        assert_eq!(first.ptr(), addrs.at(0x1000));
-        assert_eq!(second.ptr(), addrs.at(0x2008));
-        assert_eq!(third.ptr(), addrs.at(0x3000));
+        assert_eq!(first.addr(), addrs.at(0x1000));
+        assert_eq!(second.addr(), addrs.at(0x2008));
+        assert_eq!(third.addr(), addrs.at(0x3000));
     }
 
     #[test]
@@ -298,7 +301,7 @@ mod tests {
         let addrs = Addrs::new();
         let pool = RootPool::new();
         let object = unsafe { pool.root_object(addrs.at(0x1000)) };
-        let reference = unsafe { pool.root_reference(addrs.at(0x2000), 16) };
+        let reference = unsafe { pool.root_reference(FatRef::new(addrs.at(0x2000), 16)) };
         // Simulate a GC that moves 0x1000 -> 0x5000 and 0x2000 -> 0x6000.
         unsafe {
             pool.relocate_each(|base| {
@@ -311,8 +314,8 @@ mod tests {
                 }
             })
         };
-        assert_eq!(object.ptr(), addrs.at(0x5000));
-        assert_eq!(reference.ptr(), addrs.at(0x6000 + 16));
+        assert_eq!(object.addr(), addrs.at(0x5000));
+        assert_eq!(reference.addr(), addrs.at(0x6000 + 16));
     }
 
     #[test]
@@ -344,6 +347,6 @@ mod tests {
         // Every entry is offered to `relocate`, including the freed slot (now a
         // null base) — skipping null/non-heap bases is `relocate`'s job.
         assert_eq!(seen, vec![addrs.at(0x1000), addrs.at(0)]);
-        assert_eq!(live.ptr(), addrs.at(0x1000));
+        assert_eq!(live.addr(), addrs.at(0x1000));
     }
 }

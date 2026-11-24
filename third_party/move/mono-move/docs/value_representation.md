@@ -151,7 +151,7 @@ Owner region         Heap (outer)               Heap (inner)
 
 ## References (Fat Pointers)
 
-References are 16-byte fat pointers: `(base_ptr: *mut u8, byte_offset: u64)`. The actual target address is `base_ptr + byte_offset`.
+References are 16-byte fat pointers: `(base_ptr: MemAddr, byte_offset: u64)` — `FatRef` in `mono_move_core::memory`. The actual target address is `base_ptr + byte_offset`, computed only by `FatRef::target()`.
 
 ```
 The ref                          Target memory

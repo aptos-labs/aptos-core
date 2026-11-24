@@ -38,6 +38,7 @@ use mono_move_aptos_transaction_executor::{
     production_natives, AptosTransactionExecutor, DiscardReason, NoInterrupts, TxnOutcome,
 };
 use mono_move_core::{
+    memory::HeapObject,
     storage::resource_provider::{InMemoryStorageKey, ReadPin},
     struct_tag_of,
 };
@@ -49,7 +50,6 @@ use move_vm_runtime::Module;
 use move_vm_types::{code::SyncModuleCache, delayed_values::delayed_field_id::DelayedFieldID};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    ptr::NonNull,
     sync::Arc,
 };
 
@@ -61,7 +61,7 @@ use provider::BlockSTMSequentialProvider;
 #[derive(Clone)]
 pub enum MonoValue {
     Write {
-        ptr: NonNull<u8>,
+        ptr: HeapObject,
         kind: WriteOpKind,
         /// Pins the allocation backing the pointer. As long as we hold the pin,
         /// using the pointer is safe.
