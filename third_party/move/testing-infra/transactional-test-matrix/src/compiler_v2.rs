@@ -306,61 +306,9 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/more-v1/parser/return_not_binary.move",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/calculator.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/capturing_generic_option.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality.move",
-        "function values in resources, function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_operand_order.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/closure_equality_widened.move",
-        "function value equality",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/funs_as_storage_key.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/fv_enum.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/no-v1-comparison/closures/misc_1.move",
-        "function value serialization",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/persistent.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/registry.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/resolve_from_storage.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/storable_entry.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/closures/storage_examples.move",
-        "function values in resources",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/no-v1-comparison/fv_as_keys.move",
-        "function values in resources",
+        "a native abort reports no code offset",
     ),
 ];
 

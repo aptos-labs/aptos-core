@@ -117,6 +117,16 @@ pub enum RuntimeError {
     #[error("resource type is too deeply nested to encode as a state key")]
     StateKeyTypeTooDeep,
 
+    /// A value V1 refuses to serialize, such as a closure over a function that
+    /// is not persistent.
+    #[error("BCS serialize: {0}")]
+    ValueNotSerializable(&'static str),
+
+    /// Ordering reached a function value. V1 orders function values; MonoMove
+    /// refuses to, by design.
+    #[error("function values cannot be ordered")]
+    FunctionValuesNotOrdered,
+
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
 
@@ -143,6 +153,9 @@ pub enum RuntimeError {
 
     #[error("BCS deserialize: cannot deserialize a signer")]
     BCSSignerNotDeserializable,
+
+    #[error("BCS deserialize: malformed function value ({0})")]
+    BCSInvalidClosure(&'static str),
 
     /// A `String` argument is not valid UTF-8.
     #[error("argument check: a `String` is not valid UTF-8")]
@@ -182,7 +195,8 @@ impl RuntimeError {
             | BCSRemainingInput { .. }
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
-            | BCSInvalidEnumTag { .. } => true,
+            | BCSInvalidEnumTag { .. }
+            | BCSInvalidClosure(_) => true,
 
             MalformedStringArgument
             | ObjectArgumentDoesNotExist
@@ -211,6 +225,8 @@ impl RuntimeError {
             | InvalidAbortMessage { .. }
             | AbortMessageTooLong { .. }
             | StateKeyTypeTooDeep
+            | ValueNotSerializable(_)
+            | FunctionValuesNotOrdered
             | InvariantViolation(_)
             | ResourceProvider(_)
             | Unsupported(_) => false,
@@ -238,7 +254,9 @@ impl IntoExecutionError for RuntimeError {
             | ResourceAlreadyExists { .. }
             | ReentrancyUnderModuleLock { .. }
             | ResourceAccessDuringReentrancy { .. }
-            | EnumVariantMismatch { .. } => ExecutionErrorKind::InvalidOperation,
+            | EnumVariantMismatch { .. }
+            | ValueNotSerializable(_)
+            | FunctionValuesNotOrdered => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -254,6 +272,7 @@ impl IntoExecutionError for RuntimeError {
             | BCSInvalidBool { .. }
             | BCSSignerNotDeserializable
             | BCSInvalidEnumTag { .. }
+            | BCSInvalidClosure(_)
             | MalformedStringArgument
             | ObjectArgumentDoesNotExist
             | ObjectArgumentLacksResource => ExecutionErrorKind::InvalidOperation,
@@ -457,8 +476,64 @@ pub enum RuntimeInvariantViolation {
     #[error("CallClosure: mask {mask:#b} references parameters beyond callee's {num_params}")]
     ClosureMaskExceedsParams { mask: u64, num_params: usize },
 
-    #[error("CallClosure: packed captured values_size {packed} != resolved callee's captured layout {expected}")]
-    ClosureCapturedLayoutMismatch { expected: u32, packed: u32 },
+    #[error(
+        "CallClosure: stored closure references non-persistent function `{}::{function}`",
+        .module.short_str_lossless()
+    )]
+    StoredClosureTargetNotPersistent {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
+
+    #[error("CallClosure: closure type is not a function type")]
+    ClosureTypeNotFunction,
+
+    #[error(
+        "CallClosure: closure type does not match the signature of `{}::{function}`",
+        .module.short_str_lossless()
+    )]
+    ClosureSignatureMismatch {
+        module: Box<ModuleId>,
+        function: Identifier,
+    },
+
+    #[error(
+        "CallClosure: capture {capture_idx} was packed under layout {packed_id} but resolved \
+         callee's param {param_idx} has layout {param_id}"
+    )]
+    ClosureCapturedLayoutMismatch {
+        capture_idx: usize,
+        packed_id: u32,
+        param_idx: usize,
+        param_id: u32,
+    },
+
+    #[error(
+        "CallClosure: param {param_idx}'s layout is ({layout_size}, {layout_align}) but its slot \
+         is ({param_size}, {param_align})"
+    )]
+    ClosureParamLayoutMismatch {
+        param_idx: usize,
+        layout_size: u32,
+        layout_align: u32,
+        param_size: u32,
+        param_align: u32,
+    },
+
+    #[error("CallClosure: {packed} captured values for a mask capturing {captured}")]
+    ClosureCapturedCountMismatch { packed: usize, captured: usize },
+
+    #[error("CallClosure: capture {capture_idx} was stored under a layout the callee's parameter cannot read")]
+    ClosureCapturedLayoutIncompatible { capture_idx: usize },
+
+    #[error("closure equality: captures compared under layouts of different kinds")]
+    ClosureCaptureKindMismatch,
+
+    #[error("CallClosure: no published struct layout {id} for the captured values")]
+    ClosureCapturedValuesLayoutMissing { id: u32 },
+
+    #[error("CallClosure: no published layout for capture {capture_idx}")]
+    ClosureCaptureLayoutMissing { capture_idx: usize },
 
     #[error("CallClosure: null function pointer in closure")]
     NullFuncRefInClosure,

@@ -1,4 +1,4 @@
-/// Stores a function value, which MonoMove cannot serialize yet.
+/// Stores a function value.
 module fixtures::closures {
     struct Holder has key {
         apply: |u64| u64 has copy + drop + store,

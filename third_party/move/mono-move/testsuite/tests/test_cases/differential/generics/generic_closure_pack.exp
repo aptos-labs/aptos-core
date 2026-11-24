@@ -73,12 +73,13 @@ fun call_identity() {
   frame_data_size: 16
   entry_gas: 125
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, captured_desc=<none>, captured=[] @0
+    0: PackClosure [8] <- func_ref=Unresolved(identity), mask=0, persistent=false, captured_desc=<none>, captured=[] @0
     1: CallClosure closure=[8], provided_args=[[0](8)] @4
     2: Move8 [0] <- [40] @5
     3: Return @5
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun call_pick() {
@@ -101,6 +102,9 @@ fun call_pick() {
     13: AddU64 [24] <- [24] + [72] @20
     14: Move8 [0] <- [24] @21
     15: Return @21
+  safe_point_layouts:
+    8: []
+    12: []
 }
 
 fun identity(): skipped (generic function not instantiated)

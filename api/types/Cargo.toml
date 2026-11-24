@@ -13,7 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [package.metadata.cargo-machete]
-ignored = ["async-trait", "poem", "poem-openapi-derive"]
+ignored = ["poem", "poem-openapi-derive"]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -25,7 +25,6 @@ aptos-resource-viewer = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 hex = { workspace = true }
