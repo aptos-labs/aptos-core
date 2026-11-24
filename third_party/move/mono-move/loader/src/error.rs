@@ -52,7 +52,7 @@ pub enum LoaderError {
         name: String,
     },
 
-    /// TODO(completeness): temporary until nominal types are supported.
+    /// TODO(completeness): temporary until lowering no longer skips any function.
     #[error("Failed to lower function: {reason}")]
     LoweringSkipped { reason: &'static str },
 
