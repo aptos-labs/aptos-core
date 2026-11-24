@@ -1,0 +1,349 @@
+=== stackless ===
+// module 0x1::heap_field_read_copy
+
+fun get(r0): vector<u64> {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x1::heap_field_read_copy::H
+    r1: vector<u64>
+  code:
+  L0:
+    0: r1 := read_variant_field H::One::v, r0 @1
+    1: ret [r1] @3
+}
+
+fun local_chain(): vector<u64> * vector<u64> {
+  slots: params(0), locals(2), temps(5), transfer(1)
+    r0: 0x1::heap_field_read_copy::Outer
+    r1: vector<u64>
+    r2: u64
+    r3: &mut vector<u64>
+    r4: u64
+    r5: &mut u64
+    r6: vector<u64>
+  code:
+  L0:
+    0: [r0] := call_exempt outer, [] @0
+    1: r1 := read_loc_field_chain Outer::mid.Mid::inner.Inner::items, r0 @6
+    2: r2 := ld_u64 9 @8
+    3: r3 := mut_borrow_loc r1 @9
+    4: r4 := ld_u64 0 @10
+    5: r5 := vec_mut_borrow u64, r3, r4 @11
+    6: write_ref r5, r2 @12
+    7: r2 := ld_u64 8 @13
+    8: r3 := mut_borrow_loc_field_chain Outer::mid.Mid::inner.Inner::items, r0 @17
+    9: r4 := ld_u64 1 @18
+    10: r5 := vec_mut_borrow u64, r3, r4 @19
+    11: write_ref r5, r2 @20
+    12: r6 := read_loc_field_chain Outer::mid.Mid::inner.Inner::items, r0 @25
+    13: ret [r6, r1] @27
+}
+
+fun one(r0): vector<u64> {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x1::heap_field_read_copy::Inner
+    r1: vector<u64>
+  code:
+  L0:
+    0: r1 := read_field Inner::items, r0 @1
+    1: ret [r1] @3
+}
+
+fun outer(): Outer {
+  slots: params(0), locals(0), temps(4)
+    r0: vector<u64>
+    r1: 0x1::heap_field_read_copy::Inner
+    r2: 0x1::heap_field_read_copy::Mid
+    r3: 0x1::heap_field_read_copy::Outer
+  code:
+  L0:
+    0: r0 := ld_const #0 @0
+    1: r1 := pack 0x1::heap_field_read_copy::Inner, [r0] @1
+    2: r2 := pack 0x1::heap_field_read_copy::Mid, [r1] @2
+    3: r3 := pack 0x1::heap_field_read_copy::Outer, [r2] @3
+    4: ret [r3] @4
+}
+
+fun ref_chain(): vector<u64> * vector<u64> {
+  slots: params(0), locals(2), temps(5), transfer(1)
+    r0: 0x1::heap_field_read_copy::Outer
+    r1: vector<u64>
+    r2: u64
+    r3: &mut vector<u64>
+    r4: u64
+    r5: &mut u64
+    r6: vector<u64>
+  code:
+  L0:
+    0: [r0] := call_exempt outer, [] @0
+    1: x0 := imm_borrow_loc r0 @2
+    2: [r1] := call_exempt via_ref, [x0] @3
+    3: r2 := ld_u64 9 @5
+    4: r3 := mut_borrow_loc r1 @6
+    5: r4 := ld_u64 0 @7
+    6: r5 := vec_mut_borrow u64, r3, r4 @8
+    7: write_ref r5, r2 @9
+    8: r2 := ld_u64 8 @10
+    9: r3 := mut_borrow_loc_field_chain Outer::mid.Mid::inner.Inner::items, r0 @14
+    10: r4 := ld_u64 1 @15
+    11: r5 := vec_mut_borrow u64, r3, r4 @16
+    12: write_ref r5, r2 @17
+    13: r6 := read_loc_field_chain Outer::mid.Mid::inner.Inner::items, r0 @22
+    14: ret [r6, r1] @24
+}
+
+fun ref_field(): vector<u64> * vector<u64> {
+  slots: params(0), locals(2), temps(5), transfer(1)
+    r0: 0x1::heap_field_read_copy::Inner
+    r1: vector<u64>
+    r2: vector<u64>
+    r3: u64
+    r4: &mut vector<u64>
+    r5: u64
+    r6: &mut u64
+  code:
+  L0:
+    0: r2 := ld_const #0 @0
+    1: r0 := pack 0x1::heap_field_read_copy::Inner, [r2] @1
+    2: x0 := imm_borrow_loc r0 @3
+    3: [r1] := call_exempt one, [x0] @4
+    4: r3 := ld_u64 9 @6
+    5: r4 := mut_borrow_loc r1 @7
+    6: r5 := ld_u64 0 @8
+    7: r6 := vec_mut_borrow u64, r4, r5 @9
+    8: write_ref r6, r3 @10
+    9: r3 := ld_u64 8 @11
+    10: r4 := mut_borrow_loc_field Inner::items, r0 @12
+    11: r5 := ld_u64 1 @14
+    12: r6 := vec_mut_borrow u64, r4, r5 @15
+    13: write_ref r6, r3 @16
+    14: r2 := read_loc_field Inner::items, r0 @17
+    15: ret [r2, r1] @21
+}
+
+fun variant_field(r0): vector<u64> * vector<u64> {
+  slots: params(1), locals(2), temps(7), transfer(1)
+    r0: u64
+    r1: 0x1::heap_field_read_copy::H
+    r2: vector<u64>
+    r3: vector<u64>
+    r4: u64
+    r5: &mut vector<u64>
+    r6: u64
+    r7: &mut u64
+    r8: &mut 0x1::heap_field_read_copy::H
+    r9: &0x1::heap_field_read_copy::H
+  code:
+  L3:
+    0: br_neq L0, r0, #0 @1
+  L1:
+    1: r3 := ld_const #0 @4
+    2: r1 := pack_variant 0x1::heap_field_read_copy::H@0, [r3] @5
+  L2:
+    3: x0 := imm_borrow_loc r1 @7
+    4: [r2] := call_exempt get, [x0] @8
+    5: r4 := ld_u64 9 @10
+    6: r5 := mut_borrow_loc r2 @11
+    7: r6 := ld_u64 0 @12
+    8: r7 := vec_mut_borrow u64, r5, r6 @13
+    9: write_ref r7, r4 @14
+    10: r4 := ld_u64 8 @15
+    11: r8 := mut_borrow_loc r1 @16
+    12: r5 := mut_borrow_variant_field H::One::v, r8 @17
+    13: r6 := ld_u64 1 @18
+    14: r7 := vec_mut_borrow u64, r5, r6 @19
+    15: write_ref r7, r4 @20
+    16: r9 := imm_borrow_loc r1 @21
+    17: r3 := read_variant_field H::One::v, r9 @22
+    18: ret [r3, r2] @25
+  L0:
+    19: r3 := ld_const #0 @26
+    20: r4 := ld_u64 9 @27
+    21: r1 := pack_variant 0x1::heap_field_read_copy::H@1, [r3, r4] @28
+    22: branch L2 @30
+}
+
+fun via_ref(r0): vector<u64> {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x1::heap_field_read_copy::Outer
+    r1: vector<u64>
+  code:
+  L0:
+    0: r1 := read_field_chain Outer::mid.Mid::inner.Inner::items, r0 @4
+    1: ret [r1] @5
+}
+=== micro-ops ===
+// module 0x1::heap_field_read_copy
+
+fun get() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: HeapReadOffset(8) [16] <- (*[0]).8 @1
+    1: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @1
+    2: Move8 [0] <- [16] @3
+    3: Return @3
+  safe_point_layouts:
+    1: []
+}
+
+fun local_chain() {
+  frame_data_size: 72
+  entry_gas: 276
+  code:
+    0: CallByNameExempt 0x1::heap_field_read_copy::outer @0
+    1: Move8 [0] <- [96] @0
+    2: Move8 [8] <- [0] @6
+    3: DeepCopyHeapPtrs [8] deep-copy ptrs at [0] @6
+    4: StoreImm8 [16] <- #9 @8
+    5: SlotBorrow [24] <- &[8] @9
+    6: StoreImm8 [40] <- #0 @10
+    7: VecBorrow [48] <- &[24][[40]] (elem_size=8) @11
+    8: WriteRef *[48] <- [16] (size=8) @12
+    9: StoreImm8 [16] <- #8 @13
+    10: SlotBorrow [24] <- &[0] @17
+    11: StoreImm8 [40] <- #1 @18
+    12: VecBorrow [48] <- &[24][[40]] (elem_size=8) @19
+    13: WriteRef *[48] <- [16] (size=8) @20
+    14: Move8 [64] <- [0] @25
+    15: DeepCopyHeapPtrs [64] deep-copy ptrs at [0] @25
+    16: Move8 [0] <- [64] @27
+    17: Return @27
+  safe_point_layouts:
+    3: []
+    15: []
+}
+
+fun one() {
+  frame_data_size: 24
+  entry_gas: 80
+  code:
+    0: ReadRefOffset [16] <- *([0]+0) (size=8) @1
+    1: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @1
+    2: Move8 [0] <- [16] @3
+    3: Return @3
+  safe_point_layouts:
+    1: []
+}
+
+fun outer() {
+  frame_data_size: 32
+  entry_gas: 134
+  code:
+    0: StoreImmVec [0] <- const[0] @0
+    1: Move8 [8] <- [0] @1
+    2: Move8 [16] <- [8] @2
+    3: Move8 [24] <- [16] @3
+    4: Move8 [0] <- [24] @4
+    5: Return @4
+  safe_point_layouts:
+    0: []
+}
+
+fun ref_chain() {
+  frame_data_size: 72
+  entry_gas: 334
+  code:
+    0: CallByNameExempt 0x1::heap_field_read_copy::outer @0
+    1: Move8 [0] <- [96] @0
+    2: SlotBorrow [96] <- &[0] @2
+    3: CallByNameExempt 0x1::heap_field_read_copy::via_ref @3
+    4: Move8 [8] <- [96] @3
+    5: StoreImm8 [16] <- #9 @5
+    6: SlotBorrow [24] <- &[8] @6
+    7: StoreImm8 [40] <- #0 @7
+    8: VecBorrow [48] <- &[24][[40]] (elem_size=8) @8
+    9: WriteRef *[48] <- [16] (size=8) @9
+    10: StoreImm8 [16] <- #8 @10
+    11: SlotBorrow [24] <- &[0] @14
+    12: StoreImm8 [40] <- #1 @15
+    13: VecBorrow [48] <- &[24][[40]] (elem_size=8) @16
+    14: WriteRef *[48] <- [16] (size=8) @17
+    15: Move8 [64] <- [0] @22
+    16: DeepCopyHeapPtrs [64] deep-copy ptrs at [0] @22
+    17: Move8 [0] <- [64] @24
+    18: Return @24
+  safe_point_layouts:
+    16: []
+}
+
+fun ref_field() {
+  frame_data_size: 72
+  entry_gas: 318
+  code:
+    0: StoreImmVec [16] <- const[0] @0
+    1: Move8 [0] <- [16] @1
+    2: SlotBorrow [96] <- &[0] @3
+    3: CallByNameExempt 0x1::heap_field_read_copy::one @4
+    4: Move8 [8] <- [96] @4
+    5: StoreImm8 [24] <- #9 @6
+    6: SlotBorrow [32] <- &[8] @7
+    7: StoreImm8 [48] <- #0 @8
+    8: VecBorrow [56] <- &[32][[48]] (elem_size=8) @9
+    9: WriteRef *[56] <- [24] (size=8) @10
+    10: StoreImm8 [24] <- #8 @11
+    11: SlotBorrow [32] <- &[0] @12
+    12: StoreImm8 [48] <- #1 @14
+    13: VecBorrow [56] <- &[32][[48]] (elem_size=8) @15
+    14: WriteRef *[56] <- [24] (size=8) @16
+    15: Move8 [16] <- [0] @17
+    16: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @17
+    17: Move8 [0] <- [16] @21
+    18: Return @21
+  safe_point_layouts:
+    0: []
+    16: []
+}
+
+fun variant_field() {
+  frame_data_size: 120
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @24 [0] != u64 #0 gas_taken=66 gas_fallthrough=36 @1
+    1: StoreImmVec [24] <- const[0] @4
+    2: EnumNew [8] desc=3 tag #0 @5
+    3: HeapMoveTo8 [8]+8 <- [24] @5
+    4: SlotBorrow [144] <- &[8] @7
+    5: CallByNameExempt 0x1::heap_field_read_copy::get @8
+    6: Move8 [16] <- [144] @8
+    7: StoreImm8 [32] <- #9 @10
+    8: SlotBorrow [40] <- &[16] @11
+    9: StoreImm8 [56] <- #0 @12
+    10: VecBorrow [64] <- &[40][[56]] (elem_size=8) @13
+    11: WriteRef *[64] <- [32] (size=8) @14
+    12: StoreImm8 [32] <- #8 @15
+    13: SlotBorrow [80] <- &[8] @16
+    14: HeapBorrow [40] <- &[80]+8 @17
+    15: StoreImm8 [56] <- #1 @18
+    16: VecBorrow [64] <- &[40][[56]] (elem_size=8) @19
+    17: WriteRef *[64] <- [32] (size=8) @20
+    18: SlotBorrow [96] <- &[8] @21
+    19: HeapReadOffset(8) [24] <- (*[96]).8 @22
+    20: DeepCopyHeapPtrs [24] deep-copy ptrs at [0] @22
+    21: Move8 [0] <- [24] @25
+    22: Move8 [8] <- [16] @25
+    23: Return @25
+    24: StoreImmVec [24] <- const[0] @26
+    25: StoreImm8 [32] <- #9 @27
+    26: EnumNew [8] desc=3 tag #1 @28
+    27: HeapMoveTo8 [8]+8 <- [24] @28
+    28: HeapMoveTo8 [8]+16 <- [32] @28
+    29: Jump @4 gas=273 @30
+  safe_point_layouts:
+    1: []
+    2: []
+    20: []
+    24: []
+    26: []
+}
+
+fun via_ref() {
+  frame_data_size: 24
+  entry_gas: 84
+  code:
+    0: ReadRefOffset [16] <- *([0]+0) (size=8) @4
+    1: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+  safe_point_layouts:
+    1: []
+}

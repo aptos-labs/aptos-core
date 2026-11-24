@@ -1,0 +1,115 @@
+=== micro-ops ===
+// module 0x42::padded_eq
+
+fun build() {
+  frame_data_size: 48
+  entry_gas: 224
+  code:
+    0: Move(1) [40] <- [16] @3
+    1: Move8 [32] <- [8] @3
+    2: Move(1) [24] <- [0] @3
+    3: Move(24) [0] <- [24] @4
+    4: Return @4
+}
+
+fun differ_after_dirty() {
+  frame_data_size: 40
+  entry_gas: 323
+  code:
+    0: StoreImm8 [64] <- #11574427654092267680 @0
+    1: CallByNameExempt 0x42::padded_eq::dirty @1
+    2: Move8 [0] <- [64] @1
+    3: StoreImm1 [64] <- #1 @3
+    4: StoreImm8 [72] <- #2 @4
+    5: StoreImm1 [80] <- #3 @5
+    6: CallByNameExempt 0x42::padded_eq::build @6
+    7: Move(24) [8] <- [64] @6
+    8: StoreImm8 [64] <- #5787213827046133840 @7
+    9: CallByNameExempt 0x42::padded_eq::dirty @8
+    10: Move8 [0] <- [64] @8
+    11: StoreImm1 [64] <- #1 @10
+    12: StoreImm8 [72] <- #2 @11
+    13: StoreImm1 [80] <- #4 @12
+    14: CallByNameExempt 0x42::padded_eq::build @13
+    15: ValueCmp [32] <- [8] == [64] : 0x42::padded_eq::P @14
+    16: Move(1) [0] <- [32] @15
+    17: Return @15
+}
+
+fun dirty() {
+  frame_data_size: 56
+  entry_gas: 114
+  code:
+    0: IntBitXor [40] <- [0] ^ u64 #72340172838076673 @1
+    1: IntBitXor [48] <- [0] ^ u64 #144680345676153346 @4
+    2: IntBitXor [8] <- [0] ^ u64 #217020518514230019 @7
+    3: IntBitXor [16] <- [0] ^ u64 #289360691352306692 @11
+    4: IntBitXor [24] <- [0] ^ u64 #361700864190383365 @15
+    5: IntBitXor [32] <- [0] ^ u64 #434041037028460038 @19
+    6: BitXorU64 [48] <- [40] ^ [48] @22
+    7: BitXorU64 [48] <- [48] ^ [8] @24
+    8: BitXorU64 [48] <- [48] ^ [16] @26
+    9: BitXorU64 [48] <- [48] ^ [24] @28
+    10: BitXorU64 [48] <- [48] ^ [32] @30
+    11: BitXorU64 [48] <- [48] ^ [0] @32
+    12: Move8 [0] <- [48] @33
+    13: Return @33
+}
+
+fun equal_after_dirty() {
+  frame_data_size: 40
+  entry_gas: 323
+  code:
+    0: StoreImm8 [64] <- #11574427654092267680 @0
+    1: CallByNameExempt 0x42::padded_eq::dirty @1
+    2: Move8 [0] <- [64] @1
+    3: StoreImm1 [64] <- #1 @3
+    4: StoreImm8 [72] <- #2 @4
+    5: StoreImm1 [80] <- #3 @5
+    6: CallByNameExempt 0x42::padded_eq::build @6
+    7: Move(24) [8] <- [64] @6
+    8: StoreImm8 [64] <- #5787213827046133840 @7
+    9: CallByNameExempt 0x42::padded_eq::dirty @8
+    10: Move8 [0] <- [64] @8
+    11: StoreImm1 [64] <- #1 @10
+    12: StoreImm8 [72] <- #2 @11
+    13: StoreImm1 [80] <- #3 @12
+    14: CallByNameExempt 0x42::padded_eq::build @13
+    15: ValueCmp [32] <- [8] == [64] : 0x42::padded_eq::P @14
+    16: Move(1) [0] <- [32] @15
+    17: Return @15
+}
+
+fun ref_equal_after_dirty() {
+  frame_data_size: 96
+  entry_gas: 401
+  code:
+    0: StoreImm8 [120] <- #11574427654092267680 @0
+    1: CallByNameExempt 0x42::padded_eq::dirty @1
+    2: Move8 [48] <- [120] @1
+    3: StoreImm1 [120] <- #1 @3
+    4: StoreImm8 [128] <- #2 @4
+    5: StoreImm1 [136] <- #3 @5
+    6: CallByNameExempt 0x42::padded_eq::build @6
+    7: Move(24) [0] <- [120] @6
+    8: StoreImm8 [120] <- #5787213827046133840 @8
+    9: CallByNameExempt 0x42::padded_eq::dirty @9
+    10: Move8 [48] <- [120] @9
+    11: StoreImm1 [120] <- #1 @11
+    12: StoreImm8 [128] <- #2 @12
+    13: StoreImm1 [136] <- #3 @13
+    14: CallByNameExempt 0x42::padded_eq::build @14
+    15: Move(24) [24] <- [120] @14
+    16: SlotBorrow [56] <- &[0] @16
+    17: SlotBorrow [72] <- &[24] @17
+    18: ValueRefCmp [88] <- *[56] == *[72] : 0x42::padded_eq::P @18
+    19: Move(1) [0] <- [88] @19
+    20: Return @19
+}
+=== frame-layout ===
+// module 0x42::padded_eq
+fun build: heap_ptr_offsets=[] zero_frame=false
+fun differ_after_dirty: heap_ptr_offsets=[] zero_frame=false
+fun dirty: heap_ptr_offsets=[] zero_frame=false
+fun equal_after_dirty: heap_ptr_offsets=[] zero_frame=false
+fun ref_equal_after_dirty: heap_ptr_offsets=[56, 72] zero_frame=true

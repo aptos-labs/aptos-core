@@ -1,0 +1,74 @@
+=== micro-ops ===
+// module 0x1::u64_fast_path_errors
+
+fun add() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun div() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: DivU64 [16] <- [0] / [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun mod() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: ModU64 [16] <- [0] % [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun mul() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: MulU64 [16] <- [0] * [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun shl() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: ShlU64 [16] <- [0] << [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun shr() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: ShrU64 [16] <- [0] >> [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun sub() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: SubU64 [16] <- [0] - [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun sub_imm() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: SubU64Imm [8] <- [0] - #5 @2
+    1: Move8 [0] <- [8] @3
+    2: Return @3
+}

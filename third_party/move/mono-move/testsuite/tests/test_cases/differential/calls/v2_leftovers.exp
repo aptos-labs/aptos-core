@@ -20,15 +20,6 @@ fun add_two(r0, r1): u64 {
     1: ret [r2] @3
 }
 
-fun copy_to_call(r0): u64 {
-  slots: params(1), locals(0), temps(0), transfer(1)
-    r0: u64
-  code:
-  L0:
-    0: [x0] := call_exempt identity, [r0] @1
-    1: ret [x0] @2
-}
-
 fun move_to_call(r0): u64 {
   slots: params(1), locals(0), temps(0), transfer(1)
     r0: u64
@@ -86,16 +77,6 @@ fun add_two() {
     0: AddU64 [16] <- [0] + [8] @2
     1: Move8 [0] <- [16] @3
     2: Return @3
-}
-
-fun copy_to_call() {
-  frame_data_size: 8
-  entry_gas: 90
-  code:
-    0: Move8 [32] <- [0] @1
-    1: CallByNameExempt 0x66::v2_leftovers::identity @1
-    2: Move8 [0] <- [32] @2
-    3: Return @2
 }
 
 fun move_to_call() {

@@ -11,11 +11,6 @@ fun add_two(a: u64, b: u64): u64
     add
     ret
 
-fun copy_to_call(x: u64): u64
-    copy_loc x
-    call identity
-    ret
-
 fun move_to_call(x: u64): u64
     move_loc x
     call identity
@@ -47,9 +42,6 @@ fun two_copies_to_call(x: u64, y: u64): u64
     copy_loc y
     call add_two
     ret
-
-// RUN: execute 0x66::v2_leftovers::copy_to_call --args 7
-// CHECK: results: 7
 
 // RUN: execute 0x66::v2_leftovers::move_to_call --args 7
 // CHECK: results: 7

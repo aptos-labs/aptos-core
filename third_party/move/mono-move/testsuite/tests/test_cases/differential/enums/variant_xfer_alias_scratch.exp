@@ -1,0 +1,162 @@
+=== stackless ===
+// module 0x66::variant_xfer_alias_scratch
+
+fun id(r0): u64 {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: ret [r0] @1
+}
+
+fun make_tri(r0): Tri {
+  slots: params(1), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: 0x66::variant_xfer_alias_scratch::Tri
+  code:
+  L0:
+    0: r1 := add r0, #1 @3
+    1: r2 := add r0, #2 @6
+    2: r3 := pack_variant 0x66::variant_xfer_alias_scratch::Tri@0, [r0, r1, r2] @7
+    3: ret [r3] @8
+}
+
+fun add3(r0, r1, r2): u64 {
+  slots: params(3), locals(0), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+    r3: u64
+    r4: u64
+  code:
+  L0:
+    0: r3 := mul r0, #100 @2
+    1: r4 := mul r1, #10 @5
+    2: r4 := add r3, r4 @6
+    3: r4 := add r4, r2 @8
+    4: ret [r4] @9
+}
+
+fun sum(r0): u64 {
+  slots: params(1), locals(0), temps(0), transfer(3)
+    r0: 0x66::variant_xfer_alias_scratch::Tri
+  code:
+  L0:
+    0: [x0, x1, x2] := unpack_variant 0x66::variant_xfer_alias_scratch::Tri@0, r0 @1
+    1: [x0] := call_exempt add3, [x0, x1, x2] @2
+    2: ret [x0] @3
+}
+
+fun unpack_alias(r0): u64 {
+  slots: params(1), locals(0), temps(0), transfer(3)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call_exempt make_tri, [r0] @1
+    1: [x0, x1, x2] := unpack_variant 0x66::variant_xfer_alias_scratch::Tri@0, x0 @2
+    2: [x0] := call_exempt add3, [x0, x1, x2] @3
+    3: ret [x0] @4
+}
+
+fun pack_alias(r0): u64 {
+  slots: params(1), locals(0), temps(2), transfer(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: [x0] := call_exempt id, [r0] @1
+    1: r1 := ld_u64 5 @2
+    2: r2 := ld_u64 6 @3
+    3: x0 := pack_variant 0x66::variant_xfer_alias_scratch::Tri@0, [x0, r1, r2] @4
+    4: [x0] := call_exempt sum, [x0] @5
+    5: ret [x0] @6
+}
+=== micro-ops ===
+// module 0x66::variant_xfer_alias_scratch
+
+fun id() {
+  frame_data_size: 8
+  entry_gas: 54
+  code:
+    0: Return @1
+}
+
+fun make_tri() {
+  frame_data_size: 40
+  entry_gas: 150
+  code:
+    0: AddU64Imm [8] <- [0] + #1 @3
+    1: AddU64Imm [16] <- [0] + #2 @6
+    2: EnumNew [24] desc=3 tag #0 @7
+    3: HeapMoveTo8 [24]+8 <- [0] @7
+    4: HeapMoveTo8 [24]+16 <- [8] @7
+    5: HeapMoveTo8 [24]+24 <- [16] @7
+    6: Move8 [0] <- [24] @8
+    7: Return @8
+  safe_point_layouts:
+    2: []
+}
+
+fun add3() {
+  frame_data_size: 40
+  entry_gas: 74
+  code:
+    0: MulU64Imm [24] <- [0] * #100 @2
+    1: MulU64Imm [32] <- [8] * #10 @5
+    2: AddU64 [32] <- [24] + [32] @6
+    3: AddU64 [32] <- [32] + [16] @8
+    4: Move8 [0] <- [32] @9
+    5: Return @9
+}
+
+fun sum() {
+  frame_data_size: 16
+  entry_gas: 228
+  code:
+    0: EnumCheckVariant assert [0].tag == #0 @1
+    1: HeapMoveFrom8 [40] <- [0]+8 @1
+    2: HeapMoveFrom8 [48] <- [0]+16 @1
+    3: HeapMoveFrom8 [56] <- [0]+24 @1
+    4: CallByNameExempt 0x66::variant_xfer_alias_scratch::add3 @2
+    5: Move8 [0] <- [40] @3
+    6: Return @3
+}
+
+fun unpack_alias() {
+  frame_data_size: 16
+  entry_gas: 264
+  code:
+    0: Move8 [40] <- [0] @1
+    1: CallByNameExempt 0x66::variant_xfer_alias_scratch::make_tri @1
+    2: Move8 [8] <- [40] @2
+    3: EnumCheckVariant assert [8].tag == #0 @2
+    4: HeapMoveFrom8 [40] <- [8]+8 @2
+    5: HeapMoveFrom8 [48] <- [8]+16 @2
+    6: HeapMoveFrom8 [56] <- [8]+24 @2
+    7: CallByNameExempt 0x66::variant_xfer_alias_scratch::add3 @3
+    8: Move8 [0] <- [40] @4
+    9: Return @4
+}
+
+fun pack_alias() {
+  frame_data_size: 32
+  entry_gas: 216
+  code:
+    0: Move8 [56] <- [0] @1
+    1: CallByNameExempt 0x66::variant_xfer_alias_scratch::id @1
+    2: StoreImm8 [8] <- #5 @2
+    3: StoreImm8 [16] <- #6 @3
+    4: EnumNew [24] desc=3 tag #0 @4
+    5: HeapMoveTo8 [24]+8 <- [56] @4
+    6: HeapMoveTo8 [24]+16 <- [8] @4
+    7: HeapMoveTo8 [24]+24 <- [16] @4
+    8: Move8 [56] <- [24] @4
+    9: CallByNameExempt 0x66::variant_xfer_alias_scratch::sum @5
+    10: Move8 [0] <- [56] @6
+    11: Return @6
+  safe_point_layouts:
+    4: []
+}

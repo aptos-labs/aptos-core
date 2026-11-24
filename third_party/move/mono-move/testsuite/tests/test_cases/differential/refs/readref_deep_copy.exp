@@ -1,0 +1,37 @@
+=== micro-ops ===
+// module 0x42::readref_copy
+
+fun independent() {
+  frame_data_size: 64
+  entry_gas: 266
+  code:
+    0: StoreImmVec [0] <- const[0] @0
+    1: SlotBorrow [88] <- &[0] @2
+    2: CallByNameExempt 0x42::readref_copy::read @3
+    3: Move8 [8] <- [88] @3
+    4: StoreImm8 [16] <- #9 @5
+    5: SlotBorrow [24] <- &[8] @6
+    6: StoreImm8 [40] <- #0 @7
+    7: VecBorrow [48] <- &[24][[40]] (elem_size=8) @8
+    8: WriteRef *[48] <- [16] (size=8) @9
+    9: StoreImm8 [16] <- #8 @10
+    10: SlotBorrow [24] <- &[0] @11
+    11: StoreImm8 [40] <- #1 @12
+    12: VecBorrow [48] <- &[24][[40]] (elem_size=8) @13
+    13: WriteRef *[48] <- [16] (size=8) @14
+    14: Return @17
+  safe_point_layouts:
+    0: []
+}
+
+fun read() {
+  frame_data_size: 24
+  entry_gas: 80
+  code:
+    0: ReadRef [16] <- *[0] (size=8) @1
+    1: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @1
+    2: Move8 [0] <- [16] @2
+    3: Return @2
+  safe_point_layouts:
+    1: []
+}

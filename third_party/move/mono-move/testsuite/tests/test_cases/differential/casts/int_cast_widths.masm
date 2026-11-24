@@ -1,7 +1,7 @@
 // RUN: publish --print(stackless,micro-ops)
 module 0x1::cast_widths
 
-// --- Identity, small widths. ---
+// --- Identity. ---
 
 fun u8_to_u8(a: u8): u8
     copy_loc a
@@ -21,6 +21,12 @@ fun i8_to_i8(a: i8): i8
 fun i32_to_i32(a: i32): i32
     copy_loc a
     cast_i32
+    ret
+
+// The compiler drops a same-type cast from source; bytecode keeps it.
+fun u64_to_u64(value: u64): u64
+    copy_loc value
+    cast_u64
     ret
 
 // --- Widening, unsigned. ---
@@ -117,7 +123,7 @@ fun u8_to_i256(a: u8): i256
     cast_i256
     ret
 
-// --- Identity, small widths: never aborts, endpoints included. ---
+// --- Identity: never aborts, endpoints included. ---
 
 // RUN: execute 0x1::cast_widths::u8_to_u8 --args 0
 // CHECK: results: 0
@@ -131,6 +137,12 @@ fun u8_to_i256(a: u8): i256
 // CHECK: results: 65535
 // RUN: execute 0x1::cast_widths::i32_to_i32 --args -2147483648
 // CHECK: results: -2147483648
+// RUN: execute 0x1::cast_widths::u64_to_u64 --args 42
+// CHECK: results: 42
+// RUN: execute 0x1::cast_widths::u64_to_u64 --args 0
+// CHECK: results: 0
+// RUN: execute 0x1::cast_widths::u64_to_u64 --args 18446744073709551615
+// CHECK: results: 18446744073709551615
 
 // --- Widening, unsigned: always fits. ---
 

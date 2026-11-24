@@ -1,0 +1,68 @@
+// `unpack_alias` unpacks a variant returned by a call straight into the next call's
+// arguments; `pack_alias` packs a variant whose first field is a call's result and passes
+// it straight to a call. In both, the enum and its first field are in the same argument
+// position. The golden pins how both lower.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::variant_xfer_alias_scratch
+
+enum Tri has drop
+  T
+    a: u64
+    b: u64
+    c: u64
+
+fun id(value: u64): u64
+    move_loc value
+    ret
+
+fun make_tri(value: u64): Tri
+    copy_loc value
+    copy_loc value
+    ld_u64 1
+    add
+    move_loc value
+    ld_u64 2
+    add
+    pack_variant Tri, T
+    ret
+
+fun add3(hundreds: u64, tens: u64, ones: u64): u64
+    move_loc hundreds
+    ld_u64 100
+    mul
+    move_loc tens
+    ld_u64 10
+    mul
+    add
+    move_loc ones
+    add
+    ret
+
+fun sum(tri: Tri): u64
+    move_loc tri
+    unpack_variant Tri, T
+    call add3
+    ret
+
+public fun unpack_alias(value: u64): u64
+    move_loc value
+    call make_tri
+    unpack_variant Tri, T
+    call add3
+    ret
+
+public fun pack_alias(value: u64): u64
+    move_loc value
+    call id
+    ld_u64 5
+    ld_u64 6
+    pack_variant Tri, T
+    call sum
+    ret
+
+// RUN: execute 0x66::variant_xfer_alias_scratch::unpack_alias --args 1
+// CHECK: results: 123
+
+// RUN: execute 0x66::variant_xfer_alias_scratch::pack_alias --args 4
+// CHECK: results: 456

@@ -1,0 +1,56 @@
+=== micro-ops ===
+// module 0x42::stale_frame
+
+fun fresh() {
+  frame_data_size: 64
+  entry_gas: 986
+  code:
+    0: ForceGC @0
+    1: VecPack [8] <- [[0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0]] (size=8, desc=0) @31
+    2: SlotBorrow [16] <- &[8] @33
+    3: VecLen [32] <- vec_len([16]) @34
+    4: SlotBorrow [16] <- &[8] @35
+    5: StoreImm8 [40] <- #29 @36
+    6: VecBorrow [48] <- &[16][[40]] (elem_size=8) @37
+    7: ReadRef [40] <- *[48] (size=8) @38
+    8: AddU64 [40] <- [32] + [40] @39
+    9: Move8 [0] <- [40] @40
+    10: Return @40
+  safe_point_layouts:
+    0: []
+    1: []
+}
+
+fun keep_big() {
+  frame_data_size: 40
+  entry_gas: 848
+  code:
+    0: VecPack [8] <- [[0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0], [0]] (size=8, desc=0) @30
+    1: SlotBorrow [16] <- &[8] @32
+    2: VecLen [32] <- vec_len([16]) @33
+    3: Move8 [0] <- [32] @34
+    4: Return @34
+  safe_point_layouts:
+    0: []
+}
+
+fun run() {
+  frame_data_size: 16
+  entry_gas: 188
+  code:
+    0: Move8 [40] <- [0] @1
+    1: CallByNameExempt 0x42::stale_frame::keep_big @1
+    2: Move8 [8] <- [40] @1
+    3: Move8 [40] <- [0] @3
+    4: CallByNameExempt 0x42::stale_frame::fresh @3
+    5: Move8 [0] <- [40] @3
+    6: MulU64Imm [8] <- [8] * #1000 @6
+    7: AddU64 [8] <- [8] + [0] @8
+    8: Move8 [0] <- [8] @9
+    9: Return @9
+}
+=== frame-layout ===
+// module 0x42::stale_frame
+fun fresh: heap_ptr_offsets=[8, 16, 48] zero_frame=true
+fun keep_big: heap_ptr_offsets=[8, 16] zero_frame=true
+fun run: heap_ptr_offsets=[] zero_frame=false
