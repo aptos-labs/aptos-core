@@ -1,0 +1,66 @@
+=== micro-ops ===
+// module 0x42::suspended
+
+fun descend() {
+  frame_data_size: 88
+  entry_gas: 75
+  code:
+    0: AddU64Imm [40] <- [0] + #1 @2
+    1: MulU64Imm [48] <- [0] * #10 @5
+    2: VecPack [24] <- [[40], [48]] (size=8, desc=0) @6
+    3: JumpIntCmp @31 [0] != u64 #0 gas_taken=93 gas_fallthrough=371 @9
+    4: ForceGC @12
+    5: AddU64Imm [48] <- [0] + #9001 @15
+    6: AddU64Imm [40] <- [0] + #9002 @18
+    7: VecPack [32] <- [[48], [40]] (size=8, desc=0) @19
+    8: ForceGC @21
+    9: SlotBorrow [56] <- &[32] @23
+    10: StoreImm8 [40] <- #0 @24
+    11: VecBorrow [72] <- &[56][[40]] (elem_size=8) @25
+    12: ReadRef [40] <- *[72] (size=8) @26
+    13: SlotBorrow [56] <- &[32] @27
+    14: StoreImm8 [48] <- #1 @28
+    15: VecBorrow [72] <- &[56][[48]] (elem_size=8) @29
+    16: ReadRef [48] <- *[72] (size=8) @30
+    17: AddU64 [48] <- [40] + [48] @31
+    18: VecPushBack [8].push([48], size=8, desc=0) @32
+    19: SlotBorrow [56] <- &[24] @34
+    20: StoreImm8 [48] <- #0 @35
+    21: VecBorrow [72] <- &[56][[48]] (elem_size=8) @36
+    22: ReadRef [48] <- *[72] (size=8) @37
+    23: MulU64Imm [48] <- [48] * #100 @39
+    24: SlotBorrow [56] <- &[24] @40
+    25: StoreImm8 [40] <- #1 @41
+    26: VecBorrow [72] <- &[56][[40]] (elem_size=8) @42
+    27: ReadRef [40] <- *[72] (size=8) @43
+    28: AddU64 [40] <- [48] + [40] @44
+    29: VecPushBack [8].push([40], size=8, desc=0) @45
+    30: Return @46
+    31: SubU64Imm [112] <- [0] - #1 @49
+    32: Move(16) [120] <- [8] @51
+    33: CallByNameExempt 0x42::suspended::descend @51
+    34: Jump @19 gas=106 @52
+  safe_point_layouts:
+    2: []
+    4: []
+    7: []
+    8: []
+    18: []
+    29: []
+}
+
+fun run() {
+  frame_data_size: 16
+  entry_gas: 152
+  code:
+    0: VecNew [8] @0
+    1: SlotBorrow [48] <- &[8] @3
+    2: Move8 [40] <- [0] @4
+    3: CallByNameExempt 0x42::suspended::descend @4
+    4: Move8 [0] <- [8] @6
+    5: Return @6
+}
+=== frame-layout ===
+// module 0x42::suspended
+fun descend: heap_ptr_offsets=[8, 24, 32, 56, 72] zero_frame=true
+fun run: heap_ptr_offsets=[8] zero_frame=true

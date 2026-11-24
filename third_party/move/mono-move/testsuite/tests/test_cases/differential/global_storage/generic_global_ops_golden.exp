@@ -1,0 +1,137 @@
+=== stackless ===
+// module 0x42::gg
+
+fun bump(r0, r1) {
+  slots: params(2), locals(1), temps(1)
+    r0: address
+    r1: u64
+    r2: &mut 0x42::gg::Box<u64>
+    r3: u64
+  code:
+  L0:
+    0: r2 := mut_borrow_global 0x42::gg::Box<u64>, r0 @1
+    1: r3 := read_field Box::value, r2 @4
+    2: r3 := mul r3, #10 @7
+    3: r3 := add r3, r1 @9
+    4: write_field Box::value, r2, r3 @11
+    5: ret [] @13
+}
+
+fun put(r0, r1) {
+  slots: params(2), locals(0), temps(2)
+    r0: signer
+    r1: u64
+    r2: &signer
+    r3: 0x42::gg::Box<u64>
+  code:
+  L0:
+    0: r2 := imm_borrow_loc r0 @0
+    1: r3 := pack 0x42::gg::Box<u64>, [r1] @2
+    2: move_to 0x42::gg::Box<u64>, r2, r3 @3
+    3: ret [] @4
+}
+
+fun put_wide(r0, r1) {
+  slots: params(2), locals(0), temps(2)
+    r0: signer
+    r1: u128
+    r2: &signer
+    r3: 0x42::gg::Box<u128>
+  code:
+  L0:
+    0: r2 := imm_borrow_loc r0 @0
+    1: r3 := pack 0x42::gg::Box<u128>, [r1] @2
+    2: move_to 0x42::gg::Box<u128>, r2, r3 @3
+    3: ret [] @4
+}
+
+fun read(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: address
+    r1: &0x42::gg::Box<u64>
+    r2: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_global 0x42::gg::Box<u64>, r0 @1
+    1: r2 := read_field Box::value, r1 @2
+    2: ret [r2] @4
+}
+
+fun take(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: address
+    r1: 0x42::gg::Box<u64>
+    r2: u64
+  code:
+  L0:
+    0: r1 := move_from 0x42::gg::Box<u64>, r0 @1
+    1: [r2] := unpack 0x42::gg::Box<u64>, r1 @2
+    2: ret [r2] @3
+}
+=== micro-ops ===
+// module 0x42::gg
+
+fun bump() {
+  frame_data_size: 64
+  entry_gas: 79
+  code:
+    0: BorrowGlobalMut<0x42::gg::Box<u64>> [40] <- addr=[0], ty= @1
+    1: ReadRefOffset [56] <- *([40]+0) (size=8) @4
+    2: MulU64Imm [56] <- [56] * #10 @7
+    3: AddU64 [56] <- [56] + [32] @9
+    4: WriteRefOffset *([40]+0) <- [56] (size=8) @11
+    5: Return @13
+  safe_point_layouts:
+    0: []
+}
+
+fun put() {
+  frame_data_size: 72
+  entry_gas: 45
+  code:
+    0: SlotBorrow [40] <- &[0] @0
+    1: Move8 [56] <- [32] @2
+    2: HeapNew [64] desc=3 @3
+    3: HeapMoveTo8 [64]+0 <- [56] @3
+    4: MoveTo<0x42::gg::Box<u64>> signer=[40], src=[64] @3
+    5: Return @4
+  safe_point_layouts:
+    2: []
+}
+
+fun put_wide() {
+  frame_data_size: 88
+  entry_gas: 69
+  code:
+    0: SlotBorrow [48] <- &[0] @0
+    1: Move(16) [64] <- [32] @2
+    2: HeapNew [80] desc=4 @3
+    3: HeapMoveTo [80]+0 <- [64] (size=16) @3
+    4: MoveTo<0x42::gg::Box<u128>> signer=[48], src=[80] @3
+    5: Return @4
+  safe_point_layouts:
+    2: []
+}
+
+fun read() {
+  frame_data_size: 56
+  entry_gas: 95
+  code:
+    0: BorrowGlobal<0x42::gg::Box<u64>> [32] <- addr=[0], ty= @1
+    1: ReadRefOffset [48] <- *([32]+0) (size=8) @2
+    2: Move8 [0] <- [48] @4
+    3: Return @4
+}
+
+fun take() {
+  frame_data_size: 56
+  entry_gas: 95
+  code:
+    0: MoveFrom<0x42::gg::Box<u64>> [48] <- addr=[0], ty= @1
+    1: HeapMoveFrom8 [32] <- [48]+0 @1
+    2: Move8 [40] <- [32] @2
+    3: Move8 [0] <- [40] @3
+    4: Return @3
+  safe_point_layouts:
+    0: []
+}

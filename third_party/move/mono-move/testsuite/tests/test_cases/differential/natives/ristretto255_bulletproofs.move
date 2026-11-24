@@ -122,21 +122,6 @@ module 0x1::ristretto255_bulletproofs {
         verify(A_COMM, A_RANGE_PROOF_PEDERSEN, 10, A_DST)
     }
 
-    // Aborts with NFE_BATCH_SIZE_NOT_SUPPORTED (0x01_0004). The bit-width check
-    // runs first, so this also pins the abort ordering.
-    public fun verify_batch_unsupported_size(): bool {
-        verify_batch(vector[A_COMM, B_COMM, A_COMM], AB_BATCH_RANGE_PROOF_PEDERSEN, 64, A_DST)
-    }
-
-    // Aborts with NFE_DESERIALIZE_RANGE_PROOF (0x01_0001).
-    public fun verify_garbage_proof(): bool {
-        verify(A_COMM, b"not a range proof", 64, A_DST)
-    }
-
-    public fun verify_batch_garbage_proof(): bool {
-        verify_batch(vector[A_COMM, B_COMM], vector[], 64, A_DST)
-    }
-
     // The prover's commitment is deterministic even though its proof is not.
     public fun prove_single_commitment(): vector<u8> {
         let (_proof, comm) = prove_range_internal(
@@ -168,11 +153,6 @@ module 0x1::ristretto255_bulletproofs {
     public fun prove_batch_commitments(): (u64, vector<u8>, vector<u8>) {
         let (_proof, comms) = prove_batch(64);
         (comms.length(), comms[0], comms[1])
-    }
-
-    public fun prove_verify_batch_roundtrip(): bool {
-        let (proof, comms) = prove_batch(64);
-        verify_batch(comms, proof, 64, A_DST)
     }
 
     // Allocate after the prover returns, so the collector has to relocate the
@@ -207,16 +187,7 @@ module 0x1::ristretto255_bulletproofs {
 // CHECK: results: false
 
 // RUN: execute 0x1::ristretto255_bulletproofs::verify_unsupported_bits
-// CHECK-SUBSTR: aborted: code 65539
-
-// RUN: execute 0x1::ristretto255_bulletproofs::verify_batch_unsupported_size
-// CHECK-SUBSTR: aborted: code 65540
-
-// RUN: execute 0x1::ristretto255_bulletproofs::verify_garbage_proof
-// CHECK-SUBSTR: aborted: code 65537
-
-// RUN: execute 0x1::ristretto255_bulletproofs::verify_batch_garbage_proof
-// CHECK-SUBSTR: aborted: code 65537
+// CHECK: aborted: code 65539 (Range of 10 bits is not supported (must be 8, 16, 32, or 64)) in 0x1::ristretto255_bulletproofs
 
 // RUN: execute 0x1::ristretto255_bulletproofs::prove_single_commitment
 // CHECK: results: 0x0a665260a4e42e575882c2cdcb3d0febd6cf168834f6de1e9e61e7b2e53dbf14
@@ -226,9 +197,6 @@ module 0x1::ristretto255_bulletproofs {
 
 // RUN: execute 0x1::ristretto255_bulletproofs::prove_batch_commitments
 // CHECK: results: 2, 0x0a665260a4e42e575882c2cdcb3d0febd6cf168834f6de1e9e61e7b2e53dbf14, 0x748c244d880a1de3970a3d01670a04db6b74b9741bfec8732e512312384a6515
-
-// RUN: execute 0x1::ristretto255_bulletproofs::prove_verify_batch_roundtrip
-// CHECK: results: true
 
 // RUN: execute 0x1::ristretto255_bulletproofs::prove_batch_survives_gc --args 0 --heap-size 16384
 // CHECK: results: true

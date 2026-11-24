@@ -1,0 +1,134 @@
+=== micro-ops ===
+// module 0x42::variant_maps
+
+fun both() {
+  frame_data_size: 104
+  entry_gas: 1357
+  code:
+    0: StoreImm1 [128] <- #120 @0
+    1: StoreImm8 [136] <- #1 @1
+    2: CallByNameExempt 0x42::variant_maps::bytes_of @2
+    3: StoreImm8 [56] <- #3 @3
+    4: EnumNew [64] desc=3 tag #0 @4
+    5: HeapMoveTo8 [64]+8 <- [128] @4
+    6: HeapMoveTo8 [64]+16 <- [56] @4
+    7: StoreImm8 [56] <- #4 @5
+    8: StoreImm1 [128] <- #121 @6
+    9: StoreImm8 [136] <- #2 @7
+    10: CallByNameExempt 0x42::variant_maps::bytes_of @8
+    11: EnumNew [72] desc=3 tag #1 @9
+    12: HeapMoveTo8 [72]+8 <- [56] @9
+    13: HeapMoveTo8 [72]+16 <- [128] @9
+    14: VecPack [0] <- [[64], [72]] (size=8, desc=2) @10
+    15: ForceGC @12
+    16: StoreImm8 [56] <- #98 @13
+    17: StoreImm1 [128] <- #65 @14
+    18: StoreImm8 [136] <- #2 @15
+    19: CallByNameExempt 0x42::variant_maps::bytes_of @16
+    20: EnumNew [72] desc=3 tag #1 @17
+    21: HeapMoveTo8 [72]+8 <- [56] @17
+    22: HeapMoveTo8 [72]+16 <- [128] @17
+    23: StoreImm1 [128] <- #81 @18
+    24: StoreImm8 [136] <- #1 @19
+    25: CallByNameExempt 0x42::variant_maps::bytes_of @20
+    26: StoreImm8 [56] <- #99 @21
+    27: EnumNew [64] desc=3 tag #0 @22
+    28: HeapMoveTo8 [64]+8 <- [128] @22
+    29: HeapMoveTo8 [64]+16 <- [56] @22
+    30: VecPack [8] <- [[72], [64]] (size=8, desc=2) @23
+    31: ForceGC @25
+    32: SlotBorrow [80] <- &[0] @26
+    33: VecPopBack [64] <- [80].pop(size=8) @27
+    34: EnumCheckVariant assert [64].tag == #1 @28
+    35: HeapMoveFrom8 [24] <- [64]+8 @28
+    36: HeapMoveFrom8 [16] <- [64]+16 @28
+    37: SlotBorrow [80] <- &[0] @31
+    38: VecPopBack [64] <- [80].pop(size=8) @32
+    39: EnumCheckVariant assert [64].tag == #0 @33
+    40: HeapMoveFrom8 [48] <- [64]+8 @33
+    41: HeapMoveFrom8 [40] <- [64]+16 @33
+    42: SlotBorrow [80] <- &[8] @34
+    43: VecPopBack [128] <- [80].pop(size=8) @35
+    44: CallByNameExempt 0x42::variant_maps::weight @36
+    45: Move8 [56] <- [128] @36
+    46: SlotBorrow [80] <- &[8] @37
+    47: VecPopBack [128] <- [80].pop(size=8) @38
+    48: CallByNameExempt 0x42::variant_maps::weight @39
+    49: AddU64 [32] <- [56] + [128] @40
+    50: Move8 [0] <- [40] @49
+    51: Move8 [8] <- [48] @49
+    52: Move8 [144] <- [24] @49
+    53: Move8 [24] <- [16] @49
+    54: Move8 [16] <- [144] @49
+    55: Return @49
+  safe_point_layouts:
+    4: [128]
+    11: [128]
+    14: []
+    15: []
+    20: [128]
+    27: [128]
+    30: []
+    31: []
+}
+
+fun bytes_of() {
+  frame_data_size: 56
+  entry_gas: 12
+  code:
+    0: VecNew [16] @0
+    1: StoreImm8 [24] <- #0 @2
+    2: JumpGreaterEqualU64 @9 [24] >= [8] gas_taken=54 gas_fallthrough=26 @6
+    3: SlotBorrow [32] <- &[16] @8
+    4: IntCast.u64->u8 [48] <- [24] @11
+    5: IntAdd [48] <- [0] + u8 [48] @12
+    6: VecPushBack [32].push([48], size=1, desc=0) @13
+    7: AddU64Imm [24] <- [24] + #1 @16
+    8: Jump @2 gas=3 @18
+    9: Move8 [0] <- [16] @20
+    10: Return @20
+  safe_point_layouts:
+    6: []
+}
+
+fun weight() {
+  frame_data_size: 120
+  entry_gas: 9
+  code:
+    0: SlotBorrow [8] <- &[0] @0
+    1: EnumTestTag [48] <- (*[8]).tag == #0 @3
+    2: JumpZeroByte @15 [48] gas_taken=7 gas_fallthrough=141 @4
+    3: EnumCheckVariant assert [0].tag == #0 @8
+    4: HeapMoveFrom8 [32] <- [0]+8 @8
+    5: HeapMoveFrom8 [24] <- [0]+16 @8
+    6: MulU64Imm [56] <- [24] * #1000 @13
+    7: SlotBorrow [64] <- &[32] @14
+    8: StoreImm8 [80] <- #0 @15
+    9: VecBorrow [88] <- &[64][[80]] (elem_size=1) @16
+    10: ReadRef [104] <- *[88] (size=1) @17
+    11: IntCast.u8->u64 [80] <- [104] @18
+    12: AddU64 [80] <- [56] + [80] @19
+    13: Move8 [0] <- [80] @20
+    14: Return @20
+    15: EnumTestTag [48] <- (*[8]).tag == #1 @22
+    16: JumpZeroByte @29 [48] gas_taken=4 gas_fallthrough=141 @23
+    17: EnumCheckVariant assert [0].tag == #1 @25
+    18: HeapMoveFrom8 [80] <- [0]+8 @25
+    19: HeapMoveFrom8 [40] <- [0]+16 @25
+    20: MulU64Imm [80] <- [80] * #1000 @28
+    21: SlotBorrow [64] <- &[40] @29
+    22: StoreImm8 [56] <- #0 @30
+    23: VecBorrow [88] <- &[64][[56]] (elem_size=1) @31
+    24: ReadRef [104] <- *[88] (size=1) @32
+    25: IntCast.u8->u64 [56] <- [104] @33
+    26: AddU64 [56] <- [80] + [56] @34
+    27: Move8 [0] <- [56] @35
+    28: Return @35
+    29: StoreImm8 [56] <- #14566554180833181697 @36
+    30: Abort [56] @37
+}
+=== frame-layout ===
+// module 0x42::variant_maps
+fun both: heap_ptr_offsets=[0, 8, 16, 48, 64, 72, 80] zero_frame=true
+fun bytes_of: heap_ptr_offsets=[16, 32] zero_frame=true
+fun weight: heap_ptr_offsets=[0, 8, 32, 40, 64, 88] zero_frame=true
