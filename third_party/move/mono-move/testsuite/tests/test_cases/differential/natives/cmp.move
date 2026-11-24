@@ -10,6 +10,19 @@ module 0x42::main {
         b: u64,
     }
 
+    struct Tagged has drop {
+        tag: u64,
+        f: ||u64 has drop,
+    }
+
+    fun one(): u64 {
+        1
+    }
+
+    fun two(): u64 {
+        2
+    }
+
     public fun u64_lt(): bool {
         cmp::compare(&1u64, &2u64).is_lt()
     }
@@ -35,6 +48,26 @@ module 0x42::main {
     public fun vec_gt(): bool {
         cmp::compare(&vector[1u8, 9u8], &vector[1u8, 3u8]).is_gt()
     }
+
+    // MonoMove does not order function values, which V1 does.
+    public fun closure_same_target(): bool {
+        let f: ||u64 has drop = one;
+        cmp::compare(&f, &f).is_eq()
+    }
+
+    // The tags tie, so the comparison reaches the closures.
+    public fun closure_in_struct(): bool {
+        let a = Tagged { tag: 1, f: one };
+        let b = Tagged { tag: 1, f: two };
+        cmp::compare(&a, &b).is_lt()
+    }
+
+    // The tags differ, so the comparison never reaches the closures.
+    public fun closure_in_struct_decided_before(): bool {
+        let a = Tagged { tag: 1, f: two };
+        let b = Tagged { tag: 2, f: one };
+        cmp::compare(&a, &b).is_lt()
+    }
 }
 
 // RUN: execute 0x42::main::u64_lt
@@ -53,4 +86,15 @@ module 0x42::main {
 // CHECK: results: true
 
 // RUN: execute 0x42::main::vec_gt
+// CHECK: results: true
+
+// RUN: execute 0x42::main::closure_same_target
+// CHECK-V1: results: true
+// CHECK-V2-SUBSTR: function values cannot be ordered
+
+// RUN: execute 0x42::main::closure_in_struct
+// CHECK-V1: results: true
+// CHECK-V2-SUBSTR: function values cannot be ordered
+
+// RUN: execute 0x42::main::closure_in_struct_decided_before
 // CHECK: results: true

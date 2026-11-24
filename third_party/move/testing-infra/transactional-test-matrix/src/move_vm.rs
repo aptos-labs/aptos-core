@@ -190,17 +190,17 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/entry_points/return_values.masm",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/entry_points/script_too_few_type_args.masm",
-        "no entry type-argument validation: a count mismatch is reported as unsupported",
+        "a type-argument count mismatch is located nowhere instead of in the script",
     ),
     MonoMoveDivergence::semantic(
         "tests/entry_points/script_too_few_type_args_inner.masm",
         "no entry type-argument validation: a struct instantiated with the wrong arity runs",
     ),
-    MonoMoveDivergence::unsupported(
+    MonoMoveDivergence::rendering(
         "tests/entry_points/script_too_many_type_args.masm",
-        "no entry type-argument validation: a count mismatch is reported as unsupported",
+        "a type-argument count mismatch is located nowhere instead of in the script",
     ),
     MonoMoveDivergence::semantic(
         "tests/entry_points/script_too_many_type_args_inner.masm",
@@ -218,17 +218,9 @@ const MONO_MOVE_DIVERGENCES: &[MonoMoveDivergence] = &[
         "tests/entry_points/struct_arguments.masm",
         "reference parameters, which no production path accepts",
     ),
-    MonoMoveDivergence::unsupported(
-        "tests/function_values_safety/closure_assign_return.masm",
-        "function value serialization",
-    ),
     MonoMoveDivergence::rendering(
         "tests/function_values_safety/dep_compatibility.masm",
         "invariant violation message, sub-status, location, and exec_state for a stale closure",
-    ),
-    MonoMoveDivergence::unsupported(
-        "tests/instructions/closure_equality.masm",
-        "function value equality",
     ),
     MonoMoveDivergence::semantic(
         "tests/lazy_loading/cyclic_structs.masm",

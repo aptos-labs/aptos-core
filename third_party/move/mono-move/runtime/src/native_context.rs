@@ -231,6 +231,17 @@ impl<'a> ProductionNativeContext<'a> {
     }
 }
 
+/// Maps an encoding or decoding V1's BCS natives reject, which carries the
+/// `InvalidOperation` kind, to `None`. Heap exhaustion, missing layouts and
+/// invariant violations carry other kinds and still propagate.
+fn rejected_as_none<T>(result: VMResult<T>) -> VMResult<Option<T>> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 /// Allocates an uninitialized value buffer, rejecting zero sizes because
 /// [`MemoryRegion`] requires a nonempty allocation.
 fn value_region(size: usize) -> VMResult<MemoryRegion> {
@@ -435,7 +446,7 @@ impl NativeContext for ProductionNativeContext<'_> {
     }
 
     fn caller_module(&self) -> Option<InternedModuleId> {
-        self.caller_frame().map(|(caller, _)| caller.module_id)
+        self.caller_frame().map(|(caller, _)| caller.module_id())
     }
 
     fn direct_caller_module(&self) -> Option<InternedModuleId> {
@@ -451,7 +462,7 @@ impl NativeContext for ProductionNativeContext<'_> {
                 | MicroOp::CallByPtr { .. }
                 | MicroOp::CallByPtrExempt { .. }
         ) {
-            Some(caller.module_id)
+            Some(caller.module_id())
         } else {
             None
         }
@@ -871,15 +882,23 @@ impl NativeContext for ProductionNativeContext<'_> {
         Ok(true)
     }
 
-    unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>> {
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<Vec<u8>>> {
         // SAFETY: forwarded from this method's contract; serialization performs
         // no VM-heap allocation, so `base` stays valid throughout.
-        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
+        rejected_as_none(unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) })
     }
 
-    unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize> {
+    unsafe fn bcs_serialized_size(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<usize>> {
         // SAFETY: forwarded from this method's contract.
-        unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) }
+        rejected_as_none(unsafe { crate::value_conv::bcs::serialized_size(self.guard, base, ty) })
     }
 
     fn bcs_deserialize_value(
@@ -914,13 +933,8 @@ impl NativeContext for ProductionNativeContext<'_> {
                 TopFrame::Native(self.abi),
             )
         };
-        match result {
-            Ok(()) => Ok(Some(region)),
-            // Malformed input: the bytes are not a valid encoding of `ty`. Heap
-            // exhaustion and missing layouts carry other kinds and still propagate.
-            Err(e) if e.kind() == ExecutionErrorKind::InvalidOperation => Ok(None),
-            Err(e) => Err(e),
-        }
+        // Malformed input: the bytes are not a valid encoding of `ty`.
+        rejected_as_none(result.map(|()| region))
     }
 
     fn resource_exists(&self, address: AccountAddress, ty: InternedType) -> VMResult<bool> {
@@ -954,7 +968,9 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: the ABI keeps arg `i` within the frame, holding a value of type
         // `ty` that stays live for the call.
         let base = unsafe { self.frame_ptr.add(slot.offset as usize) };
-        unsafe { self.bcs_serialize_value(base, ty) }
+        // SAFETY: forwarded from the ABI guarantee above; serialization
+        // performs no VM-heap allocation.
+        unsafe { crate::value_conv::bcs::serialize(self.guard, base, ty) }
     }
 
     fn required_descriptor(&self, i: usize) -> Option<DescriptorId> {
@@ -1008,12 +1024,13 @@ impl NativeContext for ProductionNativeContext<'_> {
             TopFrame::Native(self.abi),
             CLOSURE_DESCRIPTOR_ID,
         )?;
-        // A resolved function captures nothing, so the mask is empty and the
-        // captured-data pointer stays at the null `alloc_obj` zeroed it to.
+        // A resolved function is public, so the closure is persistent. It
+        // captures nothing, so the mask is empty and the captured-data pointer
+        // stays at the null `alloc_obj` zeroed it to.
         //
         // SAFETY: `obj` is a freshly allocated closure object.
         unsafe {
-            write_closure_func_ref_and_mask(obj, &ClosureFuncRef::Unresolved(func_ref), 0);
+            write_closure_func_ref_and_mask(obj, &ClosureFuncRef::Unresolved(func_ref), true, 0);
         }
         // SAFETY: `obj` is a live heap object.
         Ok(Ok(Boxed::from_handle(unsafe {
@@ -1241,7 +1258,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         // TODO(completeness): render type arguments, locals, the source
         // location, a code window and the operand stack as V1 does.
         for (i, (func, offset)) in callers.iter().rev().enumerate() {
-            let name = match frame_module(func.module_id) {
+            let name = match frame_module(func.module_id()) {
                 Some(module_id) => format!("0x{module_id}::{}", func.name()),
                 None => "script::main".to_string(),
             };

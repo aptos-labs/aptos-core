@@ -1,11 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! An in-memory [`ModuleProvider`] backed by a map of module bytes plus
-//! a per-package sibling index.
+//! An in-memory [`ModuleProvider`] backed by a map of module bytes.
 
 use bytes::Bytes;
-use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMInternalError, VMResult};
+use mono_move_core::{ExecutionErrorKind, IntoExecutionError, VMResult};
 use mono_move_loader::ModuleProvider;
 use move_binary_format::{deserializer::DeserializerConfig, CompiledModule};
 use move_bytecode_verifier::VerifierConfig;
@@ -17,12 +16,6 @@ use thiserror::Error;
 pub enum ModuleProviderError {
     #[error("invalid module name {module_name:?}")]
     InvalidModuleName { module_name: String },
-
-    #[error("no package declared for {address}::{module_name}")]
-    PackageNotFound {
-        address: AccountAddress,
-        module_name: String,
-    },
 }
 
 impl IntoExecutionError for ModuleProviderError {
@@ -34,7 +27,6 @@ impl IntoExecutionError for ModuleProviderError {
 #[derive(Clone, Default)]
 pub struct InMemoryModuleProvider {
     module_bytes: UnorderedMap<(AccountAddress, Identifier), Bytes>,
-    packages: UnorderedMap<(AccountAddress, Identifier), Vec<Identifier>>,
     deserializer_config: DeserializerConfig,
     verifier_config: VerifierConfig,
 }
@@ -81,22 +73,6 @@ impl InMemoryModuleProvider {
     pub fn add_module_bytes(&mut self, address: AccountAddress, name: Identifier, bytes: Bytes) {
         self.module_bytes.insert((address, name), bytes);
     }
-
-    /// Registers `name` and `siblings` as one package at `address`.
-    /// `siblings` must exclude `name`; `get_same_package_modules` returns the
-    /// full member list, including the queried module.
-    pub fn declare_package(
-        &mut self,
-        address: AccountAddress,
-        name: Identifier,
-        siblings: Vec<Identifier>,
-    ) {
-        let mut all = siblings.clone();
-        all.push(name.clone());
-        for member in &all {
-            self.packages.insert((address, member.clone()), all.clone());
-        }
-    }
 }
 
 impl ModuleProvider for InMemoryModuleProvider {
@@ -118,26 +94,5 @@ impl ModuleProvider for InMemoryModuleProvider {
 
     fn verifier_config(&self) -> &VerifierConfig {
         &self.verifier_config
-    }
-
-    fn get_same_package_modules(
-        &self,
-        address: &AccountAddress,
-        module_name: &str,
-    ) -> VMResult<Vec<Identifier>> {
-        let ident = Identifier::new(module_name).map_err(|_| {
-            VMInternalError::new(ModuleProviderError::InvalidModuleName {
-                module_name: module_name.to_string(),
-            })
-        })?;
-        self.packages
-            .get(&(*address, ident))
-            .cloned()
-            .ok_or_else(|| {
-                VMInternalError::new(ModuleProviderError::PackageNotFound {
-                    address: *address,
-                    module_name: module_name.to_string(),
-                })
-            })
     }
 }

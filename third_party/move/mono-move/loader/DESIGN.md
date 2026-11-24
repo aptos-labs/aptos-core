@@ -123,7 +123,7 @@ module 0x23::d {
 }
 ```
 
-In this design, we propose three loading policies.
+In this design, we propose two loading policies.
 Policies try to balance between the two:
 
 1. Load and charge more modules upfront (more work), no loading / charging when resolving calls (less work).
@@ -174,15 +174,6 @@ module 0x34::d {
 }
 ```
 
-#### Package Loading (PL)
-
-The module is loaded together with all other modules that belong to the same package.
-Essentially, package becomes a single atomic unit for loading.
-
-In Example 1, assume that `a` and `b` are in the same package.
-Then, only `f2` is lowered because layouts for other functions are not available.
-However, if `a`, `b` and `c` are in the same package, both `f1` and `f2` can be lowered.
-
 ### Loading framework
 
 Framework code is treated separately.
@@ -217,11 +208,10 @@ B0 (committed, old framework)
 
 ### Mandatory Sets
 
-All three loading policies can be unified under the same concept: **mandatory sets (MS)**.
+Both loading policies can be unified under the same concept: **mandatory sets (MS)**.
 Mandatory set is a set of modules of fixed size that has to be loaded on the first module access or during the first function call.
 In Example 1, under LL policy `MS(a) = {a}`, `MS(f1) = {b, c}`, and `MS(f2) = {}`.
 Under EL policy, `MS(a) = {a, b, c}`, `MS(f1) = {}`, and `MS(f2) = {}`.
-Under PL policy, mandatory set is all modules in the package.
 
 In order to make metering deterministic:
 

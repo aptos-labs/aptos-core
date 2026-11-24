@@ -16,10 +16,6 @@
 //!      needed to lower all functions in this module. These extra modules are
 //!      essentially a transitive closure of struct dependencies used in the
 //!      requested module.
-//!
-//! - [`LoadingPolicy::Package`] loads every module in the requested module's
-//!   package atomically. Lowering is lazy: any function that needs information
-//!   outside the package is lowered during the first call.
 
 mod error;
 mod loader;

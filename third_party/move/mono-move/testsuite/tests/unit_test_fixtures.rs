@@ -106,10 +106,10 @@ fn unsupported_test_fails_the_run_unless_allowed() {
     assert!(ok, "{output}");
 }
 
-/// Writes MonoMove cannot serialize make a successful differential run
-/// unsupported. Failed runs still compare errors without comparing writes.
+/// Stored function values serialize as V1 serializes them, so the writes of a
+/// test that stores one compare.
 #[test]
-fn unserializable_writes_are_unsupported() {
+fn closure_writes_compare() {
     let v1 = common::v1_backend();
     let mono = MonoMoveBackendFactory::new(u64::MAX);
     let (ok, output) = run(
@@ -118,7 +118,7 @@ fn unserializable_writes_are_unsupported() {
             reference: &v1,
             candidate: &mono,
         },
-        true,
+        false,
     );
     assert!(ok, "{output}");
     let has_line = |status: &str, test: &str| {
@@ -126,10 +126,7 @@ fn unserializable_writes_are_unsupported() {
             .lines()
             .any(|line| line.contains(status) && line.contains(test))
     };
-    assert!(
-        has_line("UNSUPPORTED", "closures::stores_a_closure"),
-        "{output}"
-    );
+    assert!(has_line("PASS", "closures::stores_a_closure"), "{output}");
     assert!(
         has_line("PASS", "closures::aborts_after_storing_a_closure"),
         "{output}"
