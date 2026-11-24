@@ -5,18 +5,21 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    interner::{InternedModuleId, ModuleId},
-    types::{InternedType, EMPTY_TYPE_LIST},
-    verify_function, CallClosureOp, Code, CodeOffset as CO, DescriptorId, DescriptorProvider,
-    FrameLayoutInfo, FrameOffset as FO, Function, FunctionDefinitionIndex, LayoutId,
-    LayoutProvider, MicroOp, ObjectDescriptor, ObjectDescriptorTable, SizedSlot,
-    SortedSafePointEntries, ValueLayout, POINTER_VEC_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    interner::{FunctionRef, InternedFunctionRef, ModuleId},
+    types::{InternedType, Type, EMPTY_TYPE_LIST, U32_TY, U64_TY},
+    value_layout::{FUNCTION_LAYOUT_ID, U32_LAYOUT_ID, U64_LAYOUT_ID, U8_LAYOUT_ID},
+    verify_function, CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, DescriptorId,
+    DescriptorProvider, FieldValueLayout, FrameLayoutInfo, FrameOffset as FO, Function,
+    FunctionDefinitionIndex, FunctionPtr, LayoutFlags, LayoutId, LayoutProvider, MicroOp,
+    ObjectDescriptor, ObjectDescriptorTable, PackClosureOp, SafePointEntry, SizedSlot,
+    SortedSafePointEntries, ValueLayout, ValueLayoutTable, POINTER_VEC_DESCRIPTOR_ID,
+    TRIVIAL_DESCRIPTOR_ID,
 };
+use move_core_types::ability::AbilitySet;
 
-/// A descriptor table paired with an empty layout provider, to satisfy the
-/// verifier's `DescriptorProvider + LayoutProvider` bound. These tests do not
-/// exercise value-comparison operands, the only ops that read a layout.
-struct VerifierProvider(ObjectDescriptorTable);
+/// A descriptor table paired with a layout table, to satisfy the verifier's
+/// `DescriptorProvider + LayoutProvider` bound.
+struct VerifierProvider(ObjectDescriptorTable, ValueLayoutTable);
 
 impl DescriptorProvider for VerifierProvider {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
@@ -25,36 +28,51 @@ impl DescriptorProvider for VerifierProvider {
 }
 
 impl LayoutProvider for VerifierProvider {
-    fn layout(&self, _id: LayoutId) -> Option<&ValueLayout> {
-        None
+    fn layout(&self, id: LayoutId) -> Option<&ValueLayout> {
+        self.1.layout(id)
     }
 
-    fn layout_id(&self, _ty: InternedType) -> Option<LayoutId> {
-        None
+    fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
+        self.1.layout_id(ty)
     }
 }
 
-/// A table holding only the reserved descriptors.
+/// Tables holding only the reserved descriptors and layouts.
 fn trivial_descriptors() -> VerifierProvider {
-    VerifierProvider(ObjectDescriptorTable::new())
+    VerifierProvider(ObjectDescriptorTable::new(), ValueLayoutTable::new())
 }
 
-/// Interned module id for hand-built test functions.
-fn test_module_id() -> InternedModuleId {
+/// Interned function reference for hand-built test functions.
+fn test_func_ref() -> InternedFunctionRef {
     static MODULE_ID: ModuleId = ModuleId::new(
         move_core_types::account_address::AccountAddress::ONE,
         GlobalArenaPtr::from_static("test"),
     );
-    GlobalArenaPtr::from_static(&MODULE_ID)
+    static FUNC_REF: FunctionRef = FunctionRef {
+        module_id: GlobalArenaPtr::from_static(&MODULE_ID),
+        func_name: GlobalArenaPtr::from_static("test"),
+        ty_args: EMPTY_TYPE_LIST,
+    };
+    GlobalArenaPtr::from_static(&FUNC_REF)
+}
+
+/// Interned `||` function type for hand-built `CallClosure`s.
+fn test_closure_ty() -> InternedType {
+    static TY: Type = Type::Function {
+        args: EMPTY_TYPE_LIST,
+        results: EMPTY_TYPE_LIST,
+        abilities: AbilitySet::EMPTY,
+    };
+    GlobalArenaPtr::from_static(&TY)
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
 fn minimal_func() -> Function {
     Function {
-        name: GlobalArenaPtr::from_static("test"),
-        module_id: test_module_id(),
+        func_ref: test_func_ref(),
         def_idx: FunctionDefinitionIndex(0),
         has_module_lock: false,
+        is_persistent: false,
         code: Code::from_vec(vec![MicroOp::Return]),
         entry_gas: 0,
         param_slots: vec![],
@@ -121,6 +139,31 @@ fn valid_with_vec_and_pointer_slots() {
         extended_frame_size: 56,
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        ..minimal_func()
+    };
+    let errors = verify_function(&func, &trivial_descriptors());
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn valid_with_safe_point_at_call_closure() {
+    use MicroOp::*;
+
+    #[rustfmt::skip]
+    let code = vec![
+        CallClosure(Box::new(CallClosureOp { closure_src: FO(0), closure_ty: test_closure_ty(), provided_args: vec![] })),
+        Return,
+    ];
+    let func = Function {
+        code: Code::from_vec(code),
+        param_and_local_sizes_sum: 16,
+        extended_frame_size: 40,
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(0)]),
+        safe_point_layouts: SortedSafePointEntries::new(vec![SafePointEntry {
+            code_offset: CO(0),
+            layout: FrameLayoutInfo::new(vec![FO(8)]),
+        }]),
         ..minimal_func()
     };
     let errors = verify_function(&func, &trivial_descriptors());
@@ -641,7 +684,10 @@ fn vec_pushback_rejects_non_vector_descriptor() {
     let mut descriptors = ObjectDescriptorTable::new();
     let struct_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
     let func = vec_pushback_func(struct_desc);
-    let errors = verify_function(&func, &VerifierProvider(descriptors));
+    let errors = verify_function(
+        &func,
+        &VerifierProvider(descriptors, ValueLayoutTable::new()),
+    );
     assert!(errors.iter().any(|e| e.message.contains("VecPushBack")
         && e.message.contains("not a non-empty Vector or Trivial")));
 }
@@ -676,6 +722,7 @@ fn call_closure_operands_confined_to_data_region() {
             code: Code::from_vec(vec![
                 MicroOp::CallClosure(Box::new(CallClosureOp {
                     closure_src: FO(closure_src),
+                    closure_ty: test_closure_ty(),
                     provided_args: vec![SizedSlot {
                         offset: FO(arg_offset),
                         size: 8,
@@ -706,4 +753,250 @@ fn call_closure_operands_confined_to_data_region() {
             "closure_src {closure_src}, arg {arg_offset}: {errors:?}"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// PackClosure captured layout
+// ---------------------------------------------------------------------------
+
+/// Publishes a captured-values layout with one field per `(offset, id)`.
+fn push_captured_layout(
+    layouts: &mut ValueLayoutTable,
+    size: u32,
+    fields: &[(u32, LayoutId)],
+) -> LayoutId {
+    let fields = fields
+        .iter()
+        .map(|&(offset, id)| FieldValueLayout {
+            offset,
+            id,
+            name: GlobalArenaPtr::from_static("f"),
+        })
+        .collect::<Vec<_>>();
+    layouts.push_anonymous(ValueLayout::struct_layout(
+        None,
+        size,
+        8,
+        None,
+        LayoutFlags::empty(),
+        fields.into_boxed_slice(),
+    ))
+}
+
+/// A `u64` capture from frame slot 0, then a `u8` capture from slot 8, packed
+/// at offsets 0 and 8 of a 9-byte values region.
+fn scalar_captures() -> Vec<SizedSlot> {
+    vec![
+        SizedSlot {
+            offset: FO(0),
+            size: 8,
+            align: 8,
+        },
+        SizedSlot {
+            offset: FO(8),
+            size: 1,
+            align: 1,
+        },
+    ]
+}
+
+/// A `PackClosure` of `captured` over an unresolved target, into slot 16.
+fn pack_op(
+    captured: Vec<SizedSlot>,
+    captured_layout_id: Option<LayoutId>,
+    descriptor_id: DescriptorId,
+    values_size: u32,
+) -> PackClosureOp {
+    PackClosureOp {
+        dst: FO(16),
+        func_ref: ClosureFuncRef::Unresolved(test_func_ref()),
+        mask: (1u64 << captured.len()) - 1,
+        persistent: false,
+        captured_data_descriptor_id: Some(descriptor_id),
+        values_size,
+        captured_layout_id,
+        captured,
+    }
+}
+
+/// A function that packs `op` and returns.
+fn pack_closure_func(op: PackClosureOp) -> Function {
+    Function {
+        zero_frame: true,
+        frame_layout: FrameLayoutInfo::new(vec![FO(16)]),
+        ..func_with_single_op(MicroOp::PackClosure(Box::new(op)))
+    }
+}
+
+/// Verifies a function packing `op` against `layouts` and the reserved
+/// descriptors.
+fn verify_pack(op: PackClosureOp, layouts: ValueLayoutTable) -> Vec<String> {
+    let func = pack_closure_func(op);
+    let provider = VerifierProvider(ObjectDescriptorTable::new(), layouts);
+    verify_function(&func, &provider)
+        .into_iter()
+        .map(|e| e.message)
+        .collect()
+}
+
+fn assert_error(errors: &[String], needle: &str) {
+    assert!(
+        errors.iter().any(|e| e.contains(needle)),
+        "expected an error containing {needle:?}, got {errors:?}"
+    );
+}
+
+#[test]
+fn valid_pack_closure_with_captured_layout() {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 9, &[(0, U64_LAYOUT_ID), (8, U8_LAYOUT_ID)]);
+    let errors = verify_pack(
+        pack_op(scalar_captures(), Some(id), TRIVIAL_DESCRIPTOR_ID, 9),
+        layouts,
+    );
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn pack_closure_rejects_missing_captured_layout() {
+    let errors = verify_pack(
+        pack_op(scalar_captures(), None, TRIVIAL_DESCRIPTOR_ID, 9),
+        ValueLayoutTable::new(),
+    );
+    assert_error(&errors, "does not match 2 captures");
+}
+
+#[test]
+fn pack_closure_rejects_unknown_captured_layout() {
+    let errors = verify_pack(
+        pack_op(
+            scalar_captures(),
+            Some(LayoutId::from_usize(1000)),
+            TRIVIAL_DESCRIPTOR_ID,
+            9,
+        ),
+        ValueLayoutTable::new(),
+    );
+    assert_error(&errors, "unknown captured_layout_id");
+}
+
+#[test]
+fn pack_closure_rejects_non_struct_captured_layout() {
+    let errors = verify_pack(
+        pack_op(
+            scalar_captures(),
+            Some(U64_LAYOUT_ID),
+            TRIVIAL_DESCRIPTOR_ID,
+            9,
+        ),
+        ValueLayoutTable::new(),
+    );
+    assert_error(&errors, "is not a struct layout");
+}
+
+#[test]
+fn pack_closure_rejects_captured_layout_field_count() {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 9, &[(0, U64_LAYOUT_ID)]);
+    let errors = verify_pack(
+        pack_op(scalar_captures(), Some(id), TRIVIAL_DESCRIPTOR_ID, 9),
+        layouts,
+    );
+    assert_error(&errors, "has 1 fields for 2 captures");
+}
+
+#[test]
+fn pack_closure_rejects_captured_layout_size() {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 16, &[(0, U64_LAYOUT_ID), (8, U8_LAYOUT_ID)]);
+    let errors = verify_pack(
+        pack_op(scalar_captures(), Some(id), TRIVIAL_DESCRIPTOR_ID, 9),
+        layouts,
+    );
+    assert_error(&errors, "captured layout size 16 != values_size 9");
+}
+
+#[test]
+fn pack_closure_rejects_captured_layout_offset() {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 9, &[(0, U64_LAYOUT_ID), (4, U8_LAYOUT_ID)]);
+    let errors = verify_pack(
+        pack_op(scalar_captures(), Some(id), TRIVIAL_DESCRIPTOR_ID, 9),
+        layouts,
+    );
+    assert_error(&errors, "field 1 at offset 4 != packed offset 8");
+}
+
+#[test]
+fn pack_closure_rejects_captured_layout_field_size() {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 9, &[(0, U32_LAYOUT_ID), (8, U8_LAYOUT_ID)]);
+    let errors = verify_pack(
+        pack_op(scalar_captures(), Some(id), TRIVIAL_DESCRIPTOR_ID, 9),
+        layouts,
+    );
+    assert_error(&errors, "field 0 is (4, 4) but captured[0] is (8, 8)");
+}
+
+#[test]
+fn pack_closure_rejects_untraced_captured_pointer() {
+    // A function value is a heap pointer, which the `Trivial` descriptor would
+    // leave untraced.
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 8, &[(0, FUNCTION_LAYOUT_ID)]);
+    let captured = vec![SizedSlot {
+        offset: FO(0),
+        size: 8,
+        align: 8,
+    }];
+    let errors = verify_pack(
+        pack_op(captured, Some(id), TRIVIAL_DESCRIPTOR_ID, 8),
+        layouts,
+    );
+    assert_error(&errors, "pointer offsets [0] != descriptor offsets []");
+}
+
+/// A callee with one parameter of type `ty` in an 8-byte slot, so only its
+/// layout can disagree with a `u64` capture.
+fn resolved_callee(ty: InternedType) -> FunctionPtr {
+    FunctionPtr::new(Box::new(Function {
+        param_slots: vec![SizedSlot {
+            offset: FO(0),
+            size: 8,
+            align: 8,
+        }],
+        param_tys: vec![ty],
+        param_region_size: 8,
+        ..minimal_func()
+    }))
+}
+
+/// Verifies packing a `u64` capture for `callee`.
+fn verify_resolved_pack(callee: FunctionPtr) -> Vec<String> {
+    let mut layouts = ValueLayoutTable::new();
+    let id = push_captured_layout(&mut layouts, 8, &[(0, U64_LAYOUT_ID)]);
+    let captured = vec![SizedSlot {
+        offset: FO(0),
+        size: 8,
+        align: 8,
+    }];
+    let op = PackClosureOp {
+        func_ref: ClosureFuncRef::Resolved(callee),
+        ..pack_op(captured, Some(id), TRIVIAL_DESCRIPTOR_ID, 8)
+    };
+    verify_pack(op, layouts)
+}
+
+#[test]
+fn pack_closure_checks_resolved_param_layout() {
+    let callee = resolved_callee(U32_TY);
+    assert_error(&verify_resolved_pack(callee), "the callee's parameter has");
+    // SAFETY: nothing references the leaked callee any more.
+    unsafe { callee.free_unchecked() };
+
+    let callee = resolved_callee(U64_TY);
+    let errors = verify_resolved_pack(callee);
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+    // SAFETY: nothing references the leaked callee any more.
+    unsafe { callee.free_unchecked() };
 }

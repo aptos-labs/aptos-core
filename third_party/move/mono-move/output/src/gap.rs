@@ -61,6 +61,8 @@ pub fn gap(err: &VMInternalError) -> Option<Gap> {
             LoaderError::ResourceLayoutNotDerivable => GapKind::ResourceLayoutNotDerivable,
             LoaderError::ModuleNotFound { .. }
             | LoaderError::FunctionNotFound { .. }
+            | LoaderError::TypeArgumentCountMismatch { .. }
+            | LoaderError::TypeArgumentConstraintNotSatisfied { .. }
             | LoaderError::ScriptDeserializationFailed { .. }
             | LoaderError::ScriptVerificationFailed { .. }
             | LoaderError::GlobalContext(_)

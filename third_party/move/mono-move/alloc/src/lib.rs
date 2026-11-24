@@ -6,9 +6,8 @@
 //! # Global arena
 //!
 //! [`GlobalArenaPool`] is used for bump-allocating long-lived data (types,
-//! identifiers, etc.) that outlives executables and is not subject to code
-//! upgrade invalidation. Returns [`GlobalArenaPtr<T>`] which is a raw pointer
-//! to arena's allocation.
+//! identifiers, etc.) that outlives executables. Returns
+//! [`GlobalArenaPtr<T>`] which is a raw pointer to arena's allocation.
 //!
 //! ## Safety model
 //!
@@ -27,8 +26,8 @@
 //! # Explicit memory management
 //!
 //! [`LeakedBoxPtr<T>`] is used for data that cannot be bulk-allocated and
-//! requires explicit memory management. For example, not all executables in
-//! the cache need to be freed at the same time, but only stale old versions.
+//! requires explicit memory management. For example, a loaded module or
+//! function that loses a concurrent cache-insertion race is freed on its own.
 //!
 //! ## Safety model
 //!
@@ -57,5 +56,5 @@ mod memory_region;
 
 pub use align::MAX_ALIGN;
 pub use global_arena::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-pub use leaked::{LeakedBoxPtr, VersionedLeakedBoxPtr};
+pub use leaked::LeakedBoxPtr;
 pub use memory_region::MemoryRegion;

@@ -107,6 +107,9 @@ fn drain_write_set(
     // SAFETY: written pointers refer to live values in the effects' frozen
     // heap, `layouts` describes their interned types, and no GC runs during the
     // drain.
+    // TODO(correctness): a written value V1 refuses to serialize, such as a
+    // closure whose captured layout exceeds V1's bounds, fails materialization
+    // here. V1 keeps the transaction with `VALUE_SERIALIZATION_ERROR` instead.
     let written_bytes = |ptr: NonNull<u8>, ty: InternedType| -> Result<Bytes, String> {
         // SAFETY: forwarded from this function's contract.
         let blob = unsafe { serialize(layouts, ptr.as_ptr(), ty) }
