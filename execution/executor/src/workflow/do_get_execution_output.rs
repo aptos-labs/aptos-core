@@ -598,9 +598,11 @@ impl Parser {
         };
 
         let validator_set = ValidatorSet::fetch_config(&write_set_view)?
-            .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = ConfigurationResource::fetch_config(&write_set_view)?
-            .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
+            .ok_or_else(|| anyhow!("ValidatorSet not found in state at the end of the block"))?;
+        let configuration =
+            ConfigurationResource::fetch_config(&write_set_view)?.ok_or_else(|| {
+                anyhow!("Configuration resource not found in state at the end of the block")
+            })?;
 
         Ok(EpochState::new(
             configuration.epoch(),
