@@ -2092,20 +2092,26 @@ impl<'a> LoweringState<'a> {
                 // hand-crafted bytecode; without it, mono-move would read
                 // another variant's bytes (potential type confusion).
                 //
-                // TODO(perf): elide this check when the variant is statically
-                // known. The dominant case is a `match` arm, where a preceding
-                // `TestVariant(&L, V)` + `BrTrue` already proved the tag. A
-                // sound elision is a conservative forward dataflow in the
-                // destack phase tracking "local L is known variant V": seed {L:
-                // V} on the taken edge of `TestVariant(ref, V)` + `BrTrue`
-                // where `ref` borrows L (via `ImmBorrowLoc` provenance); kill
-                // on any reassignment of L; intersect at CFG joins; then drop
-                // this check when `src` is a direct Move/Copy of a local known
-                // to be V. Default to emitting the check, so an imprecise
-                // analysis can only keep a redundant check, never drop a needed
-                // one. The fact must key on the shared local (TestVariant takes
-                // a `&enum`, UnpackVariant the value); there is no
-                // `VariantSwitch` in this IR to shortcut through.
+                // TODO(perf): skip this check when the variant is already
+                // known. The common case is a `match` arm, which tests through
+                // a reference and then unpacks the value:
+                //
+                //   r := &L;  if test_variant(r, V) { unpack_variant(L, V) }
+                //
+                // A forward dataflow in the destack phase could track the fact
+                // "local L holds variant V":
+                // - Establish it on the true edge of a test of V through a
+                //   reference to L. The reference may be kept in a local and
+                //   tested in a later block, so track what each reference local
+                //   points to.
+                // - Invalidate it when L is redefined or mutably borrowed
+                //   (`mut_local_borrow_target`): a write through the borrow can
+                //   change the variant. This includes a mutable borrow taken
+                //   between `r := &L` and the test (allowed while `r` is live).
+                // - At a join, keep it only if it holds on every incoming edge.
+                // Skip the check only when `src` is a direct move or copy of
+                // such a local; otherwise keep it, so an imprecise analysis
+                // never drops a needed check.
                 self.emit(MicroOp::enum_check_variant(load_ptr, *variant as u64))?;
                 for (field, &dst_off) in variant_fields.iter().zip(dst_offs.iter()) {
                     let size = field.size;

@@ -51,6 +51,44 @@
 //! [`assert_transfer_invariants`] checks all seven invariants at the end of
 //! `analyze` in debug builds.
 //!
+//! # Why `stloc_targets` placement is safe
+//!
+//! Placement makes the instruction that computes a value write it straight
+//! into the local it is later stored to, and drops the store:
+//!
+//! ```text
+//! v := op              x := op
+//! ...           =>     ...
+//! x := move v
+//! ```
+//!
+//! `x` now changes when `op` runs instead of at the store, so the
+//! instructions in between see the new value of `x` where they used to see
+//! the old one. This is safe only if none of them reads or writes `x`.
+//!
+//! An instruction can do that without naming `x`. The verifier guarantees
+//! that `x` is unborrowed at the store, not at `op`, so a reference to `x`
+//! taken before `op` can still be used in between, directly or inside a
+//! callee.
+//!
+//! Placement is therefore allowed only when the store comes right after
+//! `op`. When `op` has several results, the stores of its other results
+//! into other locals may come in between:
+//!
+//! ```text
+//! [v, w] := op              [x, y] := op
+//! y := move w        =>
+//! x := move v
+//! ```
+//!
+//! `y := move w` only copies another result into another local, so it uses
+//! no reference and does not touch `x`.
+//!
+//! `op` may itself use a reference to `x`, as in `x = f(&mut x)`. An
+//! instruction writes its results last (see the operand roles on
+//! [`Instr`]), so those uses still come before `x` is written, as with a
+//! separate store.
+//!
 //! # Why `coalesce_to_local` aliasing is safe
 //!
 //! In SSA, a ValueId is defined once and read-only thereafter — coalescing
@@ -69,7 +107,10 @@
 //!    live, but the coalesced ValueId is, at the IR level, an independent
 //!    stack value — the borrow checker does not see the aliasing.
 //!    Tracked by `home_mut_borrow_pos`; checked via `home_mut_borrowed`.
-//!    `MutBorrowLocField` is tracked under the same channel.
+//!    `MutBorrowLocField` is tracked under the same channel. Only borrows
+//!    inside the live range need tracking: a `&mut x` taken before the
+//!    copy or move cannot be live at it (the verifier rejects `CopyLoc` of
+//!    a mutably borrowed local and `MoveLoc` of a borrowed one).
 //!
 //! With both channels clear over `[def_pos(value_id)+1, live_end(value_id))`, the
 //! ValueId's snapshot equals the local's slot at every read site and they
@@ -97,12 +138,12 @@ pub(crate) struct BlockAnalysis {
     /// the def site. Used downstream as the "kill point" beyond which the
     /// ValueId's slot can be reused.
     pub live_end: UnorderedMap<SsaSlot, usize>,
-    /// `ValueId` → Home slot index it will later be moved into
-    /// (`Move { dst: Home, src: value_id }`, the `st_loc` shape produced by destack),
-    /// when the Home slot is not accessed between the ValueId's def and the
-    /// store. Sound because destack emits this shape only for `StLoc`,
-    /// where the ValueId is popped — the move is its last use, so coloring
-    /// the ValueId into the Home slot makes the store a self-move that elides.
+    /// `ValueId` → Home slot to allocate it to, so that the store of the
+    /// ValueId into that slot (`Move { dst: Home, src: value_id }`) becomes
+    /// a self-move and is elided. Set only when that store comes right after
+    /// the instruction defining the ValueId, with nothing in between but
+    /// stores of that instruction's other results into other Home slots.
+    /// See "Why `stloc_targets` placement is safe" in the file header.
     pub stloc_targets: UnorderedMap<SsaSlot, HomeIndex>,
     /// `ValueId` → Home slot index of the local it was copied/moved out of,
     /// when the local is neither redefined nor mut-borrowed during the
@@ -147,12 +188,7 @@ impl BlockAnalysis {
         let mut live_end: UnorderedMap<SsaSlot, usize> = UnorderedMap::new();
         // `ValueId` -> instruction index where it is defined.
         let mut def_pos: UnorderedMap<SsaSlot, usize> = UnorderedMap::new();
-        // `Home` -> sorted positions where the Home slot appears as def or use.
-        // Used only for range-existence queries, so any duplicate `i` (from a
-        // single instr touching the same Home as both def and use — destack
-        // doesn't currently emit such shapes) would be harmless.
-        let mut home_touch_pos: UnorderedMap<SsaSlot, Vec<usize>> = UnorderedMap::new();
-        // `Home` -> sorted positions where the Home slot appears as def only.
+        // `Home` -> sorted positions where the Home slot is a def.
         let mut home_def_pos: UnorderedMap<SsaSlot, Vec<usize>> = UnorderedMap::new();
         // `Home` -> sorted positions of `MutBorrowLoc` whose source is the
         // Home slot (see file header for why `coalesce_to_local` treats these
@@ -160,29 +196,25 @@ impl BlockAnalysis {
         let mut home_mut_borrow_pos: UnorderedMap<SsaSlot, Vec<usize>> = UnorderedMap::new();
 
         // TODO(perf): we can reduce the number of passes over instructions.
-        for (i, instr) in instrs.iter().enumerate() {
-            for_each_use(instr, |slot| match slot {
-                SsaSlot::ValueId(_) => {
-                    live_end.insert(slot, i);
-                },
-                SsaSlot::Home(_) => {
-                    home_touch_pos.entry(slot).or_default().push(i);
-                },
+        for (pos, instr) in instrs.iter().enumerate() {
+            for_each_use(instr, |slot| {
+                if slot.is_value_id() {
+                    live_end.insert(slot, pos);
+                }
             });
             for_each_def(instr, |slot| match slot {
                 SsaSlot::ValueId(_) => {
-                    live_end.entry(slot).or_insert(i);
-                    def_pos.entry(slot).or_insert(i);
+                    live_end.entry(slot).or_insert(pos);
+                    def_pos.entry(slot).or_insert(pos);
                 },
                 SsaSlot::Home(_) => {
-                    home_touch_pos.entry(slot).or_default().push(i);
-                    home_def_pos.entry(slot).or_default().push(i);
+                    home_def_pos.entry(slot).or_default().push(pos);
                 },
             });
             // A `&mut` into a home local's storage can defer a write through
             // the returned reference, conflicting with coalescing.
             if let Some(local @ SsaSlot::Home(_)) = mut_local_borrow_target(instr) {
-                home_mut_borrow_pos.entry(local).or_default().push(i);
+                home_mut_borrow_pos.entry(local).or_default().push(pos);
             }
         }
 
@@ -194,24 +226,32 @@ impl BlockAnalysis {
             .filter_map(|(i, instr)| Some((i, transfer_rets_and_args(instr)?)))
             .unzip();
 
-        // StLoc look-ahead: map `ValueId` → Home slot when the `ValueId` is produced
-        // and later stored to that Home slot, with the Home slot not accessed
-        // in between. Check uses binary search on home_touch_pos: O(log n)
-        // per candidate.
+        // StLoc placement (rule on `BlockAnalysis::stloc_targets`).
+        // `run_producer` is the position of the last non-store instruction
+        // while every store after it so far stores one of its results, else
+        // `None`. O(log n) per store.
+        //
+        // TODO(perf): a local whose address is never taken in the function
+        // cannot be reached through a reference, so its store could be placed
+        // whenever no instruction in between names it. Needs a per-function
+        // address-taken set.
         let mut stloc_targets: UnorderedMap<SsaSlot, HomeIndex> = UnorderedMap::new();
-        for (i, instr) in instrs.iter().enumerate() {
-            if let Instr::Move {
+        let mut run_producer: Option<usize> = None;
+        for (pos, instr) in instrs.iter().enumerate() {
+            let Instr::Move {
                 dst: dst @ SsaSlot::Home(home_idx),
-                src,
+                src: src @ SsaSlot::ValueId(_),
             } = instr
-                && src.is_value_id()
-                && !stloc_targets.contains_key(src)
-            {
-                let dp = def_pos.get(src).copied().unwrap_or(0);
-                let touches = home_touch_pos.get(dst).map(|v| v.as_slice()).unwrap_or(&[]);
-                let home_touched = has_any_in_range(touches, dp + 1, i);
-                if !home_touched {
-                    stloc_targets.insert(*src, *home_idx);
+            else {
+                run_producer = Some(pos);
+                continue;
+            };
+            run_producer =
+                run_producer.filter(|producer_pos| def_pos.get(src) == Some(producer_pos));
+            if let Some(producer_pos) = run_producer {
+                let defs = home_def_pos.get(dst).map(Vec::as_slice).unwrap_or(&[]);
+                if !has_any_in_range(defs, producer_pos + 1, pos) {
+                    stloc_targets.entry(*src).or_insert(*home_idx);
                 }
             }
         }

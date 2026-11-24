@@ -1,0 +1,108 @@
+// Stores into a local a value computed through a reference to that same local,
+// as in `x = *(&x)` and `x = f(&mut x)`.
+
+// RUN: publish --print(stackless)
+module 0x66::stloc_producer_reads_destination
+
+struct S has copy+drop
+  a: u64
+  b: u64
+
+fun bump_ret(r: &mut u64): u64
+    copy_loc r
+    read_ref
+    ld_u64 100
+    add
+    ld_u64 7
+    move_loc r
+    write_ref
+    ret
+
+// `s = *(&s)` on a struct with two fields.
+fun readref_struct(): u64
+    local s: S
+    local r: &S
+    ld_u64 3
+    ld_u64 4
+    pack S
+    st_loc s
+    borrow_loc s
+    st_loc r
+    move_loc r
+    read_ref
+    st_loc s
+    borrow_loc s
+    borrow_field S, a
+    read_ref
+    ld_u64 10
+    mul
+    borrow_loc s
+    borrow_field S, b
+    read_ref
+    add
+    ret
+
+// `x = *(&x)` on a vector.
+fun readref_vec(): u64
+    local x: vector<u64>
+    local r: &vector<u64>
+    ld_u64 1
+    ld_u64 2
+    vec_pack <u64>, 2
+    st_loc x
+    borrow_loc x
+    st_loc r
+    move_loc r
+    read_ref
+    st_loc x
+    borrow_loc x
+    vec_len <u64>
+    ret
+
+// `x = (&x == &y)`, where `y` holds the same value as `x`.
+fun eq_refs(): bool
+    local x: bool
+    local y: bool
+    local r1: &bool
+    local r2: &bool
+    ld_false
+    st_loc x
+    ld_false
+    st_loc y
+    borrow_loc x
+    st_loc r1
+    borrow_loc y
+    st_loc r2
+    move_loc r1
+    move_loc r2
+    eq
+    st_loc x
+    move_loc x
+    ret
+
+// `x = bump_ret(&mut x)`: the callee writes 7 through the reference and returns
+// the old value plus 100, which is stored last.
+fun call_ret_into_borrowed(): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    move_loc r
+    call bump_ret
+    st_loc x
+    move_loc x
+    ret
+
+// RUN: execute 0x66::stloc_producer_reads_destination::readref_struct
+// CHECK: results: 34
+
+// RUN: execute 0x66::stloc_producer_reads_destination::readref_vec
+// CHECK: results: 2
+
+// RUN: execute 0x66::stloc_producer_reads_destination::eq_refs
+// CHECK: results: true
+
+// RUN: execute 0x66::stloc_producer_reads_destination::call_ret_into_borrowed
+// CHECK: results: 101

@@ -176,7 +176,9 @@ fn eliminate_identity_moves(func: &mut FunctionIR, module: &PreparedModule) {
 /// A definition is dead if its value has no remaining reads in the block
 /// and cannot be read after the block. A retained overwrite in the block
 /// or a slot marked dead by `live_at_some_block_end` rules out reads after
-/// block exit.
+/// block exit. Reads through a reference are covered: a borrow after the
+/// definition is a use of the slot, and the verifier rejects a store to a
+/// local that is borrowed.
 ///
 /// Each Transfer binding must be read exactly once. A Copy/Move from a
 /// Transfer slot must therefore remain even when its destination is dead.

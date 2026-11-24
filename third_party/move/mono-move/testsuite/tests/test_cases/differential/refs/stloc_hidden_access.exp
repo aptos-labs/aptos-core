@@ -1,0 +1,200 @@
+=== stackless ===
+// module 0x66::stloc_hidden_access
+
+fun set7(r0) {
+  slots: params(1), locals(0), temps(1)
+    r0: &mut u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := ld_u64 7 @0
+    1: write_ref r0, r1 @2
+    2: ret [] @3
+}
+
+fun get(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_ref r0 @1
+    1: ret [r1] @2
+}
+
+fun five(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 5 @0
+    1: ret [r0] @1
+}
+
+fun hidden_write(): u64 {
+  slots: params(0), locals(2), temps(2)
+    r0: u64
+    r1: &mut u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1 @0
+    1: r1 := mut_borrow_loc r0 @2
+    2: r2 := ld_u64 5 @4
+    3: r3 := ld_u64 7 @5
+    4: write_ref r1, r3 @7
+    5: ret [r2] @10
+}
+
+fun hidden_read(): u64 {
+  slots: params(0), locals(3), temps(1)
+    r0: u64
+    r1: &u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1 @0
+    1: r1 := imm_borrow_loc r0 @2
+    2: r3 := ld_u64 5 @4
+    3: r2 := read_ref r1 @6
+    4: r0 := move r3 @8
+    5: r3 := mul r0, #10 @11
+    6: r3 := add r3, r2 @13
+    7: ret [r3] @14
+}
+
+fun hidden_call_write(): u64 {
+  slots: params(0), locals(2), temps(1), transfer(1)
+    r0: u64
+    r1: &mut u64
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1 @0
+    1: r1 := mut_borrow_loc r0 @2
+    2: r2 := ld_u64 5 @4
+    3: [] := call_exempt set7, [r1] @6
+    4: ret [r2] @9
+}
+
+fun hidden_call_read(): u64 {
+  slots: params(0), locals(3), temps(1), transfer(1)
+    r0: u64
+    r1: &u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1 @0
+    1: r1 := imm_borrow_loc r0 @2
+    2: r3 := ld_u64 5 @4
+    3: [r2] := call_exempt get, [r1] @6
+    4: r0 := move r3 @8
+    5: r3 := mul r0, #10 @11
+    6: r3 := add r3, r2 @13
+    7: ret [r3] @14
+}
+
+fun hidden_write_call_ret(): u64 {
+  slots: params(0), locals(2), temps(1), transfer(1)
+    r0: u64
+    r1: &mut u64
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1 @0
+    1: r1 := mut_borrow_loc r0 @2
+    2: [x0] := call_exempt five, [] @4
+    3: r2 := ld_u64 7 @5
+    4: write_ref r1, r2 @7
+    5: r0 := move x0 @8
+    6: ret [r0] @10
+}
+
+fun hidden_field_write(): u64 {
+  slots: params(0), locals(2), temps(3)
+    r0: 0x66::stloc_hidden_access::S
+    r1: &mut u64
+    r2: u64
+    r3: u64
+    r4: 0x66::stloc_hidden_access::S
+  code:
+  L0:
+    0: r2 := ld_u64 1 @0
+    1: r3 := ld_u64 2 @1
+    2: r0 := pack 0x66::stloc_hidden_access::S, [r2, r3] @2
+    3: r1 := mut_borrow_loc_field S::a, r0 @4
+    4: r3 := ld_u64 5 @7
+    5: r2 := ld_u64 6 @8
+    6: r4 := pack 0x66::stloc_hidden_access::S, [r3, r2] @9
+    7: r2 := ld_u64 7 @10
+    8: write_ref r1, r2 @12
+    9: r0 := move r4 @13
+    10: r2 := read_loc_field S::a, r0 @14
+    11: r2 := mul r2, #10 @18
+    12: r3 := read_loc_field S::b, r0 @19
+    13: r3 := add r2, r3 @22
+    14: ret [r3] @23
+}
+
+fun hidden_vec_write(): u64 {
+  slots: params(0), locals(2), temps(3)
+    r0: vector<u64>
+    r1: &mut vector<u64>
+    r2: u64
+    r3: vector<u64>
+    r4: &vector<u64>
+  code:
+  L0:
+    0: r2 := ld_u64 1 @0
+    1: r0 := vec_pack u64, 1, [r2] @1
+    2: r1 := mut_borrow_loc r0 @3
+    3: r3 := vec_pack u64, 0, [] @5
+    4: r2 := ld_u64 9 @7
+    5: vec_push_back u64, r1, r2 @8
+    6: r0 := move r3 @9
+    7: r4 := imm_borrow_loc r0 @10
+    8: r2 := vec_len u64, r4 @11
+    9: ret [r2] @12
+}
+
+fun hidden_write_cross_block(): u64 {
+  slots: params(0), locals(2), temps(2)
+    r0: u64
+    r1: &mut u64
+    r2: u64
+    r3: u64
+  code:
+  L1:
+    0: r0 := ld_u64 1 @0
+    1: r1 := mut_borrow_loc r0 @2
+    2: branch L0 @4
+  L0:
+    3: r2 := ld_u64 5 @5
+    4: r3 := ld_u64 7 @6
+    5: write_ref r1, r3 @8
+    6: ret [r2] @11
+}
+
+fun hidden_signer_read(r0, r1) {
+  slots: params(2), locals(2), temps(3)
+    r0: signer
+    r1: signer
+    r2: signer
+    r3: &signer
+    r4: u64
+    r5: 0x66::stloc_hidden_access::R
+    r6: &signer
+  code:
+  L0:
+    0: r2 := move r0 @0
+    1: r3 := imm_borrow_loc r2 @2
+    2: r4 := ld_u64 1 @6
+    3: r5 := pack 0x66::stloc_hidden_access::R, [r4] @7
+    4: move_to 0x66::stloc_hidden_access::R, r3, r5 @8
+    5: r2 := move r1 @9
+    6: r6 := imm_borrow_loc r2 @10
+    7: ret [] @12
+}

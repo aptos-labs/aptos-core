@@ -1,0 +1,229 @@
+// A local is borrowed, a new value for it is computed, the reference is used,
+// and only then is the new value stored. A read through the reference must see
+// the old value; a write through it must be overwritten by the store.
+
+// RUN: publish --print(stackless)
+module 0x66::stloc_hidden_access
+
+struct S has drop
+  a: u64
+  b: u64
+
+struct R has key
+  v: u64
+
+fun set7(r: &mut u64)
+    ld_u64 7
+    move_loc r
+    write_ref
+    ret
+
+fun get(r: &u64): u64
+    move_loc r
+    read_ref
+    ret
+
+fun five(): u64
+    ld_u64 5
+    ret
+
+// The reference writes 7 before 5 is stored: returns 5.
+fun hidden_write(): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    ld_u64 5
+    ld_u64 7
+    move_loc r
+    write_ref
+    st_loc x
+    move_loc x
+    ret
+
+// The reference reads 1 before 5 is stored: returns 5 * 10 + 1.
+fun hidden_read(): u64
+    local x: u64
+    local r: &u64
+    local y: u64
+    ld_u64 1
+    st_loc x
+    borrow_loc x
+    st_loc r
+    ld_u64 5
+    move_loc r
+    read_ref
+    st_loc y
+    st_loc x
+    move_loc x
+    ld_u64 10
+    mul
+    move_loc y
+    add
+    ret
+
+// Same as `hidden_write`, with the write inside a callee.
+fun hidden_call_write(): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    ld_u64 5
+    move_loc r
+    call set7
+    st_loc x
+    move_loc x
+    ret
+
+// Same as `hidden_read`, with the read inside a callee.
+fun hidden_call_read(): u64
+    local x: u64
+    local r: &u64
+    local y: u64
+    ld_u64 1
+    st_loc x
+    borrow_loc x
+    st_loc r
+    ld_u64 5
+    move_loc r
+    call get
+    st_loc y
+    st_loc x
+    move_loc x
+    ld_u64 10
+    mul
+    move_loc y
+    add
+    ret
+
+// Same as `hidden_write`, with the stored value returned by a call.
+fun hidden_write_call_ret(): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    call five
+    ld_u64 7
+    move_loc r
+    write_ref
+    st_loc x
+    move_loc x
+    ret
+
+// The reference writes 7 to field `a` before `s` is replaced by S { a: 5, b: 6 }:
+// returns 5 * 10 + 6.
+fun hidden_field_write(): u64
+    local s: S
+    local r: &mut u64
+    ld_u64 1
+    ld_u64 2
+    pack S
+    st_loc s
+    mut_borrow_loc s
+    mut_borrow_field S, a
+    st_loc r
+    ld_u64 5
+    ld_u64 6
+    pack S
+    ld_u64 7
+    move_loc r
+    write_ref
+    st_loc s
+    borrow_loc s
+    borrow_field S, a
+    read_ref
+    ld_u64 10
+    mul
+    borrow_loc s
+    borrow_field S, b
+    read_ref
+    add
+    ret
+
+// The reference pushes onto the old vector before `x` is replaced by an empty
+// one: returns length 0.
+fun hidden_vec_write(): u64
+    local x: vector<u64>
+    local r: &mut vector<u64>
+    ld_u64 1
+    vec_pack <u64>, 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    vec_pack <u64>, 0
+    move_loc r
+    ld_u64 9
+    vec_push_back <u64>
+    st_loc x
+    borrow_loc x
+    vec_len <u64>
+    ret
+
+// Same as `hidden_write`, with the borrow taken in an earlier block.
+fun hidden_write_cross_block(): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    mut_borrow_loc x
+    st_loc r
+    branch l1
+l1: ld_u64 5
+    ld_u64 7
+    move_loc r
+    write_ref
+    st_loc x
+    move_loc x
+    ret
+
+// `move_to` reads the first signer through the reference before the second
+// signer is stored: the resource is published under the first signer.
+fun hidden_signer_read(s1: signer, s2: signer)
+    local x: signer
+    local r: &signer
+    move_loc s1
+    st_loc x
+    borrow_loc x
+    st_loc r
+    move_loc s2
+    move_loc r
+    ld_u64 1
+    pack R
+    move_to R
+    st_loc x
+    borrow_loc x
+    pop
+    ret
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_write
+// CHECK: results: 5
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_read
+// CHECK: results: 51
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_call_write
+// CHECK: results: 5
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_call_read
+// CHECK: results: 51
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_write_call_ret
+// CHECK: results: 5
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_field_write
+// CHECK: results: 56
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_vec_write
+// CHECK: results: 0
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_write_cross_block
+// CHECK: results: 5
+
+// RUN: execute 0x66::stloc_hidden_access::hidden_signer_read --args 0xa1, 0xb2 --commit
+// CHECK: writes: create 0x66::stloc_hidden_access::R at 0xa1 0x0100000000000000

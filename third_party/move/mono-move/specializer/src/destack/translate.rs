@@ -10,9 +10,8 @@ use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIn
 
 /// Convert an entire compiled module to stackless IR.
 ///
-/// The caller is responsible for running the bytecode verifier beforehand
-/// if the module comes from an untrusted source. The conversion relies on
-/// the following verifier-guaranteed invariants:
+/// The module must have passed the bytecode verifier. The conversion relies
+/// on the following verifier-guaranteed invariants:
 ///
 /// - **Stack balance**: every pop has a matching push; the stack is empty at
 ///   basic-block boundaries and `Ret` drains exactly the declared return values.
@@ -34,8 +33,9 @@ use move_binary_format::{access::ModuleAccess, file_format::FunctionDefinitionIn
 ///   are well-formed.
 /// - **Type parameter bounds**: `TypeParameter(idx)` indices fall within the
 ///   type-parameter list of the enclosing generic context.
-/// - **Reference safety**: the borrow checker guarantees that freed slots
-///   truly hold dead values, so type-keyed slot recycling is sound.
+/// - **Reference safety**: a local is not copied while mutably borrowed, and
+///   not moved or overwritten while borrowed at all; a reference to a local
+///   comes only from a borrow of that local in this function.
 pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> VMResult<ModuleIR> {
     let functions = module
         .function_defs
