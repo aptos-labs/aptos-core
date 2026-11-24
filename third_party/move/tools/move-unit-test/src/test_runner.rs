@@ -345,6 +345,12 @@ impl SharedTestingConfig<'_> {
             TestExecution::BackendError { message } => {
                 return backend_error(function_name, format!("{candidate_name}: {message}"))
             },
+            TestExecution::Diverged { reason } => {
+                return unless_failing(
+                    adjudicate(function_name, test, reference_execution, None),
+                    agreed_divergence(reason),
+                )
+            },
         };
         let reference_run = match reference_execution {
             TestExecution::Ran(run) => run,
@@ -355,6 +361,9 @@ impl SharedTestingConfig<'_> {
             },
             TestExecution::BackendError { message } => {
                 return backend_error(function_name, format!("{reference_name}: {message}"))
+            },
+            TestExecution::Diverged { reason } => {
+                return agreed_divergence(format!("{reference_name}: {reason}"))
             },
         };
 
@@ -400,6 +409,7 @@ fn adjudicate(
         TestExecution::Ran(run) => run,
         TestExecution::Unsupported { reason } => return Verdict::Unsupported { reason },
         TestExecution::BackendError { message } => return backend_error(function_name, message),
+        TestExecution::Diverged { reason } => return agreed_divergence(reason),
     };
     let test_run_info = run_info(function_name, &run, candidate);
     let TestRun {
@@ -494,6 +504,13 @@ fn backend_error(function_name: &str, message: String) -> Verdict {
         None,
         None,
     ))
+}
+
+/// A run that diverges from the reference by design is not compared.
+fn agreed_divergence(reason: String) -> Verdict {
+    Verdict::Incomparable {
+        reason: format!("agreed divergence: {reason}"),
+    }
 }
 
 /// A failing reference verdict stands. Otherwise `verdict` replaces it, since

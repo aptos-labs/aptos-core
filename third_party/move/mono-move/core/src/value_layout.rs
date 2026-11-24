@@ -17,7 +17,7 @@
 //! header.
 
 use crate::{
-    interner::InternedIdentifier,
+    interner::{InternedIdentifier, Interner},
     types::{
         intrinsic_slot_size_and_align, view_type, Alignment, InternedType, Size, Type, ADDRESS_TY,
         BOOL_TY, I128_TY, I16_TY, I256_TY, I32_TY, I64_TY, I8_TY, SIGNER_TY, U128_TY, U16_TY,
@@ -50,6 +50,18 @@ impl LayoutId {
     #[inline(always)]
     pub const fn as_usize(self) -> usize {
         self.0 as usize
+    }
+
+    /// Returns the underlying index, as stored in a captured-data object.
+    #[inline(always)]
+    pub const fn as_u32(self) -> u32 {
+        self.0
+    }
+
+    /// Rebuilds an ID from the `u32` read back out of a captured-data object.
+    #[inline(always)]
+    pub const fn from_u32(raw: u32) -> Self {
+        Self(raw)
     }
 }
 
@@ -558,6 +570,13 @@ pub trait LayoutProvider {
     /// published for it yet (e.g. its module is not loaded).
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId>;
 
+    /// Returns the interner these layouts were built against, or [`None`] for a
+    /// provider that has none. Deserializing a function value interns the
+    /// target's identity, so a provider without an interner cannot decode one.
+    fn interner(&self) -> Option<&dyn Interner> {
+        None
+    }
+
     fn layout_by_ty(&self, ty: InternedType) -> Option<&ValueLayout> {
         let id = self.layout_id(ty)?;
         self.layout(id)
@@ -571,6 +590,41 @@ pub trait LayoutProvider {
     fn size_and_align(&self, ty: InternedType) -> Option<(Size, Alignment)> {
         intrinsic_slot_size_and_align(view_type(ty))
             .or_else(|| self.layout_by_ty(ty).map(|l| (l.size, l.align)))
+    }
+
+    /// Heap-pointer byte offsets within a value of layout `id`, relative to the
+    /// value's start, or [`None`] if a reachable layout is not published or an
+    /// offset overflows. A reference, vector, function or (frozen) enum slot
+    /// holds a pointer at relative offset 0; a struct recurses through its
+    /// fields; scalars hold none.
+    fn pointer_offsets(&self, id: LayoutId) -> Option<Vec<u32>> {
+        let mut out = vec![];
+        self.push_pointer_offsets(id, 0, &mut out)?;
+        Some(out)
+    }
+
+    /// Appends the heap-pointer offsets of layout `id`, shifted by `base`, to
+    /// `out`. See [`Self::pointer_offsets`].
+    //
+    // TODO(metering): rewrite without recursion or add a depth/visited bound.
+    fn push_pointer_offsets(&self, id: LayoutId, base: u32, out: &mut Vec<u32>) -> Option<()> {
+        match &self.layout(id)?.kind {
+            LayoutKind::Bool
+            | LayoutKind::UnsignedInt
+            | LayoutKind::SignedInt
+            | LayoutKind::Address
+            | LayoutKind::Signer => {},
+            LayoutKind::Ref
+            | LayoutKind::Vector { .. }
+            | LayoutKind::FrozenEnum { .. }
+            | LayoutKind::Function => out.push(base),
+            LayoutKind::Struct { fields } => {
+                for field in fields.iter() {
+                    self.push_pointer_offsets(field.id, base.checked_add(field.offset)?, out)?;
+                }
+            },
+        }
+        Some(())
     }
 }
 

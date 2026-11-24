@@ -106,10 +106,10 @@ fun runner() {
   code:
     0: StoreImm2 [0] <- #10 @0
     1: StoreImm1 [2] <- #12 @1
-    2: PackClosure [8] <- func_ref=Unresolved(make), mask=0, captured_desc=<none>, captured=[] @2
+    2: PackClosure [8] <- func_ref=Unresolved(make), mask=0, persistent=true, captured_desc=<none>, captured=[] @2
     3: CallClosure closure=[8], provided_args=[[0](2), [2](1)] @3
     4: Move(4) [16] <- [64] @3
-    5: PackClosure [24] <- func_ref=Unresolved(observe), mask=0, captured_desc=<none>, captured=[] @4
+    5: PackClosure [24] <- func_ref=Unresolved(observe), mask=0, persistent=true, captured_desc=<none>, captured=[] @4
     6: CallClosure closure=[24], provided_args=[[16](4)] @5
     7: Move(1) [32] <- [64] @5
     8: Move(1) [2] <- [65] @5
@@ -126,5 +126,7 @@ fun runner() {
     19: Return @7
   safe_point_layouts:
     2: []
+    3: []
     5: []
+    6: []
 }
