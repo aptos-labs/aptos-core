@@ -6,9 +6,8 @@
 //! # Global arena
 //!
 //! [`GlobalArenaPool`] is used for bump-allocating long-lived data (types,
-//! identifiers, etc.) that outlives executables and is not subject to code
-//! upgrade invalidation. Returns [`GlobalArenaPtr<T>`] which is a raw pointer
-//! to arena's allocation.
+//! identifiers, etc.) that outlives executables. Returns
+//! [`GlobalArenaPtr<T>`] which is a raw pointer to arena's allocation.
 //!
 //! ## Safety model
 //!

@@ -164,7 +164,7 @@ pub enum LayoutKind {
     /// pointing at an enum object. Each variant body has its own published
     /// layout, which may itself contain enums, vectors, or structs.
     ///
-    /// TODO(completeness): revisit with upgrade story, might not need to be frozen.
+    /// TODO(completeness): revisit whether the variant set needs to be frozen.
     FrozenEnum {
         descriptor_id: DescriptorId,
         /// One entry per variant body, indexed by variant tag.

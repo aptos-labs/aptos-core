@@ -5,8 +5,8 @@
 //!
 //! Each entry is a stable pointer to a slot holding at most one loaded
 //! module. A slot is created empty (a cache miss; readers load the module
-//! and fill it) and, once filled, never changes: modules are not versioned
-//! and publishes take effect only between blocks.
+//! and fill it) and, once filled, never changes: modules are not versioned.
+//! A publish is handled by clearing the whole cache between blocks.
 //!
 //! Other loaded modules may point to their dependency slots before those are
 //! filled. Hence, slots and modules are never evicted individually; they are
@@ -64,8 +64,9 @@ impl ModuleCache {
             Err(loser) => {
                 // SAFETY: `loser` is exclusive to this call and has no aliases.
                 unsafe { loser.free_unchecked() };
-                slot.get_ptr()
-                    .ok_or_else(|| anyhow!("cache invariant violated: slot null after CAS failure"))
+                slot.get_ptr().ok_or_else(|| {
+                    anyhow!("cache invariant violated: slot empty after losing init race")
+                })
             },
         }
     }

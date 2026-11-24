@@ -164,9 +164,12 @@ struct Context {
 ///   the table. Reset drops every descriptor, freeing their heap-owning
 ///   payloads (e.g. `Vec<u32>` offset lists).
 /// - The type-keyed caches key on `InternedType` alone, with no module
-///   version. This is sound because modules are never versioned or upgraded
-///   in place: a publish takes effect only between blocks, and the interner,
-///   descriptors, layouts and module cache are always reset together.
+///   version. This is sound only if the interner, descriptors, layouts and
+///   module cache are reset together after every publish, before the next
+///   block.
+//
+// TODO(correctness): nothing resets them after a publish yet; see
+// `AptosModuleCacheManager::try_lock`.
 struct Descriptors {
     /// Vector-descriptor idempotency cache: `elem_ty -> id`. Lock-free reads
     /// via DashMap; the first publisher for a given `elem_ty` takes a shard
@@ -711,7 +714,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// `enum_ty`. `variant_pointer_offsets[v]` are the heap-pointer byte
     /// offsets (relative to the data region after the tag) for variant `v`.
     ///
-    /// Keyed on `InternedType` alone; see [`Descriptors`] for why that is sound.
+    /// TODO(correctness): keyed on `InternedType` alone, which is sound only
+    /// if caches are reset after every publish; see [`Descriptors`].
     pub fn publish_enum_descriptor(
         &self,
         enum_ty: InternedType,
