@@ -21,11 +21,13 @@ use crate::{
     types::{META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
+    borrow_cell,
     interner::{view_module_id, InternedFunctionRef, InternedIdentifier, InternedModuleId},
     native::{
         native_invariant_violation, Boxed, Dispatch, FunctionResolutionError, NativeABI,
         NativeContext, NativeContextFamily, NativeExtension, NativeExtensions, NativeFunction,
-        NativeIdx, NativeName, NativeResolver, Opaque, Ref, RootPool, TableHandle, VMValue, Vector,
+        NativeIdx, NativeName, NativeResolver, ObjectHandle, Opaque, Ref, RootPool, TableHandle,
+        VMValue, Vector,
     },
     storage::resource_provider::InMemoryStorageKey,
     types::{view_name, view_type_list, InternedType, InternedTypeList},
@@ -76,17 +78,30 @@ pub trait LoaderAccess {
 ///
 /// # Interior mutability & safety invariants
 ///
-/// Trait methods take `&self`, so the mutable sub-components sit behind interior
-/// mutability and these invariants MUST be upheld by the implementation rather than
-/// the borrow checker:
-///  - Together, all public entry points must ensure that **at most one** mutable
-///    borrow of any field is live at any time. If one methods needs to call another,
-///    it must ensure all borrows are all disjoint -- if the callee needs
-///    to borrow the same field, it must be passed in from the caller. Another way to
-///    phrase this is that no reentrancies should be allowed.
+/// Trait methods take `&self`, so `heap` and `rws` sit in
+/// `UnsafeCell<&mut _>` fields and a method reborrows what it needs with
+/// `borrow_cell!(let x = unsafe { &mut **self.<field>.get() })`. The macro
+/// ties the reborrow to a local, so the compiler stops it from leaving the
+/// method. The borrow checker cannot see anything else about these reborrows,
+/// so the implementation MUST uphold these invariants itself:
+///  - **At most one** reborrow of a field is live at any time. A method
+///    reborrows a field at most once, and while it holds the reborrow it runs
+///    nothing that could reborrow the same field: if a callee needs the field,
+///    it is passed in from the caller. In other words, no re-entrancy, whether
+///    through another method of this type or through code that was handed
+///    `self`.
+///  - A reborrow never outlives the method that made it: nothing returns or
+///    stores one. Natives only ever get pool handles. (`borrow_cell!` makes
+///    the compiler enforce this.)
 ///  - Exclusivity against the rest of the interpreter is not a manual burden:
 ///    access to other VM components are passed in as `&mut T`, allowing us to have
 ///    exclusive access to those here.
+///
+/// This type is opted in to the `unsafe_cell_reborrow` lint, which checks a
+/// conservative version of the first invariant on every change, and that
+/// every reborrow goes through `borrow_cell!`. The exact
+/// rules, what they guarantee and what they leave to review are in
+/// `devtools/lints/docs/unsafe_cell_reborrow.md`.
 pub struct ProductionNativeContext<'a> {
     /// ABI of the native being invoked, describing the native's frame layout.
     abi: &'a NativeABI,
@@ -180,6 +195,25 @@ impl<'a> ProductionNativeContext<'a> {
         }
     }
 
+    /// Allocates an uninitialized object of `size` bytes, collecting garbage
+    /// first if the heap is full. The result is not rooted: the caller must
+    /// initialize and root it before anything else can allocate.
+    fn alloc_object(&self, size: usize, descriptor: DescriptorId) -> VMResult<*mut u8> {
+        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
+        alloc_or_gc(
+            heap,
+            self.guard,
+            rws,
+            &self.pool,
+            self.extensions,
+            self.frame_ptr,
+            TopFrame::Native(self.abi),
+            |h| heap_alloc(h, size, descriptor),
+        )
+    }
+
     /// Borrows the read-write set entry at `storage_key`, rooting a reference
     /// to it for the rest of the call. Returns `None` if the entry does not
     /// exist.
@@ -189,15 +223,15 @@ impl<'a> ProductionNativeContext<'a> {
         group: Option<InternedType>,
         mutable: bool,
     ) -> VMResult<Option<Ref<'_, Opaque>>> {
-        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let rws = unsafe { &mut **self.rws.get() };
+        // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let ptr = if mutable {
             match rws.try_borrow_global_mut(self.resource_provider, storage_key, group) {
                 Ok(EntryPtr::Writable(ptr)) => ptr,
                 Ok(EntryPtr::NonWritable(ptr)) => {
                     // Copy-on-write: an external or stale value must be copied
                     // into the local heap before it can be mutated.
-                    let heap = unsafe { &mut **self.heap.get() };
+                    borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
                     // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
                     let copied = unsafe {
                         deep_copy_or_gc(
@@ -229,6 +263,69 @@ impl<'a> ProductionNativeContext<'a> {
         let handle = unsafe { self.pool.root_reference(ptr.as_ptr(), 0) };
         Ok(Some(Ref::from_handle(handle)))
     }
+}
+
+/// Allocates a pointer-free vector of `count` elements of `elem_size` bytes,
+/// copies `data` into it and roots it in `pool`. `data` must hold exactly
+/// `count * elem_size` bytes and must not alias the VM heap. A zero `count`
+/// yields the null vector.
+///
+/// Takes the context's components rather than the context: it runs while the
+/// caller holds `heap` and `rws` (see the aliasing rule on
+/// [`ProductionNativeContext`]).
+// TODO(cleanup): bundle the allocation components into one struct.
+#[allow(clippy::too_many_arguments)]
+fn alloc_vector_no_pointers<'a>(
+    heap: &mut Heap,
+    guard: &ExecutionGuard<'_>,
+    rws: &mut ResourceReadWriteSet,
+    pool: &'a RootPool,
+    extensions: &NativeExtensions,
+    frame_ptr: *mut u8,
+    top_frame: TopFrame<'_>,
+    elem_size: u32,
+    count: u64,
+    data: &[u8],
+) -> VMResult<ObjectHandle<'a>> {
+    if (count as usize).checked_mul(elem_size as usize) != Some(data.len()) {
+        return Err(native_invariant_violation(
+            "vector data length must equal count * elem_size".into(),
+        ));
+    }
+    if count == 0 {
+        // TODO(correctness): audit empty <=> null vector invariant
+        // SAFETY: passing `null` is always safe.
+        return Ok(unsafe { pool.root_object(std::ptr::null_mut()) });
+    }
+    // A heap-aliasing `data` would be invalidated by the GC `alloc_vec` may
+    // trigger, before the copy below.
+    if is_heap_ptr(heap, data.as_ptr()) {
+        return Err(native_invariant_violation(
+            "vector data must not alias the VM heap".into(),
+        ));
+    }
+    // Pointer-free elements, so the vector uses the trivial descriptor.
+    let ptr = alloc_vec(
+        heap,
+        guard,
+        rws,
+        pool,
+        extensions,
+        frame_ptr,
+        top_frame,
+        TRIVIAL_DESCRIPTOR_ID,
+        elem_size,
+        count,
+    )?;
+    // SAFETY: `ptr` is a fresh vector with room for `count` elements; no GC
+    // runs between here and these writes, so the raw pointer is valid.
+    unsafe {
+        write_u64(ptr, VEC_LENGTH_OFFSET, count);
+        std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len());
+    }
+    // Root it so it survives later allocations and is GC-relocated.
+    // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
+    Ok(unsafe { pool.root_object(ptr) })
 }
 
 /// Allocates an uninitialized value buffer, rejecting zero sizes because
@@ -473,18 +570,29 @@ impl NativeContext for ProductionNativeContext<'_> {
             return Ok(Vector::from_handle(handle));
         }
 
+        // SAFETY: one reborrow of each cell, released with this call. Every
+        // allocation below goes through these two bindings, so the borrow
+        // checker sees all of them, and nothing calls back into this context
+        // (see the type-level aliasing rule).
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         // Allocate the elements first. Each is rooted, so the GC that a later
         // element's allocation may trigger relocates the earlier ones.
-        let inner = items
-            .iter()
-            .map(|bytes| self.new_byte_vector(bytes))
-            .collect::<VMResult<Vec<_>>>()?;
-
-        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
-        // through `&self` at once is sound — at most one `&mut` per field is
-        // live (see the type-level aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        let mut inner = Vec::with_capacity(items.len());
+        for bytes in items {
+            inner.push(alloc_vector_no_pointers(
+                heap,
+                self.guard,
+                rws,
+                &self.pool,
+                self.extensions,
+                self.frame_ptr,
+                TopFrame::Native(self.abi),
+                1,
+                bytes.len() as u64,
+                bytes,
+            )?);
+        }
         let ptr = alloc_vec(
             heap,
             self.guard,
@@ -525,32 +633,12 @@ impl NativeContext for ProductionNativeContext<'_> {
                 "new_vector_no_pointers called after a return value was written".into(),
             ));
         }
-        if (count as usize).checked_mul(elem_size as usize) != Some(data.len()) {
-            return Err(native_invariant_violation(
-                "new_vector_no_pointers: data length must equal count * elem_size".into(),
-            ));
-        }
-        if count == 0 {
-            // TODO(correctness): audit empty <=> null vector invariant
-            // SAFETY: passing `null` is always safe.
-            let handle = unsafe { self.pool.root_object(std::ptr::null_mut()) };
-            return Ok(Vector::from_handle(handle));
-        }
-
-        // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
-        // through `&self` at once is sound — at most one `&mut` per field is
-        // live (see the type-level aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
-        // A heap-aliasing `data` would be invalidated by the GC `alloc_vec` may
-        // trigger, before the copy below.
-        if is_heap_ptr(heap, data.as_ptr()) {
-            return Err(native_invariant_violation(
-                "new_vector_no_pointers: data must not alias the VM heap".into(),
-            ));
-        }
-        // Pointer-free elements, so the vector uses the trivial descriptor.
-        let ptr = alloc_vec(
+        // SAFETY: one reborrow of each cell, released with this call; the
+        // helper takes the components and calls nothing on this context (see
+        // the type-level aliasing rule).
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
+        let handle = alloc_vector_no_pointers(
             heap,
             self.guard,
             rws,
@@ -558,19 +646,11 @@ impl NativeContext for ProductionNativeContext<'_> {
             self.extensions,
             self.frame_ptr,
             TopFrame::Native(self.abi),
-            TRIVIAL_DESCRIPTOR_ID,
             elem_size,
             count,
+            data,
         )?;
-        // SAFETY: `ptr` is a fresh vector with room for `count` elements; no GC
-        // runs between here and these writes, so the raw pointer is valid.
-        unsafe {
-            write_u64(ptr, VEC_LENGTH_OFFSET, count);
-            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr.add(VEC_DATA_OFFSET), data.len());
-        }
-        // Root it so it survives later allocations and is GC-relocated.
-        // SAFETY: `ptr` is the data pointer of the freshly allocated vector.
-        Ok(Vector::from_handle(unsafe { self.pool.root_object(ptr) }))
+        Ok(Vector::from_handle(handle))
     }
 
     fn new_vector<'a>(
@@ -616,8 +696,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         // SAFETY: `heap` and `rws` are distinct fields, so reborrowing both
         // through `&self` at once is sound — at most one `&mut` per field is
         // live (see the type-level aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let ptr = alloc_vec(
             heap,
             self.guard,
@@ -704,8 +784,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         }
 
         // SAFETY: `heap` and `rws` are distinct fields (see the aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         // A heap-aliasing `data` would be invalidated by the GC the deep copies
         // below may trigger.
         let src = data.as_ptr().cast::<u8>();
@@ -809,8 +889,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         };
         if required > to_cap {
             // SAFETY: distinct fields, reborrowed exclusively (the aliasing rule).
-            let heap = unsafe { &mut **self.heap.get() };
-            let rws = unsafe { &mut **self.rws.get() };
+            borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+            borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
 
             // `to` may be null (an unallocated empty vector), so take the shared
             // `vector<T>` descriptor from `from`, which is non-null here: length > 0
@@ -895,8 +975,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         let dst = region.as_ptr();
         // SAFETY: heap and rws are distinct fields (see the type-level aliasing
         // rule), so reborrowing both through `&self` at once is sound.
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         // `bytes` is off-heap (the native copied it), so it survives the GC the
         // retry may run.
         // SAFETY: `dst` is `layout.size` writable, correctly aligned bytes.
@@ -929,7 +1009,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let group = self.loader.resource_group_of(ty)?;
 
         // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let key = InMemoryStorageKey::resource(address, ty);
         Ok(rws.exists(self.resource_provider, &key, group)?)
     }
@@ -996,8 +1076,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         };
 
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let obj = alloc_obj(
             heap,
             self.guard,
@@ -1060,20 +1140,11 @@ impl NativeContext for ProductionNativeContext<'_> {
         value: V,
     ) -> VMResult<Boxed<'a, Opaque>> {
         let payload = ENUM_DATA_OFFSET + V::FRAME_SLOT_SIZE;
-        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
-        let obj = alloc_or_gc(
-            heap,
-            self.guard,
-            rws,
-            &self.pool,
-            self.extensions,
-            self.frame_ptr,
-            TopFrame::Native(self.abi),
-            |h| heap_alloc(h, OBJECT_HEADER_SIZE + payload, descriptor),
-        )?;
-        // SAFETY: `obj` has `payload` bytes; no GC runs before these writes.
+        // The heap is borrowed only inside this call, so it is not held while
+        // the caller-supplied `write_to_frame` runs below.
+        let obj = self.alloc_object(OBJECT_HEADER_SIZE + payload, descriptor)?;
+        // SAFETY: `obj` has `payload` bytes. No GC runs before these writes:
+        // `write_to_frame` must not allocate (`VMValue`'s `# Safety` contract).
         unsafe {
             write_enum_tag(obj, tag);
             value.write_to_frame(obj, ENUM_DATA_OFFSET);
@@ -1089,7 +1160,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         value_ty: InternedType,
     ) -> VMResult<bool> {
         // SAFETY: `rws` is reborrowed exclusively here.
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         let storage_key = InMemoryStorageKey::table_item(handle, key.into(), value_ty);
         // Table items never belong to a resource group.
         Ok(rws.exists(self.resource_provider, &storage_key, None)?)
@@ -1127,8 +1198,8 @@ impl NativeContext for ProductionNativeContext<'_> {
         })?;
         let size = slot.size as usize;
         // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let heap = unsafe { &mut **self.heap.get() };
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
 
         // Allocate first, then copy the value out of the frame, so to be
         // GC-safe.
@@ -1164,7 +1235,7 @@ impl NativeContext for ProductionNativeContext<'_> {
         let obj = NonNull::new(value.ptr())
             .ok_or_else(|| native_invariant_violation("table_add: null boxed value".into()))?;
         // SAFETY: `rws` is reborrowed exclusively here.
-        let rws = unsafe { &mut **self.rws.get() };
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         // Table items never belong to a resource group.
         match rws.move_to(self.resource_provider, &storage_key, None, obj) {
             Ok(()) => Ok(true),
@@ -1180,15 +1251,15 @@ impl NativeContext for ProductionNativeContext<'_> {
         value_ty: InternedType,
     ) -> VMResult<Option<Boxed<'_, Opaque>>> {
         let storage_key = InMemoryStorageKey::table_item(handle, key.into(), value_ty);
-        // SAFETY: heap and rws are distinct fields (see the aliasing rule).
-        let rws = unsafe { &mut **self.rws.get() };
+        // SAFETY: `rws` is reborrowed exclusively here; no other borrow is live.
+        borrow_cell!(let rws = unsafe { &mut **self.rws.get() });
         // Table items never belong to a resource group.
         let ptr = match rws.try_move_from(self.resource_provider, &storage_key, None) {
             Ok(EntryPtr::Writable(ptr)) => ptr,
             Ok(EntryPtr::NonWritable(ptr)) => {
                 // Copy-on-write: an external or older-epoch value must be copied
                 // into the local heap before it is taken out.
-                let heap = unsafe { &mut **self.heap.get() };
+                borrow_cell!(let heap = unsafe { &mut **self.heap.get() });
                 // SAFETY: `ptr` is a live object (provider- or older-epoch-owned).
                 let copied = unsafe {
                     deep_copy_or_gc(

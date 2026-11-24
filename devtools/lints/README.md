@@ -9,6 +9,7 @@ fully resolved types, HIR and MIR — everything clippy can see.
 | lint | what it flags | applies to (see `/dylint.toml`) |
 |---|---|---|
 | `no_std_hash_map` | `std::collections::{HashMap, HashSet}`, `hashbrown`, and aliases such as `FxHashMap`; use `shared_dsa::{UnorderedMap, UnorderedSet}` (no ordered iteration exposed) or `BTreeMap`/`BTreeSet` | consensus-critical mono-move crates |
+| `unsafe_cell_reborrow` | breaches of the reborrow discipline for structs whose `&self` methods mutate through `UnsafeCell` fields; opt-in per struct, see below | the structs listed in `/dylint.toml` (the native context and the root pool) |
 
 ### What `no_std_hash_map` does not guarantee
 
@@ -29,6 +30,21 @@ accident. It does not make a site deterministic or safe on its own.
 
 `third_party/move/mono-move/AGENTS.md` ("Choosing a map") has the guideline
 for picking a map at a given site.
+
+### `unsafe_cell_reborrow`
+
+Opt-in: it checks only the structs listed under `structs` in `/dylint.toml`.
+For those, it establishes that at most one reference obtained from an
+`UnsafeCell` field is live at a time, by a conservative discipline: every
+reborrow is tied to a local anchor, so that the compiler stops it from
+leaving the function; one reborrow per field per function, counted as held
+for the whole function; no call that could reborrow a held field, whether
+through this crate's code or by handing the struct to code the lint cannot
+see. It rejects some sound code by design, and every finding says so.
+
+[`docs/unsafe_cell_reborrow.md`](docs/unsafe_cell_reborrow.md) is the
+specification: the problem the pattern solves, the contract it puts on the
+implementation, and the scope and rules of the check.
 
 ## Running
 
@@ -77,6 +93,7 @@ src/scope.rs          per-lint crate scoping, read from /dylint.toml
 src/<lint>.rs         one module per lint
 ui/<lint>.rs          UI test: cases the lint must and must not flag
 ui/<lint>.stderr      the exact diagnostics that file must produce
+docs/<lint>.md        specification, for a lint whose rules need one
 ```
 
 `ui/` is rustc's and clippy's convention for lint tests ("UI" as in what the

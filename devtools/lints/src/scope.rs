@@ -23,6 +23,9 @@ use serde::Deserialize;
 #[serde(default)]
 pub struct Config {
     pub no_std_hash_map: Scope,
+    /// A scope plus the lint's own struct and anchor-function lists; see its
+    /// module.
+    pub unsafe_cell_reborrow: crate::unsafe_cell_reborrow::Config,
 }
 
 impl Config {
@@ -43,8 +46,11 @@ impl Scope {
     /// Whether the lint applies to the crate being compiled. Cheap enough to
     /// call once per pass; lints cache the answer.
     pub fn applies(&self, cx: &LateContext<'_>) -> bool {
-        let name = cx.tcx.crate_name(LOCAL_CRATE);
-        let name = name.as_str();
+        self.applies_to(cx.tcx.crate_name(LOCAL_CRATE).as_str())
+    }
+
+    /// Whether the lint applies to the crate called `name`.
+    pub fn applies_to(&self, name: &str) -> bool {
         // Cargo passes crate names with `-` turned into `_`; accept either.
         let normalized = name.replace('-', "_");
         let matches = |pattern: &String| {

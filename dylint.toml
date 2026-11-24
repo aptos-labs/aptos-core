@@ -19,3 +19,18 @@ exempt = [
     "mono-move-lean-link",
     "vm-comparison",
 ]
+
+[aptos_lints.unsafe_cell_reborrow]
+# Opt-in: the structs whose `&self` methods reborrow through `UnsafeCell`
+# fields under the discipline in devtools/lints/docs/unsafe_cell_reborrow.md.
+# Nothing else is checked; adding a struct here is a deliberate decision.
+structs = [
+    "mono_move_runtime::native_context::ProductionNativeContext",
+    "mono_move_runtime::interpreter::LoaderAdapter",
+    "mono_move_core::root_pool::RootPool",
+]
+# Every borrow of a cell goes through `borrow_cell!`, which ties it to a local
+# anchor with this function, so that the compiler stops it from leaving the
+# function that made it.
+anchor_fns = ["mono_move_core::cell::anchor_borrow"]
+crates = ["mono-move-*"]

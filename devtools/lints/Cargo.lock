@@ -75,6 +75,8 @@ dependencies = [
  "dylint_linting",
  "dylint_testing",
  "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
