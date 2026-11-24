@@ -1,0 +1,10 @@
+processed 6 tasks
+task 0 lines 1-56:  publish [module 0x42::legacy_local]
+task 1 lines 58-122:  publish [module 0x42::legacy_global]
+task 2 lines 124-124:  run 0x42::legacy_local::local_read_after --args 3
+return values: 3
+task 3 lines 126-126:  run 0x42::legacy_local::local_read_after --args 10
+return values: 5
+task 4 lines 128-128:  run 0x42::legacy_global::publish --signers 0x42
+task 5 lines 130-130:  run 0x42::legacy_global::global_call_after --args @0x42 3
+return values: 3

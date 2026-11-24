@@ -1,0 +1,38 @@
+//# publish
+module 0x42::both_sided
+
+struct S
+    f: u64
+
+// The reference is held on both edges into the loop head. Only the back edge borrows `t`.
+public fun f(n: u64): u64
+    local s: S
+    local t: S
+    local r: &mut S
+    ld_u64 0
+    pack S
+    st_loc s
+    ld_u64 0
+    pack S
+    st_loc t
+    mut_borrow_loc s
+    st_loc r
+l_head:
+    copy_loc n
+    ld_u64 0
+    eq
+    br_true l_exit
+    mut_borrow_loc t
+    st_loc r
+    move_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    branch l_head
+l_exit:
+    move_loc t
+    unpack S
+    move_loc s
+    unpack S
+    add
+    ret

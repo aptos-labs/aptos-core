@@ -94,11 +94,13 @@ pub(crate) struct AbstractState {
     locals: Vec<AbstractValue>,
     borrow_graph: BorrowGraph,
     next_id: usize,
+    /// See [`crate::VerifierConfig::keep_one_sided_refs_at_join`].
+    keep_one_sided_refs_at_join: bool,
 }
 
 impl AbstractState {
     /// create a new abstract state
-    pub fn new(function_view: &FunctionView) -> Self {
+    pub fn new(function_view: &FunctionView, keep_one_sided_refs_at_join: bool) -> Self {
         let num_locals = function_view.parameters().len() + function_view.locals().len();
         // ids in [0, num_locals) are reserved for constructing canonical state
         // id at num_locals is reserved for the frame root
@@ -108,6 +110,7 @@ impl AbstractState {
             locals: vec![AbstractValue::NonReference; num_locals],
             borrow_graph: BorrowGraph::new(),
             next_id,
+            keep_one_sided_refs_at_join,
         };
 
         for (param_idx, param_ty) in function_view.parameters().0.iter().enumerate() {
@@ -646,6 +649,7 @@ impl AbstractState {
             borrow_graph,
             current_function: self.current_function,
             next_id: self.locals.len() + 1,
+            keep_one_sided_refs_at_join: self.keep_one_sided_refs_at_join,
         };
         assert!(canonical_state.is_canonical());
         canonical_state
@@ -663,6 +667,7 @@ impl AbstractState {
 
     pub fn join_(&self, other: &Self) -> Self {
         assert!(self.current_function == other.current_function);
+        assert!(self.keep_one_sided_refs_at_join == other.keep_one_sided_refs_at_join);
         assert!(self.is_canonical() && other.is_canonical());
         assert!(self.next_id == other.next_id);
         assert!(self.locals.len() == other.locals.len());
@@ -675,12 +680,10 @@ impl AbstractState {
             .map(|(self_value, other_value)| {
                 match (self_value, other_value) {
                     (AbstractValue::Reference(id), AbstractValue::NonReference) => {
-                        self_graph.release(*id);
-                        AbstractValue::NonReference
+                        self.join_one_sided_ref(*id, &mut self_graph, &mut other_graph)
                     },
                     (AbstractValue::NonReference, AbstractValue::Reference(id)) => {
-                        other_graph.release(*id);
-                        AbstractValue::NonReference
+                        self.join_one_sided_ref(*id, &mut other_graph, &mut self_graph)
                     },
                     // The local has a value on each side, add it to the state
                     (v1, v2) => {
@@ -700,6 +703,25 @@ impl AbstractState {
             locals,
             borrow_graph,
             next_id,
+            keep_one_sided_refs_at_join: self.keep_one_sided_refs_at_join,
+        }
+    }
+
+    /// Joins a local holding reference `id` in `holder_graph` with the same local holding no
+    /// value in `other_graph`, returning the joined value of the local.
+    fn join_one_sided_ref(
+        &self,
+        id: RefID,
+        holder_graph: &mut BorrowGraph,
+        other_graph: &mut BorrowGraph,
+    ) -> AbstractValue {
+        if self.keep_one_sided_refs_at_join {
+            // An edge-less node lets the graph join carry over the borrows of `id`.
+            other_graph.new_ref(id, holder_graph.is_mutable(id));
+            AbstractValue::Reference(id)
+        } else {
+            holder_graph.release(id);
+            AbstractValue::NonReference
         }
     }
 }

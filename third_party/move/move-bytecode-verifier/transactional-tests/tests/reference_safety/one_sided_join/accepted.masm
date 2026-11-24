@@ -1,0 +1,85 @@
+//# publish
+module 0x42::accepted
+
+struct S
+    f: u64
+
+// The one-sided reference is overwritten before the borrowed local is moved.
+public fun overwrite_ref(flag: bool): u64
+    local s: S
+    local t: S
+    local r: &mut S
+    ld_u64 1
+    pack S
+    st_loc s
+    ld_u64 2
+    pack S
+    st_loc t
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc s
+    st_loc r
+l_join:
+    mut_borrow_loc t
+    st_loc r
+    move_loc r
+    pop
+    move_loc s
+    unpack S
+    move_loc t
+    unpack S
+    add
+    ret
+
+// The function returns while the one-sided reference is still held.
+public fun return_with_ref(flag: bool): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc x
+    st_loc r
+l_join:
+    ld_u64 5
+    ret
+
+// An immutable one-sided reference allows reading the borrowed local.
+public fun copy_with_imm_ref(flag: bool): u64
+    local x: u64
+    local r: &u64
+    ld_u64 1
+    st_loc x
+    move_loc flag
+    br_false l_join
+    borrow_loc x
+    st_loc r
+l_join:
+    copy_loc x
+    ret
+
+// Locals not borrowed by the one-sided reference are unaffected.
+public fun unrelated_local(flag: bool): u64
+    local x: u64
+    local y: u64
+    local r: &mut u64
+    ld_u64 1
+    st_loc x
+    ld_u64 2
+    st_loc y
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc x
+    st_loc r
+l_join:
+    move_loc y
+    ret
+
+//# run 0x42::accepted::overwrite_ref --args true
+
+//# run 0x42::accepted::return_with_ref --args true
+
+//# run 0x42::accepted::copy_with_imm_ref --args true
+
+//# run 0x42::accepted::unrelated_local --args true

@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-38:  publish [module 0x42::both_sided]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::both_sided'. Got VMError: {
+    major_status: MOVELOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0x42::both_sided,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 19)],
+}

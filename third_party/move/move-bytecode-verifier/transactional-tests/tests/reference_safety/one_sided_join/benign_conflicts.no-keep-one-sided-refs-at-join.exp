@@ -1,0 +1,14 @@
+processed 9 tasks
+task 0 lines 1-15:  publish [module 0x42::copy_after_join]
+task 1 lines 17-17:  run 0x42::copy_after_join::f --args true
+return values: 7
+task 2 lines 19-35:  publish [module 0x42::overwrite_after_join]
+task 3 lines 37-37:  run 0x42::overwrite_after_join::f --args true
+return values: 8
+task 4 lines 39-64:  publish [module 0x42::borrow_global_after_join]
+task 5 lines 66-66:  run 0x42::borrow_global_after_join::publish --signers 0x42
+task 6 lines 68-68:  run 0x42::borrow_global_after_join::f --args @0x42 true
+return values: 1
+task 7 lines 70-108:  publish [module 0x42::param_after_join]
+task 8 lines 110-110:  run 0x42::param_after_join::run --args true
+return values: 3

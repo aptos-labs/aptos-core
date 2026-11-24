@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 1-77:  publish [module 0x42::accepted]
+task 1 lines 79-79:  run 0x42::accepted::overwrite_ref --args true
+return values: 3
+task 2 lines 81-81:  run 0x42::accepted::return_with_ref --args true
+return values: 5
+task 3 lines 83-83:  run 0x42::accepted::copy_with_imm_ref --args true
+return values: 1
+task 4 lines 85-85:  run 0x42::accepted::unrelated_local --args true
+return values: 2
