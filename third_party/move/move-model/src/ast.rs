@@ -1293,12 +1293,29 @@ impl ExpData {
     /// they make the spec function two-state.
     pub fn behavior_target_memory(
         env: &GlobalEnv,
+        id: NodeId,
         kind: BehaviorKind,
         args: &[Exp],
     ) -> Option<BehaviorTargetMemory> {
         let ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _) = args.first()?.as_ref()
         else {
-            return None;
+            // A function value whose predicates may read every memory (a field without a
+            // frame, or a `*` frame): the world memory stands for all of them; a two-state
+            // predicate also reads it in the pre-state slot, as for a closure target below.
+            let world = env.world_memory()?;
+            if !env.behavior_reaches_world(id, args.first()?) {
+                return None;
+            }
+            return Some(BehaviorTargetMemory {
+                used: BTreeSet::from([world.clone()]),
+                generic_used: BTreeSet::new(),
+                old: if kind.is_two_state() {
+                    BTreeSet::from([world])
+                } else {
+                    BTreeSet::new()
+                },
+                generic_old: BTreeSet::new(),
+            });
         };
         let target_qid = mid.qualified(*fid);
         let target = env.get_function(target_qid);
@@ -1865,8 +1882,8 @@ impl ExpData {
                     }
                     result.extend(concrete.into_iter().map(|mem| (mem, label)));
                 },
-                Call(_, Behavior(kind, range), args) => {
-                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                Call(id, Behavior(kind, range), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *id, *kind, args) {
                         let label = range.post.or(range.pre);
                         result.extend(target.used.into_iter().map(|mem| (mem, label)));
                     }
@@ -1924,8 +1941,8 @@ impl ExpData {
                     let (mid, sid, sinst) = inst[0].require_struct();
                     result.insert(mid.qualified_inst(sid, sinst.to_owned()));
                 },
-                Call(_, Behavior(kind, _), args) => {
-                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                Call(id, Behavior(kind, _), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *id, *kind, args) {
                         result.extend(target.used);
                     }
                 },
@@ -1963,8 +1980,8 @@ impl ExpData {
                         }
                     }
                 },
-                ExpData::Call(_, Operation::Behavior(kind, _), args) => {
-                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                ExpData::Call(id, Operation::Behavior(kind, _), args) => {
+                    if let Some(target) = Self::behavior_target_memory(env, *id, *kind, args) {
                         result.extend(target.generic_used);
                     }
                 },
@@ -2020,10 +2037,10 @@ impl ExpData {
                 // The target's own pre-state reads are pre-state reads here
                 // whether or not the predicate sits under `old(..)`; under
                 // `old(..)` its whole footprint is.
-                ExpData::Call(_, Operation::Behavior(kind, _), args)
+                ExpData::Call(id, Operation::Behavior(kind, _), args)
                     if matches!(pos, VisitorPosition::Pre) =>
                 {
-                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                    if let Some(target) = Self::behavior_target_memory(env, *id, *kind, args) {
                         result.extend(target.old);
                         if in_old_depth > 0 {
                             result.extend(target.used);
@@ -2070,10 +2087,10 @@ impl ExpData {
                         }
                     }
                 },
-                ExpData::Call(_, Operation::Behavior(kind, _), args)
+                ExpData::Call(id, Operation::Behavior(kind, _), args)
                     if matches!(pos, VisitorPosition::Pre) =>
                 {
-                    if let Some(target) = Self::behavior_target_memory(env, *kind, args) {
+                    if let Some(target) = Self::behavior_target_memory(env, *id, *kind, args) {
                         result.extend(target.generic_old);
                         if in_old_depth > 0 {
                             result.extend(target.generic_used);

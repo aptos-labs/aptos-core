@@ -1700,8 +1700,18 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                         post: self.in_old.then_some(label).or(range.post),
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
-                } else if let Some(ExpData::Call(_, Operation::Select(smid, sid, field_id), _)) =
-                    args.first().map(|a| a.as_ref())
+                } else if let Some((smid, sid, field_sym)) =
+                    args.first().and_then(|a| match a.as_ref() {
+                        ExpData::Call(_, Operation::Select(smid, sid, field_id), _) => {
+                            Some((*smid, *sid, field_id.symbol()))
+                        },
+                        // An enum field has the same name, and the same frame, in every
+                        // variant that declares it.
+                        ExpData::Call(_, Operation::SelectVariants(smid, sid, field_ids), _) => {
+                            field_ids.first().map(|f| (*smid, *sid, f.symbol()))
+                        },
+                        _ => None,
+                    })
                 {
                     // Struct-field function value (e.g. `pool.pricing.0`):
                     // the closure's memory footprint is declared by the
@@ -1709,8 +1719,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     // Using `self.fun_env.get_spec_used_memory()` here would miss
                     // these resources, leaving the pre-state label unsaved at
                     // procedure entry.
-                    let struct_env = env.get_module(*smid).into_struct(*sid);
-                    let field_sym = field_id.symbol();
+                    let struct_env = env.get_module(smid).into_struct(sid);
                     let memory = collect_field_access_memory(env, &struct_env, field_sym);
                     if range.post.is_some() && memory.is_empty() {
                         return None;
@@ -1728,8 +1737,17 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                     // `reads_of` declarations, the env_pipeline spec rewriter
                     // already propagates the parameter's access_of memory into
                     // the function's spec_used_memory / spec_old_memory, so
-                    // this fallback covers the fun-param case too.
-                    let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    // this fallback covers the fun-param case too. A value that may touch
+                    // any memory (`behavior_reaches_world`) saves the world memory, which the
+                    // backend expands to every memory.
+                    let mut used_memory = self.fun_env.get_spec_used_memory().clone();
+                    if let Some(world) = args.first().and_then(|operand| {
+                        env.behavior_reaches_world(id, operand)
+                            .then(|| env.world_memory())
+                            .flatten()
+                    }) {
+                        used_memory.insert(world);
+                    }
                     if range.post.is_some() && used_memory.is_empty() {
                         return None;
                     }
@@ -1872,6 +1890,20 @@ fn collect_field_access_memory(
     field_sym: Symbol,
 ) -> BTreeSet<QualifiedInstId<StructId>> {
     let mut memory: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+    let decl = struct_env
+        .get_field_access_of()
+        .iter()
+        .find(|a| a.fun_param == field_sym);
+    if decl.is_none_or(|a| a.frame_spec.modifies_all || a.frame_spec.reads_all) {
+        // Unframed or wildcard: a save of the world memory stands for a save of every
+        // memory the root translates (the backend expands it).
+        if let Some(world) = env.world_memory() {
+            memory.insert(world);
+            if decl.is_none() {
+                return memory;
+            }
+        }
+    }
     for access in struct_env.get_field_access_of() {
         if access.fun_param != field_sym {
             continue;

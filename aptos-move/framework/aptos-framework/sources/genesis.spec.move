@@ -143,6 +143,10 @@ spec aptos_framework::genesis {
         ensures std::signer::address_of(result) == account_address;
     }
 
+    spec create_account {
+        pragma opaque;
+    }
+
     spec create_accounts {
         pragma opaque;
     }

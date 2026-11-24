@@ -1,0 +1,18 @@
+Move prover returns: exiting with bytecode transformation errors
+error: cannot establish what function argument `f` may modify: it is returned by a call, and not every value the callee returns is a closure with known effects built in a transparent function
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin_param.move:16:9
+   │
+16 │         probe(h); let a = h(1);
+   │         ^^^^^^^^
+
+error: cannot establish what function argument `f` may modify: it is returned by a call, and not every value the callee returns is a closure with known effects built in a transparent function
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin_param.move:17:9
+   │
+17 │         probe(h); let b = h(1);
+   │         ^^^^^^^^
+
+error: cannot establish what captured function value for `g` of `r2::call_g` may modify: it is returned by a call, and not every value the callee returns is a closure with known effects built in a transparent function
+   ┌─ tests/sources/functional/closures/unframed_field_world_unknown_origin_param.move:29:44
+   │
+29 │         let k: |u64| u64 has copy + drop = |y| call_g(h, y);
+   │                                            ^^^^^^^^^^^^^^^^

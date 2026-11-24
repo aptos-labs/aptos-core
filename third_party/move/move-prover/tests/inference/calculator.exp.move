@@ -35,7 +35,7 @@ module 0x66::calculator {
         modifies State[signer::address_of(s)];
         ensures [inferred] (old(State[signer::address_of(s)]) is Continuation) && (input is Number) ==> {
             let a = signer::address_of(s);
-            let b = State::Value(result_of<old(State[signer::address_of(s)]).Continuation.0>(input.0));
+            let b = State::Value(S1.. |~ result_of<old(State[signer::address_of(s)]).Continuation.0>(input.0));
             S1.. |~ publish<State>(a, b)
         };
         ensures [inferred] (old(State[signer::address_of(s)]) is Value) && (input is Number) ==> {
@@ -74,7 +74,7 @@ module 0x66::calculator {
         aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Add) && (S1 |~ exists<State>(signer::address_of(s)));
         aborts_if [inferred] (State[signer::address_of(s)] is Value) && (input is Sub) && (S1 |~ exists<State>(signer::address_of(s)));
         aborts_if [inferred] (State[signer::address_of(s)] is Empty) && (input is Number) && (S1 |~ exists<State>(signer::address_of(s)));
-        aborts_if [inferred] (State[signer::address_of(s)] is Continuation) && (input is Number) && aborts_of<State[signer::address_of(s)].Continuation.0>(input.0);
+        aborts_if [inferred] (State[signer::address_of(s)] is Continuation) && (input is Number) && (S1 |~ aborts_of<State[signer::address_of(s)].Continuation.0>(input.0));
     }
 
 
