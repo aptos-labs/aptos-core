@@ -4,7 +4,9 @@
 //! Defines a wrapper for [`CompiledModule`] with all its types pre-interned.
 
 use crate::{
-    interner::{InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError},
+    interner::{
+        is_script_module_id, InternedIdentifier, InternedModuleId, Interner, TypeSubstitutionError,
+    },
     types::{view_type, view_type_list, InternedType, InternedTypeList, Type, EMPTY_TYPE_LIST},
     ExecutionErrorKind, IntoExecutionError,
 };
@@ -14,8 +16,8 @@ use move_binary_format::{
         ConstantPoolIndex, FieldDefinition, FieldHandleIndex, FunctionAttribute,
         FunctionDefinitionIndex, FunctionHandleIndex, FunctionInstantiationIndex, IdentifierIndex,
         ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
-        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
-        VariantIndex,
+        StructFieldInformation, StructHandle, StructHandleIndex, TableIndex,
+        VariantFieldHandleIndex, VariantIndex, Visibility,
     },
     CompiledModule,
 };
@@ -194,6 +196,45 @@ impl PreparedModule {
     pub fn is_unlocked_local_callee(&self, handle_idx: FunctionHandleIndex) -> bool {
         self.module.function_handle_at(handle_idx).module == self.module.self_handle_idx()
             && !self.handle_has_module_lock(handle_idx)
+    }
+
+    /// Whether this module's function definition `def_idx` is persistent:
+    /// public or `#[persistent]`. Script functions never are.
+    pub fn definition_is_persistent(&self, def_idx: FunctionDefinitionIndex) -> bool {
+        let def = self.module.function_def_at(def_idx);
+        !is_script_module_id(self.id)
+            && (def.visibility == Visibility::Public
+                || self
+                    .module
+                    .function_handle_at(def.function)
+                    .attributes
+                    .contains(&FunctionAttribute::Persistent))
+    }
+
+    /// Whether the function named by `handle_idx` is persistent, so a closure
+    /// over it can be serialized. [`None`] when this module cannot tell.
+    ///
+    /// A callee in this module is read from its definition. An imported handle
+    /// marked `Persistent` is trusted, because linking requires the callee's
+    /// definition to be persistent too. An imported handle without it says
+    /// nothing, so the caller has to read the callee's definition.
+    pub fn function_handle_is_persistent(&self, handle_idx: FunctionHandleIndex) -> Option<bool> {
+        let handle = self.module.function_handle_at(handle_idx);
+        if handle.module != self.module.self_handle_idx() {
+            return handle
+                .attributes
+                .contains(&FunctionAttribute::Persistent)
+                .then_some(true);
+        }
+        Some(
+            self.module
+                .function_defs()
+                .iter()
+                .position(|def| def.function == handle_idx)
+                .is_some_and(|idx| {
+                    self.definition_is_persistent(FunctionDefinitionIndex(idx as TableIndex))
+                }),
+        )
     }
 
     fn handle_has_module_lock(&self, handle_idx: FunctionHandleIndex) -> bool {
@@ -678,7 +719,10 @@ pub fn intern_sig_token(
 /// resource's struct tag).
 //
 // TODO(metering): decide if this construction requires metering.
-pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Result<InternedType> {
+pub fn intern_type_tag(
+    tag: &TypeTag,
+    interner: &(impl Interner + ?Sized),
+) -> anyhow::Result<InternedType> {
     use crate::types as ty;
     Ok(match tag {
         TypeTag::Bool => ty::BOOL_TY,
@@ -720,7 +764,7 @@ pub fn intern_type_tag(tag: &TypeTag, interner: &impl Interner) -> anyhow::Resul
 /// reference kind.
 fn intern_function_param_tags(
     tags: &[FunctionParamOrReturnTag],
-    interner: &impl Interner,
+    interner: &(impl Interner + ?Sized),
 ) -> anyhow::Result<Vec<InternedType>> {
     tags.iter()
         .map(|tag| {
@@ -740,7 +784,7 @@ fn intern_function_param_tags(
 /// Interns a struct tag into its nominal type.
 pub fn intern_struct_tag(
     struct_tag: &StructTag,
-    interner: &impl Interner,
+    interner: &(impl Interner + ?Sized),
 ) -> anyhow::Result<InternedType> {
     let module_id = interner.module_id_of(&struct_tag.address, struct_tag.module.as_ident_str());
     let name = interner.identifier_of(struct_tag.name.as_ident_str());

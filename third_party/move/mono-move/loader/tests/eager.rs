@@ -7,9 +7,11 @@
 //! closure (excluding M itself). Lowering itself stays per-call in
 //! `load_function`.
 
-use mono_move_core::{native::NoNatives, GasMeter};
+use mono_move_core::{native::NoNatives, types::EMPTY_TYPE_LIST, GasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
+use mono_move_loader::{
+    Loader, LoadingPolicy, LoweringPolicy, ModuleRead, ModuleReadSet, ModuleState,
+};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -186,4 +188,84 @@ fn load_eager_cache_hit_reproduces_state() {
     assert_eq!(cost_first, cost_second);
     assert_eq!(rs1.len(), rs2.len());
     assert_eq!(rs2.len(), 3);
+}
+
+const SIDE_LOAD_SOURCE: &str = r#"
+module 0x1::b {
+    struct S has drop { x: u64 }
+    public fun g(): u64 { 42 }
+}
+module 0x1::a {
+    use 0x1::b::S;
+    public fun f(_s: S): u64 { 1 }
+}
+"#;
+
+#[test]
+fn load_eager_promotes_side_loaded_metered_module_on_function_call() {
+    let modules =
+        mono_move_testsuite::compile_move_source(SIDE_LOAD_SOURCE).expect("compilation failed");
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    let loader = Loader::new_with_policy(
+        &guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Eager),
+        &NoNatives,
+    );
+
+    let id_a_key = guard.intern_module_id(&ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("a").to_owned(),
+    ));
+    let id_b_key = guard.intern_module_id(&ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("b").to_owned(),
+    ));
+    let id_a = id_a_key.into_global_arena_ptr();
+    let id_b = id_b_key.into_global_arena_ptr();
+    let name_f = guard
+        .intern_identifier(ident_str!("f"))
+        .into_global_arena_ptr();
+    let name_g = guard
+        .intern_identifier(ident_str!("g"))
+        .into_global_arena_ptr();
+
+    let mut read_set = ModuleReadSet::new();
+    let mut gas = GasMeter::with_max_budget();
+
+    // `a::f` takes `b::S`, so MS(a) side-loads `b` for its layout only. `b`
+    // stays metered: its own mandatory set is not computed yet.
+    loader
+        .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
+        .expect("load_function(a::f) must succeed");
+    assert!(matches!(
+        read_set.get(id_b_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::Metered,
+            ..
+        })
+    ));
+
+    // Calling into `b` must promote it to ready for lowering.
+    loader
+        .load_function(&mut read_set, &mut gas, id_b, name_g, EMPTY_TYPE_LIST)
+        .expect("load_function(b::g) must promote b");
+    assert!(matches!(
+        read_set.get(id_b_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
+    assert!(matches!(
+        read_set.get(id_a_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
 }

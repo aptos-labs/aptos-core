@@ -201,21 +201,32 @@ pub trait NativeContext {
         elem_ty: InternedType,
     ) -> VMResult<bool>;
 
-    /// BCS-serializes the value of type `ty` stored at `base`.
+    /// BCS-serializes the value of type `ty` stored at `base`, or returns
+    /// `None` when V1 refuses to serialize it (e.g., a closure over a function
+    /// that is not persistent).
     ///
     /// # Safety
     ///
     /// `base` must point to a fully initialized value of type `ty` that stays
     /// live for the duration of the call.
-    unsafe fn bcs_serialize_value(&self, base: *const u8, ty: InternedType) -> VMResult<Vec<u8>>;
+    unsafe fn bcs_serialize_value(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<Vec<u8>>>;
 
-    /// BCS serialized size of the value of type `ty` stored at `base`.
+    /// BCS serialized size of the value of type `ty` stored at `base`, or
+    /// `None` when V1 refuses to serialize it.
     ///
     /// # Safety
     ///
     /// `base` must point to a fully initialized value of type `ty` that stays
     /// live for the duration of the call.
-    unsafe fn bcs_serialized_size(&self, base: *const u8, ty: InternedType) -> VMResult<usize>;
+    unsafe fn bcs_serialized_size(
+        &self,
+        base: *const u8,
+        ty: InternedType,
+    ) -> VMResult<Option<usize>>;
 
     /// Deserializes `bytes` as a value of type `ty`, returning its in-frame
     /// representation, or `None` when `bytes` is not a valid encoding of `ty`.

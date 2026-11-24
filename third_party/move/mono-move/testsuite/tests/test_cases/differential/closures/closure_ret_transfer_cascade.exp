@@ -107,7 +107,7 @@ fun collision() {
   frame_data_size: 24
   entry_gas: 218
   code:
-    0: PackClosure [8] <- func_ref=Unresolved(three_rets), mask=0, captured_desc=<none>, captured=[] @1
+    0: PackClosure [8] <- func_ref=Unresolved(three_rets), mask=0, persistent=false, captured_desc=<none>, captured=[] @1
     1: CallClosure closure=[8], provided_args=[] @2
     2: Move8 [16] <- [64] @2
     3: AddU64Imm [16] <- [16] + #5 @4
@@ -119,13 +119,14 @@ fun collision() {
     9: Return @7
   safe_point_layouts:
     0: []
+    1: []
 }
 
 fun non_monotonic() {
   frame_data_size: 32
   entry_gas: 218
   code:
-    0: PackClosure [16] <- func_ref=Unresolved(two_rets), mask=0, captured_desc=<none>, captured=[] @2
+    0: PackClosure [16] <- func_ref=Unresolved(two_rets), mask=0, persistent=false, captured_desc=<none>, captured=[] @2
     1: CallClosure closure=[16], provided_args=[] @3
     2: Move8 [24] <- [64] @3
     3: AddU64Imm [24] <- [24] + #1 @5
@@ -137,4 +138,5 @@ fun non_monotonic() {
     9: Return @8
   safe_point_layouts:
     0: []
+    1: []
 }

@@ -23,6 +23,27 @@ pub enum LoaderError {
         name: String,
     },
 
+    /// A function was named with a different number of type arguments than it
+    /// declares, as an untrusted caller such as a closure decoded from storage
+    /// or a script's transaction can.
+    #[error("Function {address}::{module}::{name} takes {expected} type arguments, got {got}")]
+    TypeArgumentCountMismatch {
+        address: AccountAddress,
+        module: String,
+        name: String,
+        expected: usize,
+        got: usize,
+    },
+
+    /// A function was named with type arguments that do not satisfy its
+    /// declared constraints, as a closure decoded from bytes can.
+    #[error("Type arguments of {address}::{module}::{name} do not satisfy its constraints")]
+    TypeArgumentConstraintNotSatisfied {
+        address: AccountAddress,
+        module: String,
+        name: String,
+    },
+
     /// TODO(completeness): temporary until natives are loadable as functions.
     #[error("Function {address}::{module}::{name} is a native and cannot be loaded as code")]
     NativeFunctionNotLoadable {
@@ -70,9 +91,11 @@ impl IntoExecutionError for LoaderError {
     fn kind(&self) -> ExecutionErrorKind {
         use LoaderError::*;
         match self {
-            ModuleNotFound { .. } | FunctionNotFound { .. } | NativeFunctionNotLoadable { .. } => {
-                ExecutionErrorKind::LinkingError
-            },
+            ModuleNotFound { .. }
+            | FunctionNotFound { .. }
+            | TypeArgumentCountMismatch { .. }
+            | TypeArgumentConstraintNotSatisfied { .. }
+            | NativeFunctionNotLoadable { .. } => ExecutionErrorKind::LinkingError,
 
             // TODO(cleanup): delegate once GlobalContext has its own error type.
             GlobalContext(_) | LoweringSkipped { .. } | ResourceLayoutNotDerivable => {
@@ -138,12 +161,6 @@ pub enum LoaderInvariantViolation {
     #[error("All modules in the read-set must be loaded")]
     ReadSetEntryNotLoaded,
 
-    #[error("Target module is not loaded")]
-    TargetModuleNotLoaded,
-
-    #[error("Target module is not metered and ready")]
-    TargetModuleNotReady,
-
     #[error("All modules must be present in the read-set")]
     UnexpectedReadSetMiss,
 
@@ -154,9 +171,6 @@ pub enum LoaderInvariantViolation {
     // ---- mandatory dependencies ----
     #[error("Mandatory dependencies must be set")]
     MandatoryDepsNotSet,
-
-    #[error("Mandatory dependencies must always be lazy")]
-    MandatoryDepsNotLazy,
 
     // ---- lowering ----
     /// The specializer produced a function the micro-op verifier rejects.
