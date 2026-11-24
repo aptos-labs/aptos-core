@@ -55,6 +55,13 @@ enum LoweringError {
         inner_offset: u32,
     },
 
+    // ---- closures ----
+    #[error("a closure's captured values have no derivable layout")]
+    CapturedLayoutNotDerivable,
+
+    #[error("a closure's captured values region overflows u32")]
+    CapturedValuesOverflow,
+
     // ---- layout / size resolution ----
     #[error("{label} has no concrete size")]
     NoConcreteSize { label: &'static str },
@@ -208,6 +215,8 @@ impl IntoExecutionError for LoweringError {
             | LayoutIdUnresolved
             | LayoutWithoutType
             | GcFieldOffsetOverflow { .. }
+            | CapturedLayoutNotDerivable
+            | CapturedValuesOverflow
             | NoConcreteSize { .. }
             | StructLayoutNotPopulated { .. }
             | NominalTypeNotStruct { .. }

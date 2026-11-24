@@ -205,32 +205,47 @@ fn publish_struct_descriptor_for(
 pub struct ClosurePackInfo {
     /// Symbolic target identity, resolved lazily at call time.
     pub func_ref: InternedFunctionRef,
+    /// Whether the target is persistent, so the closure can be serialized.
+    pub persistent: bool,
     /// GC trace descriptor for the captured-data object; `None` for a
     /// non-capturing closure (no captured-data object is allocated).
     pub captured_data_descriptor_id: Option<DescriptorId>,
     /// Byte width of the captured-data values region (`0` if non-capturing).
     pub values_size: u32,
+    /// Layout of the captured values; `None` for a non-capturing closure.
+    pub captured_layout_id: Option<LayoutId>,
 }
 
 /// Captured-data layout for one capturing `PackClosure`: the GC trace
-/// descriptor (the reserved `Trivial` slot when pointer-free) and the byte
-/// width of the values region, which the allocation needs.
+/// descriptor (the reserved `Trivial` slot when pointer-free), the byte width
+/// of the values region, which the allocation needs, and the layout of the
+/// captured values, which serialization needs.
 #[derive(Clone, Copy)]
 pub struct ClosureCapturedInfo {
     pub descriptor_id: DescriptorId,
     pub values_size: u32,
+    pub layout_id: LayoutId,
 }
 
-/// Per-`PackClosure` outcome of the discovery pass, in IR order. Distinguishes
-/// the three cases the build pass must act on, so it needn't re-derive them
-/// from the mask.
+/// Per-`PackClosure` outcome of the discovery pass, in IR order.
+#[derive(Clone, Copy)]
+pub struct DiscoveredClosurePack {
+    pub captured: CapturedDataLayout,
+    /// Whether the target is persistent, so the closure can be serialized.
+    pub persistent: bool,
+}
+
+/// Captured-data layout of one `PackClosure`. Distinguishes the three cases the
+/// build pass must act on, so it needn't re-derive them from the mask.
 #[derive(Clone, Copy)]
 pub enum CapturedDataLayout {
     /// Closure captures nothing; no captured-data object is allocated.
     NonCapturing,
     /// Concrete capturing closure with its resolved captured-data layout.
     Capturing(ClosureCapturedInfo),
-    /// A captured type isn't concrete / GC-walkable yet; lowering must `Skip`.
+    /// A captured type has no layout, which only an open type can lack. The
+    /// module-wide discovery pass walks generic functions and reaches it;
+    /// lowering an instantiated function never should.
     NotDerivable,
 }
 
@@ -325,9 +340,9 @@ pub struct LoweringDescriptors {
     pub structs: UnorderedMap<InternedType, DescriptorId>,
     /// Concrete enum type -> its descriptor + per-variant field layout.
     pub enum_layouts: UnorderedMap<InternedType, EnumLayout>,
-    /// Captured-data layout per `PackClosure`, in IR order; consumed
-    /// positionally by the build pass.
-    pub closure_captured: Vec<CapturedDataLayout>,
+    /// Discovery outcome per `PackClosure`, in IR order; consumed positionally
+    /// by the build pass.
+    pub closure_packs: Vec<DiscoveredClosurePack>,
 }
 
 /// Frame layout for one function.
@@ -451,8 +466,7 @@ pub enum BuildContextOutcome<'a> {
 
 /// Outcome of attempting to lower a function: either a fully lowered
 /// [`Function`] was produced, or lowering was skipped for an
-/// out-of-scope feature (currently nominal types or partial
-/// concretization). Mirrors [`BuildContextOutcome`] — `Skipped` is a
+/// out-of-scope feature. Mirrors [`BuildContextOutcome`] — `Skipped` is a
 /// non-fatal "not yet supported," while internal-invariant violations
 /// still travel on the `Err` path.
 pub enum LoweringOutcome {
@@ -696,23 +710,30 @@ pub fn try_build_context<'a>(
                 }
                 let func_ref =
                     interner.function_ref_of(callee_module_id, callee_func_name, closure_ty_args);
-                let layout = descriptors.closure_captured[closure_pack_idx];
+                let DiscoveredClosurePack {
+                    captured: layout,
+                    persistent,
+                } = descriptors.closure_packs[closure_pack_idx];
                 closure_pack_idx += 1;
-                let (captured_data_descriptor_id, values_size) = match layout {
-                    CapturedDataLayout::NonCapturing => (None, 0),
-                    CapturedDataLayout::Capturing(info) => {
-                        (Some(info.descriptor_id), info.values_size)
-                    },
+                let (captured_data_descriptor_id, values_size, captured_layout_id) = match layout {
+                    CapturedDataLayout::NonCapturing => (None, 0, None),
+                    CapturedDataLayout::Capturing(info) => (
+                        Some(info.descriptor_id),
+                        info.values_size,
+                        Some(info.layout_id),
+                    ),
+                    // Discovery ran under this function's type arguments, so
+                    // every capture type is closed and its layout derivable.
                     CapturedDataLayout::NotDerivable => {
-                        return Ok(BuildContextOutcome::Skipped(
-                            "captured-data layout not derivable",
-                        ));
+                        return Err(LoweringError::CapturedLayoutNotDerivable.into());
                     },
                 };
                 closure_pack_sites.push(ClosurePackInfo {
                     func_ref,
+                    persistent,
                     captured_data_descriptor_id,
                     values_size,
+                    captured_layout_id,
                 });
                 continue;
             },
@@ -788,8 +809,8 @@ pub fn try_build_context<'a>(
     // the end of the discovered set.
     debug_assert_eq!(
         closure_pack_idx,
-        descriptors.closure_captured.len(),
-        "PackClosure count diverged from discovered captured-data layouts"
+        descriptors.closure_packs.len(),
+        "PackClosure count diverged from discovered closure packs"
     );
 
     // 7. Place `Ret` scratch after the callee argument/return region, beyond
@@ -909,6 +930,14 @@ pub trait SpecializerContext: LayoutProvider {
         nominal_name: &InternedIdentifier,
     ) -> VMResult<Option<NominalFields>>;
 
+    /// Whether module `module_id` defines `func_name` as a persistent function:
+    /// public or `#[persistent]`.
+    fn function_is_persistent(
+        &mut self,
+        module_id: &InternedModuleId,
+        func_name: &InternedIdentifier,
+    ) -> VMResult<bool>;
+
     /// Publishes a vector descriptor for `elem_ty` (with byte width
     /// `elem_size` and intra-element heap-pointer offsets
     /// `elem_ptr_offsets`), returning the assigned [`DescriptorId`].
@@ -945,6 +974,18 @@ pub trait SpecializerContext: LayoutProvider {
         values_size: u32,
         pointer_offsets: &[FrameOffset],
     ) -> DescriptorId;
+
+    /// Publishes the layout of a closure's captured values, an anonymous struct
+    /// with one field per capture, and returns its id. Idempotent on
+    /// `captured`, the captured types in capture order.
+    //
+    // TODO(metering): each distinct list of captured types is a permanent
+    // layout in a global cache that nothing bounds or charges.
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId;
 
     /// Publishes `layout` for the type it was built for and returns its
     /// assigned id. Idempotent. [`None`] if the layout carries no type, which
@@ -1068,10 +1109,10 @@ pub fn try_lower_function(
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(ctx.home_types))?;
 
     Ok(LoweringOutcome::Built(Function {
-        name,
-        module_id: module_ir.module.id(),
+        func_ref: interner.function_ref_of(module_ir.module.id(), name, ty_args),
         def_idx: func_ir.def_idx,
         has_module_lock: module_ir.module.definition_has_module_lock(func_ir.def_idx),
+        is_persistent: module_ir.module.definition_is_persistent(func_ir.def_idx),
         code: Code::with_origins(code, origins),
         entry_gas,
         param_slots,
@@ -1276,19 +1317,36 @@ fn try_discover_types_for_lowering_in_function_impl(
             discover_type_metadata(ctx, interner, ty, ty_args, visited, descriptors)?;
         }
 
-        // `PackClosure`: resolve the captured-data layout and record it
-        // positionally, in IR order, for the build pass.
+        // `PackClosure`: resolve the captured-data layout and the target's
+        // persistence, and record them positionally, in IR order, for the build
+        // pass.
         if let Instr::PackClosure { data } = instr {
             let closure_ty_args = interner.subst_type_list(data.ty_args, ty_args)?;
-            let layout = discover_captured_data_descriptor(
+            let captured = discover_captured_data_descriptor(
                 ctx,
                 interner,
                 module_ir,
                 data.function_handle,
                 data.mask,
                 closure_ty_args,
+                visited,
+                descriptors,
             )?;
-            descriptors.closure_captured.push(layout);
+            let persistent = match module_ir
+                .module
+                .function_handle_is_persistent(data.function_handle)
+            {
+                Some(persistent) => persistent,
+                None => {
+                    let (module_id, func_name) =
+                        callee_identity(&module_ir.module, data.function_handle);
+                    ctx.function_is_persistent(&module_id, &func_name)?
+                },
+            };
+            descriptors.closure_packs.push(DiscoveredClosurePack {
+                captured,
+                persistent,
+            });
         }
 
         // Resources accessed by global-storage ops are laid out as heap
@@ -1312,9 +1370,19 @@ fn try_discover_types_for_lowering_in_function_impl(
     Ok(())
 }
 
+/// Field names of a closure's captured values, by position. A mask has 64
+/// bits, so a closure captures at most 64 values.
+const CAPTURE_FIELD_NAMES: [&str; 64] = [
+    "_0", "_1", "_2", "_3", "_4", "_5", "_6", "_7", "_8", "_9", "_10", "_11", "_12", "_13", "_14",
+    "_15", "_16", "_17", "_18", "_19", "_20", "_21", "_22", "_23", "_24", "_25", "_26", "_27",
+    "_28", "_29", "_30", "_31", "_32", "_33", "_34", "_35", "_36", "_37", "_38", "_39", "_40",
+    "_41", "_42", "_43", "_44", "_45", "_46", "_47", "_48", "_49", "_50", "_51", "_52", "_53",
+    "_54", "_55", "_56", "_57", "_58", "_59", "_60", "_61", "_62", "_63",
+];
+
 /// Resolves the captured-data layout for one `PackClosure`: which of
 /// [`CapturedDataLayout`]'s cases it is and, when capturing, its GC trace
-/// descriptor and values-region size.
+/// descriptor, values-region size and the layout of the captured values.
 ///
 /// Captured values are laid out at their natural alignment (see
 /// [`next_captured_value_offset`]) so heap pointers inside captures stay
@@ -1327,30 +1395,61 @@ fn discover_captured_data_descriptor(
     fhi: FunctionHandleIndex,
     mask: ClosureMask,
     ty_args: InternedTypeList,
+    visited: &mut UnorderedSet<InternedType>,
+    descriptors: &mut LoweringDescriptors,
 ) -> VMResult<CapturedDataLayout> {
     let Some(captured_list) = captured_types_of(interner, module_ir, fhi, mask, ty_args)? else {
         return Ok(CapturedDataLayout::NonCapturing);
     };
     let mut cursor = 0usize;
-    let mut pointer_offsets = Vec::new();
-    for &ty in view_type_list(captured_list) {
-        let Some((size, align)) = ctx.size_and_align(ty) else {
+    let mut max_align = 1u32;
+    let mut fields = vec![];
+    let mut field_ids = vec![];
+    for (i, &ty) in view_type_list(captured_list).iter().enumerate() {
+        // The capture types are already substituted, so the walk needs no
+        // further type arguments. Everything below reads the layout it
+        // publishes.
+        let Some(id) =
+            discover_type_metadata(ctx, interner, ty, EMPTY_TYPE_LIST, visited, descriptors)?
+        else {
             return Ok(CapturedDataLayout::NotDerivable);
         };
-        if !gc_layout_supports(ctx, ty) {
-            return Ok(CapturedDataLayout::NotDerivable);
-        }
+        let layout = ctx.layout(id).ok_or(LoweringError::LayoutIdUnresolved)?;
+        let (size, align) = (layout.size, layout.align);
         let (offset, next) = next_captured_value_offset(cursor, size as usize, align as usize);
-        for rel in type_pointer_offsets(ctx, ty)? {
-            pointer_offsets.push(FrameOffset(offset as u32 + rel));
-        }
+        // Captures have no names, so they are named by position.
+        let name = CAPTURE_FIELD_NAMES
+            .get(i)
+            .copied()
+            .ok_or(LoweringError::CapturedValuesOverflow)?;
+        fields.push(VariantFieldLayout {
+            offset: u32::try_from(offset).map_err(|_| LoweringError::CapturedValuesOverflow)?,
+            size,
+            ty,
+            name: InternedIdentifier::from_static(name),
+        });
+        field_ids.push(Some(id));
+        max_align = max_align.max(align);
         cursor = next;
     }
-    let values_size = cursor as u32;
+    let values_size = u32::try_from(cursor).map_err(|_| LoweringError::CapturedValuesOverflow)?;
+    // Every field has a layout, so the aggregate always builds.
+    let layout =
+        try_build_inline_value_layout(&*ctx, None, &fields, &field_ids, values_size, max_align)?
+            .ok_or(LoweringError::CapturedLayoutNotDerivable)?;
+    let layout_id = ctx.publish_captured_values_layout(captured_list, layout);
+    // The GC traces exactly the pointers the captured values' layout holds.
+    let pointer_offsets = ctx
+        .pointer_offsets(layout_id)
+        .ok_or(LoweringError::CapturedValuesOverflow)?
+        .into_iter()
+        .map(FrameOffset)
+        .collect::<Vec<_>>();
     let descriptor_id = ctx.publish_captured_data_descriptor(values_size, &pointer_offsets);
     Ok(CapturedDataLayout::Capturing(ClosureCapturedInfo {
         descriptor_id,
         values_size,
+        layout_id,
     }))
 }
 

@@ -120,6 +120,7 @@ use crate::{
     types::{
         display_type, display_type_list, view_name, InternedType, InternedTypeList, VariantTag,
     },
+    value_layout::LayoutId,
     FunctionPtr,
 };
 use move_binary_format::file_format::ConstantPoolIndex;
@@ -242,6 +243,9 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
+    /// Whether the target is persistent (public or `#[persistent]`). Only a
+    /// closure over a persistent target can be serialized.
+    pub persistent: bool,
     /// GC trace descriptor for the allocated `ClosureCapturedData`
     /// (Materialized) object. `Some` iff this closure captures at least one
     /// value; otherwise `None` and no captured-data object is allocated. A
@@ -255,6 +259,11 @@ pub struct PackClosureOp {
     /// Byte width of the captured values region: the natural-aligned layout of
     /// `captured`. `0` for a non-capturing closure.
     pub values_size: u32,
+    /// Layout of the captured values: an anonymous struct with one field per
+    /// capture, in capture order. Serialization takes each capture's layout
+    /// from here instead of from the target's parameter types, so it never has
+    /// to load the target. [`None`] for a non-capturing closure.
+    pub captured_layout_id: Option<LayoutId>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -266,6 +275,10 @@ pub struct PackClosureOp {
 pub struct CallClosureOp {
     /// Frame slot holding the closure heap pointer.
     pub closure_src: FrameOffset,
+    /// The closure's function type at this call site, with type arguments
+    /// substituted. A closure decoded from bytes can name any function, so its
+    /// target is checked against this type when it is resolved.
+    pub closure_ty: InternedType,
     /// Non-captured argument sources, all within the caller's data region.
     /// Ordered by ascending parameter index `i` where `mask.is_captured(i)`
     /// is false.
@@ -1948,8 +1961,8 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
-                    op.dst.0, op.func_ref, op.mask
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, persistent={}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask, op.persistent
                 )?;
                 match op.captured_data_descriptor_id {
                     Some(id) => write!(f, "{}", id)?,
@@ -2172,8 +2185,12 @@ const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
 //
 //   within func_ref:
 //     offset 0:  tag (u8)   — FUNC_REF_TAG_RESOLVED = 0
-//     offset 1:  padding (7 bytes)
+//     offset 1:  closure flags (u8)
+//     offset 2:  padding (6 bytes)
 //     offset 8:  payload (8-byte pointer)
+//
+// The flags byte describes the closure, not its target, so resolving an
+// `Unresolved` func-ref leaves it unchanged.
 
 /// Reserved size for an inline `ClosureFuncRef` inside a closure heap object.
 /// Sized to accommodate a future `Unresolved` variant without on-disk layout
@@ -2199,6 +2216,13 @@ pub const FUNC_REF_TAG_OFFSET: usize = 0;
 /// Byte offset of the payload within `func_ref`.
 pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
 
+/// Byte offset of the closure flags (`u8`) within a closure heap object.
+pub const CLOSURE_FLAGS_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + 1;
+
+/// Closure flag: the target is persistent, so the closure can be serialized.
+/// Set for every closure decoded from storage.
+pub const CLOSURE_FLAG_PERSISTENT: u8 = 1;
+
 /// `ClosureFuncRef::Resolved` tag value.
 pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 /// `ClosureFuncRef::Unresolved` tag value. Payload is a thin
@@ -2206,10 +2230,13 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 
 // ---------------------------------------------------------------------------
-// ClosureCapturedData object layout (Materialized)
+// ClosureCapturedData object layout
 // ---------------------------------------------------------------------------
 //
-//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4] [captured values @ 8, packed in param order]
+//   Data region: [tag: u8 @ 0] [pad(3)] [values_size: u32 @ 4]
+//                [blob_size: u32 @ 8] [layout_id: u32 @ 12]
+//                [captured values @ 16, packed in param order]
+//                [blob @ 16 + values_size]
 //
 // Offsets below are relative to the data start (the object pointer). The
 // 8-byte header lives at `obj_ptr - 8`.
@@ -2218,6 +2245,10 @@ pub const FUNC_REF_TAG_UNRESOLVED: u8 = 1;
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
 // Total count is implied by `mask.captured_count()`. Individual sizes are
 // read from the target function's `param_slots` at call time.
+//
+// The blob is the verbatim `(layout, value)*` tail of a deserialized
+// closure's wire encoding. Re-serializing it reproduces the layouts the
+// value was stored under, which may predate the current module version.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
 pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
@@ -2226,12 +2257,34 @@ pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
 /// captured-data object's prefix.
 pub const CAPTURED_DATA_VALUES_SIZE_OFFSET: usize = 4;
 
-/// Byte offset where captured values begin (after tag + padding).
-pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
+/// Byte offset of the trailing wire blob's byte width (`u32`). Zero when the
+/// object holds no blob.
+pub const CAPTURED_DATA_BLOB_SIZE_OFFSET: usize = 8;
 
-/// `ClosureCapturedData::Materialized` tag value.
+/// Byte offset of the `LayoutId` (`u32`) of the captured values. Set only under
+/// the `Materialized` tag.
+pub const CAPTURED_DATA_LAYOUT_ID_OFFSET: usize = 12;
+
+/// Byte offset where captured values begin (after the header).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = 16;
+
+// Captured values are laid out at their natural alignment from here, so the
+// region must start `MAX_ALIGN`-aligned for the widest capture to land right.
+const _: () = assert!(CAPTURED_DATA_VALUES_OFFSET.is_multiple_of(MAX_ALIGN));
+
+/// `ClosureCapturedData::Materialized` tag value. The captured values are laid
+/// out flat in the values region and there is no blob.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
-// Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
+
+/// `ClosureCapturedData::Raw` tag value. The object holds only the blob: the
+/// captures are still wire bytes and the values region is empty.
+pub const CAPTURED_DATA_TAG_RAW: u8 = 1;
+
+/// `ClosureCapturedData::MaterializedRaw` tag value. The object holds both the
+/// decoded values and the blob they were decoded from. The first `CallClosure`
+/// on a `Raw` closure produces it, so later calls read the values directly and
+/// serialization still reproduces the stored bytes.
+pub const CAPTURED_DATA_TAG_MATERIALIZED_RAW: u8 = 2;
 
 /// Places the next captured value of `(size, align)` after `cursor` bytes at its
 /// natural alignment, returning `(value_offset, next_cursor)`. The values region
@@ -2269,6 +2322,9 @@ impl MicroOp {
             | MicroOp::VecPack(_)
             | MicroOp::StoreImmVec { .. }
             | MicroOp::PackClosure(_)
+            // Calling a closure whose captures are still wire bytes decodes
+            // them into a fresh captured-data object first.
+            | MicroOp::CallClosure(_)
             | MicroOp::BorrowGlobalMut { .. }
             | MicroOp::MoveFrom { .. }
             | MicroOp::DeepCopyHeapPtrs { .. }
@@ -2344,7 +2400,6 @@ impl MicroOp {
             | MicroOp::HeapMoveToImm8 { .. }
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::CallClosure(_)
             | MicroOp::IntAdd(_)
             | MicroOp::IntSub(_)
             | MicroOp::IntMul(_)

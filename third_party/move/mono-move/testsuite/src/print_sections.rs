@@ -19,9 +19,9 @@ use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     native::NoNatives,
-    types::{InternedType, EMPTY_TYPE_LIST},
-    DescriptorId, FrameOffset, FrameworkSymbols, LayoutId, LayoutProvider, NominalFields, VMResult,
-    ValueLayout,
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    DescriptorId, FrameOffset, FrameworkSymbols, Interner, LayoutId, LayoutProvider, NominalFields,
+    VMResult, ValueLayout,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -207,6 +207,10 @@ impl LayoutProvider for SnapshotLoaderContext<'_, '_, '_> {
     fn layout_id(&self, ty: InternedType) -> Option<LayoutId> {
         self.guard.layout_id(ty)
     }
+
+    fn interner(&self) -> Option<&dyn Interner> {
+        self.guard.interner()
+    }
 }
 
 impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
@@ -223,6 +227,15 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .module
             .interned_fields(*nominal_name)
             .cloned())
+    }
+
+    // Only asked about imported functions, which are out of scope here.
+    fn function_is_persistent(
+        &mut self,
+        _module_id: &InternedModuleId,
+        _func_name: &InternedIdentifier,
+    ) -> VMResult<bool> {
+        Ok(false)
     }
 
     fn publish_vec_descriptor(
@@ -256,6 +269,14 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
     ) -> DescriptorId {
         self.guard
             .publish_captured_data_descriptor(values_size, pointer_offsets)
+    }
+
+    fn publish_captured_values_layout(
+        &self,
+        captured: InternedTypeList,
+        layout: ValueLayout,
+    ) -> LayoutId {
+        self.guard.publish_captured_values_layout(captured, layout)
     }
 
     fn publish_layout(&self, layout: ValueLayout) -> Option<LayoutId> {

@@ -1,6 +1,6 @@
 # Native Function Interface — Draft
 
-> **Status:** Informal first draft. Companion: [`native_functions_existing.md`](native_functions_existing.md) — survey of the current Aptos VM native interface.
+> **Status:** Informal first draft.
 >
 > **Note:** Rust signatures throughout this doc are illustrative — exact shapes may be adjusted during implementation.
 

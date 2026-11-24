@@ -7,7 +7,7 @@
 use crate::context::ExecutionGuard;
 use anyhow::Result;
 use aptos_types::vm::module_metadata::{get_metadata, get_randomness_annotation};
-use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
+use mono_move_alloc::LeakedBoxPtr;
 use mono_move_core::{
     intern_struct_tag,
     interner::{InternedIdentifier, InternedModuleId},
@@ -26,10 +26,11 @@ use std::sync::{Arc, OnceLock};
 
 /// Stable cache slot for a loaded module. The slot's identifier is fixed at
 /// creation time (from the cache key), while the content may be empty until
-/// the module is installed.
+/// the module is installed. Once set, the content never changes: modules are
+/// not versioned, and the slot is freed only when the whole cache is cleared.
 pub struct ModuleSlot {
     id: InternedModuleId,
-    versions: VersionedLeakedBoxPtr<LoadedModule>,
+    module: OnceLock<LeakedBoxPtr<LoadedModule>>,
 }
 
 impl ModuleSlot {
@@ -37,7 +38,7 @@ impl ModuleSlot {
     pub fn new(id: InternedModuleId) -> Self {
         Self {
             id,
-            versions: VersionedLeakedBoxPtr::new(),
+            module: OnceLock::new(),
         }
     }
 
@@ -51,23 +52,19 @@ impl ModuleSlot {
     pub fn get<'guard>(&self, _guard: &'guard ExecutionGuard<'_>) -> Option<&'guard LoadedModule> {
         // SAFETY: while a guard is held, maintenance cannot run, so the
         // pointer is alive for and not null.
-        unsafe { self.versions.load().map(|p| p.as_ref_unchecked()) }
+        unsafe { self.get_ptr().map(|p| p.as_ref_unchecked()) }
     }
 
     /// Returns the raw pointer to the module if set, and [`None`] otherwise.
     pub fn get_ptr(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.load()
+        self.module.get().copied()
     }
 
-    /// Sets the slot content if empty. See [`VersionedLeakedBoxPtr::init`]
-    /// for race semantics.
+    /// Sets the slot content if empty. On race, if the slot is already set,
+    /// returns the input pointer back in `Err` so the caller can free it and
+    /// adopt the winner.
     pub fn init(&self, ptr: LeakedBoxPtr<LoadedModule>) -> Result<(), LeakedBoxPtr<LoadedModule>> {
-        self.versions.init(ptr)
-    }
-
-    /// Atomically empties the slot, returning the previous content if any.
-    pub fn clear(&self) -> Option<LeakedBoxPtr<LoadedModule>> {
-        self.versions.clear()
+        self.module.set(ptr)
     }
 }
 
@@ -75,51 +72,38 @@ impl ModuleSlot {
 /// module has not yet been cached.
 pub type LoadedModuleSlot = LeakedBoxPtr<ModuleSlot>;
 
-/// What a loaded module says about its mandatory dependencies, keyed by the
-/// loading policy that built it.
-#[derive(Clone)]
-pub enum ModuleMandatoryDependencies {
-    /// Cell that may be filled with slots at a later time. Used by all lazy
-    /// (LL and EL) policies, and for module loads for lowering (shallow).
-    ///
-    /// # Invariants
-    ///   1. Under LL the cell is always empty.
-    ///   2. For shallow layout loads, the cell is created empty.
-    ///   3. Under EL the loader fills it for module M once MS(M) has been
-    ///      computed. Shallow side-loads stay with an unset cell until they require lowering.
-    ///   4. Filled entries always include self.
-    Lazy(OnceLock<Arc<[LoadedModuleSlot]>>),
-    /// Every member of the same package as the owning module. Includes the
-    /// owning module itself. Used by package loading (PL) policy.
-    Package(Arc<[LoadedModuleSlot]>),
-}
+/// Mandatory dependencies of a loaded module. Starts empty and may be filled
+/// with slots at a later time.
+///
+/// # Invariants
+///   1. Under LL the cell is always empty.
+///   2. For shallow layout loads, the cell is created empty.
+///   3. Under EL the loader fills it for module M once MS(M) has been
+///      computed. Shallow side-loads stay with an unset cell until they require lowering.
+///   4. Filled entries always include self.
+pub struct ModuleMandatoryDependencies(OnceLock<Arc<[LoadedModuleSlot]>>);
 
 impl ModuleMandatoryDependencies {
-    /// Slots of the modules this module loaded together with.
+    /// Returns empty mandatory dependencies. This does not include self.
+    pub fn unset() -> Self {
+        Self(OnceLock::new())
+    }
+
+    /// Slots of the modules this module loaded together with. Empty if not
+    /// set.
     pub fn slots(&self) -> &[LoadedModuleSlot] {
-        match self {
-            Self::Lazy(cell) => cell.get().map(|s| s.as_ref()).unwrap_or(&[]),
-            Self::Package(slots) => slots,
-        }
+        self.0.get().map(|s| s.as_ref()).unwrap_or(&[])
     }
 
-    /// Returns the cell for lazy mandatory dependencies.
-    pub fn as_lazy(&self) -> Option<&OnceLock<Arc<[LoadedModuleSlot]>>> {
-        match self {
-            Self::Lazy(cell) => Some(cell),
-            Self::Package(_) => None,
-        }
+    /// Returns the slots, or [`None`] if not set.
+    pub fn get(&self) -> Option<&Arc<[LoadedModuleSlot]>> {
+        self.0.get()
     }
 
-    /// Returns empty mandatory dependencies for lazy module loads. This does
-    /// not include self.
-    pub fn lazy_unset() -> Self {
-        Self::Lazy(OnceLock::new())
-    }
-
-    /// Returns mandatory dependencies for the package. Always includes self.
-    pub fn package(package_slots: Vec<LoadedModuleSlot>) -> Self {
-        Self::Package(Arc::from(package_slots))
+    /// Sets the slots. Does nothing if they have already been set, e.g., by
+    /// a concurrent load.
+    pub fn set(&self, slots: Arc<[LoadedModuleSlot]>) {
+        let _ = self.0.set(slots);
     }
 }
 
@@ -201,12 +185,7 @@ pub struct LoadedModule {
 }
 
 impl LoadedModule {
-    pub fn new(
-        ir: ModuleIR,
-        cost: u64,
-        mandatory_dependencies: ModuleMandatoryDependencies,
-        interner: &impl Interner,
-    ) -> Result<Box<Self>> {
+    pub fn new(ir: ModuleIR, cost: u64, interner: &impl Interner) -> Result<Box<Self>> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
         let mut randomness_annotated = UnorderedSet::new();
@@ -242,7 +221,7 @@ impl LoadedModule {
         Ok(Box::new(Self {
             ir,
             cost,
-            mandatory_dependencies,
+            mandatory_dependencies: ModuleMandatoryDependencies::unset(),
             functions,
             function_indices,
             instantiated_functions: RwLock::new(UnorderedMap::new()),
