@@ -40,7 +40,7 @@ use mono_move_core::{
 };
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FunctionIrLookup, FunctionSlot, LoadedModule, LoadedModuleSlot,
-    ModuleMandatoryDependencies, ModuleSlot, ScriptHash,
+    ModuleSlot, ScriptHash,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -513,13 +513,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let module_ir =
             specializer::destack(script_into_module(script, SCRIPT_MAIN.as_str()), self.guard)?;
         self.check_natives_do_not_shadow(&module_ir)?;
-        let module = LoadedModule::new(
-            module_ir,
-            cost,
-            ModuleMandatoryDependencies::unset(),
-            self.guard,
-        )
-        .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
+        let module = LoadedModule::new(module_ir, cost, self.guard)
+            .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
         Ok(self.guard.insert_script(hash, module))
     }
 
@@ -645,7 +640,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set.record_pending_loading(id)?;
         let module = match self.guard.get_module(id) {
             Some(module) => module,
-            None => self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?,
+            None => self.build_and_insert_module_ir(id)?,
         };
 
         read_set.record_ready_for_lowering(id, module)?;
@@ -665,8 +660,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let module = match self.guard.get_module(id) {
             None => {
                 read_set.record_pending_loading(id)?;
-                let module =
-                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?;
+                let module = self.build_and_insert_module_ir(id)?;
                 read_set.record_unmetered(id, module)?;
                 module
             },
@@ -839,10 +833,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn build_and_insert_module_ir(
         &self,
         id: ArenaRef<'guard, ModuleId>,
-        deps: ModuleMandatoryDependencies,
     ) -> VMResult<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
-        let module = LoadedModule::new(module_ir, cost, deps, self.guard)
+        let module = LoadedModule::new(module_ir, cost, self.guard)
             .map_err(|e| VMInternalError::new(LoaderError::GlobalContext(e)))?;
         self.guard
             .insert_module(module)
@@ -896,9 +889,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             read_set.record_pending_loading(id)?;
             let module = match slot.get(self.guard) {
                 Some(module) => module,
-                None => {
-                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?
-                },
+                None => self.build_and_insert_module_ir(id)?,
             };
             read_set.record_metered(id, module)?;
             Ok(module)
@@ -1001,9 +992,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
                 self.read_set.record_pending_loading(id)?;
                 let module = match self.loader.guard.get_module(id) {
                     Some(module) => module,
-                    None => self
-                        .loader
-                        .build_and_insert_module_ir(id, ModuleMandatoryDependencies::unset())?,
+                    None => self.loader.build_and_insert_module_ir(id)?,
                 };
                 self.read_set.record_unmetered(id, module)?;
                 module

@@ -12,8 +12,8 @@ use move_bytecode_verifier::VerifierConfig;
 use move_core_types::account_address::AccountAddress;
 use thiserror::Error;
 
-/// Provides module bytes, package membership, and deserialization and
-/// verification configs to the loader.
+/// Provides module bytes and deserialization and verification configs to the
+/// loader.
 ///
 /// Stored modules may already be verified at publication; providers control
 /// re-verification through [`Self::verify_module`]. The loader deserializes

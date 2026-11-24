@@ -625,7 +625,6 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "aptos-vm",
- "async-trait",
  "bcs",
  "bytes",
  "hex",

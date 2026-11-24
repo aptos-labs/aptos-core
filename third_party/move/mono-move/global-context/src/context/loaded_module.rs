@@ -188,12 +188,7 @@ pub struct LoadedModule {
 }
 
 impl LoadedModule {
-    pub fn new(
-        ir: ModuleIR,
-        cost: u64,
-        mandatory_dependencies: ModuleMandatoryDependencies,
-        interner: &impl Interner,
-    ) -> Result<Box<Self>> {
+    pub fn new(ir: ModuleIR, cost: u64, interner: &impl Interner) -> Result<Box<Self>> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
         let mut randomness_annotated = UnorderedSet::new();
@@ -229,7 +224,7 @@ impl LoadedModule {
         Ok(Box::new(Self {
             ir,
             cost,
-            mandatory_dependencies,
+            mandatory_dependencies: ModuleMandatoryDependencies::unset(),
             functions,
             function_indices,
             instantiated_functions: RwLock::new(UnorderedMap::new()),
