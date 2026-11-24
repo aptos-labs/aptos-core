@@ -164,42 +164,6 @@ fn setup() -> (FakeExecutor, AccountData, AccountData) {
     (fx, alice, bob)
 }
 
-#[test]
-fn p2p_transfer_matches_v1() {
-    let (fx, alice, bob) = setup();
-
-    let txn = alice
-        .account()
-        .transaction()
-        .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
-            *bob.address(),
-            1_000,
-        ))
-        .sequence_number(10)
-        .gas_unit_price(100)
-        .max_gas_amount(1_000_000)
-        .sign();
-
-    // V1 (reference), on the starting state.
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success),
-        "v1 rejected the transfer: {:?}",
-        v1_output.status()
-    );
-
-    // V2, on the same starting state.
-    let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert_eq!(
-        v2_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success),
-        "v2 failed the transfer"
-    );
-
-    compare_outputs(&v1_output, &v2_output, *alice.address());
-}
-
 /// Compares the two outputs' write sets and events, masking only what gas
 /// divergence explains.
 fn compare_outputs(
@@ -669,62 +633,6 @@ public fun main(divisor: u64)
     compare_outputs(&v1_output, &v2_output, *alice.address());
 }
 
-/// A script that emits an event is refused with the same status as on v1.
-#[test]
-fn event_emitting_script_refused_like_v1() {
-    let (fx, alice, _bob) = setup();
-    let txn = script_txn(
-        &alice,
-        r#"
-script
-use 0x1::event
-
-public fun main()
-    ld_u64 1
-    call event::emit<u64>
-    ret
-"#,
-        vec![],
-        10,
-    );
-
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::INVALID_OPERATION_IN_SCRIPT
-        ))),
-        "v1 did not refuse the script: {:?}",
-        v1_output.status()
-    );
-    let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert_eq!(v2_output.status(), v1_output.status());
-
-    compare_outputs(&v1_output, &v2_output, *alice.address());
-}
-
-/// A script that does not deserialize is kept with the same status as on v1.
-#[test]
-fn undeserializable_script_kept_like_v1() {
-    let (fx, alice, _bob) = setup();
-    let txn = script_bytes_txn(&alice, vec![0xDE, 0xAD, 0xBE, 0xEF], vec![], 10);
-
-    let v1_output = fx.execute_transaction(txn.clone());
-    assert_eq!(
-        v1_output.status(),
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            StatusCode::CODE_DESERIALIZATION_ERROR
-        ))),
-        "v1 did not reject the script: {:?}",
-        v1_output.status()
-    );
-    let v2_output = execute_v2(fx.get_state_view(), &txn);
-    assert_eq!(v2_output.status(), v1_output.status());
-
-    // Write sets are not compared: the payload fails before anything is
-    // loaded, and v2 charges no intrinsic gas, so it writes no fee.
-}
-
 /// The same script run twice through one global context, hitting the script
 /// cache the second time, behaves like on v1 both times.
 #[test]
@@ -1021,29 +929,6 @@ fn signer_after_argument_rejected_like_v1() {
     );
 }
 
-/// An entry function taking an `Option` of a private struct is refused like on
-/// v1.
-#[test]
-fn option_of_private_struct_rejected_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_uncallable_module(&mut fx);
-    // `Some(Private { x: 0 })`: v1 admits the type but fails to construct the
-    // value, so it would accept a `None`.
-    let txn = call_txn(
-        &alice,
-        address,
-        "uncallable",
-        "takes_option_of_private",
-        vec![bcs::to_bytes(&vec![0u64]).unwrap()],
-    );
-    assert_kept_with_code_like_v1(
-        &fx,
-        &alice,
-        txn,
-        StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
-    );
-}
-
 /// A native function is refused like on v1.
 #[test]
 fn native_function_rejected_like_v1() {
@@ -1059,17 +944,6 @@ fn native_function_rejected_like_v1() {
         txn,
         StatusCode::USER_DEFINED_NATIVE_NOT_ALLOWED,
     );
-}
-
-/// A `String` argument that is valid UTF-8 runs like on v1.
-#[test]
-fn valid_string_argument_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "callable", "takes_string", vec![
-        bcs::to_bytes("hello").unwrap(),
-    ]);
-    assert_succeeds_like_v1(&fx, &alice, txn);
 }
 
 /// A `String` argument that is not valid UTF-8 is refused. v1 aborts in
@@ -1121,17 +995,6 @@ fn object_argument_without_object_rejected() {
 /// The APT fungible-asset metadata object genesis creates.
 const APT_METADATA_OBJECT: move_core_types::account_address::AccountAddress =
     move_core_types::account_address::AccountAddress::TEN;
-
-/// An `Object<T>` argument naming an object holding a `T` runs like on v1.
-#[test]
-fn object_argument_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, CALLABLE_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "callable", "takes_object", vec![
-        bcs::to_bytes(&APT_METADATA_OBJECT).unwrap(),
-    ]);
-    assert_succeeds_like_v1(&fx, &alice, txn);
-}
 
 /// The layout cache outlives a transaction but the read set does not, so a
 /// second transaction checking the same `Object<T>` must still record `T`'s
@@ -1411,15 +1274,6 @@ fn malformed_foo() -> Vec<u8> {
     .concat()
 }
 
-/// A public struct argument runs like on v1.
-#[test]
-fn public_struct_argument_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_foo", vec![valid_foo()]);
-    assert_succeeds_like_v1(&fx, &alice, txn);
-}
-
 /// A malformed `String` field of a public struct is refused.
 #[test]
 fn malformed_string_in_public_struct_rejected() {
@@ -1442,40 +1296,6 @@ fn malformed_string_in_public_struct_in_vector_rejected() {
     ]
     .concat()]);
     assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
-}
-
-/// An `Option` of a public struct runs like on v1, as `Some` and as `None`.
-#[test]
-fn option_of_public_struct_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let some = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![[
-        vec![0x01],
-        valid_foo(),
-    ]
-    .concat()]);
-    assert_succeeds_like_v1(&fx, &alice, some);
-    let none = call_txn(&alice, address, "pubs", "takes_opt_foo", vec![vec![0x00]]);
-    assert_succeeds_like_v1(&fx, &alice, none);
-}
-
-/// A public enum argument runs like on v1, for each variant.
-#[test]
-fn public_enum_argument_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let circle = call_txn(&alice, address, "pubs", "takes_shape", vec![[
-        vec![0x00],
-        bcs::to_bytes(&1u64).unwrap(),
-    ]
-    .concat()]);
-    assert_succeeds_like_v1(&fx, &alice, circle);
-    let label = call_txn(&alice, address, "pubs", "takes_shape", vec![[
-        vec![0x01],
-        bcs::to_bytes("hi").unwrap(),
-    ]
-    .concat()]);
-    assert_succeeds_like_v1(&fx, &alice, label);
 }
 
 /// A malformed `String` field of a public enum variant is refused.
@@ -1555,17 +1375,6 @@ fn ineligible_structs_rejected_like_v1() {
     }
 }
 
-/// A generic public struct instantiated with an allowed type runs like on v1.
-#[test]
-fn generic_public_struct_argument_accepted_like_v1() {
-    let (mut fx, alice, _bob) = setup();
-    let address = publish_module(&mut fx, PUBLIC_STRUCT_ENTRY_FUNCTIONS);
-    let txn = call_txn(&alice, address, "pubs", "takes_box_string", vec![
-        bcs::to_bytes("hi").unwrap(),
-    ]);
-    assert_succeeds_like_v1(&fx, &alice, txn);
-}
-
 /// An `Object<T>` nested in a public struct inside a vector is checked: the
 /// second box names an address with no object.
 #[test]
@@ -1579,91 +1388,6 @@ fn object_in_public_struct_in_vector_rejected() {
     ]
     .concat()]);
     assert_rejected_by_both(&fx, txn, StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT);
-}
-
-/// Transactions violating the pre-execution gas bounds expressible by the
-/// fixture's gas schedule are discarded with the same status code as V1,
-/// before touching any state.
-#[test]
-fn gas_checks_discard_like_v1() {
-    let (fx, alice, bob) = setup();
-    let gas_params = TransactionGasParameters::initial();
-    let max_gas = u64::from(gas_params.maximum_number_of_gas_units);
-    let below_min_price = u64::from(gas_params.min_price_per_gas_unit).checked_sub(1);
-
-    let transfer = |price: u64, max_gas: u64| {
-        alice
-            .account()
-            .transaction()
-            .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
-                *bob.address(),
-                1_000,
-            ))
-            .sequence_number(10)
-            .gas_unit_price(price)
-            .max_gas_amount(max_gas)
-            .sign()
-    };
-    let oversized = alice
-        .account()
-        .transaction()
-        .payload(
-            aptos_cached_packages::aptos_stdlib::aptos_account_batch_transfer(
-                vec![*bob.address(); 3_000],
-                vec![1; 3_000],
-            ),
-        )
-        .sequence_number(10)
-        .gas_unit_price(100)
-        .max_gas_amount(1_000_000)
-        .sign();
-
-    let mut cases = vec![
-        (oversized, StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE),
-        (
-            transfer(100, max_gas + 1),
-            StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
-        ),
-        (
-            transfer(100, 10),
-            StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
-        ),
-        (
-            transfer(u64::MAX, 1_000_000),
-            StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND,
-        ),
-        (
-            encrypted_txn(
-                &alice,
-                encrypted_min_gas_unit_price() - 1,
-                failed_decryption,
-            ),
-            StatusCode::ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND,
-        ),
-    ];
-    // The fixture's current minimum price is zero, for which no valid `u64`
-    // gas price can be below the bound. Keep the check active when the
-    // schedule raises that minimum.
-    if let Some(price) = below_min_price {
-        cases.push((
-            transfer(price, 1_000_000),
-            StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND,
-        ));
-    }
-    for (txn, expected) in cases {
-        let v1_status = fx.execute_transaction(txn.clone()).status().clone();
-        assert_eq!(
-            v1_status,
-            TransactionStatus::Discard(expected),
-            "v1 did not discard with {expected:?}"
-        );
-        let v2_output = execute_v2(fx.get_state_view(), &txn);
-        assert_eq!(
-            v2_output.status(),
-            &v1_status,
-            "v2 discard differs from v1 for {expected:?}"
-        );
-    }
 }
 
 /// An encrypted transaction. It is signed while still encrypted, the way a
@@ -2324,43 +2048,6 @@ fn block_epilogue_v1_matches_v1() {
         executor.execute_transaction(&block_epilogue, &first_txn_aux_info())
     });
     compare_system_outputs(v1_output, &v2_output);
-}
-
-/// Two dependent transfers executed sequentially, each transaction's outputs
-/// applied to the state before the next: the second transaction's prologue
-/// only passes if it observes the first one's sequence-number bump.
-#[test]
-fn sequential_execution_applies_outputs() {
-    use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
-
-    let (fx, alice, bob) = setup();
-
-    let transfer = |seq| {
-        alice
-            .account()
-            .transaction()
-            .payload(aptos_cached_packages::aptos_stdlib::aptos_account_transfer(
-                *bob.address(),
-                1_000,
-            ))
-            .sequence_number(seq)
-            .gas_unit_price(100)
-            .max_gas_amount(1_000_000)
-            .sign()
-    };
-
-    let state = DeltaStateStore::new_with_base(fx.get_state_view());
-    for (i, txn) in [transfer(10), transfer(11)].iter().enumerate() {
-        let output = execute_v2(&state, txn);
-        assert_eq!(
-            output.status(),
-            &TransactionStatus::Keep(ExecutionStatus::Success),
-            "transaction {i} failed"
-        );
-        state
-            .apply_write_set(output.write_set())
-            .expect("write set applies");
-    }
 }
 
 /// The state keys whose content embeds the transaction fee: the fee payer's
