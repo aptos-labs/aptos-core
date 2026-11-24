@@ -1,0 +1,60 @@
+Move prover returns: exiting with compilation errors
+error: cannot resolve `ensures_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking_param.move:8:84
+   │
+ 8 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+   │                                                                                    ^^^^^^^^^^^^^^^^^^^^^
+   ·
+20 │     fun c_shadow_cond_incorrect(x: &mut T) { app_neg(x, |t| { let c = t.b > 0; let t = if (c) { &mut t.a } else { &mut t.b }; *t = 1 }) }
+   │                                              ------------------------------------------------------------------------------------------
+   │                                              │          │
+   │                                              │          lambda argument
+   │                                              from a call inlined at this callsite
+
+error: cannot resolve `ensures_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking_param.move:8:84
+   │
+ 8 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+   │                                                                                    ^^^^^^^^^^^^^^^^^^^^^
+   ·
+23 │     fun c_shadow_tracked_incorrect(x: &mut T) { app_neg(x, |t| { let t = &mut t.a; *t = 1 }) }
+   │                                                 --------------------------------------------
+   │                                                 │          │
+   │                                                 │          lambda argument
+   │                                                 from a call inlined at this callsite
+
+error: cannot resolve `ensures_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking_param.move:9:124
+   │
+ 9 │     inline fun app2_neg(t: &mut u64, s: &mut T, f: |&mut u64, &mut T|) { let pt = *t; let pre = *s; f(t, s); spec { assert ensures_of<f>(pt, pre, t, s) ==> s == pre; }; }
+   │                                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 │
+11 │     fun c_move_reassigned_incorrect(y: &mut u64, x: &mut T) { app2_neg(y, x, |t2, s2| { t2 = &mut s2.a; let q = move t2; *q = 1 }) }
+   │                                                               --------------------------------------------------------------------
+   │                                                               │              │
+   │                                                               │              lambda argument
+   │                                                               from a call inlined at this callsite
+
+error: cannot resolve `ensures_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking_param.move:9:124
+   │
+ 9 │     inline fun app2_neg(t: &mut u64, s: &mut T, f: |&mut u64, &mut T|) { let pt = *t; let pre = *s; f(t, s); spec { assert ensures_of<f>(pt, pre, t, s) ==> s == pre; }; }
+   │                                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   ·
+14 │     fun c_reassigned_incorrect(y: &mut u64, x: &mut T) { app2_neg(y, x, |t2, s2| { t2 = &mut s2.a; *t2 = 1 }) }
+   │                                                          ----------------------------------------------------
+   │                                                          │              │
+   │                                                          │              lambda argument
+   │                                                          from a call inlined at this callsite
+
+error: cannot resolve `ensures_of` for this lambda argument: add a spec block to the lambda (e.g. `|x| .. spec { aborts_if ..; ensures ..; }`)
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking_param.move:9:124
+   │
+ 9 │     inline fun app2_neg(t: &mut u64, s: &mut T, f: |&mut u64, &mut T|) { let pt = *t; let pre = *s; f(t, s); spec { assert ensures_of<f>(pt, pre, t, s) ==> s == pre; }; }
+   │                                                                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   ·
+17 │     fun c_reassign_cond_incorrect(y: &mut u64, x: &mut T) { app2_neg(y, x, |t2, s2| { t2 = if (s2.b > 0) { &mut s2.a } else { &mut s2.b }; *t2 = 1 }) }
+   │                                                             -----------------------------------------------------------------------------------------
+   │                                                             │              │
+   │                                                             │              lambda argument
+   │                                                             from a call inlined at this callsite

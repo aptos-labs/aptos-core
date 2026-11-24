@@ -1,0 +1,89 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:31:30
+   │
+31 │     spec c_set_b_incorrect { ensures s == S::B { w: 99, v: 20 }; }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:30: c_set_b_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:30: c_set_b_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:31: c_set_b_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:36:36
+   │
+36 │     spec c_set_b_local_incorrect { ensures s == S::B { w: 99, v: 20 }; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:35: c_set_b_local_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:35: c_set_b_local_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:36: c_set_b_local_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:41:36
+   │
+41 │     spec c_set_b_twice_incorrect { ensures s == S::B { w: 5, v: 7 }; }
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:40: c_set_b_twice_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:40: c_set_b_twice_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:41: c_set_b_twice_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:46:30
+   │
+46 │     spec c_set_a_incorrect { ensures s == S::A { v: 7, w: 2 }; }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:45: c_set_a_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:45: c_set_a_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:46: c_set_a_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:52:5
+   │
+11 │         requires requires_of<f>(s);
+   │         --------------------------- abort happened here with code 0x0
+   ·
+52 │     spec c_set_c_incorrect { aborts_if false; }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:51: c_set_c_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:66:30
+   │
+66 │     spec c_set_b_incorrect { ensures s == S::B { w: true, v: 20 }; }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:65: c_set_b_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:65: c_set_b_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:66: c_set_b_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:76:25
+   │
+76 │     spec mk_incorrect { ensures result == update_field(S::B { w: 10, v: 20 }, v, 99); }
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:75: mk_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_pack.move:76: mk_incorrect (spec)

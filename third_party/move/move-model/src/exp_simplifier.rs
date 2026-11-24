@@ -4998,12 +4998,18 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
         // namespace, not the Pack's runtime arguments, and a ghost select on
         // a pack denotes an arbitrary (or initializer-derived) value.
         if let Operation::Select(mid, sid, fid) = oper {
-            if let ExpData::Call(_, Operation::Pack(mid2, sid2, _), inner_args) = args[0].as_ref() {
+            if let ExpData::Call(_, Operation::Pack(mid2, sid2, var), inner_args) = args[0].as_ref()
+            {
                 if mid == mid2 && sid == sid2 {
                     let struct_env = self.env().get_module(*mid).into_struct(*sid);
                     let field_env = struct_env.get_field(*fid);
                     let offset = field_env.get_offset();
-                    if !field_env.is_ghost() && offset < inner_args.len() {
+                    // An offset is relative to the field's own variant, so it
+                    // indexes the pack's arguments only for that variant.
+                    if !field_env.is_ghost()
+                        && field_env.get_variant() == *var
+                        && offset < inner_args.len()
+                    {
                         return Some(inner_args[offset].clone());
                     }
                 }
@@ -5020,8 +5026,27 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpRewriterFunctions for ExpSimplifier<'a,
                 if mid == mid2 && sid == sid2 {
                     let struct_env = self.env().get_module(*mid).into_struct(*sid);
                     let field_env = struct_env.get_field(*fid);
-                    let offset = field_env.get_offset();
-                    if !field_env.is_ghost() && offset < inner_args.len() {
+                    // An update of an enum field applies to whichever variant
+                    // the value is in, through that variant's field of the
+                    // same name and type. The offset is taken from the packed
+                    // variant; the update is left alone if that variant has
+                    // no such field.
+                    let offset = if struct_env.has_variants() {
+                        var.and_then(|v| {
+                            struct_env
+                                .get_fields_of_variant(v)
+                                .find(|f| {
+                                    f.get_name() == field_env.get_name()
+                                        && f.get_type() == field_env.get_type()
+                                })
+                                .map(|f| f.get_offset())
+                        })
+                    } else {
+                        Some(field_env.get_offset())
+                    };
+                    if let Some(offset) =
+                        offset.filter(|o| !field_env.is_ghost() && *o < inner_args.len())
+                    {
                         let mut new_args = inner_args.clone();
                         new_args[offset] = args[1].clone();
                         return Some(

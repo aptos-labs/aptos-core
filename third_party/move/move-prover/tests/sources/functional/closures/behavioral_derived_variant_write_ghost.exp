@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_ghost.move:21:29
+   │
+21 │     spec caller_incorrect { ensures s.v == old(s.v); }
+   │                             ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_ghost.move:20: caller_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_ghost.move:13: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_ghost.move:20: caller_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_ghost.move:21: caller_incorrect (spec)

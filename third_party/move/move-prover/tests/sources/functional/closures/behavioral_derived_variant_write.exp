@@ -1,0 +1,491 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:29:30
+   │
+29 │     spec c_reset_incorrect { ensures s.v == old(s.v); }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:28: c_reset_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:28: c_reset_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:29: c_reset_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:31:32
+   │
+31 │     spec c_reset_w_incorrect { ensures s.w == 0; }
+   │                                ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:30: c_reset_w_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:30: c_reset_w_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:31: c_reset_w_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:36:28
+   │
+36 │     spec c_set_incorrect { ensures s.v == old(s.v); }
+   │                            ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:35: c_set_incorrect
+   =         s = <redacted>
+   =         n = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:35: c_set_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:36: c_set_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:41:46
+   │
+41 │     spec c_bump_incorrect { aborts_if false; ensures s.v == old(s.v); }
+   │                                              ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:40: c_bump_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:40: c_bump_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:41: c_bump_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:41:5
+   │
+10 │         requires requires_of<f>(s);
+   │         --------------------------- abort happened here with code 0x0
+   ·
+41 │     spec c_bump_incorrect { aborts_if false; ensures s.v == old(s.v); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:40: c_bump_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:46:28
+   │
+46 │     spec c_two_incorrect { ensures s.v == 1; }
+   │                            ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:45: c_two_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:45: c_two_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:46: c_two_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:51:32
+   │
+51 │     spec c_via_ref_incorrect { ensures s.v == old(s.v); }
+   │                                ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:50: c_via_ref_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:50: c_via_ref_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:51: c_via_ref_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:71:5
+   │
+10 │         requires requires_of<f>(s);
+   │         --------------------------- abort happened here with code 0x0
+   ·
+71 │     spec c_reset_abort_incorrect { aborts_if false; }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:70: c_reset_abort_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =         ABORTED
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:73:30
+   │
+73 │     spec c_reset_incorrect { ensures s.v == old(s.v); }
+   │                              ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:72: c_reset_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:72: c_reset_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:73: c_reset_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:75:38
+   │
+75 │     spec c_reset_variant_incorrect { ensures s is A; }
+   │                                      ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:74: c_reset_variant_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:74: c_reset_variant_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:75: c_reset_variant_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:77:32
+   │
+77 │     spec c_reset_w_incorrect { ensures s.w == 0; }
+   │                                ^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:76: c_reset_w_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:76: c_reset_w_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:77: c_reset_w_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:87:32
+   │
+87 │     spec c_reset_t_incorrect { ensures s is B; }
+   │                                ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:86: c_reset_t_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:86: c_reset_t_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:87: c_reset_t_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:92:5
+   │
+10 │         requires requires_of<f>(s);
+   │         --------------------------- abort happened here with code 0x0
+   ·
+92 │     spec c_reset_z_incorrect { aborts_if false; }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:91: c_reset_z_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+   =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:113:32
+    │
+113 │     spec c_in_enum_incorrect { ensures s == old(s); }
+    │                                ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:112: c_in_enum_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:112: c_in_enum_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:113: c_in_enum_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:118:34
+    │
+118 │     spec c_in_struct_incorrect { ensures s == old(s); }
+    │                                  ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:117: c_in_struct_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:117: c_in_struct_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:118: c_in_struct_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:126:37
+    │
+126 │     spec c_in_enum_enum_incorrect { ensures s == old(s); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:125: c_in_enum_enum_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:125: c_in_enum_enum_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:126: c_in_enum_enum_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:131:28
+    │
+131 │     spec c_gen_incorrect { ensures s.t == old(s.t); }
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:130: c_gen_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:130: c_gen_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:131: c_gen_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:135:30
+    │
+135 │     spec c_gen_n_incorrect { ensures s.n == old(s.n); }
+    │                              ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:134: c_gen_n_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:134: c_gen_n_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:135: c_gen_n_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:147:29
+    │
+147 │     spec c_elem_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:146: c_elem_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:146: c_elem_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:147: c_elem_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:157:30
+    │
+157 │     spec c_reset_incorrect { ensures s.v == old(s.v); }
+    │                              ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:156: c_reset_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:156: c_reset_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:157: c_reset_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:174:29
+    │
+174 │     spec c_set0_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:173: c_set0_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:173: c_set0_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:174: c_set0_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:176:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+176 │     spec c_set0_abort_incorrect { aborts_if false; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:175: c_set0_abort_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:181:29
+    │
+181 │     spec c_set1_incorrect { ensures s.0 == 0; }
+    │                             ^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:180: c_set1_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:180: c_set1_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:181: c_set1_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:193:28
+    │
+193 │     spec c_wtf_incorrect { ensures s == S::B { v: 1 }; }
+    │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:192: c_wtf_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:192: c_wtf_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:193: c_wtf_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:199:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+199 │     spec c_ftw_incorrect { aborts_if false; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:198: c_ftw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:205:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+205 │     spec c_tctf_incorrect { aborts_if false; ensures s == S::C { z: 1 }; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:204: c_tctf_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:211:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+211 │     spec c_rac_incorrect { aborts_if s is C; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:210: c_rac_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:217:29
+    │
+217 │     spec c_tatw_incorrect { ensures s == S::A { v: 0, w: 0 }; }
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:216: c_tatw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:216: c_tatw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:217: c_tatw_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:224:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+224 │     spec c_tb_incorrect { aborts_if s is C; }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:223: c_tb_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:226:29
+    │
+226 │     spec c_tb_v_incorrect { ensures s.v == old(s.v); }
+    │                             ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:225: c_tb_v_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:225: c_tb_v_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:226: c_tb_v_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:232:29
+    │
+232 │     spec c_swap_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:231: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:231: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:232: c_swap_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:238:28
+    │
+238 │     spec c_itw_incorrect { ensures s.w == s.v; }
+    │                            ^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:237: c_itw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:237: c_itw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:238: c_itw_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:244:28
+    │
+244 │     spec c_ltw_incorrect { ensures s.w == 7; }
+    │                            ^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:243: c_ltw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:243: c_ltw_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:244: c_ltw_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:259:27
+    │
+259 │     spec c_ph_incorrect { ensures s == old(s); }
+    │                           ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:258: c_ph_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:258: c_ph_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:259: c_ph_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:263:31
+    │
+263 │     spec c_ph_gen_incorrect { ensures s == old(s); }
+    │                               ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:262: c_ph_gen_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:262: c_ph_gen_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:263: c_ph_gen_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:273:31
+    │
+273 │     spec c_nested_incorrect { ensures s == old(s); }
+    │                               ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:272: c_nested_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:272: c_nested_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:273: c_nested_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+    ┌─ tests/sources/functional/closures/behavioral_derived_variant_write.move:278:5
+    │
+ 10 │         requires requires_of<f>(s);
+    │         --------------------------- abort happened here with code 0x0
+    ·
+278 │     spec c_ng_incorrect { aborts_if !(s is V1); }
+    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:277: c_ng_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_variant_write.move:10: apply_to (spec)
+    =         ABORTED

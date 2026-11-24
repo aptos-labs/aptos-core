@@ -1,0 +1,846 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `e`. Consider removing the parameter, or prefixing with an underscore (e.g., `_e`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:100:21
+    │
+100 │     fun check_first(e: &E) {}
+    │                     ^
+
+warning: Unused value of parameter `e`. Consider removing the parameter, or prefixing with an underscore (e.g., `_e`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:102:31
+    │
+102 │     fun check_first_incorrect(e: &E) {}
+    │                               ^
+
+warning: Unused value of parameter `b`. Consider removing the parameter, or prefixing with an underscore (e.g., `_b`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:107:25
+    │
+107 │     fun check_join_read(b: bool, x: u64) {}
+    │                         ^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:107:34
+    │
+107 │     fun check_join_read(b: bool, x: u64) {}
+    │                                  ^
+
+warning: Unused value of parameter `b`. Consider removing the parameter, or prefixing with an underscore (e.g., `_b`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:109:35
+    │
+109 │     fun check_join_read_incorrect(b: bool, x: u64) {}
+    │                                   ^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:109:44
+    │
+109 │     fun check_join_read_incorrect(b: bool, x: u64) {}
+    │                                            ^
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:27:30
+   │
+27 │     spec c_destr_incorrect { ensures s == old(s); }
+   │                              ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:26: c_destr_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:26: c_destr_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:27: c_destr_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:33:35
+   │
+33 │     spec c_destr_read_incorrect { ensures s.k == old(s.k); }
+   │                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:32: c_destr_read_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:32: c_destr_read_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:33: c_destr_read_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:38:32
+   │
+38 │     spec c_matched_incorrect { ensures s == old(s); }
+   │                                ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:37: c_matched_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:37: c_matched_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:38: c_matched_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:43:29
+   │
+43 │     spec c_pick_incorrect { ensures s == old(s); }
+   │                             ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:42: c_pick_incorrect
+   =         s = <redacted>
+   =         c = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:42: c_pick_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:43: c_pick_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:54:34
+   │
+54 │     spec c_pick_read_incorrect { ensures s.k == old(s.k); }
+   │                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:53: c_pick_read_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:53: c_pick_read_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:54: c_pick_read_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:60:30
+   │
+60 │     spec c_moved_incorrect { ensures s == old(s); }
+   │                              ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:59: c_moved_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:59: c_moved_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:60: c_moved_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:66:30
+   │
+66 │     spec c_whole_incorrect { ensures s == old(s); }
+   │                              ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:65: c_whole_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:65: c_whole_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:66: c_whole_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:72:31
+   │
+72 │     spec c_rebind_incorrect { ensures s == old(s); }
+   │                               ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:71: c_rebind_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:71: c_rebind_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:72: c_rebind_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:78:33
+   │
+78 │     spec c_reborrow_incorrect { ensures s == old(s); }
+   │                                 ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:77: c_reborrow_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:77: c_reborrow_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:78: c_reborrow_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:84:30
+   │
+84 │     spec c_tuple_incorrect { ensures s == old(s); }
+   │                              ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:83: c_tuple_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:83: c_tuple_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:84: c_tuple_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:90:31
+   │
+90 │     spec c_callee_incorrect { ensures s == old(s); }
+   │                               ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:89: c_callee_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:89: c_callee_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:90: c_callee_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:96:35
+   │
+96 │     spec c_callee_let_incorrect { ensures s == old(s); }
+   │                                   ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:95: c_callee_let_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:95: c_callee_let_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:96: c_callee_let_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:103:34
+    │
+103 │     spec check_first_incorrect { ensures result_of<first>(e) == e.k + 1; }
+    │                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:102: check_first_incorrect
+    =         e = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:103: check_first_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:110:38
+    │
+110 │     spec check_join_read_incorrect { ensures result_of<join_read>(b, x) == x + 1; }
+    │                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:109: check_join_read_incorrect
+    =         b = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:110: check_join_read_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:117:29
+    │
+117 │     spec c_late_incorrect { ensures s.k == 7; }
+    │                             ^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:116: c_late_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:116: c_late_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:117: c_late_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:123:29
+    │
+123 │     spec c_swap_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:122: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:122: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:123: c_swap_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:129:33
+    │
+129 │     spec c_swap_ref_incorrect { ensures s == old(s); }
+    │                                 ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:128: c_swap_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:128: c_swap_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:129: c_swap_ref_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:141:30
+    │
+141 │     spec c_destr_incorrect { ensures s == old(s); }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:140: c_destr_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:140: c_destr_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:141: c_destr_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:147:35
+    │
+147 │     spec c_destr_read_incorrect { ensures s.k == old(s.k); }
+    │                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:146: c_destr_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:146: c_destr_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:147: c_destr_read_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:152:32
+    │
+152 │     spec c_matched_incorrect { ensures s == old(s); }
+    │                                ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:151: c_matched_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:151: c_matched_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:152: c_matched_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:157:29
+    │
+157 │     spec c_pick_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:156: c_pick_incorrect
+    =         s = <redacted>
+    =         c = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:156: c_pick_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:157: c_pick_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:168:34
+    │
+168 │     spec c_pick_read_incorrect { ensures s.k == old(s.k); }
+    │                                  ^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:167: c_pick_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:167: c_pick_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:168: c_pick_read_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:174:30
+    │
+174 │     spec c_moved_incorrect { ensures s == old(s); }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:173: c_moved_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:173: c_moved_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:174: c_moved_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:180:30
+    │
+180 │     spec c_whole_incorrect { ensures s == old(s); }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:179: c_whole_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:179: c_whole_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:180: c_whole_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:186:31
+    │
+186 │     spec c_rebind_incorrect { ensures s == old(s); }
+    │                               ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:185: c_rebind_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:185: c_rebind_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:186: c_rebind_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:192:33
+    │
+192 │     spec c_reborrow_incorrect { ensures s == old(s); }
+    │                                 ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:191: c_reborrow_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:191: c_reborrow_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:192: c_reborrow_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:198:30
+    │
+198 │     spec c_tuple_incorrect { ensures s == old(s); }
+    │                              ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:197: c_tuple_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:197: c_tuple_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:198: c_tuple_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:204:31
+    │
+204 │     spec c_callee_incorrect { ensures s == old(s); }
+    │                               ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:203: c_callee_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:203: c_callee_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:204: c_callee_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:210:35
+    │
+210 │     spec c_callee_let_incorrect { ensures s == old(s); }
+    │                                   ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:209: c_callee_let_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:209: c_callee_let_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:210: c_callee_let_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:217:29
+    │
+217 │     spec c_late_incorrect { ensures s.k == 7; }
+    │                             ^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:216: c_late_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:216: c_late_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:217: c_late_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:224:33
+    │
+224 │     spec check_same_incorrect { ensures result_of<same>() == true; }
+    │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:224: check_same_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:230:29
+    │
+230 │     spec c_swap_incorrect { ensures s == old(s); }
+    │                             ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:229: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:229: c_swap_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:230: c_swap_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:236:33
+    │
+236 │     spec c_swap_ref_incorrect { ensures s == old(s); }
+    │                                 ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:235: c_swap_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:235: c_swap_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:236: c_swap_ref_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:252:28
+    │
+252 │     spec c_inl_incorrect { ensures s == old(s); }
+    │                            ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:251: c_inl_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:251: c_inl_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:252: c_inl_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:259:33
+    │
+259 │     spec c_inl_self_incorrect { ensures s == old(s); }
+    │                                 ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:258: c_inl_self_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:258: c_inl_self_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:259: c_inl_self_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:266:35
+    │
+266 │     spec c_inl_lambda_incorrect { ensures s == old(s); }
+    │                                   ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:265: c_inl_lambda_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:265: c_inl_lambda_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:266: c_inl_lambda_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:273:36
+    │
+273 │     spec c_inl_ref_ret_incorrect { ensures s == old(s); }
+    │                                    ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:272: c_inl_ref_ret_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:272: c_inl_ref_ret_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:273: c_inl_ref_ret_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:280:37
+    │
+280 │     spec c_inl_ref_ret2_incorrect { ensures s == old(s); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:279: c_inl_ref_ret2_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:279: c_inl_ref_ret2_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:280: c_inl_ref_ret2_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:287:32
+    │
+287 │     spec c_inl_vec_incorrect { ensures s == old(s); }
+    │                                ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:286: c_inl_vec_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:286: c_inl_vec_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:287: c_inl_vec_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:295:34
+    │
+295 │     spec c_inl_param_incorrect { ensures s == old(s); }
+    │                                  ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:294: c_inl_param_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:294: c_inl_param_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:295: c_inl_param_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:302:34
+    │
+302 │     spec c_tuple_inl_incorrect { ensures s == old(s); }
+    │                                  ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:301: c_tuple_inl_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:301: c_tuple_inl_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:302: c_tuple_inl_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:309:35
+    │
+309 │     spec c_ref_helper_incorrect { ensures s == old(s); }
+    │                                   ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:308: c_ref_helper_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:308: c_ref_helper_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:309: c_ref_helper_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:316:41
+    │
+316 │     spec c_ref_helper_tuple_incorrect { ensures s == old(s); }
+    │                                         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:315: c_ref_helper_tuple_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:315: c_ref_helper_tuple_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:316: c_ref_helper_tuple_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:323:39
+    │
+323 │     spec c_ref_helper_mut_incorrect { ensures s == old(s); }
+    │                                       ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:322: c_ref_helper_mut_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:322: c_ref_helper_mut_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:323: c_ref_helper_mut_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:338:33
+    │
+338 │     spec c_vec_read_incorrect { ensures s == old(s); }
+    │                                 ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:337: c_vec_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:337: c_vec_read_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:338: c_vec_read_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:356:35
+    │
+356 │     spec c_vec_borrow_incorrect { ensures s == old(s); }
+    │                                   ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:355: c_vec_borrow_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:355: c_vec_borrow_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:356: c_vec_borrow_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:362:44
+    │
+362 │     spec c_borrow_before_write_incorrect { ensures s == old(s); }
+    │                                            ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:361: c_borrow_before_write_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:361: c_borrow_before_write_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:362: c_borrow_before_write_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:377:37
+    │
+377 │     spec c_branches_imm_incorrect { ensures s == old(s); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:376: c_branches_imm_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:376: c_branches_imm_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:377: c_branches_imm_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:383:37
+    │
+383 │     spec c_imm_then_mut_incorrect { ensures s == old(s); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:382: c_imm_then_mut_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:382: c_imm_then_mut_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:383: c_imm_then_mut_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:392:39
+    │
+392 │     spec c_freeze_callees_incorrect { ensures s == old(s); }
+    │                                       ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:391: c_freeze_callees_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:391: c_freeze_callees_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:392: c_freeze_callees_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:398:37
+    │
+398 │     spec c_reassign_ref_incorrect { ensures s == old(s); }
+    │                                     ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:397: c_reassign_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:397: c_reassign_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:398: c_reassign_ref_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:404:38
+    │
+404 │     spec c_move_copy_ref_incorrect { ensures s == old(s); }
+    │                                      ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:403: c_move_copy_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:403: c_move_copy_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:404: c_move_copy_ref_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:410:34
+    │
+410 │     spec c_block_ref_incorrect { ensures s == old(s); }
+    │                                  ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:409: c_block_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:409: c_block_ref_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:410: c_block_ref_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:417:44
+    │
+417 │     spec c_assign_rooted_local_incorrect { ensures s == old(s); }
+    │                                            ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:416: c_assign_rooted_local_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:416: c_assign_rooted_local_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:417: c_assign_rooted_local_incorrect (spec)
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:424:77
+    │
+424 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+    │                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:428: c_deref_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:424: app_neg
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:428: c_deref_shadow_incorrect
+    =         x = <redacted>
+    =         t = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:424: app_neg
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:441:28
+    │
+441 │     spec c_set_incorrect { ensures s == old(s); }
+    │                            ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:440: c_set_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:11: apply_to (spec)
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:440: c_set_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:441: c_set_incorrect (spec)
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449:77
+    │
+449 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+    │                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         o = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:478: c_match_shadow_incorrect
+    =         <redacted> = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449:77
+    │
+449 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+    │                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:455: c_one_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:455: c_one_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449:77
+    │
+449 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+    │                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:472: c_unused_ref_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:472: c_unused_ref_shadow_incorrect
+    =         r = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449:77
+    │
+449 │     inline fun app_neg(s: &mut T, f: |&mut T|) { let pre = *s; f(s); spec { assert ensures_of<f>(pre, s) ==> s == pre; }; }
+    │                                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:466: c_value_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:466: c_value_shadow_incorrect
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:449: app_neg
+
+error: unknown assertion failed
+    ┌─ tests/sources/functional/closures/behavioral_derived_ref_tracking.move:451:117
+    │
+451 │     inline fun app2_neg(t: &mut u64, s: &mut T, f: |&mut u64, &mut T|) { let pt = *t; let pre = *s; f(t, s); spec { assert ensures_of<f>(pt, pre, t, s) ==> s == pre; }; }
+    │                                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:460: c_two_incorrect
+    =         y = <redacted>
+    =         x = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:451: app2_neg
+    =         t = <redacted>
+    =         s = <redacted>
+    =         pre = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:460: c_two_incorrect
+    =         x = <redacted>
+    =         y = <redacted>
+    =     at tests/sources/functional/closures/behavioral_derived_ref_tracking.move:451: app2_neg
