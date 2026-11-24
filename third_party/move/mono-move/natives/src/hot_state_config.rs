@@ -14,7 +14,7 @@ use mono_move_core::{
 ///
 /// Returns whether `config` BCS-decodes to a valid `OnChainHotStateConfig`.
 //
-// TODO(metering): V1 VM does not meter gas here, consider if we need to change that.
+// Not metered, same as V1: only the framework signer can reach it.
 pub fn native_validate<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     // SAFETY: arg 0 is `vector<u8>`, passed by value.
     let v: Vector<u8> = unsafe { ctx.arg(0)? };

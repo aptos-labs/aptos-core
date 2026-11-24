@@ -20,7 +20,7 @@ module 0x1::hot_state_config {
 
     native fun validate_internal(config: vector<u8>): bool;
 
-    fun validate(max_items_per_shard: vector<u64>, max_bytes_per_shard: vector<u64>): bool {
+    fun config_bytes(max_items_per_shard: vector<u64>, max_bytes_per_shard: vector<u64>): vector<u8> {
         let config = Config::V1 {
             max_items_per_shard,
             max_bytes_per_shard,
@@ -28,7 +28,11 @@ module 0x1::hot_state_config {
             max_promotion_bytes_per_block: 1024,
             defer_cold_writes_to_eviction: false,
         };
-        validate_internal(bcs::to_bytes(&config))
+        bcs::to_bytes(&config)
+    }
+
+    fun validate(max_items_per_shard: vector<u64>, max_bytes_per_shard: vector<u64>): bool {
+        validate_internal(config_bytes(max_items_per_shard, max_bytes_per_shard))
     }
 
     fun repeat(value: u64, n: u64): vector<u64> {
@@ -59,8 +63,17 @@ module 0x1::hot_state_config {
         validate(items, repeat(4096, 16))
     }
 
-    public fun malformed(): bool {
-        validate_internal(vector[])
+    public fun trailing_byte(): bool {
+        let bytes = config_bytes(repeat(100, 16), repeat(4096, 16));
+        vector::push_back(&mut bytes, 0);
+        validate_internal(bytes)
+    }
+
+    public fun unknown_variant(): bool {
+        let bytes = config_bytes(repeat(100, 16), repeat(4096, 16));
+        // Byte 0 is the variant tag; `V1` is 0.
+        *vector::borrow_mut(&mut bytes, 0) = 1;
+        validate_internal(bytes)
     }
 }
 
@@ -76,5 +89,8 @@ module 0x1::hot_state_config {
 // RUN: execute 0x1::hot_state_config::zero_items
 // CHECK: results: false
 
-// RUN: execute 0x1::hot_state_config::malformed
+// RUN: execute 0x1::hot_state_config::trailing_byte
+// CHECK: results: false
+
+// RUN: execute 0x1::hot_state_config::unknown_variant
 // CHECK: results: false
