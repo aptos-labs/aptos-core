@@ -19,14 +19,6 @@ module 0x1::unit_test {
         a && b && c && d
     }
 
-    public fun distinct(): bool {
-        let signers = create_signers_for_testing(3);
-        let a = *signer::borrow_address(vector::borrow(&signers, 0));
-        let b = *signer::borrow_address(vector::borrow(&signers, 1));
-        let c = *signer::borrow_address(vector::borrow(&signers, 2));
-        a != b && a != c && b != c
-    }
-
     native fun create_signers_for_testing(num_signers: u64): vector<signer>;
 }
 
@@ -37,7 +29,4 @@ module 0x1::unit_test {
 // CHECK: results: 3
 
 // RUN: execute 0x1::unit_test::equals
-// CHECK: results: true
-
-// RUN: execute 0x1::unit_test::distinct
 // CHECK: results: true

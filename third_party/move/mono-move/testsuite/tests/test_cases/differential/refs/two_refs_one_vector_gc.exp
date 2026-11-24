@@ -1,0 +1,95 @@
+=== micro-ops ===
+// module 0x42::two_refs
+
+fun bump_after_gc() {
+  frame_data_size: 24
+  entry_gas: 237
+  code:
+    0: ForceGC @0
+    1: ReadRef [16] <- *[0] (size=8) @2
+    2: AddU64Imm [16] <- [16] + #1 @4
+    3: WriteRef *[0] <- [16] (size=8) @6
+    4: ReadRef [16] <- *[0] (size=8) @8
+    5: Move8 [0] <- [16] @9
+    6: Return @9
+  safe_point_layouts:
+    0: []
+}
+
+fun read_after_gcs() {
+  frame_data_size: 80
+  entry_gas: 463
+  code:
+    0: ForceGC @0
+    1: AddU64Imm [32] <- [16] + #1 @4
+    2: AddU64Imm [40] <- [16] + #2 @7
+    3: VecPack [24] <- [[16], [32], [40]] (size=8, desc=0) @8
+    4: ForceGC @10
+    5: ReadRef [40] <- *[0] (size=8) @12
+    6: SlotBorrow [48] <- &[24] @13
+    7: StoreImm8 [32] <- #2 @14
+    8: VecBorrow [64] <- &[48][[32]] (elem_size=8) @15
+    9: ReadRef [32] <- *[64] (size=8) @16
+    10: Move8 [0] <- [40] @17
+    11: Move8 [8] <- [32] @17
+    12: Return @17
+  safe_point_layouts:
+    0: []
+    3: []
+    4: []
+}
+
+fun shared() {
+  frame_data_size: 72
+  entry_gas: 335
+  code:
+    0: VecPack [24] <- [[0], [8], [16]] (size=8, desc=0) @3
+    1: SlotBorrow [48] <- &[24] @5
+    2: StoreImm8 [64] <- #0 @6
+    3: VecBorrow [32] <- &[48][[64]] (elem_size=8) @7
+    4: SlotBorrow [48] <- &[24] @9
+    5: StoreImm8 [64] <- #2 @10
+    6: VecBorrow [96] <- &[48][[64]] (elem_size=8) @11
+    7: AddU64Imm [112] <- [0] + #7000 @14
+    8: CallByNameExempt 0x42::two_refs::read_after_gcs @15
+    9: ReadRef [16] <- *[32] (size=8) @17
+    10: MulU64Imm [64] <- [104] * #1000 @20
+    11: AddU64 [0] <- [96] + [64] @21
+    12: Move8 [8] <- [0] @25
+    13: Move8 [0] <- [16] @25
+    14: Return @25
+  safe_point_layouts:
+    0: []
+}
+
+fun write_through() {
+  frame_data_size: 96
+  entry_gas: 337
+  code:
+    0: VecPack [24] <- [[0], [8], [16]] (size=8, desc=0) @3
+    1: SlotBorrow [32] <- &[24] @5
+    2: StoreImm8 [48] <- #1 @6
+    3: VecBorrow [120] <- &[32][[48]] (elem_size=8) @7
+    4: CallByNameExempt 0x42::two_refs::bump_after_gc @8
+    5: SlotBorrow [56] <- &[24] @9
+    6: StoreImm8 [48] <- #1 @10
+    7: VecBorrow [72] <- &[56][[48]] (elem_size=8) @11
+    8: ReadRef [48] <- *[72] (size=8) @12
+    9: MulU64Imm [48] <- [48] * #100 @14
+    10: SlotBorrow [56] <- &[24] @15
+    11: StoreImm8 [88] <- #2 @16
+    12: VecBorrow [72] <- &[56][[88]] (elem_size=8) @17
+    13: ReadRef [88] <- *[72] (size=8) @18
+    14: AddU64 [88] <- [48] + [88] @19
+    15: Move8 [0] <- [120] @20
+    16: Move8 [8] <- [88] @20
+    17: Return @20
+  safe_point_layouts:
+    0: []
+}
+=== frame-layout ===
+// module 0x42::two_refs
+fun bump_after_gc: heap_ptr_offsets=[0] zero_frame=false
+fun read_after_gcs: heap_ptr_offsets=[0, 24, 48, 64] zero_frame=true
+fun shared: heap_ptr_offsets=[24, 32, 48] zero_frame=true
+fun write_through: heap_ptr_offsets=[24, 32, 56, 72] zero_frame=true

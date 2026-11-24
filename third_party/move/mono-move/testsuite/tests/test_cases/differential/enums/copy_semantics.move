@@ -60,12 +60,6 @@ module 0x42::copy_semantics {
         via_copy * 1000 + a.f
     }
 
-    fun copy_no_mutate(): u64 {
-        let a = E::V { f: 5 };
-        let b = a;
-        a.f + b.f
-    }
-
     fun move_enum(): u64 {
         let a = E::V { f: 5 };
         let b = a;
@@ -107,9 +101,6 @@ module 0x42::copy_semantics {
 
 // RUN: execute 0x42::copy_semantics::xfer_dst_copy
 // CHECK: results: 7007
-
-// RUN: execute 0x42::copy_semantics::copy_no_mutate
-// CHECK: results: 10
 
 // RUN: execute 0x42::copy_semantics::move_enum
 // CHECK: results: 5

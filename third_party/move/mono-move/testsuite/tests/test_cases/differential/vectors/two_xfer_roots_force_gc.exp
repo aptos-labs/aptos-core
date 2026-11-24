@@ -1,0 +1,56 @@
+=== micro-ops ===
+// module 0x1::two_xfer_roots_force_gc
+
+fun firsts() {
+  frame_data_size: 72
+  entry_gas: 182
+  code:
+    0: SlotBorrow [24] <- &[0] @0
+    1: StoreImm8 [40] <- #0 @1
+    2: VecBorrow [48] <- &[24][[40]] (elem_size=8) @2
+    3: ReadRef [40] <- *[48] (size=8) @3
+    4: AddU64 [40] <- [40] + [16] @5
+    5: SlotBorrow [24] <- &[8] @6
+    6: StoreImm8 [64] <- #0 @7
+    7: VecBorrow [48] <- &[24][[64]] (elem_size=8) @8
+    8: ReadRef [64] <- *[48] (size=8) @9
+    9: AddU64 [64] <- [64] + [16] @11
+    10: Move8 [0] <- [40] @12
+    11: Move8 [8] <- [64] @12
+    12: Return @12
+}
+
+fun run() {
+  frame_data_size: 80
+  entry_gas: 548
+  code:
+    0: VecPack [16] <- [[0]] (size=8, desc=0) @1
+    1: VecPack [24] <- [[8]] (size=8, desc=0) @4
+    2: Move8 [104] <- [16] @6
+    3: DeepCopyHeapPtrs [104] deep-copy ptrs at [0] @6
+    4: Move8 [112] <- [24] @7
+    5: DeepCopyHeapPtrs [112] deep-copy ptrs at [0] @7
+    6: ForceGC @8
+    7: StoreImm8 [120] <- #0 @9
+    8: CallByNameExempt 0x1::two_xfer_roots_force_gc::firsts @10
+    9: SlotBorrow [32] <- &[16] @11
+    10: StoreImm8 [48] <- #0 @12
+    11: VecBorrow [56] <- &[32][[48]] (elem_size=8) @13
+    12: ReadRef [48] <- *[56] (size=8) @14
+    13: MulU64Imm [48] <- [48] * #100 @16
+    14: SlotBorrow [32] <- &[24] @17
+    15: StoreImm8 [72] <- #0 @18
+    16: VecBorrow [56] <- &[32][[72]] (elem_size=8) @19
+    17: ReadRef [72] <- *[56] (size=8) @20
+    18: AddU64 [72] <- [48] + [72] @21
+    19: Move8 [0] <- [104] @22
+    20: Move8 [8] <- [112] @22
+    21: Move8 [16] <- [72] @22
+    22: Return @22
+  safe_point_layouts:
+    0: []
+    1: []
+    3: []
+    5: [104]
+    6: [104, 112]
+}

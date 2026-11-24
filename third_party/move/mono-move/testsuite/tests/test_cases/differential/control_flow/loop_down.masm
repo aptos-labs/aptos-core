@@ -29,3 +29,9 @@ l1: ld_u64 1
 
 // RUN: execute 0x66::test::loop_down --args 1000
 // CHECK: results:
+
+// RUN: execute 0x66::test::conditional --args true
+// CHECK: results: 1
+
+// RUN: execute 0x66::test::conditional --args false
+// CHECK: results: 0

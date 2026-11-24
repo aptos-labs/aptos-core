@@ -1,0 +1,39 @@
+// A copy (or move) of `input` that is used only after `input` is overwritten with 5: it must
+// keep the old value, so the result is input + 50, not 5 + 50. The golden pins that this
+// copy is kept apart from `input`, while the copy taken after the overwrite reads `input`
+// directly.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x42::coalesce_redef
+
+fun copy_then_overwrite(input: u64): u64
+    copy_loc input
+    ld_u64 5
+    st_loc input
+    copy_loc input
+    ld_u64 10
+    mul
+    add
+    ret
+
+fun move_then_overwrite(input: u64): u64
+    move_loc input
+    ld_u64 5
+    st_loc input
+    copy_loc input
+    ld_u64 10
+    mul
+    add
+    ret
+
+// RUN: execute 0x42::coalesce_redef::copy_then_overwrite --args 1
+// CHECK: results: 51
+
+// RUN: execute 0x42::coalesce_redef::copy_then_overwrite --args 7
+// CHECK: results: 57
+
+// RUN: execute 0x42::coalesce_redef::move_then_overwrite --args 1
+// CHECK: results: 51
+
+// RUN: execute 0x42::coalesce_redef::move_then_overwrite --args 7
+// CHECK: results: 57

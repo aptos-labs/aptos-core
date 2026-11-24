@@ -122,6 +122,39 @@ fun add_i256(r0, r1): i256 {
     1: ret [r2] @3
 }
 
+fun sub_u8(r0, r1): u8 {
+  slots: params(2), locals(0), temps(1)
+    r0: u8
+    r1: u8
+    r2: u8
+  code:
+  L0:
+    0: r2 := sub r0, r1 @2
+    1: ret [r2] @3
+}
+
+fun mul_u8(r0, r1): u8 {
+  slots: params(2), locals(0), temps(1)
+    r0: u8
+    r1: u8
+    r2: u8
+  code:
+  L0:
+    0: r2 := mul r0, r1 @2
+    1: ret [r2] @3
+}
+
+fun sub_i8(r0, r1): i8 {
+  slots: params(2), locals(0), temps(1)
+    r0: i8
+    r1: i8
+    r2: i8
+  code:
+  L0:
+    0: r2 := sub r0, r1 @2
+    1: ret [r2] @3
+}
+
 fun bit_and_u128(r0, r1): u128 {
   slots: params(2), locals(0), temps(1)
     r0: u128
@@ -355,6 +388,33 @@ fun add_i256() {
   code:
     0: IntAdd [64] <- [0] + i256 [32] @2
     1: Move(32) [0] <- [64] @3
+    2: Return @3
+}
+
+fun sub_u8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntSub [2] <- [0] - u8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
+}
+
+fun mul_u8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntMul [2] <- [0] * u8 [1] @2
+    1: Move(1) [0] <- [2] @3
+    2: Return @3
+}
+
+fun sub_i8() {
+  frame_data_size: 8
+  entry_gas: 17
+  code:
+    0: IntSub [2] <- [0] - i8 [1] @2
+    1: Move(1) [0] <- [2] @3
     2: Return @3
 }
 

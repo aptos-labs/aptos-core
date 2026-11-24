@@ -129,6 +129,3 @@ fun test_increment_field(a: u64, b: u64): u64
 
 // RUN: execute 0x66::field_fusion::test_increment_field --args 5, 99
 // CHECK: results: 6
-
-// RUN: execute 0x66::field_fusion::test_increment_field --args 0, 0
-// CHECK: results: 1

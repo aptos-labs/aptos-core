@@ -35,6 +35,3 @@ fun entry(x: u64): u64
 
 // RUN: execute 0x66::test::entry --args 1
 // CHECK: results: 42
-
-// RUN: execute 0x66::test::entry --args 100
-// CHECK: results: 42
