@@ -1,0 +1,58 @@
+// Temporary vectors die every iteration while `keep` stays live, so a heap far smaller than
+// the total allocated must collect repeatedly and keep `keep` intact. Returns 5 * n + 9.
+
+// RUN: publish
+module 0x42::churn
+
+public fun churn(n: u64): u64
+    local i: u64
+    local acc: u64
+    local keep: vector<u64>
+    local junk: vector<u64>
+    ld_u64 7
+    ld_u64 8
+    ld_u64 9
+    vec_pack <u64>, 3
+    st_loc keep
+    ld_u64 0
+    st_loc i
+    ld_u64 0
+    st_loc acc
+loop_head: copy_loc i
+    copy_loc n
+    lt
+    br_false done
+    copy_loc i
+    copy_loc i
+    copy_loc i
+    copy_loc i
+    vec_pack <u64>, 4
+    st_loc junk
+    mut_borrow_loc junk
+    copy_loc i
+    vec_push_back <u64>
+    borrow_loc junk
+    vec_len <u64>
+    copy_loc acc
+    add
+    st_loc acc
+    copy_loc i
+    ld_u64 1
+    add
+    st_loc i
+    branch loop_head
+done: borrow_loc keep
+    ld_u64 2
+    vec_borrow <u64>
+    read_ref
+    copy_loc acc
+    add
+    ret
+
+// RUN: execute 0x42::churn::churn --args 200 --heap-size 2048
+// CHECK: results: 1009
+// CHECK-GC-COUNT: 13
+
+// RUN: execute 0x42::churn::churn --args 0 --heap-size 2048
+// CHECK: results: 9
+// CHECK-GC-COUNT: 0

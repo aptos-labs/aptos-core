@@ -6,20 +6,13 @@ struct Point has copy + drop
   y: u64
 
 // Function definition at index 0
-#[persistent] public fun add(l0: u64, l1: u64): u64
-    move_loc l0
-    move_loc l1
-    add
-    ret
-
-// Function definition at index 1
 fun get_x(l0: &Point): u64
     move_loc l0
     borrow_field Point, x
     read_ref
     ret
 
-// Function definition at index 2
+// Function definition at index 1
 #[persistent] public fun get_x_of(l0: u64, l1: u64): u64
     local l2: Point
     move_loc l0
@@ -31,14 +24,14 @@ fun get_x(l0: &Point): u64
     call get_x
     ret
 
-// Function definition at index 3
+// Function definition at index 2
 fun make_point(l0: u64, l1: u64): Point
     move_loc l0
     move_loc l1
     pack Point
     ret
 
-// Function definition at index 4
+// Function definition at index 3
 #[persistent] public fun max(l0: u64, l1: u64): u64
     copy_loc l0
     copy_loc l1
@@ -52,17 +45,6 @@ l0: move_loc l1
 
 === stackless ===
 // module 0x42::basic
-
-fun add(r0, r1): u64 {
-  slots: params(2), locals(0), temps(1)
-    r0: u64
-    r1: u64
-    r2: u64
-  code:
-  L0:
-    0: r2 := add r0, r1 @2
-    1: ret [r2] @3
-}
 
 fun get_x(r0): u64 {
   slots: params(1), locals(0), temps(1)
@@ -112,15 +94,6 @@ fun max(r0, r1): u64 {
 }
 === micro-ops ===
 // module 0x42::basic
-
-fun add() {
-  frame_data_size: 24
-  entry_gas: 59
-  code:
-    0: AddU64 [16] <- [0] + [8] @2
-    1: Move8 [0] <- [16] @3
-    2: Return @3
-}
 
 fun get_x() {
   frame_data_size: 24

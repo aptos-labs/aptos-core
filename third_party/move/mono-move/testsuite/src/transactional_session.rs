@@ -21,8 +21,8 @@ use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_output::{gap::gap, v1_return_bcs};
 use mono_move_runtime::{
-    serialize, CompletedCall, InterpreterContext, RuntimeError, RuntimeStatus, SessionEffects,
-    WriteClass,
+    serialize, CompletedCall, InterpreterContext, InterpreterOptions, RuntimeError, RuntimeStatus,
+    SessionEffects, WriteClass,
 };
 use move_binary_format::{compatibility::Compatibility, errors::VMError};
 use move_core_types::{
@@ -96,6 +96,16 @@ pub enum RunOutcome {
         /// The abort's stack trace. See [`CallFrame`].
         stack_trace: Vec<CallFrame>,
     },
+}
+
+/// A run's outcome, committed resource writes, and garbage collection count.
+#[derive(Debug)]
+pub struct RunReport {
+    pub outcome: RunOutcome,
+    /// The resource writes the run committed; empty unless it succeeded.
+    pub writes: ChangeSet,
+    /// Number of garbage collections the run performed.
+    pub gc_count: usize,
 }
 
 /// Why a run produced no [`RunOutcome`].
@@ -188,8 +198,9 @@ impl TransactionalSession {
 
     /// Runs `module::function<ty_args>` on MonoVM, unmetered, with `signers`
     /// and BCS `args` placed positionally as V1 places them (signers first).
-    /// A successful run commits its resource writes to the storage; an abort
-    /// or error commits nothing.
+    /// Commits resource writes on success. Aborts and execution errors discard writes;
+    /// a storage commit error may leave partial writes. `heap_size` overrides the heap's
+    /// default capacity in bytes.
     pub fn run(
         &mut self,
         module: &ModuleId,
@@ -197,26 +208,30 @@ impl TransactionalSession {
         ty_args: &[TypeTag],
         signers: &[AccountAddress],
         args: &[Vec<u8>],
-    ) -> Result<RunOutcome, RunError> {
+        heap_size: Option<usize>,
+    ) -> Result<RunReport, RunError> {
         self.run_callee(
             Callee::Function { module, function },
             ty_args,
             signers,
             args,
+            heap_size,
         )
     }
 
     /// Runs the serialized `script` on MonoVM with `ty_args`, unmetered.
     /// Links against published modules and places `signers` before BCS `args`.
-    /// Commits resource writes only on success.
+    /// Commits writes after successful execution; a commit error may leave partial writes.
+    /// `heap_size` overrides the heap's default capacity in bytes.
     pub fn run_script(
         &mut self,
         script: &[u8],
         ty_args: &[TypeTag],
         signers: &[AccountAddress],
         args: &[Vec<u8>],
-    ) -> Result<RunOutcome, RunError> {
-        self.run_callee(Callee::Script(script), ty_args, signers, args)
+        heap_size: Option<usize>,
+    ) -> Result<RunReport, RunError> {
+        self.run_callee(Callee::Script(script), ty_args, signers, args, heap_size)
     }
 
     fn run_callee(
@@ -225,34 +240,50 @@ impl TransactionalSession {
         ty_args: &[TypeTag],
         signers: &[AccountAddress],
         args: &[Vec<u8>],
-    ) -> Result<RunOutcome, RunError> {
-        let (outcome, changes) = with_guard(&mut self.ctx, |guard| -> Result<_, RunError> {
-            let natives = build_natives();
-            let resources = storage_resource_provider(guard, &self.storage);
-            let loader = Loader::new_with_policy(
-                guard,
-                &self.module_provider,
-                LoadingPolicy::Lazy(LoweringPolicy::Lazy),
-                natives,
-            );
-            let mut interp =
-                InterpreterContext::new(loader, GasMeter::with_max_budget(), &resources, natives)
-                    .with_extensions(seed_extensions(false));
-            let outcome = execute(guard, &mut interp, callee, ty_args, signers, args)?;
-            let changes = match &outcome {
-                RunOutcome::Success { .. } => resource_changes(guard, &interp.finish()?)?,
-                RunOutcome::Aborted { .. } => ChangeSet::new(),
-            };
-            Ok((outcome, changes))
-        })?;
+        heap_size: Option<usize>,
+    ) -> Result<RunReport, RunError> {
+        let mut options = InterpreterOptions::default();
+        if let Some(heap_size) = heap_size {
+            options.heap_size = heap_size;
+        }
+        let (outcome, writes, gc_count) =
+            with_guard(&mut self.ctx, |guard| -> Result<_, RunError> {
+                let natives = build_natives();
+                let resources = storage_resource_provider(guard, &self.storage);
+                let loader = Loader::new_with_policy(
+                    guard,
+                    &self.module_provider,
+                    LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+                    natives,
+                );
+                let mut interp = InterpreterContext::new_with_options(
+                    loader,
+                    GasMeter::with_max_budget(),
+                    &resources,
+                    natives,
+                    options,
+                )
+                .with_extensions(seed_extensions(false));
+                let outcome = execute(guard, &mut interp, callee, ty_args, signers, args)?;
+                let gc_count = interp.gc_count();
+                let writes = match &outcome {
+                    RunOutcome::Success { .. } => resource_changes(guard, &interp.finish()?)?,
+                    RunOutcome::Aborted { .. } => ChangeSet::new(),
+                };
+                Ok((outcome, writes, gc_count))
+            })?;
         // TODO(correctness): `InMemoryStorage::apply` is not atomic. It applies
         // changes key by key and stops at the first error, so a `Commit` error
-        // leaves the earlier writes in storage, contradicting "an error commits
-        // nothing" above. Stage the changes on a copy and swap it in on success.
+        // leaves the earlier writes in storage. Stage the changes on a copy and
+        // swap it in on success.
         self.storage
-            .apply(changes)
+            .apply(writes.clone())
             .map_err(|err| RunError::Commit(err.to_string()))?;
-        Ok(outcome)
+        Ok(RunReport {
+            outcome,
+            writes,
+            gc_count,
+        })
     }
 
     /// Updates both stores with modules that have passed V1's publishing checks.

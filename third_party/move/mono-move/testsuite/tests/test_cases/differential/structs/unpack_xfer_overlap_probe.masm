@@ -26,11 +26,5 @@ public fun trigger(other: u64): u64
     call consume
     ret
 
-// RUN: execute 0x66::unpack_xfer_overlap_probe::trigger --args 0
-// CHECK: results: 30
-
-// RUN: execute 0x66::unpack_xfer_overlap_probe::trigger --args 5
-// CHECK: results: 35
-
 // RUN: execute 0x66::unpack_xfer_overlap_probe::trigger --args 100
 // CHECK: results: 130

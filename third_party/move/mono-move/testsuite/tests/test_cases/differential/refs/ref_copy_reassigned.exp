@@ -1,0 +1,118 @@
+=== stackless ===
+// module 0x66::ref_copy_reassigned
+
+fun two_reads(r0, r1): u64 {
+  slots: params(2), locals(2), temps(2)
+    r0: u64
+    r1: u64
+    r2: &u64
+    r3: &u64
+    r4: u64
+    r5: u64
+  code:
+  L0:
+    0: r2 := imm_borrow_loc r0 @0
+    1: r3 := copy r2 @2
+    2: r2 := imm_borrow_loc r1 @4
+    3: r4 := read_ref r3 @7
+    4: r4 := mul r4, #100 @9
+    5: r5 := read_ref r2 @11
+    6: r5 := add r4, r5 @12
+    7: ret [r5] @13
+}
+
+fun write_through_copy(): u64 {
+  slots: params(0), locals(4), temps(5)
+    r0: vector<u64>
+    r1: vector<u64>
+    r2: &mut vector<u64>
+    r3: &mut vector<u64>
+    r4: u64
+    r5: u64
+    r6: &mut u64
+    r7: &vector<u64>
+    r8: &u64
+  code:
+  L0:
+    0: r4 := ld_u64 1 @0
+    1: r5 := ld_u64 2 @1
+    2: r0 := vec_pack u64, 2, [r4, r5] @2
+    3: r5 := ld_u64 5 @4
+    4: r1 := vec_pack u64, 1, [r5] @5
+    5: r2 := mut_borrow_loc r0 @7
+    6: r3 := copy r2 @9
+    7: r2 := mut_borrow_loc r1 @11
+    8: r5 := ld_u64 9 @13
+    9: r4 := ld_u64 0 @15
+    10: r6 := vec_mut_borrow u64, r3, r4 @16
+    11: write_ref r6, r5 @17
+    12: r5 := ld_u64 6 @18
+    13: r4 := ld_u64 0 @20
+    14: r6 := vec_mut_borrow u64, r2, r4 @21
+    15: write_ref r6, r5 @22
+    16: r7 := imm_borrow_loc r0 @23
+    17: r5 := ld_u64 0 @24
+    18: r8 := vec_imm_borrow u64, r7, r5 @25
+    19: r5 := read_ref r8 @26
+    20: r5 := mul r5, #10 @28
+    21: r7 := imm_borrow_loc r1 @29
+    22: r4 := ld_u64 0 @30
+    23: r8 := vec_imm_borrow u64, r7, r4 @31
+    24: r4 := read_ref r8 @32
+    25: r4 := add r5, r4 @33
+    26: ret [r4] @34
+}
+=== micro-ops ===
+// module 0x66::ref_copy_reassigned
+
+fun two_reads() {
+  frame_data_size: 64
+  entry_gas: 170
+  code:
+    0: SlotBorrow [16] <- &[0] @0
+    1: Move(16) [32] <- [16] @2
+    2: SlotBorrow [16] <- &[8] @4
+    3: ReadRef [48] <- *[32] (size=8) @7
+    4: MulU64Imm [48] <- [48] * #100 @9
+    5: ReadRef [56] <- *[16] (size=8) @11
+    6: AddU64 [56] <- [48] + [56] @12
+    7: Move8 [0] <- [56] @13
+    8: Return @13
+}
+
+fun write_through_copy() {
+  frame_data_size: 112
+  entry_gas: 354
+  code:
+    0: StoreImm8 [48] <- #1 @0
+    1: StoreImm8 [56] <- #2 @1
+    2: VecPack [0] <- [[48], [56]] (size=8, desc=0) @2
+    3: StoreImm8 [56] <- #5 @4
+    4: VecPack [8] <- [[56]] (size=8, desc=0) @5
+    5: SlotBorrow [16] <- &[0] @7
+    6: Move(16) [32] <- [16] @9
+    7: SlotBorrow [16] <- &[8] @11
+    8: StoreImm8 [56] <- #9 @13
+    9: StoreImm8 [48] <- #0 @15
+    10: VecBorrow [64] <- &[32][[48]] (elem_size=8) @16
+    11: WriteRef *[64] <- [56] (size=8) @17
+    12: StoreImm8 [56] <- #6 @18
+    13: StoreImm8 [48] <- #0 @20
+    14: VecBorrow [64] <- &[16][[48]] (elem_size=8) @21
+    15: WriteRef *[64] <- [56] (size=8) @22
+    16: SlotBorrow [80] <- &[0] @23
+    17: StoreImm8 [56] <- #0 @24
+    18: VecBorrow [96] <- &[80][[56]] (elem_size=8) @25
+    19: ReadRef [56] <- *[96] (size=8) @26
+    20: MulU64Imm [56] <- [56] * #10 @28
+    21: SlotBorrow [80] <- &[8] @29
+    22: StoreImm8 [48] <- #0 @30
+    23: VecBorrow [96] <- &[80][[48]] (elem_size=8) @31
+    24: ReadRef [48] <- *[96] (size=8) @32
+    25: AddU64 [48] <- [56] + [48] @33
+    26: Move8 [0] <- [48] @34
+    27: Return @34
+  safe_point_layouts:
+    2: []
+    4: []
+}

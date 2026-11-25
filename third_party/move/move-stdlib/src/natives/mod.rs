@@ -13,6 +13,7 @@ pub mod string;
 pub mod type_name;
 #[cfg(feature = "testing")]
 pub mod unit_test;
+pub mod vector;
 
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
@@ -24,6 +25,7 @@ pub struct GasParameters {
     pub signer: signer::GasParameters,
     pub string: string::GasParameters,
     pub type_name: type_name::GasParameters,
+    pub vector: vector::GasParameters,
 
     #[cfg(feature = "testing")]
     pub unit_test: unit_test::GasParameters,
@@ -36,6 +38,11 @@ impl GasParameters {
                 to_bytes: bcs::ToBytesGasParameters {
                     per_byte_serialized: 0.into(),
                     legacy_min_output_size: 0.into(),
+                    failure: 0.into(),
+                },
+                serialized_size: bcs::SerializedSizeGasParameters {
+                    base: 0.into(),
+                    per_byte_serialized: 0.into(),
                     failure: 0.into(),
                 },
             },
@@ -56,6 +63,12 @@ impl GasParameters {
                 get: type_name::GetGasParameters {
                     base: 0.into(),
                     per_byte: 0.into(),
+                },
+            },
+            vector: vector::GasParameters {
+                move_range: vector::MoveRangeGasParameters {
+                    base: 0.into(),
+                    per_index_moved: 0.into(),
                 },
             },
             signer: signer::GasParameters {
@@ -107,6 +120,7 @@ pub fn all_natives(
     add_natives!("signer", signer::make_all(gas_params.signer));
     add_natives!("string", string::make_all(gas_params.string));
     add_natives!("type_name", type_name::make_all(gas_params.type_name));
+    add_natives!("vector", vector::make_all(gas_params.vector));
     #[cfg(feature = "testing")]
     {
         add_natives!("unit_test", unit_test::make_all(gas_params.unit_test));

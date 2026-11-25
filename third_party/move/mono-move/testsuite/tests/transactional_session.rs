@@ -117,7 +117,9 @@ fn run(
     signers: &[AccountAddress],
     args: &[Vec<u8>],
 ) -> Result<RunOutcome, RunError> {
-    session.run(&module(), function, &[], signers, args)
+    session
+        .run(&module(), function, &[], signers, args, None)
+        .map(|report| report.outcome)
 }
 
 /// Runs `function` with `args` and returns its single `u64` result.
@@ -261,12 +263,12 @@ fn a_signer_on_an_address_parameter_is_undecodable() {
 fn a_successful_script_commits_its_writes_for_later_runs() {
     let (mut session, _) = session_with(COUNTER);
     session
-        .run_script(&script(INIT_SCRIPT), &[], &[ADDRESS], &[])
+        .run_script(&script(INIT_SCRIPT), &[], &[ADDRESS], &[], None)
         .expect("the init script runs");
     assert_eq!(read_counter(&mut session), 1);
 
     session
-        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()], None)
         .expect("the bump script runs");
     assert_eq!(read_counter(&mut session), 2);
 }
@@ -279,8 +281,15 @@ fn a_script_abort_is_located_at_the_script_and_discards_its_writes() {
     run(&mut session, ident_str!("init"), &[ADDRESS], &[]).expect("`init` runs");
 
     let outcome = session
-        .run_script(&script(BUMP_THEN_ABORT_SCRIPT), &[], &[], &[address_arg()])
-        .expect("an abort is an outcome, not an error");
+        .run_script(
+            &script(BUMP_THEN_ABORT_SCRIPT),
+            &[],
+            &[],
+            &[address_arg()],
+            None,
+        )
+        .expect("an abort is an outcome, not an error")
+        .outcome;
     match outcome {
         RunOutcome::Aborted {
             code,
@@ -316,7 +325,7 @@ fn an_undeserializable_script_fails_at_the_script() {
     let mut session = session();
     let error = vm_error(
         session
-            .run_script(&[0xFF, 0x00], &[], &[], &[])
+            .run_script(&[0xFF, 0x00], &[], &[], &[], None)
             .expect_err("garbage is not a script"),
     );
     assert_eq!(
@@ -333,7 +342,7 @@ fn scripts_are_verified_under_the_session_vm_config() {
     let mut session = TransactionalSession::new(&vm_config);
     let error = vm_error(
         session
-            .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+            .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()], None)
             .expect_err("one parameter exceeds the limit"),
     );
     assert_eq!(
@@ -352,7 +361,7 @@ fn scripts_are_verified_under_the_session_vm_config() {
 fn a_script_whose_module_is_unpublished_fails_to_link() {
     let mut session = session();
     let error = session
-        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()], None)
         .expect_err("nothing is published");
     assert_eq!(vm_status(error), StatusCode::LINKER_ERROR);
 }
@@ -362,7 +371,7 @@ fn a_script_whose_module_is_unpublished_fails_to_link() {
 fn a_script_naming_a_missing_function_fails_verification() {
     let (mut session, _) = session_with(ORIGINAL);
     let error = session
-        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()])
+        .run_script(&script(BUMP_SCRIPT), &[], &[], &[address_arg()], None)
         .expect_err("`bump` is not in the published module");
     assert_eq!(vm_status(error), StatusCode::LOOKUP_FAILED);
 }
