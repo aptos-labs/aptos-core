@@ -5,10 +5,11 @@
 
 use crate::{
     calls::call_system_function_unmetered,
-    errors::{call_result, ExecutionStatus, MoveExecutionFailure},
+    errors::{call_result, invariant_violation, ExecutionStatus, MoveExecutionFailure},
     executor::AptosTransactionExecutor,
     natives::extensions_with,
     outcome::TxnOutcome,
+    providers::read_creation_time_usecs,
 };
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -65,8 +66,12 @@ impl SystemTxnMetadata {
 }
 
 impl<'a> AptosTransactionExecutor<'a> {
-    /// A session for one system transaction, which runs everything unmetered.
-    pub(super) fn system_session(&self, txn_data: &SystemTxnMetadata) -> InterpreterContext<'a> {
+    /// A session for one system transaction, which runs everything unmetered,
+    /// and the chain's time before the transaction.
+    pub(super) fn system_session(
+        &self,
+        txn_data: &SystemTxnMetadata,
+    ) -> Result<(InterpreterContext<'a>, u64), VMInternalError> {
         // TODO(cleanup): make the loading policy configurable.
         let loader = Loader::new_with_policy(
             self.guard,
@@ -90,14 +95,29 @@ impl<'a> AptosTransactionExecutor<'a> {
         // is supposed to run through `call_system_function_unmetered`, which
         // grants free execution, and in case it is not and anything accidentally
         // gets metered, it fails on the first charge.
-        InterpreterContext::new(loader, GasMeter::new(0), self.data_provider, self.natives)
-            .with_extensions(extensions_with(txn_context, self.usage))
+        let mut interp =
+            InterpreterContext::new(loader, GasMeter::new(0), self.data_provider, self.natives)
+                .with_extensions(extensions_with(txn_context, self.usage));
+        match read_creation_time_usecs(&mut interp, self.guard, self.symbols) {
+            Ok(creation_time_usecs) => Ok((interp, creation_time_usecs)),
+            Err(e) => {
+                // Closing the session is what returns the worker's stack and
+                // heap. The read's failure is the one reported.
+                let _ = discard_system_session(interp);
+                Err(invariant_violation(format!(
+                    "the chain's time is unreadable: {e}"
+                )))
+            },
+        }
     }
 }
 
 /// The outcome of a completed system transaction: fee-free and successful.
-pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
-    match interp.finish() {
+pub(super) fn system_txn_outcome(
+    interp: InterpreterContext<'_>,
+    creation_time_usecs: u64,
+) -> TxnOutcome {
+    match interp.finish(creation_time_usecs) {
         Ok(effects) => TxnOutcome::Executed {
             status: ExecutionStatus::Success,
             fee_statement: FeeStatement::zero(),
@@ -116,7 +136,8 @@ pub(super) fn system_txn_outcome(interp: InterpreterContext<'_>) -> TxnOutcome {
 pub(super) fn discard_system_session(
     interp: InterpreterContext<'_>,
 ) -> Result<(), VMInternalError> {
-    interp.finish().map(drop)
+    // The effects are dropped, so the creation time does not matter.
+    interp.finish(0).map(drop)
 }
 
 /// Calls `0x1::block::<function>` as the VM, with `place` filling the call
