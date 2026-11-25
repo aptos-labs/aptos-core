@@ -1,0 +1,99 @@
+=== stackless ===
+// module 0x66::vec_unpack_xfer_alias
+
+fun mk2(r0, r1): vector<u64> {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: vector<u64>
+  code:
+  L0:
+    0: r2 := vec_pack u64, 2, [r0, r1] @2
+    1: ret [r2] @3
+}
+
+fun combine(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := mul r0, #10 @2
+    1: r2 := add r2, r1 @4
+    2: ret [r2] @5
+}
+
+fun run(r0, r1): u64 {
+  slots: params(2), locals(0), temps(0), transfer(2)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call_exempt mk2, [r0, r1] @2
+    1: [x0, x1] := vec_unpack u64, 2, x0 @3
+    2: [x0] := call_exempt combine, [x0, x1] @4
+    3: ret [x0] @5
+}
+
+fun run_mismatch(): u64 {
+  slots: params(0), locals(0), temps(1), transfer(2)
+    r0: u64
+  code:
+  L0:
+    0: x0 := ld_u64 1 @0
+    1: x1 := ld_u64 2 @1
+    2: [x0] := call_exempt mk2, [x0, x1] @2
+    3: [x0, x1, r0] := vec_unpack u64, 3, x0 @3
+    4: [x0] := call_exempt combine, [x0, x1] @5
+    5: ret [x0] @6
+}
+=== micro-ops ===
+// module 0x66::vec_unpack_xfer_alias
+
+fun mk2() {
+  frame_data_size: 24
+  entry_gas: 116
+  code:
+    0: VecPack [16] <- [[0], [8]] (size=8, desc=0) @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+  safe_point_layouts:
+    0: []
+}
+
+fun combine() {
+  frame_data_size: 24
+  entry_gas: 64
+  code:
+    0: MulU64Imm [16] <- [0] * #10 @2
+    1: AddU64 [16] <- [16] + [8] @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+}
+
+fun run() {
+  frame_data_size: 16
+  entry_gas: 240
+  code:
+    0: Move8 [48] <- [8] @2
+    1: Move8 [40] <- [0] @2
+    2: CallByNameExempt 0x66::vec_unpack_xfer_alias::mk2 @2
+    3: VecUnpack [[40], [48]] <- [40] (size=8) @3
+    4: CallByNameExempt 0x66::vec_unpack_xfer_alias::combine @4
+    5: Move8 [0] <- [40] @5
+    6: Return @5
+}
+
+fun run_mismatch() {
+  frame_data_size: 8
+  entry_gas: 270
+  code:
+    0: StoreImm8 [32] <- #1 @0
+    1: StoreImm8 [40] <- #2 @1
+    2: CallByNameExempt 0x66::vec_unpack_xfer_alias::mk2 @2
+    3: VecUnpack [[32], [40], [0]] <- [32] (size=8) @3
+    4: CallByNameExempt 0x66::vec_unpack_xfer_alias::combine @5
+    5: Move8 [0] <- [32] @6
+    6: Return @6
+}

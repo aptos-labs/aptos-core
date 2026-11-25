@@ -1,0 +1,29 @@
+=== stackless ===
+// module 0x1::test_natives
+=== micro-ops ===
+// module 0x1::test_natives
+=== stackless ===
+// module 0x1::main
+
+fun wrap(r0, r1): u64 {
+  slots: params(2), locals(0), temps(0), transfer(2)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call u64_add, [r0, r1] @2
+    1: ret [x0] @3
+}
+=== micro-ops ===
+// module 0x1::main
+
+fun wrap() {
+  frame_data_size: 16
+  entry_gas: 116
+  code:
+    0: Move8 [48] <- [8] @2
+    1: Move8 [40] <- [0] @2
+    2: CallByName 0x1::test_natives::u64_add @2
+    3: Move8 [0] <- [40] @3
+    4: Return @3
+}

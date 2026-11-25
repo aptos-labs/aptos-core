@@ -41,6 +41,16 @@ fun i32_to_i32(r0): i32 {
     1: ret [r1] @2
 }
 
+fun u64_to_u64(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := cast_u64 r0 @1
+    1: ret [r1] @2
+}
+
 fun u8_to_u256(r0): u256 {
   slots: params(1), locals(0), temps(1)
     r0: u8
@@ -236,6 +246,15 @@ fun i32_to_i32() {
   code:
     0: IntCast.i32->i32 [4] <- [0] @1
     1: Move(4) [0] <- [4] @2
+    2: Return @2
+}
+
+fun u64_to_u64() {
+  frame_data_size: 16
+  entry_gas: 59
+  code:
+    0: IntCast.u64->u64 [8] <- [0] @1
+    1: Move8 [0] <- [8] @2
     2: Return @2
 }
 

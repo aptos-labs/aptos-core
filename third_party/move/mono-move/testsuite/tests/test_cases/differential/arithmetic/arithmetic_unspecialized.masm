@@ -67,6 +67,24 @@ fun add_i256(a: i256, b: i256): i256
     add
     ret
 
+fun sub_u8(lhs: u8, rhs: u8): u8
+    copy_loc lhs
+    copy_loc rhs
+    sub
+    ret
+
+fun mul_u8(lhs: u8, rhs: u8): u8
+    copy_loc lhs
+    copy_loc rhs
+    mul
+    ret
+
+fun sub_i8(lhs: i8, rhs: i8): i8
+    copy_loc lhs
+    copy_loc rhs
+    sub
+    ret
+
 // --- Bitwise (unsigned only) ---
 
 fun bit_and_u128(a: u128, b: u128): u128
@@ -174,6 +192,12 @@ fun negate_i256(a: i256): i256
 // CHECK: results: 2
 // RUN: execute 0x66::test::add_i256 --args -1000, 250
 // CHECK: results: -750
+// RUN: execute 0x66::test::sub_u8 --args 200, 75
+// CHECK: results: 125
+// RUN: execute 0x66::test::mul_u8 --args 12, 20
+// CHECK: results: 240
+// RUN: execute 0x66::test::sub_i8 --args 10, -20
+// CHECK: results: 30
 
 // --- Execution: bitwise ---
 // RUN: execute 0x66::test::bit_and_u128 --args 12, 10

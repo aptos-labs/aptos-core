@@ -1,0 +1,69 @@
+=== micro-ops ===
+// module 0x42::closure_neq
+
+fun add_base() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: AddU64 [16] <- [0] + [8] @2
+    1: Move8 [0] <- [16] @3
+    2: Return @3
+}
+
+fun distinct_neq() {
+  frame_data_size: 40
+  entry_gas: 92
+  code:
+    0: AddU64Imm [8] <- [0] + #1 @2
+    1: PackClosure [16] <- func_ref=Unresolved(add_base), mask=1, persistent=false, captured_desc=0, captured=[[0](8)] @5
+    2: PackClosure [24] <- func_ref=Unresolved(add_base), mask=1, persistent=false, captured_desc=0, captured=[[8](8)] @7
+    3: ValueCmp [32] <- [16] != [24] : |u64|(u64) has copy + drop @12
+    4: Move(1) [0] <- [32] @13
+    5: Return @13
+  safe_point_layouts:
+    1: []
+    2: []
+}
+
+fun neq_branch() {
+  frame_data_size: 56
+  entry_gas: 125
+  code:
+    0: PackClosure [16] <- func_ref=Unresolved(add_base), mask=1, persistent=false, captured_desc=0, captured=[[0](8)] @1
+    1: PackClosure [24] <- func_ref=Unresolved(add_base), mask=1, persistent=false, captured_desc=0, captured=[[8](8)] @4
+    2: Move8 [32] <- [16] @6
+    3: DeepCopyHeapPtrs [32] deep-copy ptrs at [0] @6
+    4: Move8 [40] <- [24] @7
+    5: DeepCopyHeapPtrs [40] deep-copy ptrs at [0] @7
+    6: JumpValueCmp @11 [32] == [40] : |u64|(u64) has copy + drop gas_taken=118 gas_fallthrough=118 @12
+    7: StoreImm8 [48] <- #10 @14
+    8: CallClosure closure=[16], provided_args=[[48](8)] @16
+    9: Move8 [0] <- [80] @17
+    10: Return @17
+    11: StoreImm8 [48] <- #20 @18
+    12: CallClosure closure=[24], provided_args=[[48](8)] @20
+    13: Move8 [0] <- [80] @21
+    14: Return @21
+  safe_point_layouts:
+    0: []
+    1: []
+    3: []
+    5: []
+    8: []
+    12: []
+}
+
+fun self_neq() {
+  frame_data_size: 32
+  entry_gas: 78
+  code:
+    0: PackClosure [8] <- func_ref=Unresolved(add_base), mask=1, persistent=false, captured_desc=0, captured=[[0](8)] @1
+    1: Move8 [16] <- [8] @3
+    2: DeepCopyHeapPtrs [16] deep-copy ptrs at [0] @3
+    3: ValueCmp [24] <- [16] != [8] : |u64|(u64) has copy + drop @9
+    4: Move(1) [0] <- [24] @10
+    5: Return @10
+  safe_point_layouts:
+    0: []
+    2: []
+}

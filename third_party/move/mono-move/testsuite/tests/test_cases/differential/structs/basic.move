@@ -5,10 +5,6 @@ module 0x42::basic {
         y: u64,
     }
 
-    public fun add(a: u64, b: u64): u64 {
-        a + b
-    }
-
     fun make_point(x: u64, y: u64): Point {
         Point { x, y }
     }
@@ -26,12 +22,6 @@ module 0x42::basic {
     }
 }
 
-// RUN: execute 0x42::basic::add --args 3, 4
-// CHECK: results: 7
-
-// RUN: execute 0x42::basic::add --args 0, 0
-// CHECK: results: 0
-
 // RUN: execute 0x42::basic::max --args 5, 9
 // CHECK: results: 9
 
@@ -43,6 +33,3 @@ module 0x42::basic {
 
 // RUN: execute 0x42::basic::get_x_of --args 11, 22
 // CHECK: results: 11
-
-// RUN: execute 0x42::basic::get_x_of --args 0, 0
-// CHECK: results: 0

@@ -496,6 +496,22 @@ impl RequestShare {
     }
 }
 
+/// Fetch a peer's certificate after its proactive broadcast has completed.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct RequestCertifiedAugData {
+    epoch: u64,
+}
+
+impl RequestCertifiedAugData {
+    pub fn new(epoch: u64) -> Self {
+        Self { epoch }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,

@@ -71,6 +71,10 @@ name = "e2e-move-tests::e2e_move_tests$tests::per_category_gas_limits::execution
 note = "MonoMove does not support gas metering. TODO(metering): remove once metering is added."
 
 [[test]]
+name = "e2e-move-tests::e2e_move_tests$tests::reflect::resolve_limits_apply_from_gas_feature_version_v1_51"
+note = "Checks behaviour below gas feature version RELEASE_V1_51, which MonoMove does not support."
+
+[[test]]
 name = "mono-move-aptos-transaction-executor::e2e$block_epilogue_v0_is_empty_like_v1"
 note = "Differential against V1, but the reference side is a FakeExecutor, which runs MonoMove under this variable."
 

@@ -79,6 +79,7 @@ mod public_struct_args;
 mod public_structs_enums_upgrade;
 mod randomness_test_and_abort;
 mod read_side_layout_dag;
+mod reflect;
 mod remote_state;
 mod resource_groups;
 mod rotate_auth_key;

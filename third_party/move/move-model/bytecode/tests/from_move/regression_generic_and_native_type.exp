@@ -41,6 +41,10 @@ public native fun vector::length<#0>($t0|v: &vector<#0>): u64;
 
 
 [variant baseline]
+public native fun vector::move_range<#0>($t0|from: &mut vector<#0>, $t1|removal_position: u64, $t2|length: u64, $t3|to: &mut vector<#0>, $t4|insert_position: u64);
+
+
+[variant baseline]
 public native fun vector::pop_back<#0>($t0|v: &mut vector<#0>): #0;
 
 

@@ -59,3 +59,68 @@ fun read_after_fallthrough(r0, r1): u64 {
     3: r3 := ld_u64 0 @6
     4: ret [r3] @7
 }
+
+fun load_and_store() {
+  slots: params(0), locals(1), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 10 @0
+    1: ret [] @2
+}
+=== micro-ops ===
+// module 0x66::dce_dead_store_precision
+
+fun reassign_param() {
+  frame_data_size: 24
+  entry_gas: 59
+  code:
+    0: AddU64Imm [16] <- [0] + #1 @2
+    1: Move8 [0] <- [16] @5
+    2: Return @5
+}
+
+fun reassign_param_in_entry_loop() {
+  frame_data_size: 16
+  entry_gas: 34
+  code:
+    0: AddU64 [8] <- [8] + [0] @2
+    1: Move8 [0] <- [8] @4
+    2: JumpLessEqualU64Imm @0 [8] <= #100 gas_taken=34 gas_fallthrough=54 @7
+    3: Move8 [0] <- [8] @11
+    4: Return @11
+}
+
+fun overwrite_in_loop() {
+  frame_data_size: 32
+  entry_gas: 28
+  code:
+    0: Move8 [16] <- [0] @0
+    1: StoreImm8 [24] <- #0 @2
+    2: AddU64 [24] <- [24] + [16] @6
+    3: Move8 [16] <- [0] @10
+    4: JumpLessEqualU64Imm @2 [24] <= #100 gas_taken=34 gas_fallthrough=54 @13
+    5: Move8 [0] <- [24] @17
+    6: Return @17
+}
+
+fun read_after_fallthrough() {
+  frame_data_size: 32
+  entry_gas: 29
+  code:
+    0: Move8 [16] <- [0] @0
+    1: JumpZeroByte @4 [8] gas_taken=56 gas_fallthrough=54 @3
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+    4: StoreImm8 [24] <- #0 @6
+    5: Move8 [0] <- [24] @7
+    6: Return @7
+}
+
+fun load_and_store() {
+  frame_data_size: 8
+  entry_gas: 4
+  code:
+    0: StoreImm8 [0] <- #10 @0
+    1: Return @2
+}

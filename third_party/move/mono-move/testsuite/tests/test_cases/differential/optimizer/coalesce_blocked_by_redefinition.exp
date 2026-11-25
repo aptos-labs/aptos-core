@@ -1,0 +1,56 @@
+=== stackless ===
+// module 0x42::coalesce_redef
+
+fun copy_then_overwrite(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r1 := copy r0 @0
+    1: r0 := ld_u64 5 @1
+    2: r2 := mul r0, #10 @5
+    3: r2 := add r1, r2 @6
+    4: ret [r2] @7
+}
+
+fun move_then_overwrite(r0): u64 {
+  slots: params(1), locals(0), temps(2)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r1 := move r0 @0
+    1: r0 := ld_u64 5 @1
+    2: r2 := mul r0, #10 @5
+    3: r2 := add r1, r2 @6
+    4: ret [r2] @7
+}
+=== micro-ops ===
+// module 0x42::coalesce_redef
+
+fun copy_then_overwrite() {
+  frame_data_size: 24
+  entry_gas: 92
+  code:
+    0: Move8 [8] <- [0] @0
+    1: StoreImm8 [0] <- #5 @1
+    2: MulU64Imm [16] <- [0] * #10 @5
+    3: AddU64 [16] <- [8] + [16] @6
+    4: Move8 [0] <- [16] @7
+    5: Return @7
+}
+
+fun move_then_overwrite() {
+  frame_data_size: 24
+  entry_gas: 92
+  code:
+    0: Move8 [8] <- [0] @0
+    1: StoreImm8 [0] <- #5 @1
+    2: MulU64Imm [16] <- [0] * #10 @5
+    3: AddU64 [16] <- [8] + [16] @6
+    4: Move8 [0] <- [16] @7
+    5: Return @7
+}

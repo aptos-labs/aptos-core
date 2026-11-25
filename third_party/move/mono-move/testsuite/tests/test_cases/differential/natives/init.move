@@ -56,7 +56,7 @@ module 0x1::user {
 // CHECK: results: 0x1, 206360452367674278106446022495804114826
 
 // RUN: execute 0x1::user::caller_via_function_value
-// CHECK-SUBSTR: aborted: code 65537
+// CHECK: aborted: code 65537 (initializer must be invoked by a direct module call) in 0x1::init
 
 // RUN: execute 0x1::init::caller_is_entry
-// CHECK-SUBSTR: aborted: code 65537
+// CHECK: aborted: code 65537 (initializer must be invoked by a direct module call) in 0x1::init
