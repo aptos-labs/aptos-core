@@ -3,10 +3,15 @@
 
 use anyhow::{Context as _, Result};
 use aptos_config::config::ApiConfig;
-use futures::{ready, stream, FutureExt, Stream};
-use hyper::server::{
-    accept::Accept,
-    conn::{AddrIncoming, AddrStream},
+use aptos_logger::error;
+use futures::{future, ready, FutureExt};
+use hyper::{
+    server::{
+        accept::Accept,
+        conn::{AddrIncoming, AddrStream},
+    },
+    service::{make_service_fn, service_fn, Service},
+    Server as HyperServer,
 };
 use rustls::{
     pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer},
@@ -24,6 +29,14 @@ use std::{
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_rustls::TlsAcceptor;
 use warp::{Filter, Reply};
+
+tokio::task_local! {
+    static TLS_REMOTE_ADDR: Option<SocketAddr>;
+}
+
+pub(crate) fn tls_remote_addr() -> Option<SocketAddr> {
+    TLS_REMOTE_ADDR.try_with(|addr| *addr).ok().flatten()
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebServer {
@@ -67,26 +80,71 @@ impl WebServer {
                     .expect("failed to build TLS server config");
                 let addr_incoming =
                     AddrIncoming::bind(&self.address).expect("failed to bind TLS TCP listener");
-                warp::serve(routes)
-                    .serve_incoming(tls_incoming(addr_incoming, tls_config))
-                    .await;
+                serve_tls(addr_incoming, tls_config, routes).await;
             },
         }
     }
 }
 
-fn tls_incoming(
-    mut addr_incoming: AddrIncoming,
-    tls_config: ServerConfig,
-) -> impl Stream<Item = io::Result<LazyTlsStream>> {
-    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-    stream::poll_fn(
-        move |cx| match ready!(Pin::new(&mut addr_incoming).poll_accept(cx)) {
-            Some(Ok(sock)) => Poll::Ready(Some(Ok(LazyTlsStream::new(sock, &acceptor)))),
+async fn serve_tls<F>(incoming: AddrIncoming, tls_config: ServerConfig, routes: F)
+where
+    F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
+    F::Extract: Reply,
+{
+    let inner = warp::service(routes);
+    let make_svc = make_service_fn(move |conn: &LazyTlsStream| {
+        let remote_addr = conn.remote_addr;
+        let inner = inner.clone();
+        future::ok::<_, Infallible>(service_fn(move |req| {
+            let mut svc = inner.clone();
+            TLS_REMOTE_ADDR.scope(remote_addr, async move { svc.call(req).await })
+        }))
+    });
+    if let Err(err) = HyperServer::builder(TlsAccept::new(incoming, tls_config))
+        .serve(make_svc)
+        .await
+    {
+        error!("TLS webserver error: {}", err);
+    }
+}
+
+struct TlsAccept {
+    incoming: AddrIncoming,
+    acceptor: TlsAcceptor,
+}
+
+impl TlsAccept {
+    fn new(mut incoming: AddrIncoming, tls_config: ServerConfig) -> Self {
+        incoming.set_nodelay(true);
+        Self {
+            incoming,
+            acceptor: TlsAcceptor::from(Arc::new(tls_config)),
+        }
+    }
+}
+
+impl Accept for TlsAccept {
+    type Conn = LazyTlsStream;
+    type Error = io::Error;
+
+    fn poll_accept(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<io::Result<Self::Conn>>> {
+        let this = self.get_mut();
+        match ready!(Pin::new(&mut this.incoming).poll_accept(cx)) {
+            Some(Ok(sock)) => {
+                let remote_addr = sock.remote_addr();
+                Poll::Ready(Some(Ok(LazyTlsStream::new(
+                    sock,
+                    &this.acceptor,
+                    Some(remote_addr),
+                ))))
+            },
             Some(Err(err)) => Poll::Ready(Some(Err(err))),
             None => Poll::Ready(None),
-        },
-    )
+        }
+    }
 }
 
 fn build_tls_server_config(
@@ -119,12 +177,14 @@ enum TlsState<S> {
 
 struct LazyTlsStream<S = AddrStream> {
     state: TlsState<S>,
+    remote_addr: Option<SocketAddr>,
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin> LazyTlsStream<S> {
-    fn new(stream: S, acceptor: &TlsAcceptor) -> Self {
+    fn new(stream: S, acceptor: &TlsAcceptor, remote_addr: Option<SocketAddr>) -> Self {
         Self {
             state: TlsState::Handshaking(acceptor.accept(stream)),
+            remote_addr,
         }
     }
 }
@@ -197,6 +257,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for LazyTlsStream<S> {
 mod tests {
     use super::*;
     use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
+    use std::sync::Mutex;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
         net::{TcpListener, TcpStream},
@@ -232,10 +293,19 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
         let addr = listener.local_addr().expect("local_addr");
         let addr_incoming = AddrIncoming::from_listener(listener).expect("addr_incoming");
 
-        let routes = warp::path("ping").map(|| "pong");
-        let server_handle = tokio::spawn(
-            warp::serve(routes).serve_incoming(tls_incoming(addr_incoming, tls_config)),
-        );
+        let logged_remote_addr: Arc<Mutex<Option<SocketAddr>>> = Arc::new(Mutex::new(None));
+        let logged_remote_addr_clone = logged_remote_addr.clone();
+        let routes = warp::path("ping")
+            .map(|| "pong")
+            .recover(|_: warp::Rejection| async {
+                Ok::<_, Infallible>(warp::http::StatusCode::NOT_FOUND)
+            })
+            .with(crate::logger())
+            .with(warp::log::custom(move |info| {
+                *logged_remote_addr_clone.lock().expect("lock") =
+                    info.remote_addr().or_else(tls_remote_addr);
+            }));
+        let server_handle = tokio::spawn(serve_tls(addr_incoming, tls_config, routes));
 
         let mut root_store = RootCertStore::empty();
         for cert in CertificateDer::pem_slice_iter(TEST_CERT_PEM.as_bytes()) {
@@ -252,6 +322,7 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
 
         let connector = TlsConnector::from(Arc::new(client_config));
         let tcp = TcpStream::connect(addr).await.expect("connect");
+        let client_addr = tcp.local_addr().expect("client local_addr");
         let server_name = ServerName::try_from("localhost").expect("server name");
         let mut tls_stream = connector
             .connect(server_name, tcp)
@@ -274,6 +345,7 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
             response.ends_with("pong"),
             "unexpected response body: {response}"
         );
+        assert_eq!(*logged_remote_addr.lock().expect("lock"), Some(client_addr));
 
         server_handle.abort();
     }
@@ -289,7 +361,7 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
         let tls_config = build_tls_server_config(&cert_path, &key_path).expect("server tls config");
         let acceptor = TlsAcceptor::from(Arc::new(tls_config));
         let (mut client_io, server_io) = tokio::io::duplex(1024);
-        let mut lazy_tls = LazyTlsStream::new(server_io, &acceptor);
+        let mut lazy_tls = LazyTlsStream::new(server_io, &acceptor, None);
 
         client_io
             .write_all(b"GET /plain HTTP/1.1\r\n\r\n")
