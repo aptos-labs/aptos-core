@@ -36,6 +36,14 @@ source "amazon-ebs" "build-ebs" {
   source_ami     = "${data.amazon-ami.runs-on-ami-x64.id}"
   ssh_username   = "ubuntu"
   user_data_file = "./user_data.sh"
+
+  # The minimal source AMI has a 4 GB root volume, too small for the toolchain; 30 GB matches the full image.
+  launch_block_device_mappings {
+    device_name           = "/dev/sda1"
+    volume_size           = 30
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
 }
 
 build {
