@@ -9,7 +9,7 @@ use crate::{
 use aptos_protos::transaction::v1::Transaction;
 use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use prost::Message;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tracing::trace;
 
@@ -24,13 +24,18 @@ impl<'a> InMemoryCache<'a> {
         known_latest_version: u64,
         num_slots: usize,
         size_limit_bytes: usize,
+        empty_response_retry_delay: Duration,
     ) -> Self {
         let data_manager = Arc::new(RwLock::new(DataManager::new(
             known_latest_version + 1,
             num_slots,
             size_limit_bytes,
         )));
-        let fetch_manager = Arc::new(FetchManager::new(data_manager.clone(), connection_manager));
+        let fetch_manager = Arc::new(FetchManager::new(
+            data_manager.clone(),
+            connection_manager,
+            empty_response_retry_delay,
+        ));
         Self {
             data_manager,
             fetch_manager,

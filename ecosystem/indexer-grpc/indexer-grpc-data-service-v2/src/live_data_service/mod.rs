@@ -32,6 +32,7 @@ pub struct LiveDataService<'a> {
     in_memory_cache: InMemoryCache<'a>,
     connection_manager: Arc<ConnectionManager>,
     max_transaction_filter_size_bytes: usize,
+    skip_known_latest_version_check: bool,
 }
 
 impl<'a> LiveDataService<'a> {
@@ -50,8 +51,10 @@ impl<'a> LiveDataService<'a> {
                 known_latest_version,
                 config.num_slots,
                 config.size_limit_bytes,
+                Duration::from_millis(config.empty_response_retry_delay_ms),
             ),
             max_transaction_filter_size_bytes,
+            skip_known_latest_version_check: config.skip_known_latest_version_check,
         }
     }
 
@@ -183,7 +186,7 @@ impl<'a> LiveDataService<'a> {
             self.connection_manager
                 .update_stream_progress(&id, next_version, size_bytes);
             let known_latest_version = self.get_known_latest_version();
-            if next_version > known_latest_version {
+            if next_version > known_latest_version && !self.skip_known_latest_version_check {
                 info!(
                     stream_id = %id,
                     "next_version {next_version} is larger than known_latest_version {known_latest_version}"

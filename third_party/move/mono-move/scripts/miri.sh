@@ -57,7 +57,9 @@ FORWARD=(
   -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE
 )
 
-# Packages Miri runs.
+# Packages Miri runs. `#[cfg_attr(miri, ignore = "<reason>")]` on a test
+# excludes it from every pass, and the test output reports it as ignored with
+# the reason.
 RUN_PACKAGES=(
   mono-move-alloc
   mono-move-core
@@ -138,84 +140,6 @@ run_targets() {
     cargo "+$NIGHTLY" miri test --locked --no-fail-fast "$@"
 }
 
-# The stacked pass cannot cover every target: `parking_lot`'s contended slow path
-# casts an integer to a pointer (parking_lot_core word_lock.rs), which strict
-# provenance rejects outright. That is dependency code, so those targets are run
-# with the same flags minus strict provenance and the reduced coverage is
-# reported rather than the flag being dropped globally.
-#
-# The listed targets are the ones that lock a shared `parking_lot::Mutex` from
-# several threads released together by a `Barrier`. The cast only fires on
-# schedules that actually contend the mutex, so a single default-seed run is not
-# enough to find a new one; re-derive this list with the strict flags plus
-# -Zmiri-many-seeds. As of the last sweep the package's other targets
-# (context_tests, subst_tests) and mono-move-alloc were clean across 12 seeds.
-STRICT_PROVENANCE_GAP_PKG="mono-move-global-context"
-STRICT_PROVENANCE_GAP_TARGETS=(
-  identifiers_tests
-  module_id_tests
-)
-
-# Integration-test target names for a package, from cargo metadata. Discovered
-# rather than listed so a newly added target cannot silently skip a pass.
-package_test_targets() {
-  cargo metadata --format-version 1 --no-deps --manifest-path "$REPO_ROOT/Cargo.toml" \
-    | python3 -c '
-import json, sys
-name = sys.argv[1]
-meta = json.load(sys.stdin)
-for pkg in meta["packages"]:
-    if pkg["name"] == name:
-        for target in pkg["targets"]:
-            if target["kind"] == ["test"]:
-                print(target["name"])
-' "$1"
-}
-
-run_stacked() {
-  local strict="-Zmiri-strict-provenance -Zmiri-symbolic-alignment-check -Zmiri-backtrace=full"
-  local relaxed="-Zmiri-symbolic-alignment-check -Zmiri-backtrace=full"
-  echo
-  echo "=== stacked: Stacked Borrows + strict provenance ==="
-
-  # Resolve targets before running anything, so a stale gap name fails in
-  # seconds rather than after the rest of the pass.
-  local gap_list seen="" strict_targets=(--lib) relaxed_targets=()
-  gap_list="$(printf '%s\n' "${STRICT_PROVENANCE_GAP_TARGETS[@]}")"
-  while read -r target; do
-    if grep -qxF "$target" <<<"$gap_list"; then
-      relaxed_targets+=(--test "$target")
-      seen+="$target"$'\n'
-    else
-      strict_targets+=(--test "$target")
-    fi
-  done < <(package_test_targets "$STRICT_PROVENANCE_GAP_PKG")
-
-  local stale
-  stale="$(comm -23 <(sort -u <<<"$gap_list") <(sort -u <<<"$seen"))"
-  if [[ -n "$stale" ]]; then
-    echo "error: ${STRICT_PROVENANCE_GAP_PKG} has no target(s) named:" >&2
-    sed 's/^/  /' <<<"$stale" >&2
-    echo "Update STRICT_PROVENANCE_GAP_TARGETS." >&2
-    return 1
-  fi
-
-  local package_args=()
-  for pkg in "${RUN_PACKAGES[@]}"; do
-    [[ "$pkg" == "$STRICT_PROVENANCE_GAP_PKG" ]] && continue
-    package_args+=(-p "$pkg")
-  done
-  run_targets "$strict" "${package_args[@]}"
-
-  run_targets "$strict" -p "$STRICT_PROVENANCE_GAP_PKG" "${strict_targets[@]}"
-
-  echo
-  echo "note: these ${STRICT_PROVENANCE_GAP_PKG} targets run WITHOUT strict"
-  echo "      provenance: parking_lot casts int->ptr when contended."
-  printf '        %s\n' "${STRICT_PROVENANCE_GAP_TARGETS[@]}"
-  run_targets "$relaxed" -p "$STRICT_PROVENANCE_GAP_PKG" "${relaxed_targets[@]}"
-}
-
 # Concurrency exploration is scoped to the targets that actually spawn threads,
 # and excludes the property-test targets: seeds and property cases multiply, and
 # the product does not finish under Miri.
@@ -237,7 +161,8 @@ case "${1:-stacked}" in
     ;;
   stacked)
     check_coverage
-    run_stacked
+    run_miri "stacked: Stacked Borrows + strict provenance" \
+      -Zmiri-strict-provenance -Zmiri-symbolic-alignment-check -Zmiri-backtrace=full
     ;;
   concurrency)
     check_coverage
