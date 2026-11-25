@@ -278,4 +278,15 @@ module std::vector {
         }
     }
 
+    /// Removes `[removal_position, removal_position + length)` from `from` and inserts
+    /// those elements into `to` at `insert_position`, preserving their order and the
+    /// order of the remaining elements in both vectors.
+    /// Move's mutable-reference rules require `from` and `to` to refer to distinct vectors.
+    native public fun move_range<T>(
+        from: &mut vector<T>,
+        removal_position: u64,
+        length: u64,
+        to: &mut vector<T>,
+        insert_position: u64
+    );
 }
