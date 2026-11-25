@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 5-51:  publish [module 0x42::churn]
+task 1 lines 53-53:  run 0x42::churn::churn --args 200 --heap-size 2048
+return values: 1009

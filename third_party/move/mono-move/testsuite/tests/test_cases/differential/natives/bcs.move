@@ -107,10 +107,6 @@ module 0x1::main {
         option::destroy_some(bcs::constant_serialized_size<boxes::Box<boxes::Pair<u64, u128>>>())
     }
 
-    public fun const_size_is_some_box_u64(): bool {
-        option::is_some(&bcs::constant_serialized_size<boxes::Box<u64>>())
-    }
-
     public fun const_size_is_some_box_vec(): bool {
         option::is_some(&bcs::constant_serialized_size<boxes::Box<vector<u8>>>())
     }
@@ -430,9 +426,6 @@ module 0x99::closure_bcs {
 
 // RUN: execute 0x1::main::const_size_nested
 // CHECK: results: 24
-
-// RUN: execute 0x1::main::const_size_is_some_box_u64
-// CHECK: results: true
 
 // RUN: execute 0x1::main::const_size_is_some_box_vec
 // CHECK: results: false

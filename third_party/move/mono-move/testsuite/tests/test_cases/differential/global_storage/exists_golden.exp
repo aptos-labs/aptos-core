@@ -1,0 +1,70 @@
+=== micro-ops ===
+// module 0x42::ex
+
+fun as_branch() {
+  frame_data_size: 120
+  entry_gas: 18
+  code:
+    0: Exists<0x42::ex::V> [64] <- addr=[32], ty= @1
+    1: JumpZeroByte @3 [64] gas_taken=45 gas_fallthrough=2 @2
+    2: Jump @9 gas=18 @3
+    3: SlotBorrow [72] <- &[0] @4
+    4: StoreImmVec [88] <- const[0] @5
+    5: Move8 [96] <- [88] @6
+    6: HeapNew [112] desc=3 @7
+    7: HeapMoveTo8 [112]+0 <- [96] @7
+    8: MoveTo<0x42::ex::V> signer=[72], src=[112] @7
+    9: Exists<0x42::ex::V> [64] <- addr=[32], ty= @9
+    10: JumpZeroByte @14 [64] gas_taken=56 gas_fallthrough=56 @10
+    11: StoreImm8 [104] <- #1 @11
+    12: Move8 [0] <- [104] @12
+    13: Return @12
+    14: StoreImm8 [104] <- #0 @13
+    15: Move8 [0] <- [104] @14
+    16: Return @14
+  safe_point_layouts:
+    4: []
+    6: []
+}
+
+fun instantiated() {
+  frame_data_size: 40
+  entry_gas: 18
+  code:
+    0: Exists<0x42::ex::G<u8>> [33] <- addr=[0], ty= @1
+    1: JumpZeroByte @9 [33] gas_taken=4 gas_fallthrough=2 @2
+    2: StoreImm1 [32] <- #1 @3
+    3: Exists<0x42::ex::G<vector<u64>>> [33] <- addr=[0], ty= @6
+    4: JumpNotZeroByte @6 [33] gas_taken=5 gas_fallthrough=2 @7
+    5: Jump @7 gas=12 @8
+    6: IntBitOr [32] <- [32] | u8 #2 @10
+    7: Move(1) [0] <- [32] @14
+    8: Return @14
+    9: StoreImm1 [32] <- #0 @15
+    10: Jump @3 gas=18 @17
+}
+
+fun plain() {
+  frame_data_size: 40
+  entry_gas: 27
+  code:
+    0: Exists<0x42::ex::R> [32] <- addr=[0], ty= @1
+    1: Move(1) [0] <- [32] @2
+    2: Return @2
+}
+
+fun put_vec() {
+  frame_data_size: 72
+  entry_gas: 47
+  code:
+    0: SlotBorrow [32] <- &[0] @0
+    1: StoreImmVec [48] <- const[1] @1
+    2: Move8 [56] <- [48] @2
+    3: HeapNew [64] desc=5 @3
+    4: HeapMoveTo8 [64]+0 <- [56] @3
+    5: MoveTo<0x42::ex::G<vector<u64>>> signer=[32], src=[64] @3
+    6: Return @4
+  safe_point_layouts:
+    1: []
+    3: []
+}

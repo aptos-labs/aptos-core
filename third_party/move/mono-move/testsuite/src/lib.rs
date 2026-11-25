@@ -28,5 +28,5 @@ pub use mono_move_unit_test_backend::InMemoryModuleProvider;
 pub use runner::{finalize_events_v1, finalize_events_v2};
 pub use transactional_adapter::{run_transactional_test, supports_source};
 pub use transactional_session::{
-    ArgumentError, PublishError, RunError, RunOutcome, TransactionalSession,
+    ArgumentError, PublishError, RunError, RunOutcome, RunReport, TransactionalSession,
 };

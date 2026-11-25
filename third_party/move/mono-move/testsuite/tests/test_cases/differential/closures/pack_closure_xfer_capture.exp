@@ -1,0 +1,89 @@
+=== stackless ===
+// module 0x66::pack_closure_xfer_capture
+
+fun id(r0): u64 {
+  slots: params(1), locals(0), temps(0)
+    r0: u64
+  code:
+  L0:
+    0: ret [r0] @1
+}
+
+fun combine(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := mul r0, #100 @2
+    1: r2 := add r2, r1 @4
+    2: ret [r2] @5
+}
+
+fun apply(r0, r1): u64 {
+  slots: params(2), locals(0), temps(0), transfer(1)
+    r0: |u64|(u64) has drop
+    r1: u64
+  code:
+  L0:
+    0: [x0] := call_closure [|u64|(u64) has drop], [r1, r0] @2
+    1: ret [x0] @3
+}
+
+fun run(r0): u64 {
+  slots: params(1), locals(0), temps(0), transfer(2)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call_exempt id, [r0] @1
+    1: x0 := pack_closure combine, 1, [x0] @2
+    2: x1 := ld_u64 3 @3
+    3: [x0] := call_exempt apply, [x0, x1] @4
+    4: ret [x0] @5
+}
+=== micro-ops ===
+// module 0x66::pack_closure_xfer_capture
+
+fun id() {
+  frame_data_size: 8
+  entry_gas: 54
+  code:
+    0: Return @1
+}
+
+fun combine() {
+  frame_data_size: 24
+  entry_gas: 64
+  code:
+    0: MulU64Imm [16] <- [0] * #100 @2
+    1: AddU64 [16] <- [16] + [8] @4
+    2: Move8 [0] <- [16] @5
+    3: Return @5
+}
+
+fun apply() {
+  frame_data_size: 16
+  entry_gas: 116
+  code:
+    0: CallClosure closure=[0], provided_args=[[8](8)] @2
+    1: Move8 [0] <- [40] @3
+    2: Return @3
+  safe_point_layouts:
+    0: []
+}
+
+fun run() {
+  frame_data_size: 8
+  entry_gas: 189
+  code:
+    0: Move8 [32] <- [0] @1
+    1: CallByNameExempt 0x66::pack_closure_xfer_capture::id @1
+    2: PackClosure [32] <- func_ref=Unresolved(combine), mask=1, persistent=false, captured_desc=0, captured=[[32](8)] @2
+    3: StoreImm8 [40] <- #3 @3
+    4: CallByNameExempt 0x66::pack_closure_xfer_capture::apply @4
+    5: Move8 [0] <- [32] @5
+    6: Return @5
+  safe_point_layouts:
+    2: []
+}

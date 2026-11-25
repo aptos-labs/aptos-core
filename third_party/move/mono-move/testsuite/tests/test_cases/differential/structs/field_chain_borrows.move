@@ -49,6 +49,13 @@ module 0x88::field_chain_borrows {
         *r = *r + 1;
         s.x.y.z
     }
+    fun bump(start: u64): u64 {
+        let nested = build(start);
+        let field_ref = &mut nested.x.y.z;
+        *field_ref = *field_ref + 1;
+        // Reads `nested` again: must see the value written through `field_ref`.
+        nested.x.y.z
+    }
 }
 
 // RUN: execute 0x88::field_chain_borrows::read_via_local_ref --args 5
@@ -59,3 +66,6 @@ module 0x88::field_chain_borrows {
 // CHECK: results: 10
 // RUN: execute 0x88::field_chain_borrows::bump_via_deep_mut --args 7
 // CHECK: results: 8
+
+// RUN: execute 0x88::field_chain_borrows::bump --args 41
+// CHECK: results: 42

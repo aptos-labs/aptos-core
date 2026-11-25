@@ -32,6 +32,12 @@ module 0x42::enum_variant_field_uniform {
         write_simple(&mut b, delta);
         b.value
     }
+    fun write_field(v: u64, delta: u64): u64 {
+        let b = Boxed::One { value: v };
+        let r = &mut b.value;
+        *r = *r + delta;
+        *(&b.value)
+    }
 }
 
 // RUN: execute 0x42::enum_variant_field_uniform::read_value --args 41
@@ -42,3 +48,6 @@ module 0x42::enum_variant_field_uniform {
 
 // RUN: execute 0x42::enum_variant_field_uniform::run_simple --args 5, 42
 // CHECK: results: 42
+
+// RUN: execute 0x42::enum_variant_field_uniform::write_field --args 10, 5
+// CHECK: results: 15
