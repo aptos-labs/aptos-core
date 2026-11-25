@@ -15,10 +15,15 @@ variable "ami_prefix" {
   type = string
 }
 
+# RunsOn base image; ubuntu24-minimal ships only the runner and Docker, so the build adds what CI jobs use.
+variable "source_image" {
+  type    = string
+  default = "ubuntu22-full-x64"
+}
 
 data "amazon-ami" "runs-on-ami-x64" {
   filters = {
-    name                = "runs-on-v2.2-ubuntu22-full-x64-*"
+    name                = "runs-on-v2.2-${var.source_image}-*"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
   }
@@ -39,7 +44,7 @@ source "amazon-ebs" "build-ebs" {
 }
 
 build {
-  name = "setup-ubuntu-22.04"
+  name = "setup-runs-on-runner"
   sources = [
     "source.amazon-ebs.build-ebs"
   ]
@@ -54,21 +59,17 @@ build {
     destination = "/tmp/scripts"
   }
 
+  provisioner "file" {
+    source      = "./install_runner_tools.sh"
+    destination = "/tmp/install_runner_tools.sh"
+  }
+
   provisioner "shell" {
     inline = [
       "whoami",
+      "sudo bash /tmp/install_runner_tools.sh",
       "chmod +x /tmp/scripts/dev_setup.sh",
       "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k",
-
-      // Install GCloud SDK and kubectl
-      "sudo apt-get install apt-transport-https ca-certificates gnupg -y",
-      "echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list",
-      "curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -",
-      "sudo apt-get update && sudo apt-get install kubectl google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin -y",
-      // Verify installations
-      "gcloud --version",
-      "kubectl version --client",
-      "gke-gcloud-auth-plugin --version"
     ]
   }
 }
