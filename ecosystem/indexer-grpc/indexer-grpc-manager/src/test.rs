@@ -44,6 +44,7 @@ async fn test_run() {
         http2_ping_interval_secs: 60,
         http2_ping_timeout_secs: 10,
         service_staleness_threshold_secs: 20,
+        empty_response_delay_ms: 200,
     };
 
     let task = tokio::spawn(async move {

@@ -150,6 +150,7 @@ pub(crate) struct DataManager {
     file_store_reader: FileStoreReader,
     metadata_manager: Arc<MetadataManager>,
     allow_fn_fallback: bool,
+    empty_response_delay: Duration,
 }
 
 impl DataManager {
@@ -159,6 +160,7 @@ impl DataManager {
         cache_config: CacheConfig,
         metadata_manager: Arc<MetadataManager>,
         allow_fn_fallback: bool,
+        empty_response_delay: Duration,
     ) -> Self {
         let file_store = file_store_config.create_filestore().await;
         let file_store_reader = FileStoreReader::new(chain_id, file_store).await;
@@ -168,6 +170,7 @@ impl DataManager {
             file_store_reader,
             metadata_manager,
             allow_fn_fallback,
+            empty_response_delay,
         }
     }
 
@@ -322,7 +325,7 @@ impl DataManager {
                     }
                 }
 
-                tokio::time::sleep(Duration::from_millis(200)).await;
+                tokio::time::sleep(self.empty_response_delay).await;
 
                 // Let client side to retry.
                 return Ok(vec![]);

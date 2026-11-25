@@ -45,6 +45,9 @@ pub struct IndexerGrpcManagerConfig {
     pub(crate) http2_ping_timeout_secs: u64,
     #[serde(default = "default_service_staleness_threshold_secs")]
     pub(crate) service_staleness_threshold_secs: u64,
+    /// How long `GetTransactions` waits before returning an empty response at the cache head.
+    #[serde(default = "default_empty_response_delay_ms")]
+    pub(crate) empty_response_delay_ms: u64,
 }
 
 const fn default_cache_config() -> CacheConfig {
@@ -64,6 +67,10 @@ const fn default_http2_ping_timeout_secs() -> u64 {
 
 const fn default_service_staleness_threshold_secs() -> u64 {
     20
+}
+
+const fn default_empty_response_delay_ms() -> u64 {
+    200
 }
 
 #[async_trait::async_trait]
