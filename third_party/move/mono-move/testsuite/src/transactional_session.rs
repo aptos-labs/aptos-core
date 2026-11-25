@@ -516,8 +516,8 @@ pub(crate) fn resource_changes(
                 .map_err(RunError::from)
         };
         let op = match class {
-            WriteClass::Creation(ptr) => Op::New(written(ptr)?),
-            WriteClass::Modification(ptr) => Op::Modify(written(ptr)?),
+            WriteClass::Creation { ptr, .. } => Op::New(written(ptr)?),
+            WriteClass::Modification { ptr, .. } => Op::Modify(written(ptr)?),
             WriteClass::Deletion => Op::Delete,
         };
         Ok((*address, tag, op))
@@ -525,7 +525,7 @@ pub(crate) fn resource_changes(
 
     let mut changes = ChangeSet::new();
     let mut failures = Vec::new();
-    for (key, class, group) in effects.read_write_set().writes_unordered() {
+    for (key, class, group) in effects.writes_unordered() {
         match write_op(key, class, group) {
             Ok((address, tag, op)) => changes
                 .add_resource_op(address, tag, op)
