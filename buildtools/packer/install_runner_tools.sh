@@ -11,7 +11,14 @@ chmod 0440 /etc/sudoers.d/91-runner-nopasswd
 visudo -cf /etc/sudoers.d/91-runner-nopasswd
 
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl gpg jq zip unzip
+apt-get install -y --no-install-recommends ca-certificates curl gpg jq zip unzip \
+  python3-pip python3-venv python-is-python3
+
+# Jobs call docker as runner; the minimal image restricts the socket to the docker group.
+usermod -aG docker runner
+
+# Jobs pip-install into the system Python, which Ubuntu 24.04 otherwise refuses (PEP 668).
+printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf
 
 install -d -m 0755 /etc/apt/keyrings
 

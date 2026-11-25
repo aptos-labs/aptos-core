@@ -59,12 +59,18 @@ build {
     destination = "/tmp/install_runner_tools.sh"
   }
 
+  provisioner "file" {
+    source      = "./verify_runner_image.sh"
+    destination = "/tmp/verify_runner_image.sh"
+  }
+
   provisioner "shell" {
     inline = [
       "whoami",
       "sudo bash /tmp/install_runner_tools.sh",
       "chmod +x /tmp/scripts/dev_setup.sh",
       "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k",
+      "sudo -u runner -H bash /tmp/verify_runner_image.sh",
     ]
   }
 }
