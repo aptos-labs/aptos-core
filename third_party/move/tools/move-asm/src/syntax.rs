@@ -690,8 +690,9 @@ impl AsmParser {
         self.tokens.len() > 1 && matches!(&self.tokens[1].1, Token::Special(s) if s == sp)
     }
 
+    /// End of file counts as a newline, matching `expect_newline`.
     fn lookahead_newline(&self) -> bool {
-        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline)
+        !self.tokens.is_empty() && matches!(&self.tokens[0].1, Token::Newline | Token::End)
     }
 
     fn lookahead_indent(&self) -> bool {
