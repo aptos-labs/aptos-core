@@ -126,7 +126,6 @@ use futures::{
 };
 use itertools::Itertools;
 use mini_moka::sync::Cache;
-use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -136,8 +135,10 @@ use std::{
     time::Duration,
 };
 
+mod augmented_key;
 mod dkg_state;
 
+use augmented_key::derive_augmented_key_pair;
 use dkg_state::recover_dkg_state;
 
 /// Range of rounds (window) that we might be calling proposer election
@@ -1228,9 +1229,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch = new_epoch_state.epoch,
                 "Generating a new augmented key"
             );
-            let mut rng =
-                StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-            let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
+            let augmented_key_pair = derive_augmented_key_pair(
+                &vuf_pp,
+                sk.main,
+                pk.main,
+                new_epoch,
+                &dkg_session.metadata,
+            )
+            .map_err(NoRandomnessReason::AugKeySeedSerializationError)?;
             self.rand_storage
                 .save_key_pair_bytes(
                     new_epoch,
@@ -2306,7 +2312,7 @@ pub enum NoRandomnessReason {
     ErrConvertingConsensusKeyToDecryptionKey(anyhow::Error),
     TranscriptDeserializationError(bcs::Error),
     SecretShareDecryptionFailed(anyhow::Error),
-    RngCreationError(rand::Error),
+    AugKeySeedSerializationError(bcs::Error),
     RandDbNotAvailable(anyhow::Error),
     KeyPairDeserializationError(bcs::Error),
     KeyPairSerializationError(bcs::Error),

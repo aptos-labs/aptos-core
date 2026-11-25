@@ -12391,6 +12391,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "masm-smith"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arbitrary",
+ "bcs 0.1.4 (git+https://github.com/aptos-labs/bcs.git?rev=b641d94fd00c7014eb28b48d5649d4db2edfe983)",
+ "clap 4.6.7",
+ "either",
+ "hex",
+ "move-asm",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-transactional-test-matrix",
+ "move-transactional-test-runner",
+ "serde",
+ "serde_json",
+ "shared-dsa",
+ "tempfile",
+]
+
+[[package]]
+name = "masm-smith-fuzz"
+version = "0.0.0"
+dependencies = [
+ "arbitrary",
+ "either",
+ "libfuzzer-sys",
+ "masm-smith",
+ "mono-move-testsuite",
+ "move-asm",
+ "move-binary-format",
+ "move-bytecode-verifier",
+ "move-core-types",
+ "move-transactional-test-matrix",
+ "move-transactional-test-runner",
+ "move-vm-runtime",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "matchers"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

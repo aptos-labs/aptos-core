@@ -272,6 +272,8 @@ members = [
     "third_party/move/shared-dsa",
     "third_party/move/testing-infra/transactional-test-matrix",
     "third_party/move/testing-infra/transactional-test-runner",
+    "third_party/move/tools/masm-smith",
+    "third_party/move/tools/masm-smith/fuzz",
     "third_party/move/tools/move-abigen",
     "third_party/move/tools/move-asm",
     "third_party/move/tools/move-bytecode-utils",
@@ -900,6 +902,7 @@ aptos-order-natives = { path = "aptos-move/framework/order-natives" }
 aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 legacy-move-compiler = { path = "third_party/move/move-compiler-v2/legacy-move-compiler" }
+masm-smith = { path = "third_party/move/tools/masm-smith" }
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
 mono-move-aptos-state-view-providers = { path = "third_party/move/mono-move/aptos-state-view-providers" }
 mono-move-aptos-transaction-executor = { path = "third_party/move/mono-move/aptos-transaction-executor" }
