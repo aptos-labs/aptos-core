@@ -498,10 +498,10 @@ ambassador = "0.5.1"
 annotate-snippets = "0.12.17"
 anstyle = "1.0.1"
 anyhow = "1.0.98"
-aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1", features = [
+aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "2671f35ec12532299cd82db156196b3bb15e855b", features = [
     "postgres_partial",
 ] }
-aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.2.1" }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", rev = "2671f35ec12532299cd82db156196b3bb15e855b" }
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.9.3"
 ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
@@ -559,17 +559,13 @@ clap = { version = "4.6.7", features = [
 ] }
 clap-verbosity-flag = "3.0.4"
 clap_complete = "4.6.11"
-cloud-storage = { version = "0.11.1", features = [
-    "global-client",
-    "rustls-tls",
-], default-features = false }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 colored = "3.1.1"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.4.1"
 core_affinity = "0.8.1"
-coset = "0.3"
+coset = "0.4"
 criterion = "0.8.2"
 crossbeam = "0.8.5"
 crossbeam-channel = "0.5.17"
@@ -587,7 +583,7 @@ derive_builder = "0.20.0"
 derive_more = { version = "2.1.1", features = ["add", "deref", "deref_mut"] }
 determinator = "0.13.0"
 diesel = { version = "~2.3", features = ["uuid"] }
-diesel-async = { version = "0.7.4", features = [
+diesel-async = { version = "0.9.0", features = [
     "async-connection-wrapper",
     "postgres",
     "bb8",
@@ -607,14 +603,15 @@ enum_dispatch = "0.3.12"
 env_logger = "0.11.11"
 equivalent = "1.0"
 erased-serde = "0.4.11"
-ethers = { version = "2", default-features = false }
+ethers-core = { version = "2", default-features = false }
+ethers-signers = { version = "2", default-features = false }
 ethnum = "1.5.2"
 fail = "0.5.0"
 ff = { version = "0.13", features = ["derive"] }
 field_count = "0.1.1"
 figment = { version = "0.10.19", features = ["yaml", "env"] }
 firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "34ea512d3d1fad6c11df3e7d82ff72beccc05836" }
-firestore = "0.43.0"
+firestore = "=0.60.1"
 fixed = "1.31.0"
 flate2 = "1.0.24"
 flexi_logger = "0.31.10"
@@ -625,7 +622,8 @@ futures-channel = "0.3.29"
 futures-core = "0.3.29"
 futures-util = "0.3.29"
 fxhash = "0.2.1"
-gcp-bigquery-client = "0.16.8"
+gcloud-storage = "=1.3.0"
+gcp-bigquery-client = "0.28.0"
 generic-array = { version = "0.14.7", features = ["serde"] }
 get-size = { version = "0.1.4", features = ["derive"] }
 get_if_addrs = "0.5.3"
@@ -633,7 +631,6 @@ getrandom = "0.2.2"
 git2 = { version = "0.21.0", features = ["https", "ssh"] }
 glob = "0.3.0"
 goldenfile = "1.11.0"
-google-cloud-storage = "0.13.0"
 group = "0.13"
 guppy = "0.19.1"
 handlebars = "6.4.4"
@@ -684,7 +681,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.7.0", features = [
     "stats",
     "unprefixed_malloc_on_supported_platforms",
 ] }
-json-patch = "0.2.6"
+json-patch = "4"
 jsonwebtoken = "8.1"
 lazy_static = "1.5.1"
 libc = "0.2.191"
@@ -717,18 +714,18 @@ num-traits = "0.2.19"
 num_cpus = "1.17.0"
 once_cell = "1.21.4"
 open = "5.3.1"
-opentelemetry = { version = "0.27.0", features = ["trace"] }
-opentelemetry-otlp = { version = "0.27.0", features = ["grpc-tonic", "trace"] }
-opentelemetry_sdk = { version = "0.27.0", features = ["trace", "rt-tokio"] }
+opentelemetry = { version = "0.33.1", features = ["trace"] }
+opentelemetry-otlp = { version = "0.33.1", features = ["grpc-tonic", "trace"] }
+opentelemetry_sdk = { version = "0.33.1", features = ["trace", "rt-tokio"] }
 ordered-float = "5.5.1"
 ouroboros = "0.18.5"
 owo-colors = "4.4.0"
 p256 = { version = "0.13.2" }
 pairing = "0.23"
 parking_lot = "0.12.0"
-passkey-authenticator = { version = "0.2.0", features = ["testable"] }
-passkey-client = { version = "0.2.0" }
-passkey-types = { version = "0.2.0" }
+passkey-authenticator = { version = "0.5.0", features = ["testable"] }
+passkey-client = { version = "0.5.0" }
+passkey-types = { version = "0.5.0" }
 paste = "1.0.7"
 pathsearch = "0.2.0"
 pbjson = "0.5.1"
@@ -736,10 +733,10 @@ percent-encoding = "2.1.0"
 petgraph = "0.8.3"
 pin-project = "1.0.10"
 plotters = { version = "0.3.5", default-features = false }
-poem = { version = "3.1.7", features = ["anyhow", "compression", "rustls"] }
+poem = { version = "3.1.12", features = ["anyhow", "compression", "rustls"] }
 poem-openapi = { version = "5.1.2", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "5.1.1"
-pprof = { version = "0.15", features = ["flamegraph", "protobuf-codec"] }
+pprof = { version = "0.15", features = ["protobuf-codec"] }
 pretty = "0.12.5"
 pretty_assertions = "1.2.1"
 prettydiff = "0.9.0"
@@ -747,7 +744,7 @@ primitive-types = { version = "0.14.0" }
 proc-macro2 = "1.0.107"
 # We set default-features to false so we don't onboard the libpq dep. See more here:
 # https://github.com/aptos-labs/aptos-core/pull/12568
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", tag = "aptos-indexer-processors-v2.4.3", default-features = false }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors-v2.git", rev = "d0bdb507fa3188feeea08dd4752ce082eeac173d", default-features = false }
 procfs = "0.18.0"
 project-root = "0.2.2"
 prometheus = { version = "0.14.0", default-features = false }
@@ -782,12 +779,16 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
 rlimit = "0.11.0"
-rmcp = { version = "0.16", features = ["server", "transport-io"] }
+rmcp = { version = "3.11.0", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
-rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
 rstest = { version = "0.28.0", default-features = false }
 rustc-hash = "2"
+rustls = { version = "0.23.46", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+] }
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
@@ -840,6 +841,11 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tokio = { version = "1.54.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-retry = "0.3.0"
+tokio-rustls = { version = "0.26.6", default-features = false, features = [
+    "logging",
+    "ring",
+    "tls12",
+] }
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.19", features = ["fs"] }
 tokio-test = "0.4.6"
@@ -857,7 +863,7 @@ tonic-reflection = "0.12.3"
 topological-sort = "0.3.1"
 tracing = "0.1.37"
 tracing-log = "0.2.0"
-tracing-opentelemetry = "0.28.0"
+tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.17", features = [
     "json",
     "env-filter",
@@ -872,14 +878,14 @@ ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
 ], default-features = false }
-url = { version = "2.5.8", features = ["serde"] }
+url = { version = "2.5.9", features = ["serde"] }
 usdt = "0.6.0"
 uuid = { version = "1.29.0", features = ["v4", "serde"] }
 variant_count = "1.2.1"
 version-compare = "0.2.1"
 vm-comparison = { path = "third_party/move/mono-move/vm-comparison" }
 walkdir = "2.5.0"
-warp = { version = "0.3.5", features = ["tls"] }
+warp = "0.3.7"
 warp-reverse-proxy = "1.0.0"
 wasm-bindgen = "0.2.106"
 whoami = "2.1.0"
@@ -1009,24 +1015,18 @@ opt-level = 3
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
 dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
-futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-channel = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-executor = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-core = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-util = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
+futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "0.3.32-backport" }
 ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-
-# `aptos-indexer-processor-sdk` pins an old aptos-core revision whose
-# `aptos-profiler` uses pprof 0.11. Linking it together with our pprof 0.15
-# fails on a duplicate `perf_signal_handler` symbol.
-[patch."https://github.com/aptos-labs/aptos-core.git"]
-aptos-system-utils = { path = "crates/aptos-system-utils" }

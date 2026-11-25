@@ -200,6 +200,7 @@ pub fn attach_poem_to_runtime(
                 "Failed to read TLS key from path: {}",
                 tls_key_path
             ))?;
+            let _ = rustls::crypto::ring::default_provider().install_default();
             let rustls_certificate = RustlsCertificate::new().cert(cert).key(key);
             let rustls_config = RustlsConfig::new().fallback(rustls_certificate);
             TcpListener::bind(address).rustls(rustls_config).boxed()

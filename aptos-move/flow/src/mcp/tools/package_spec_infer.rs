@@ -11,7 +11,7 @@ use move_model::model::GlobalEnv;
 use move_prover::inference::InferenceOutput;
 use rmcp::{
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, ContentBlock as Content},
     schemars, tool, tool_router,
 };
 use std::{

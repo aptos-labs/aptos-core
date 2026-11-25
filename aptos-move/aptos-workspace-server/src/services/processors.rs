@@ -79,6 +79,8 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
                 reconnection_config: Default::default(),
                 transaction_filter: Default::default(),
                 backup_endpoints: Default::default(),
+                primary_failback_interval_secs:
+                    TransactionStreamConfig::default_primary_failback_interval(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
                 connection_string: get_postgres_connection_string(postgres_port),
@@ -87,6 +89,7 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
             processor_mode: ProcessorMode::Default(BootStrapConfig {
                 initial_starting_version: 0,
             }),
+            progress_health_config: None,
         };
 
         config.run().await

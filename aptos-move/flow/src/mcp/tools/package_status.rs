@@ -4,7 +4,7 @@
 use super::super::{package_data::DiagnosticSource, session::FlowSession};
 use rmcp::{
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, ContentBlock as Content},
     schemars, tool, tool_router,
 };
 

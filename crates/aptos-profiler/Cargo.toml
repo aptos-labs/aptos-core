@@ -16,5 +16,6 @@ anyhow = { workspace = true }
 regex = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
+inferno = { workspace = true }
 jemalloc-sys = { workspace = true }
 pprof = { workspace = true }

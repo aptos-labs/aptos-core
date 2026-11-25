@@ -7,12 +7,12 @@ use aptos_crypto::SigningKey;
 use aptos_forge::Swarm;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::function_info::FunctionInfo;
-use ethers::{
-    core::rand::rngs::OsRng,
-    signers::{LocalWallet, Signer},
+use ethers_core::{
+    rand::rngs::OsRng,
     types::{Address, H256},
     utils::keccak256,
 };
+use ethers_signers::{LocalWallet, Signer};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use serde::Serialize;

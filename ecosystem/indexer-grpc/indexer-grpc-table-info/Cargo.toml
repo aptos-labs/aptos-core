@@ -27,8 +27,7 @@ aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
-google-cloud-storage = { workspace = true }
-hyper = { workspace = true }
+gcloud-storage = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }

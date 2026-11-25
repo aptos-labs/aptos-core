@@ -11,7 +11,7 @@ use crate::utils::{
 use anyhow::Context;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
-use google_cloud_storage::{
+use gcloud_storage::{
     client::Client,
     http::objects::upload::{Media, UploadObjectRequest, UploadType},
 };

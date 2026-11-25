@@ -221,7 +221,7 @@ pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write>
 fn try_init_otel_layer() -> Option<
     tracing_opentelemetry::OpenTelemetryLayer<
         tracing_subscriber::Registry,
-        opentelemetry_sdk::trace::Tracer,
+        opentelemetry_sdk::trace::SdkTracer,
     >,
 > {
     if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_err() {
@@ -235,11 +235,13 @@ fn try_init_otel_layer() -> Option<
 
     let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "unknown".to_string());
 
-    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
-        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-        .with_resource(opentelemetry_sdk::Resource::new(vec![
-            opentelemetry::KeyValue::new("service.name", service_name),
-        ]))
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .with_resource(
+            opentelemetry_sdk::Resource::builder()
+                .with_service_name(service_name)
+                .build(),
+        )
         .build();
 
     let tracer = provider.tracer("indexer-grpc");

@@ -13,8 +13,9 @@ use crate::{
 use rmcp::{
     handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
     model::{
-        CallToolRequestParams, CallToolResult, Content, Implementation, ListToolsResult,
-        PaginatedRequestParams, ProtocolVersion, ServerCapabilities, ServerInfo, Tool,
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
+        ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, ServerResult,
+        Tool,
     },
     service::RequestContext,
     RoleServer, ServerHandler,
@@ -392,7 +393,7 @@ impl ServerHandler for FlowSession {
         &self,
         request: CallToolRequestParams,
         context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResult, rmcp::ErrorData> {
+    ) -> Result<CallToolResponse, rmcp::ErrorData> {
         // Some MCP clients dispatch multiple tool calls from one model turn in
         // parallel. Flow's package model and watcher are session state, so wait
         // for the active tool call instead of allowing those requests to race.
@@ -452,18 +453,22 @@ impl ServerHandler for FlowSession {
         let call_context = ToolCallContext::new(self, request, context);
         let result = self.tool_router.call(call_context).await;
         let (outcome, response_bytes) = match &result {
-            Ok(response) => (
-                if response.is_error == Some(true) {
-                    "tool_error"
+            Ok(response) => {
+                let is_error = if let CallToolResponse::Complete(res) = response {
+                    res.is_error == Some(true)
                 } else {
-                    "success"
-                },
-                if recording {
-                    serde_json::to_vec(response).map_or(0, |bytes| bytes.len())
-                } else {
-                    0
-                },
-            ),
+                    false
+                };
+                (
+                    if is_error { "tool_error" } else { "success" },
+                    if recording {
+                        serde_json::to_vec(&ServerResult::from(response.clone()))
+                            .map_or(0, |bytes| bytes.len())
+                    } else {
+                        0
+                    },
+                )
+            },
             Err(error) => (
                 if error.to_string().contains("timeout") {
                     "timeout"
@@ -497,18 +502,14 @@ impl ServerHandler for FlowSession {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, rmcp::ErrorData> {
-        Ok(ListToolsResult {
-            tools: self.tool_router.list_all(),
-            meta: None,
-            next_cursor: None,
-        })
+        Ok(ListToolsResult::with_all_items(self.tool_router.list_all()))
     }
 
     fn get_tool(&self, name: &str) -> Option<Tool> {
         self.tool_router.get(name).cloned()
     }
 
-    fn get_info(&self) -> ServerInfo {
+    fn get_info(&self) -> ServerConfig {
         let mut instructions =
             "MCP server for Move smart contract development on Aptos.".to_string();
         instructions.push_str(&format!(
@@ -521,16 +522,9 @@ impl ServerHandler for FlowSession {
                  (dev-addresses and dev-dependencies are active).",
             );
         }
-        ServerInfo {
-            protocol_version: ProtocolVersion::default(),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            server_info: Implementation {
-                name: "move-flow".into(),
-                version: env!("CARGO_PKG_VERSION").into(),
-                ..Default::default()
-            },
-            instructions: Some(instructions),
-        }
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new("move-flow", env!("CARGO_PKG_VERSION")))
+            .with_instructions(instructions)
     }
 }
 
@@ -539,5 +533,5 @@ impl ServerHandler for FlowSession {
 /// Helper to convert any Serialize type into a CallToolResult with JSON text content
 pub(crate) fn into_call_tool_result<T: Serialize>(value: &T) -> CallToolResult {
     let json = serde_json::to_string_pretty(value).expect("serde_json serialization failed");
-    CallToolResult::success(vec![Content::text(json)])
+    CallToolResult::success(vec![ContentBlock::text(json)])
 }

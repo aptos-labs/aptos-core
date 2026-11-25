@@ -18,7 +18,7 @@ use diesel::{
     r2d2::{ConnectionManager, Pool},
     PgConnection,
 };
-use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
+use gcloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use worker::Worker;

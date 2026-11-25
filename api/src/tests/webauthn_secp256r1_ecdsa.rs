@@ -46,6 +46,7 @@ mod tests {
             challenge: String::from(sha3_256_raw_txn_bytes),
             origin: "http://localhost:5173".to_string(),
             cross_origin: None,
+            extra_data: (),
             unknown_keys: Default::default(),
         }
     }

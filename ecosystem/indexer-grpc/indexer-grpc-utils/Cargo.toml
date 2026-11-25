@@ -23,9 +23,9 @@ base64 = { workspace = true }
 build_html = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
-cloud-storage = { workspace = true }
 dashmap = { workspace = true }
 futures = { workspace = true }
+gcloud-storage = { workspace = true }
 itertools = { workspace = true }
 lz4 = { workspace = true }
 once_cell = { workspace = true }

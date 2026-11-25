@@ -337,17 +337,13 @@ impl AptosTelemetryServiceArgs {
         F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
         F::Extract: Reply,
     {
-        match &config.tls_cert_path {
-            None => warp::serve(routes).bind(config.address).await,
-            Some(cert_path) => {
-                warp::serve(routes)
-                    .tls()
-                    .cert_path(cert_path)
-                    .key_path(config.tls_key_path.as_ref().unwrap())
-                    .bind(config.address)
-                    .await
-            },
-        };
+        aptos_warp_webserver::WebServer::new(
+            config.address,
+            config.tls_cert_path.clone(),
+            config.tls_key_path.clone(),
+        )
+        .serve(routes)
+        .await;
     }
 }
 

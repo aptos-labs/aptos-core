@@ -4,7 +4,17 @@
 use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::compression_util::{FileEntry, StorageFormat};
 use aptos_metrics_core::{register_int_counter, IntCounter};
-use cloud_storage::Client;
+use gcloud_storage::{
+    client::{google_cloud_auth::credentials::CredentialsFile, Client, ClientConfig},
+    http::{
+        objects::{
+            download::Range,
+            get::GetObjectRequest,
+            upload::{Media, UploadObjectRequest, UploadType},
+        },
+        Error,
+    },
+};
 use once_cell::sync::Lazy;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -101,12 +111,17 @@ impl Processor {
             let progress_file_bytes =
                 serde_json::to_vec(&progress_file).context("Failed to serialize progress file.")?;
             client
-                .object()
-                .create(
-                    &self.new_bucket_name,
+                .upload_object(
+                    &UploadObjectRequest {
+                        bucket: self.new_bucket_name.clone(),
+                        ..Default::default()
+                    },
                     progress_file_bytes,
-                    PROGRESS_FILE_NAME,
-                    "application/json",
+                    &UploadType::Simple(Media {
+                        name: PROGRESS_FILE_NAME.into(),
+                        content_type: "application/json".into(),
+                        content_length: None,
+                    }),
                 )
                 .await
                 .context("Update progress file failure")?;
@@ -117,7 +132,22 @@ impl Processor {
 
     /// Initialize the processor.
     pub async fn init(&self) -> Result<(Client, ProgressFile)> {
-        let client = Client::new();
+        let gcs_config = match std::env::var("SERVICE_ACCOUNT") {
+            Ok(service_account_path) => {
+                let creds = CredentialsFile::new_from_file(service_account_path)
+                    .await
+                    .context("Failed to read SERVICE_ACCOUNT credentials.")?;
+                ClientConfig::default()
+                    .with_credentials(creds)
+                    .await
+                    .context("Failed to create GCS client config.")?
+            },
+            Err(_) => ClientConfig::default()
+                .with_auth()
+                .await
+                .context("Failed to create GCS client config.")?,
+        };
+        let client = Client::new(gcs_config);
 
         // All errors are considered fatal: files must exist for the processor to work.
         let existing_metadata =
@@ -168,20 +198,26 @@ async fn download_raw_file(
     bucket_name: &str,
     file_name: &str,
 ) -> Result<Option<Vec<u8>>> {
-    let file = client.object().download(bucket_name, file_name).await;
+    let file = client
+        .download_object(
+            &GetObjectRequest {
+                bucket: bucket_name.to_string(),
+                object: file_name.to_string(),
+                ..Default::default()
+            },
+            &Range::default(),
+        )
+        .await;
     match file {
         Ok(file) => Ok(Some(file)),
-        Err(cloud_storage::Error::Other(err)) => {
-            if err.contains("No such object: ") {
-                Ok(None)
-            } else {
-                anyhow::bail!(
-                    "[Indexer File] Error happens when downloading transaction file. {}",
-                    err
-                );
-            }
+        Err(Error::Response(err)) if err.code == 404 => Ok(None),
+        Err(Error::HttpClient(err)) if err.status().map(|s| s.as_u16()) == Some(404) => Ok(None),
+        Err(err) => {
+            anyhow::bail!(
+                "[Indexer File] Error happens when downloading transaction file. {}",
+                err
+            );
         },
-        Err(e) => Err(e.into()),
     }
 }
 

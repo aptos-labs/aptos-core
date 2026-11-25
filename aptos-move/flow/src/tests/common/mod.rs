@@ -17,7 +17,7 @@ use move_model::metadata::LanguageVersion;
 use move_prover_test_utils::baseline_test::verify_or_update_baseline;
 use regex::Regex;
 use rmcp::{
-    model::{CallToolRequestParams, CallToolResult, ListToolsResult, RawContent},
+    model::{CallToolRequestParams, CallToolResult, ListToolsResult},
     ServiceError, ServiceExt,
 };
 use std::path::{Path, PathBuf};
@@ -229,14 +229,11 @@ pub async fn call_tool_raw(
     name: &str,
     args: serde_json::Value,
 ) -> Result<CallToolResult, rmcp::ServiceError> {
-    client
-        .call_tool(CallToolRequestParams {
-            meta: None,
-            name: name.to_owned().into(),
-            arguments: args.as_object().cloned(),
-            task: None,
-        })
-        .await
+    let mut params = CallToolRequestParams::new(name.to_owned());
+    if let Some(arguments) = args.as_object().cloned() {
+        params = params.with_arguments(arguments);
+    }
+    client.call_tool(params).await
 }
 
 /// Format a [`CallToolResult`] into a stable text representation for baseline
@@ -247,16 +244,13 @@ pub fn format_tool_result(result: &CallToolResult) -> String {
         out.push_str("is_error: true\n");
     }
     for content in &result.content {
-        match &content.raw {
-            RawContent::Text(t) => {
-                out.push_str(&t.text);
-                if !t.text.ends_with('\n') {
-                    out.push('\n');
-                }
-            },
-            other => {
-                out.push_str(&format!("{:?}\n", other));
-            },
+        if let Some(t) = content.as_text() {
+            out.push_str(&t.text);
+            if !t.text.ends_with('\n') {
+                out.push('\n');
+            }
+        } else {
+            out.push_str(&format!("{:?}\n", content));
         }
     }
     out

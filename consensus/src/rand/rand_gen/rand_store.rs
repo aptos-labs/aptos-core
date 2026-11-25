@@ -619,7 +619,7 @@ mod tests {
         {
             rand_store.add_share(share).unwrap();
         }
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
         for metadata in blocks_1.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
         }
@@ -632,7 +632,7 @@ mod tests {
         for metadata in blocks_2.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata, Some(resolved_rand_check(true)));
         }
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
 
         for share in ctxt.authors[1..6]
             .iter()
@@ -675,7 +675,7 @@ mod tests {
         }
 
         // No decision yet because the future hasn't resolved
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
 
         // Resolve the future — the spawned task proceeds to aggregate
         resolve_tx.send(true).unwrap();
@@ -703,7 +703,7 @@ mod tests {
         for m in metadata.iter() {
             rand_store.add_rand_metadata(m.clone(), Some(resolved_rand_check(true)));
         }
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
 
         // Add shares one by one — aggregation should trigger when threshold is met
         for share in ctxt.authors[0..4]
@@ -747,7 +747,7 @@ mod tests {
         // The spawned task sees the future resolved to false → skips aggregation silently
         // (Skip sending is handled by the shared future in rand_manager, not by try_aggregate)
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
     }
 
     #[tokio::test]
@@ -772,7 +772,7 @@ mod tests {
             rand_store.add_share(share).unwrap();
         }
         // No decision yet — still waiting for metadata
-        assert!(result_rx.try_next().is_err());
+        assert!(result_rx.try_recv().is_err());
 
         // Now add metadata with resolved future — threshold already met → aggregation triggered
         for m in metadata.iter() {

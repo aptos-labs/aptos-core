@@ -18,7 +18,14 @@ aptos-api-types = { workspace = true }
 aptos-config = { workspace = true }
 aptos-logger = { workspace = true }
 bcs = { workspace = true }
+futures = { workspace = true }
 hyper = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
 warp = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

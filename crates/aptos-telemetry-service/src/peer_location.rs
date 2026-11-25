@@ -106,7 +106,7 @@ pub async fn query_peer_locations(
 
     BIG_QUERY_REQUEST_TOTAL.inc();
 
-    let mut res = client
+    let query_response = client
         .job()
         .query(ANALYTICS_PROJECT_ID, req)
         .await
@@ -115,6 +115,7 @@ pub async fn query_peer_locations(
             aptos_logger::error!("Failed to query peer locations: {}", e);
             e
         })?;
+    let mut res = ResultSet::new_from_query_response(query_response);
 
     let mut map = HashMap::new();
     while res.next_row() {

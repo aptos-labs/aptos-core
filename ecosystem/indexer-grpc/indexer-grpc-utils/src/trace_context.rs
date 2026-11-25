@@ -153,7 +153,7 @@ pub fn set_otel_parent(span: &tracing::Span, ctx: &TraceContext) {
     );
 
     let otel_context = opentelemetry::Context::new().with_remote_span_context(span_context);
-    span.set_parent(otel_context);
+    let _ = span.set_parent(otel_context);
 }
 
 /// Builds a `TraceContext` from the current `tracing::Span`'s OTel span context.

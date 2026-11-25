@@ -213,7 +213,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         // Drain stale decision messages (Success/Skip) from previously spawned
         // aggregation tasks and shared futures to prevent them from affecting
         // new blocks that may arrive at the same rounds after reset.
-        while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
+        while self.decision_rx.try_recv().is_ok() {}
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -412,7 +412,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
-                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
+                    while incoming_blocks.try_recv().is_ok() {}
                     self.process_reset(reset);
                 }
                 Some(result) = self.decision_rx.next() => {
