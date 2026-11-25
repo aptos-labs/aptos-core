@@ -2,11 +2,15 @@
 # Fails the AMI build when a tool CI jobs rely on is missing for the runner user.
 set -euo pipefail
 
-export PATH="${HOME}/bin:${HOME}/.cargo/bin:/usr/local/bin:${PATH}"
+# Check with the environment jobs get, not a hand-built PATH.
+set -a
+# shellcheck disable=SC1091
+. /etc/environment
+set +a
 
 missing=()
 for tool in git curl jq zip unzip gh gcloud kubectl docker python python3 pip3 \
-  rustc cargo cargo-nextest protoc clang cmake pkg-config node; do
+  rustc cargo cargo-nextest protoc clang cmake pkg-config node boogie z3 cvc5; do
   if command -v "$tool" >/dev/null; then
     echo "ok: $tool -> $(command -v "$tool")"
   else

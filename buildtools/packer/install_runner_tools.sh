@@ -20,6 +20,17 @@ usermod -aG docker runner
 # Jobs pip-install into the system Python, which Ubuntu 24.04 otherwise refuses (PEP 668).
 printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf
 
+# The full image put runner's user tool dirs on the system PATH; jobs rely on it (e.g. boogie for
+# the Move prover tests). dev_setup.sh only writes these to a shell profile.
+sed -i -E '/^(PATH|DOTNET_ROOT|Z3_EXE|CVC5_EXE|BOOGIE_EXE)=/d' /etc/environment
+cat >> /etc/environment <<'EOF'
+PATH="/home/runner/bin:/home/runner/.cargo/bin:/home/runner/.dotnet/tools:/home/runner/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+DOTNET_ROOT=/home/runner/.dotnet
+Z3_EXE=/home/runner/bin/z3
+CVC5_EXE=/home/runner/bin/cvc5
+BOOGIE_EXE=/home/runner/.dotnet/tools/boogie
+EOF
+
 # rolaunch runs the user data under its 3-minute startup timeout, and RunsOn stacks before v2.12
 # run the agent inside the user data, so jobs were killed 3 minutes in. 24h covers the longest job.
 install -d /etc/systemd/system/rolaunch.service.d
