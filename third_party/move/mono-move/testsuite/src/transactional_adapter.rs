@@ -9,7 +9,7 @@
 //! outcomes in V1's baseline format.
 
 use crate::transactional_session::{
-    ArgumentError, PublishError, RunError, RunOutcome, TransactionalSession,
+    ArgumentError, PublishError, RunError, RunOutcome, RunReport, TransactionalSession,
 };
 use anyhow::{bail, Result};
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
@@ -31,10 +31,10 @@ use move_transactional_test_runner::{
     framework::{run_test_impl_with_baseline, BaselineTarget, CompiledState, MoveTestAdapter},
     tasks::{taskify, EmptyCommand, InitCommand, SyntaxChoice, TaskCommand, TaskInput},
     vm_test_harness::{
-        compiled_state_with_stdlib, deserialize_value, function_execution_error,
-        precompiled_v2_stdlib, publish_error, script_execution_error, serialize_module,
-        serialize_script, stage_precompiled_stdlib, type_layout, view_resource, AdapterExecuteArgs,
-        AdapterPublishArgs, PrecompiledFilesModules, TestRunConfig,
+        append_line, compiled_state_with_stdlib, deserialize_value, function_execution_error,
+        precompiled_v2_stdlib, publish_error, render_writes, script_execution_error,
+        serialize_module, serialize_script, stage_precompiled_stdlib, type_layout, view_resource,
+        AdapterExecuteArgs, AdapterPublishArgs, PrecompiledFilesModules, TestRunConfig,
     },
 };
 use move_vm_runtime::move_vm::SerializedReturnValues;
@@ -164,12 +164,23 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
         };
         let signers = self.compiled_state.resolve_signers(signers);
         let args = serialize_values(&args);
-        let result = self
-            .session
-            .run_script(&script_bytes, &type_args, &signers, &args);
-        self.run_result(result, script_execution_error, extra_args.verbose)
+        let result = self.session.run_script(
+            &script_bytes,
+            &type_args,
+            &signers,
+            &args,
+            extra_args.heap_size,
+        );
+        let effects = self.effects_report(&result);
+        let output = self
+            .run_result(
+                result.map(|report| report.outcome),
+                script_execution_error,
+                extra_args.verbose,
+            )
             .err()
-            .map(|error| format!("Error: {error}"))
+            .map(|error| format!("Error: {error}"));
+        append_line(output, effects)
     }
 
     /// Runs the function unmetered.
@@ -188,13 +199,24 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
         }
         let signers = self.compiled_state.resolve_signers(signers);
         let args = serialize_values(&args);
-        let result = self
-            .session
-            .run(module, function, &type_args, &signers, &args);
-        match self.run_result(result, function_execution_error, extra_args.verbose) {
+        let result = self.session.run(
+            module,
+            function,
+            &type_args,
+            &signers,
+            &args,
+            extra_args.heap_size,
+        );
+        let effects = self.effects_report(&result);
+        let output = match self.run_result(
+            result.map(|report| report.outcome),
+            function_execution_error,
+            extra_args.verbose,
+        ) {
             Ok(values) => self.display_return_values(values),
             Err(error) => Some(format!("Error: {error}")),
-        }
+        };
+        append_line(output, effects)
     }
 
     fn view_data(
@@ -217,6 +239,21 @@ impl<'a> MoveTestAdapter<'a> for MonoVMTestAdapter<'a> {
 }
 
 impl MonoVMTestAdapter<'_> {
+    /// Reports GC count and committed writes when [`TestRunConfig::report_effects`] is set.
+    /// Aborts report no writes; `RunError` results produce no report. MonoVM runs unmetered.
+    fn effects_report(&self, result: &Result<RunReport, RunError>) -> Option<String> {
+        if !self.run_config.report_effects {
+            return None;
+        }
+        let report = result.as_ref().ok()?;
+        Some(
+            std::iter::once(format!("gc count: {}", report.gc_count))
+                .chain(render_writes(&report.writes))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    }
+
     /// Pairs successful outputs with their V1 layouts, or formats the failure
     /// with the task-specific `execution_error` function.
     fn run_result(

@@ -6,7 +6,7 @@ use crate::{
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
         AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig, RandShare,
-        RequestShare, TAugmentedData, TShare,
+        RequestCertifiedAugData, RequestShare, TAugmentedData, TShare,
     },
 };
 use anyhow::{bail, ensure};
@@ -28,6 +28,7 @@ pub enum RandMessage<S, D> {
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
+    RequestCertifiedAugData(RequestCertifiedAugData),
 }
 
 impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
@@ -45,6 +46,7 @@ impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
             RandMessage::CertifiedAugData(certified_aug_data) => {
                 certified_aug_data.verify(&epoch_state.verifier)
             },
+            RandMessage::RequestCertifiedAugData(_) => Ok(()),
             _ => bail!("[RandMessage] unexpected message type"),
         }
     }
@@ -61,6 +63,7 @@ impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
             RandMessage::AugDataSignature(signature) => signature.epoch(),
             RandMessage::CertifiedAugData(certified_aug_data) => certified_aug_data.epoch(),
             RandMessage::CertifiedAugDataAck(ack) => ack.epoch(),
+            RandMessage::RequestCertifiedAugData(request) => request.epoch(),
         }
     }
 
@@ -120,22 +123,34 @@ pub struct RpcRequest<S, D> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rand::rand_gen::types::{MockAugData, MockShare, RandConfig, RandShare};
+    use crate::rand::rand_gen::{
+        rand_manager::verify_fetched_aug_data,
+        rand_store::RandStore,
+        reliable_broadcast_state::ShareAggregateState,
+        types::{MockAugData, MockShare, RandConfig, RandShare},
+    };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, Uniform};
     use aptos_dkg::{
         pvss::{traits::TranscriptCore, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
+    use aptos_infallible::Mutex;
+    use aptos_reliable_broadcast::BroadcastStatus;
     use aptos_types::{
+        aggregate_signature::{AggregateSignature, PartialSignatures},
         dkg::{real_dkg::maybe_dk_from_bls_sk, DKGSessionMetadata, DKGTrait, DefaultDKG},
         epoch_state::EpochState,
         on_chain_config::OnChainRandomnessConfig,
         randomness::{RandKeys, RandMetadata, WvufPP, WVUF},
+        validator_signer::ValidatorSigner,
         validator_verifier::{
             ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
         },
     };
+    use futures::{FutureExt, StreamExt};
+    use futures_channel::mpsc::unbounded;
     use rand::thread_rng;
     use std::{str::FromStr, sync::Arc};
 
@@ -143,6 +158,7 @@ mod tests {
         authors: Vec<Author>,
         epoch_state: Arc<EpochState>,
         rand_config: RandConfig,
+        private_keys: Vec<bls12381::PrivateKey>,
     }
 
     fn build_test_context(weights: Vec<u64>, my_index: usize) -> TestContext {
@@ -228,6 +244,7 @@ mod tests {
             authors,
             epoch_state,
             rand_config,
+            private_keys,
         }
     }
 
@@ -272,5 +289,102 @@ mod tests {
 
         let result = msg.verify(&ctx.epoch_state, &ctx.rand_config, author);
         assert!(result.is_ok());
+    }
+
+    /// Certify an aug data for `author` in `epoch` the way the proactive broadcast does: every
+    /// validator signs it and the signatures are aggregated.
+    fn certify_aug_data_for_epoch(
+        ctx: &TestContext,
+        epoch: u64,
+        author: Author,
+    ) -> CertifiedAugData<MockAugData> {
+        let aug_data = AugData::new(epoch, author, MockAugData);
+        let mut partial = PartialSignatures::empty();
+        for (idx, sk) in ctx.private_keys.iter().enumerate() {
+            let signer = ValidatorSigner::new(ctx.authors[idx], Arc::new(sk.clone()));
+            partial.add_signature(ctx.authors[idx], signer.sign(&aug_data).unwrap());
+        }
+        let signatures = ctx
+            .epoch_state
+            .verifier
+            .aggregate_signatures(partial.signatures_iter())
+            .unwrap();
+        CertifiedAugData::new(aug_data, signatures)
+    }
+
+    fn certify_aug_data(ctx: &TestContext, author: Author) -> CertifiedAugData<MockAugData> {
+        certify_aug_data_for_epoch(ctx, ctx.epoch_state.epoch, author)
+    }
+
+    #[test]
+    fn test_missing_apk_notifications_coalesce_per_author() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let metadata = RandMetadata {
+            epoch: ctx.epoch_state.epoch,
+            round: 1,
+        };
+        let (decision_tx, _decision_rx) = unbounded();
+        let store = Arc::new(Mutex::new(RandStore::new(
+            metadata.epoch,
+            ctx.authors[0],
+            ctx.rand_config.clone(),
+            decision_tx,
+        )));
+        let (tx, mut rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
+        let state = Arc::new(ShareAggregateState::new(
+            store,
+            metadata.clone(),
+            ctx.rand_config,
+            tx,
+        ));
+        for _ in 0..100 {
+            for &author in &ctx.authors[1..] {
+                let share = RandShare::new(author, metadata.clone(), MockShare);
+                assert!(BroadcastStatus::<RandMessage<MockShare, MockAugData>>::add(
+                    &state, author, share
+                )
+                .is_err());
+            }
+        }
+        let notified: std::collections::HashSet<_> = (0..2)
+            .map(|_| rx.next().now_or_never().flatten().unwrap())
+            .collect();
+        assert_eq!(notified, ctx.authors[1..].iter().copied().collect());
+        assert!(rx.next().now_or_never().flatten().is_none());
+    }
+
+    #[test]
+    fn test_cert_fetch_rejects_a_cert_for_another_author() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+
+        // The certificate is valid, but belongs to a different validator.
+        assert!(verify_fetched_aug_data(
+            &certify_aug_data(&ctx, ctx.authors[2]),
+            &ctx.epoch_state,
+            peer,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_cert_fetch_rejects_a_cert_from_another_epoch() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+
+        // Same validator set across epochs: a valid signature must not admit a stale certificate.
+        let stale = certify_aug_data_for_epoch(&ctx, ctx.epoch_state.epoch - 1, peer);
+        assert!(verify_fetched_aug_data(&stale, &ctx.epoch_state, peer).is_err());
+    }
+
+    #[test]
+    fn test_cert_fetch_rejects_a_cert_without_quorum() {
+        let ctx = build_test_context(vec![100, 100, 100], 0);
+        let peer = ctx.authors[1];
+        let aug_data = AugData::new(ctx.epoch_state.epoch, peer, MockAugData);
+
+        // Right author, but no 2f+1 multi-signature behind it.
+        let certified = CertifiedAugData::new(aug_data, AggregateSignature::empty());
+        assert!(verify_fetched_aug_data(&certified, &ctx.epoch_state, peer).is_err());
     }
 }

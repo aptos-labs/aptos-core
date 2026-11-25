@@ -29,29 +29,29 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
           VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
             (fun result final => False)
             (fun failure =>
-              VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+              VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
             state)
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape
           (VerexIR.Proofs.Denote.Flow.return_ result env))
         (fun result final => False)
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
     | VerexIR.Proofs.Denote.Flow.break_ nest env =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape (VerexIR.Proofs.Denote.Flow.break_ nest env))
         (fun result final => False)
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       VerexIR.Proofs.wp
         (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape
           (VerexIR.Proofs.Denote.Flow.continue_ nest env))
         (fun result final => False)
-        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5782 5796 True)
+        (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
 pathDecision✝ : value.snd.fst.val = 10
 a✝ : value.snd.fst = value.snd.snd
