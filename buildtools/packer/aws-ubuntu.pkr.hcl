@@ -15,15 +15,10 @@ variable "ami_prefix" {
   type = string
 }
 
-# RunsOn base image; ubuntu24-minimal ships only the runner and Docker, so the build adds what CI jobs use.
-variable "source_image" {
-  type    = string
-  default = "ubuntu22-full-x64"
-}
-
+# The minimal image ships only the Actions runner and Docker; install_runner_tools.sh adds what CI jobs use.
 data "amazon-ami" "runs-on-ami-x64" {
   filters = {
-    name                = "runs-on-v2.2-${var.source_image}-*"
+    name                = "runs-on-v2.2-ubuntu24-minimal-x64-*"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
   }
