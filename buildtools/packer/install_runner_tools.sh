@@ -20,6 +20,13 @@ usermod -aG docker runner
 # Jobs pip-install into the system Python, which Ubuntu 24.04 otherwise refuses (PEP 668).
 printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf
 
+# rolaunch runs the user data under its 3-minute startup timeout, and RunsOn stacks before v2.12
+# run the agent inside the user data, so jobs were killed 3 minutes in. 24h covers the longest job.
+install -d /etc/systemd/system/rolaunch.service.d
+printf '[Service]\nExecStart=\nExecStart=/usr/bin/rolaunch -timeout 24h\n' \
+  > /etc/systemd/system/rolaunch.service.d/90-job-timeout.conf
+systemctl daemon-reload
+
 install -d -m 0755 /etc/apt/keyrings
 
 curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \

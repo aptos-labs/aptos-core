@@ -14,6 +14,9 @@ for tool in git curl jq zip unzip gh gcloud kubectl docker python python3 pip3 \
   fi
 done
 
+if ! systemctl show rolaunch -p ExecStart | grep -q -- "-timeout 24h"; then
+  missing+=("rolaunch job timeout")
+fi
 if ! pkg-config --exists libpq; then
   missing+=("libpq")
 fi
