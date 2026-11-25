@@ -126,6 +126,9 @@ spec aptos_framework::primary_fungible_store {
     ///
     spec module {
         pragma verify = true;
+        /// The derive ref of an asset derives from the asset's own address.
+        invariant forall m: address {exists<DeriveRefPod>(m)} where exists<DeriveRefPod>(m):
+            global<DeriveRefPod>(m).metadata_derive_ref.self == m;
     }
 
     spec fun spec_primary_store_exists<T: key>(account: address, metadata: Object<T>): bool {
@@ -159,9 +162,7 @@ spec aptos_framework::primary_fungible_store {
 
     spec create_primary_store<T: key>(owner_addr: address, metadata: Object<T>): Object<FungibleStore> {
         let metadata_addr = metadata.inner;
-        let store_addr = object::spec_create_user_derived_object_address(
-            owner_addr, global<DeriveRefPod>(metadata_addr).metadata_derive_ref.self
-        );
+        let store_addr = spec_primary_store_address(owner_addr, metadata);
         aborts_if !exists<object::ObjectCore>(metadata_addr) || !exists<Metadata>(metadata_addr);
         aborts_if !exists<DeriveRefPod>(metadata_addr);
         aborts_if exists<object::ObjectCore>(store_addr);
@@ -198,25 +199,56 @@ spec aptos_framework::primary_fungible_store {
         aborts_if existing && store.frozen;
         aborts_if existing && fungible_asset::spec_store_no_deposit_hook(store_addr)
             && fa.metadata != store.metadata;
-        ensures existing && fungible_asset::spec_store_no_deposit_hook(store_addr) ==>
-            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + fa.amount;
+        include PrimaryDepositBalance;
     }
 
-    /// Both stores exist and the transfer runs without withdraw or deposit hooks.
-    spec fun spec_is_plain_transfer(from: address, to: address): bool {
-        exists<FungibleStore>(from) && exists<FungibleStore>(to)
-            && fungible_asset::spec_store_no_withdraw_hook(from) && fungible_asset::spec_store_no_deposit_hook(to)
+    /// Without a deposit hook, `fa` lands in the primary store of `owner`, which is created if missing.
+    spec schema PrimaryDepositBalance {
+        owner: address;
+        fa: FungibleAsset;
+        let store_addr = spec_primary_store_address(owner, fa.metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        // A missing store is created with the asset's metadata.
+        let no_hook = if (existing) {
+            fungible_asset::spec_store_no_deposit_hook(store_addr)
+        } else {
+            spec_metadata_no_deposit_hook(fa.metadata.inner)
+        };
+        ensures no_hook ==> exists<FungibleStore>(store_addr)
+            && global<FungibleStore>(store_addr).metadata == fa.metadata
+            && fungible_asset::spec_balance(store_addr)
+                == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + fa.amount;
     }
 
-    /// If `plain`, `amount` moves from the store at `from` to the store at `to`; a self-transfer changes nothing.
-    spec schema PlainTransferBalances {
+    /// The asset at `m` has no deposit hook.
+    spec fun spec_metadata_no_deposit_hook(m: address): bool {
+        !exists<fungible_asset::DispatchFunctionStore>(m)
+            || std::option::is_none(global<fungible_asset::DispatchFunctionStore>(m).deposit_function)
+    }
+
+    /// The store at `from` exists and the transfer runs without hooks; a missing store at `to` is created for asset `m`.
+    spec fun spec_is_plain_transfer_to(from: address, to: address, m: address): bool {
+        exists<FungibleStore>(from) && fungible_asset::spec_store_no_withdraw_hook(from)
+            && if (exists<FungibleStore>(to)) {
+                fungible_asset::spec_store_no_deposit_hook(to)
+            } else {
+                spec_metadata_no_deposit_hook(m)
+            }
+    }
+
+    /// If `plain`, `amount` moves from the store at `from` to the store at `to`, where a store missing at `to` is
+    /// created with balance `amount`; a self-transfer changes nothing.
+    spec schema PlainTransferBalancesToNew {
         from: address;
         to: address;
         amount: u64;
         plain: bool;
         ensures plain && from != to ==>
             fungible_asset::spec_balance(from) == old(fungible_asset::spec_balance(from)) - amount
-            && fungible_asset::spec_balance(to) == old(fungible_asset::spec_balance(to)) + amount;
+            && exists<FungibleStore>(to)
+            && fungible_asset::spec_balance(to) == (if (old(exists<FungibleStore>(to))) {
+                old(fungible_asset::spec_balance(to))
+            } else { 0 }) + amount;
         ensures plain && from == to ==>
             fungible_asset::spec_balance(from) == old(fungible_asset::spec_balance(from));
     }
@@ -229,13 +261,13 @@ spec aptos_framework::primary_fungible_store {
         amount: u64;
         let from = spec_primary_store_address(signer::address_of(sender), metadata);
         let to = spec_primary_store_address(recipient, metadata);
-        let plain = spec_is_plain_transfer(from, to);
+        let plain = spec_is_plain_transfer_to(from, to, metadata.inner);
         aborts_if exists<FungibleStore>(from) && global<FungibleStore>(from).frozen;
         // A withdraw hook runs before the deposit check and may change the recipient's frozen flag.
         aborts_if exists<FungibleStore>(from) && exists<FungibleStore>(to)
             && fungible_asset::spec_store_no_withdraw_hook(from) && global<FungibleStore>(to).frozen;
         aborts_if plain && fungible_asset::spec_balance(from) < amount;
-        include PlainTransferBalances { from, to, amount, plain };
+        include PlainTransferBalancesToNew { from, to, amount, plain };
     }
 
     spec transfer<T: key>(sender: &signer, metadata: Object<T>, recipient: address, amount: u64) {
@@ -258,6 +290,6 @@ spec aptos_framework::primary_fungible_store {
         let from = spec_primary_store_address(signer::address_of(sender), metadata);
         let to = spec_primary_store_address(recipient, metadata);
         include PrimaryTransfer<T>;
-        aborts_if spec_is_plain_transfer(from, to) && from != to && amount < expected;
+        aborts_if spec_is_plain_transfer_to(from, to, metadata.inner) && from != to && amount < expected;
     }
 }

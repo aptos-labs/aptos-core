@@ -598,6 +598,10 @@ module aptos_framework::jwks {
                 found = comparison.is_equal();
                 break
             }
+        } spec {
+            invariant index <= num_entries;
+            invariant !found;
+            invariant spec_issuers_below(jwks.entries, provider_jwks.issuer, index);
         };
 
         // Now if `found == true`, `index` points to the JWK we want to update/remove; otherwise, `index` points to

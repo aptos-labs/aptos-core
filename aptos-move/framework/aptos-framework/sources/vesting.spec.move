@@ -108,7 +108,8 @@ spec aptos_framework::vesting {
         pragma aborts_if_is_partial;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
-        invariant forall a: address where exists<VestingContract>(a):
+        // Explicit trigger: an inferred one matches every address term.
+        invariant forall a: address {exists<VestingContract>(a)} where exists<VestingContract>(a):
             global<VestingContract>(a).grant_pool.shareholders_limit <= MAXIMUM_SHAREHOLDERS;
     }
 
@@ -239,20 +240,14 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
-        // TODO: Calls `unlock_rewards` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec vest(contract_address: address) {
-        // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = false;
         include UnlockRewardsAbortsIf;
     }
 
     spec vest_many(contract_addresses: vector<address>) {
-        // TODO: Calls `vest` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
@@ -265,18 +260,19 @@ spec aptos_framework::vesting {
     }
 
     spec distribute_many(contract_addresses: vector<address>) {
-        // TODO: Calls `distribute` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
-        // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = false;
+        // Partial: the aborts of the distribution loop, of reading the stake and of unlocking it are not specified.
         include ActiveVestingContractAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
         include WithdrawStakeAbortsIf { vesting_contract };
+        aborts_if signer::address_of(admin) != vesting_contract.admin;
+        let post post_vesting_contract = global<VestingContract>(contract_address);
+        ensures post_vesting_contract.state == VESTING_POOL_TERMINATED;
+        ensures post_vesting_contract.remaining_grant == 0;
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
@@ -339,7 +335,6 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_voter: address,
     ) {
-        pragma verify_duration_estimate = 300;
         include VerifyAdminAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -375,7 +370,6 @@ spec aptos_framework::vesting {
         shareholder: address,
         new_beneficiary: address,
     ) {
-        pragma verify_duration_estimate = 300;
         aborts_if !account::spec_exists_at(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
@@ -439,13 +433,10 @@ spec aptos_framework::vesting {
         ensures signer::address_of(result) == vesting_contract.signer_cap.account;
     }
 
-    spec fun spec_get_vesting_account_signer(vesting_contract: VestingContract): signer;
-
     spec create_vesting_contract_account(
         admin: &signer,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) {
-        pragma verify_duration_estimate = 300;
         let admin_addr = signer::address_of(admin);
         let admin_store = global<AdminStore>(admin_addr);
         let seed = bcs::to_bytes(admin_addr);
@@ -473,7 +464,6 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
-        pragma verify_duration_estimate = 120;
         /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }

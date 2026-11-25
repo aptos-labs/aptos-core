@@ -415,10 +415,14 @@ spec aptos_framework::multisig_account {
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
     ) {
-        // Transaction-context and signature-verification aborts and the auth-key revocation
-        // are not specified.
+        // Transaction-context and signature-verification aborts are not specified.
         pragma aborts_if_is_partial;
         include CreateMultisigAccountAbortsIfAndEnsures;
+        // The auth key is rotated to zero and any signer or rotation capability offer is revoked.
+        let post account_resource = global<account::Account>(multisig_address);
+        ensures account_resource.authentication_key == ZERO_AUTH_KEY;
+        ensures option::is_none(account_resource.signer_capability_offer.for);
+        ensures option::is_none(account_resource.rotation_capability_offer.for);
     }
 
     spec create_with_existing_account_and_revoke_auth_key_call(
@@ -429,11 +433,15 @@ spec aptos_framework::multisig_account {
         metadata_values:vector<vector<u8>>,
     ) {
         use std::signer;
-        // Owner validation, metadata and account-resource aborts and the auth-key revocation are
-        // not specified.
+        // Owner validation, metadata and account-resource aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_address = signer::address_of(multisig_account);
         include CreateMultisigAccountAbortsIfAndEnsures;
+        // The auth key is rotated to zero and any signer or rotation capability offer is revoked.
+        let post account_resource = global<account::Account>(multisig_address);
+        ensures account_resource.authentication_key == ZERO_AUTH_KEY;
+        ensures option::is_none(account_resource.signer_capability_offer.for);
+        ensures option::is_none(account_resource.rotation_capability_offer.for);
     }
 
     ////////////////////////// Core entry function specs ///////////////////////////////
@@ -617,7 +625,6 @@ spec aptos_framework::multisig_account {
 
     spec validate_owners(owners: &vector<address>, multisig_account: address) {
         pragma opaque;
-        pragma verify = false;
         aborts_if [abstract] exists i in 0..len(owners): owners[i] == multisig_account;
         aborts_if [abstract] exists i in 0..len(owners), j in 0..len(owners) where i < j:
             owners[i] == owners[j];
