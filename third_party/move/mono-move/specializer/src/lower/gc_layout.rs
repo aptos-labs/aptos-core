@@ -61,43 +61,12 @@ pub fn derive_frame_layout(
     })
 }
 
-/// Returns `true` iff `type_pointer_offsets` would accept `ty` without
-/// erroring. Keep in sync with `type_pointer_offsets`: every case that
-/// errors there must return `false` here.
-pub fn gc_layout_supports(layouts: &dyn LayoutProvider, ty: InternedType) -> bool {
-    match view_type(ty) {
-        Type::Bool
-        | Type::U8
-        | Type::U16
-        | Type::U32
-        | Type::U64
-        | Type::U128
-        | Type::U256
-        | Type::I8
-        | Type::I16
-        | Type::I32
-        | Type::I64
-        | Type::I128
-        | Type::I256
-        | Type::Address
-        | Type::Signer
-        | Type::ImmutRef { .. }
-        | Type::MutRef { .. }
-        | Type::Vector { .. }
-        | Type::Function { .. } => true,
-        // A nominal is walkable once its value layout is published.
-        Type::Nominal { .. } => layouts.layout_by_ty(ty).is_some(),
-        Type::TypeParam { .. } => false,
-    }
-}
-
 /// Byte offsets of the pointer slots inside a value of type `ty`,
 /// relative to the value's start.
 ///
-/// Returns an error if the provided type is not yet supported or
-/// contains non-instantiated type parameters. Callers that want to
-/// decide *whether* to lower a function should use `gc_layout_supports`
-/// for a graceful `Skipped` outcome rather than reaching this `Err`.
+/// With a consistent layout table, succeeds for every sized type (see
+/// `LayoutProvider::size_and_align`). Errors on a nominal with no published
+/// layout, a bare type parameter, or an inconsistent layout table.
 pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> VMResult<Vec<u32>> {
     let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
@@ -149,7 +118,8 @@ pub fn type_pointer_offsets(layouts: &dyn LayoutProvider, ty: InternedType) -> V
 /// Heap-pointer byte offsets for a sequence of `(field_offset, field_type)`
 /// pairs: each field's own pointer offsets shifted by the field's offset within
 /// the enclosing region.
-/// Errors on a non-GC-walkable field type or a `u32` offset overflow.
+/// Errors when `type_pointer_offsets` does for a field type, or on a `u32`
+/// offset overflow.
 pub fn shifted_field_pointer_offsets(
     layouts: &dyn LayoutProvider,
     fields: impl IntoIterator<Item = (u32, InternedType)>,

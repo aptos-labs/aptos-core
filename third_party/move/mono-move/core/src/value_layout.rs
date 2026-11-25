@@ -586,7 +586,7 @@ pub trait LayoutProvider {
     /// (primitives, references, vectors, functions) resolve without the table;
     /// nominal types resolve through their published [`ValueLayout`]. Returns
     /// [`None`] for unresolved type parameters and for nominals whose layout
-    /// has not been published yet.
+    /// has not been published yet. A type is *sized* when this returns `Some`.
     fn size_and_align(&self, ty: InternedType) -> Option<(Size, Alignment)> {
         intrinsic_slot_size_and_align(view_type(ty))
             .or_else(|| self.layout_by_ty(ty).map(|l| (l.size, l.align)))
