@@ -6,7 +6,7 @@ export PATH="${HOME}/bin:${HOME}/.cargo/bin:/usr/local/bin:${PATH}"
 
 missing=()
 for tool in git curl jq zip unzip gh gcloud kubectl docker python python3 pip3 \
-  rustc cargo cargo-nextest protoc clang cmake pkg-config node psql; do
+  rustc cargo cargo-nextest protoc clang cmake pkg-config node; do
   if command -v "$tool" >/dev/null; then
     echo "ok: $tool -> $(command -v "$tool")"
   else
@@ -14,6 +14,9 @@ for tool in git curl jq zip unzip gh gcloud kubectl docker python python3 pip3 \
   fi
 done
 
+if ! pkg-config --exists libpq; then
+  missing+=("libpq")
+fi
 if ! id -nG runner | tr ' ' '\n' | grep -qx docker; then
   missing+=("docker group membership")
 fi
