@@ -347,15 +347,18 @@ spec aptos_framework::primary_fungible_store {
 
     /// Mints `amount` into the primary store of `owner`, which is created if missing.
     spec mint(mint_ref: &MintRef, owner: address, amount: u64) {
-        // Partial: the abort conditions of store creation and supply overflow are not specified.
-        pragma aborts_if_is_partial;
         let metadata = mint_ref.metadata;
         let store_addr = spec_primary_store_address(owner, metadata);
         let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
         aborts_if existing && global<FungibleStore>(store_addr).frozen;
         aborts_if existing && global<FungibleStore>(store_addr).metadata != metadata;
-        aborts_if amount != 0 && !exists<fungible_asset::ConcurrentSupply>(metadata.inner)
-            && !exists<fungible_asset::Supply>(metadata.inner);
+        include fungible_asset::IncreaseSupplyAbortsIf { metadata_addr: metadata.inner };
+        // A new store starts empty, so only an existing one can overflow.
+        include existing ==> fungible_asset::UncheckedDepositAbortsIf {
+            store_addr, fa: FungibleAsset { metadata, amount }
+        };
         ensures exists<FungibleStore>(store_addr);
         ensures fungible_asset::spec_balance(store_addr)
             == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + amount;
@@ -380,9 +383,11 @@ spec aptos_framework::primary_fungible_store {
     }
 
     spec set_frozen_flag(transfer_ref: &TransferRef, owner: address, frozen: bool) {
-        // Partial: the abort conditions of store creation are not specified.
-        pragma aborts_if_is_partial;
-        let store_addr = spec_primary_store_address(owner, transfer_ref.metadata);
+        let metadata = transfer_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
         aborts_if exists<FungibleStore>(store_addr)
             && global<FungibleStore>(store_addr).metadata != transfer_ref.metadata;
         ensures exists<FungibleStore>(store_addr);
@@ -402,12 +407,15 @@ spec aptos_framework::primary_fungible_store {
 
     /// Deposits into the primary store of `owner`, which is created if missing, ignoring its frozen flag.
     spec deposit_with_ref(transfer_ref: &TransferRef, owner: address, fa: FungibleAsset) {
-        // Partial: the abort conditions of store creation and balance overflow are not specified.
-        pragma aborts_if_is_partial;
-        let store_addr = spec_primary_store_address(owner, transfer_ref.metadata);
+        let metadata = transfer_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
         let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
         aborts_if transfer_ref.metadata != fa.metadata;
         aborts_if existing && global<FungibleStore>(store_addr).metadata != fa.metadata;
+        // A new store starts empty, so only an existing one can overflow.
+        include existing ==> fungible_asset::UncheckedDepositAbortsIf { store_addr };
         ensures exists<FungibleStore>(store_addr);
         ensures fungible_asset::spec_balance(store_addr)
             == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + fa.amount;
@@ -415,13 +423,25 @@ spec aptos_framework::primary_fungible_store {
 
     /// Moves `amount` between the primary stores of `from` and `to`, ignoring their frozen flags.
     spec transfer_with_ref(transfer_ref: &TransferRef, from: address, to: address, amount: u64) {
-        // Partial: the abort conditions of store creation and balance overflow are not specified.
-        pragma aborts_if_is_partial;
-        let from_addr = spec_primary_store_address(from, transfer_ref.metadata);
-        let to_addr = spec_primary_store_address(to, transfer_ref.metadata);
+        let metadata = transfer_ref.metadata;
+        let from_addr = spec_primary_store_address(from, metadata);
+        let to_addr = spec_primary_store_address(to, metadata);
+        let to_existing = exists<FungibleStore>(to_addr);
+        let to_concurrent = global<fungible_asset::ConcurrentFungibleBalance>(to_addr).balance;
+        aborts_if !exists<object::ObjectCore>(from_addr);
         aborts_if !exists<FungibleStore>(from_addr);
+        aborts_if to_existing && !exists<object::ObjectCore>(to_addr);
+        include !to_existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: to };
         aborts_if transfer_ref.metadata != global<FungibleStore>(from_addr).metadata;
         aborts_if fungible_asset::spec_balance(from_addr) < amount;
+        // A new recipient store starts empty, so only an existing one can overflow.
+        include to_existing && from_addr != to_addr ==> fungible_asset::UncheckedDepositAbortsIf {
+            store_addr: to_addr, fa: FungibleAsset { metadata, amount }
+        };
+        // For a self-transfer the deposit runs on the reduced balance.
+        aborts_if amount != 0 && from_addr == to_addr && fungible_asset::spec_is_concurrent_balance(to_addr)
+            && aptos_framework::aggregator_v2::spec_get_value(to_concurrent)
+                > aptos_framework::aggregator_v2::spec_get_max_value(to_concurrent);
         ensures from_addr != to_addr ==>
             fungible_asset::spec_balance(from_addr) == old(fungible_asset::spec_balance(from_addr)) - amount
             && fungible_asset::spec_balance(to_addr) == (if (old(exists<FungibleStore>(to_addr))) {
@@ -432,9 +452,12 @@ spec aptos_framework::primary_fungible_store {
     }
 
     spec upgrade_to_concurrent(owner: &signer, metadata: Object<Metadata>) {
-        // Partial: the abort conditions of store creation and the upgrade are not specified.
+        // Partial: the ownership check of an existing store walks the object owner chain, which is not specified.
         pragma aborts_if_is_partial;
         let store_addr = spec_primary_store_address(signer::address_of(owner), metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: signer::address_of(owner) };
         ensures exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
         ensures old(exists<FungibleStore>(store_addr)) ==> fungible_asset::spec_balance(store_addr)
             == old(fungible_asset::spec_balance(store_addr));
