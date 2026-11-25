@@ -3,7 +3,11 @@
 
 use anyhow::{Context as _, Result};
 use aptos_config::config::ApiConfig;
-use futures::{ready, stream, FutureExt};
+use futures::{ready, stream, FutureExt, Stream};
+use hyper::server::{
+    accept::Accept,
+    conn::{AddrIncoming, AddrStream},
+};
 use rustls::{
     pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer},
     ServerConfig,
@@ -17,10 +21,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::{
-    io::{AsyncRead, AsyncWrite, ReadBuf},
-    net::{TcpListener, TcpStream},
-};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_rustls::TlsAcceptor;
 use warp::{Filter, Reply};
 
@@ -64,21 +65,28 @@ impl WebServer {
                     .expect("tls_key_path is required when tls_cert_path is set");
                 let tls_config = build_tls_server_config(cert_path, key_path)
                     .expect("failed to build TLS server config");
-                let listener = TcpListener::bind(self.address)
-                    .await
-                    .expect("failed to bind TLS TCP listener");
-                let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-                let incoming = stream::unfold((listener, acceptor), |(listener, acceptor)| async {
-                    let res = listener
-                        .accept()
-                        .await
-                        .map(|(stream, _addr)| LazyTlsStream::new(stream, &acceptor));
-                    Some((res, (listener, acceptor)))
-                });
-                warp::serve(routes).serve_incoming(incoming).await;
+                let addr_incoming =
+                    AddrIncoming::bind(&self.address).expect("failed to bind TLS TCP listener");
+                warp::serve(routes)
+                    .serve_incoming(tls_incoming(addr_incoming, tls_config))
+                    .await;
             },
         }
     }
+}
+
+fn tls_incoming(
+    mut addr_incoming: AddrIncoming,
+    tls_config: ServerConfig,
+) -> impl Stream<Item = io::Result<LazyTlsStream>> {
+    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+    stream::poll_fn(
+        move |cx| match ready!(Pin::new(&mut addr_incoming).poll_accept(cx)) {
+            Some(Ok(sock)) => Poll::Ready(Some(Ok(LazyTlsStream::new(sock, &acceptor)))),
+            Some(Err(err)) => Poll::Ready(Some(Err(err))),
+            None => Poll::Ready(None),
+        },
+    )
 }
 
 fn build_tls_server_config(
@@ -103,24 +111,25 @@ fn build_tls_server_config(
     Ok(config)
 }
 
-enum TlsState {
-    Handshaking(tokio_rustls::Accept<TcpStream>),
-    Streaming(tokio_rustls::server::TlsStream<TcpStream>),
+enum TlsState<S> {
+    Handshaking(tokio_rustls::Accept<S>),
+    Streaming(tokio_rustls::server::TlsStream<S>),
+    Failed,
 }
 
-struct LazyTlsStream {
-    state: TlsState,
+struct LazyTlsStream<S = AddrStream> {
+    state: TlsState<S>,
 }
 
-impl LazyTlsStream {
-    fn new(stream: TcpStream, acceptor: &TlsAcceptor) -> Self {
+impl<S: AsyncRead + AsyncWrite + Unpin> LazyTlsStream<S> {
+    fn new(stream: S, acceptor: &TlsAcceptor) -> Self {
         Self {
             state: TlsState::Handshaking(acceptor.accept(stream)),
         }
     }
 }
 
-impl AsyncRead for LazyTlsStream {
+impl<S: AsyncRead + AsyncWrite + Unpin> AsyncRead for LazyTlsStream<S> {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -134,14 +143,18 @@ impl AsyncRead for LazyTlsStream {
                     this.state = TlsState::Streaming(stream);
                     poll
                 },
-                Err(err) => Poll::Ready(Err(err)),
+                Err(err) => {
+                    this.state = TlsState::Failed;
+                    Poll::Ready(Err(err))
+                },
             },
             TlsState::Streaming(stream) => Pin::new(stream).poll_read(cx, buf),
+            TlsState::Failed => Poll::Ready(Err(io::Error::from(io::ErrorKind::BrokenPipe))),
         }
     }
 }
 
-impl AsyncWrite for LazyTlsStream {
+impl<S: AsyncRead + AsyncWrite + Unpin> AsyncWrite for LazyTlsStream<S> {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -155,22 +168,26 @@ impl AsyncWrite for LazyTlsStream {
                     this.state = TlsState::Streaming(stream);
                     poll
                 },
-                Err(err) => Poll::Ready(Err(err)),
+                Err(err) => {
+                    this.state = TlsState::Failed;
+                    Poll::Ready(Err(err))
+                },
             },
             TlsState::Streaming(stream) => Pin::new(stream).poll_write(cx, buf),
+            TlsState::Failed => Poll::Ready(Err(io::Error::from(io::ErrorKind::BrokenPipe))),
         }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut self.get_mut().state {
-            TlsState::Handshaking(_) => Poll::Ready(Ok(())),
+            TlsState::Handshaking(_) | TlsState::Failed => Poll::Ready(Ok(())),
             TlsState::Streaming(stream) => Pin::new(stream).poll_flush(cx),
         }
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match &mut self.get_mut().state {
-            TlsState::Handshaking(_) => Poll::Ready(Ok(())),
+            TlsState::Handshaking(_) | TlsState::Failed => Poll::Ready(Ok(())),
             TlsState::Streaming(stream) => Pin::new(stream).poll_shutdown(cx),
         }
     }
@@ -180,7 +197,10 @@ impl AsyncWrite for LazyTlsStream {
 mod tests {
     use super::*;
     use rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::{TcpListener, TcpStream},
+    };
     use tokio_rustls::TlsConnector;
 
     const TEST_CERT_PEM: &str = "-----BEGIN CERTIFICATE-----\n\
@@ -210,17 +230,12 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
         let tls_config = build_tls_server_config(&cert_path, &key_path).expect("server tls config");
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let addr = listener.local_addr().expect("local_addr");
-        let acceptor = TlsAcceptor::from(Arc::new(tls_config));
-        let incoming = stream::unfold((listener, acceptor), |(listener, acceptor)| async {
-            let res = listener
-                .accept()
-                .await
-                .map(|(stream, _addr)| LazyTlsStream::new(stream, &acceptor));
-            Some((res, (listener, acceptor)))
-        });
+        let addr_incoming = AddrIncoming::from_listener(listener).expect("addr_incoming");
 
         let routes = warp::path("ping").map(|| "pong");
-        let server_handle = tokio::spawn(warp::serve(routes).serve_incoming(incoming));
+        let server_handle = tokio::spawn(
+            warp::serve(routes).serve_incoming(tls_incoming(addr_incoming, tls_config)),
+        );
 
         let mut root_store = RootCertStore::empty();
         for cert in CertificateDer::pem_slice_iter(TEST_CERT_PEM.as_bytes()) {
@@ -261,5 +276,38 @@ d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
         );
 
         server_handle.abort();
+    }
+
+    #[tokio::test]
+    async fn test_tls_handshake_error_repoll_does_not_panic() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let cert_path = dir.path().join("cert.pem");
+        let key_path = dir.path().join("key.pem");
+        std::fs::write(&cert_path, TEST_CERT_PEM).expect("write cert");
+        std::fs::write(&key_path, TEST_KEY_PEM).expect("write key");
+
+        let tls_config = build_tls_server_config(&cert_path, &key_path).expect("server tls config");
+        let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+        let (mut client_io, server_io) = tokio::io::duplex(1024);
+        let mut lazy_tls = LazyTlsStream::new(server_io, &acceptor);
+
+        client_io
+            .write_all(b"GET /plain HTTP/1.1\r\n\r\n")
+            .await
+            .expect("write plaintext");
+        drop(client_io);
+
+        let mut buf = [0u8; 32];
+        assert!(lazy_tls.read(&mut buf).await.is_err());
+        assert_eq!(
+            lazy_tls.read(&mut buf).await.unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        assert_eq!(
+            lazy_tls.write(b"x").await.unwrap_err().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        lazy_tls.flush().await.expect("flush after error");
+        lazy_tls.shutdown().await.expect("shutdown after error");
     }
 }
