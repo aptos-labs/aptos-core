@@ -17,7 +17,7 @@ use aptos_storage_interface::{
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         HotStateShardUpdates, HotStateUpdates,
     },
-    DbReader, Result as DbResult,
+    CheckpointStateReader, Result as DbResult,
 };
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -531,8 +531,8 @@ impl StateByVersion {
     }
 }
 
-impl DbReader for StateByVersion {
-    fn get_state_value_with_version_by_version(
+impl CheckpointStateReader for StateByVersion {
+    fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
         version: Version,
@@ -687,9 +687,10 @@ fn update_state(
                 let value = state_view.get_state_value(k).unwrap();
                 let expected_value = parent_state.version().and_then(|version| {
                     state_by_version
-                        .get_state_value_with_version_by_version(k, version)
-                        .unwrap()
-                        .map(|(_ver, val)| val)
+                        .get_state(Some(version))
+                        .state
+                        .get(k)
+                        .map(|(_ver, val)| val.clone())
                 });
                 assert_eq!(value, expected_value)
             });

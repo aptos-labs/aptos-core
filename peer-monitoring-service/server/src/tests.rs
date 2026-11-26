@@ -37,7 +37,7 @@ use aptos_peer_monitoring_service_types::{
     },
     PeerMonitoringMetadata, PeerMonitoringServiceError, PeerMonitoringServiceMessage,
 };
-use aptos_storage_interface::{DbReader, LedgerSummary, StateKind};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, LedgerSummary, StateKind};
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
@@ -728,6 +728,15 @@ mod database_mock {
 
     mock! {
         pub DatabaseReader {}
+
+        impl CheckpointStateReader for DatabaseReader {
+            fn get_state_value_with_proof_by_version(
+                &self,
+                state_key: &StateKey,
+                version: Version,
+            ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
+        }
+
         impl DbReader for DatabaseReader {
             fn get_epoch_ending_ledger_infos(
                 &self,
@@ -793,12 +802,6 @@ mod database_mock {
             ) -> Result<StateProof>;
 
             fn get_state_proof(&self, known_version: u64) -> Result<StateProof>;
-
-            fn get_state_value_with_proof_by_version(
-                &self,
-                state_key: &StateKey,
-                version: Version,
-            ) -> Result<(Option<StateValue>, SparseMerkleProof)>;
 
             fn get_pre_committed_ledger_summary(&self) -> Result<LedgerSummary>;
 

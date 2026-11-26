@@ -168,7 +168,7 @@ impl ObserverFallbackManager {
 mod test {
     use super::*;
     use aptos_crypto::HashValue;
-    use aptos_storage_interface::Result;
+    use aptos_storage_interface::{CheckpointStateReader, Result};
     use aptos_types::{
         aggregate_signature::AggregateSignature, block_info::BlockInfo, ledger_info::LedgerInfo,
         transaction::Version,
@@ -179,6 +179,9 @@ mod test {
     // This is a simple mock of the DbReader (it generates a MockDatabaseReader)
     mock! {
         pub DatabaseReader {}
+
+        impl CheckpointStateReader for DatabaseReader {}
+
         impl DbReader for DatabaseReader {
             fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
