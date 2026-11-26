@@ -75,9 +75,12 @@ spec aptos_framework::version {
         include config_buffer::OnNewEpochApply<Version>;
     }
 
-    /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.
-    spec initialize_for_test {
-        // Don't verify test functions.
-        pragma verify = false;
+    /// Only the core resources account can receive the capability, once.
+    spec initialize_for_test(core_resources: &signer) {
+        use std::signer;
+        let addr = signer::address_of(core_resources);
+        aborts_if addr != @core_resources;
+        aborts_if exists<SetVersionCapability>(addr);
+        ensures exists<SetVersionCapability>(addr);
     }
 }

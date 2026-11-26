@@ -1,0 +1,29 @@
+=== micro-ops ===
+// module 0x42::leaf
+
+fun mk() {
+  frame_data_size: 16
+  entry_gas: 80
+  code:
+    0: Move8 [8] <- [0] @1
+    1: Move8 [0] <- [8] @2
+    2: Return @2
+}
+=== micro-ops ===
+// module 0x42::mid
+
+fun swap(): skipped (not all types are concrete)
+
+fun bytes(): skipped (not all types are concrete)
+
+fun eq(): skipped (not all types are concrete)
+
+fun gc_live(): skipped (not all types are concrete)
+
+fun mk1(): skipped (not all types are concrete)
+
+fun mk2(): skipped (not all types are concrete)
+
+fun put(): skipped (not all types are concrete)
+
+fun reload(): skipped (not all types are concrete)

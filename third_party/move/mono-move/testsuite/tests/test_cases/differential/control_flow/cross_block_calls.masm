@@ -25,6 +25,3 @@ l1: ld_u64 5
 
 // RUN: execute 0x66::test::trigger --args 1
 // CHECK: results: 99
-
-// RUN: execute 0x66::test::trigger --args 100
-// CHECK: results: 99

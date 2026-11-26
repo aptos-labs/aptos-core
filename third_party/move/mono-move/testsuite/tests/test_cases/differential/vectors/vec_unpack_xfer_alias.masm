@@ -1,0 +1,44 @@
+// Unpacking a vector returned by a call straight into the next call's arguments, so the
+// vector and its first element are in the same argument position. The golden pins how it
+// lowers. `run_mismatch` unpacks with the wrong length, which fails on both VMs.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::vec_unpack_xfer_alias
+
+fun mk2(first: u64, second: u64): vector<u64>
+    move_loc first
+    move_loc second
+    vec_pack <u64>, 2
+    ret
+
+fun combine(tens: u64, ones: u64): u64
+    move_loc tens
+    ld_u64 10
+    mul
+    move_loc ones
+    add
+    ret
+
+public fun run(first: u64, second: u64): u64
+    move_loc first
+    move_loc second
+    call mk2
+    vec_unpack <u64>, 2
+    call combine
+    ret
+
+public fun run_mismatch(): u64
+    ld_u64 1
+    ld_u64 2
+    call mk2
+    vec_unpack <u64>, 3
+    pop
+    call combine
+    ret
+
+// RUN: execute 0x66::vec_unpack_xfer_alias::run --args 4, 2
+// CHECK: results: 42
+
+// RUN: execute 0x66::vec_unpack_xfer_alias::run_mismatch
+// CHECK-V1-SUBSTR: VECTOR_OPERATION_ERROR
+// CHECK-ERROR-PARITY

@@ -183,6 +183,27 @@ module 0x42::m {
         ).unwrap();
         f(1, 2) + f(3, 4)
     }
+
+    // Names up to the 255-byte identifier size limit are looked up; longer ones are invalid.
+    public fun module_name_of_len(len: u64): u64 {
+        reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &name_of_len(len), &utf8(b"add")
+        ).unwrap_err().error_code()
+    }
+
+    public fun function_name_of_len(len: u64): u64 {
+        reflect::resolve<|u64, u64|u64 has copy + drop>(
+            @0x42, &utf8(b"target"), &name_of_len(len)
+        ).unwrap_err().error_code()
+    }
+
+    fun name_of_len(len: u64): std::string::String {
+        let bytes = vector[];
+        for (_index in 0..len) {
+            bytes.push_back(0x61);
+        };
+        utf8(bytes)
+    }
 }
 
 // RUN: execute 0x42::m::resolve_and_call --args 40, 2
@@ -244,3 +265,15 @@ module 0x42::m {
 
 // RUN: execute 0x42::m::call_twice
 // CHECK: results: 10
+
+// RUN: execute 0x42::m::module_name_of_len --args 255
+// CHECK: results: 1
+
+// RUN: execute 0x42::m::module_name_of_len --args 256
+// CHECK: results: 0
+
+// RUN: execute 0x42::m::function_name_of_len --args 255
+// CHECK: results: 1
+
+// RUN: execute 0x42::m::function_name_of_len --args 256
+// CHECK: results: 0

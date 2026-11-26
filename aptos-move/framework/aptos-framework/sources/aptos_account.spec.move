@@ -33,20 +33,22 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-4](set_allow_direct_coin_transfers).
     ///
     /// No.: 5
-    /// Requirement: The transfer function should ensure an account is created for the provided destination if one does not
-    /// exist; then, register AptosCoin for that account if a particular is unregistered before transferring the amount.
+    /// Requirement: After a transfer, the destination account should exist and a fungible store should exist at its
+    /// APT primary store address.
     /// Criticality: Critical
-    /// Implementation: The transfer function checks if the recipient account exists. If the account does not exist,
-    /// the function creates one and registers the account to AptosCoin if not registered.
-    /// Enforcement: Formally verified via [high-level-req-5](transfer).
+    /// Implementation: The transfer function creates the recipient account if `account::exists_at` is false (an
+    /// Account resource is created only when default account resources are disabled), then deposits into the
+    /// fungible store at the recipient's APT primary store address, creating a store there if missing.
+    /// Enforcement: Formally verified via [high-level-req-5.1](transfer) and [high-level-req-5.2](AptTransfer).
     ///
     /// No.: 6
-    /// Requirement: Creating an account for the provided destination and registering it for that particular CoinType
-    /// should be the only way to enable depositing coins, provided the account does not already exist.
+    /// Requirement: Depositing coins should create the destination account if needed and land the coins in the
+    /// destination's primary store paired with CoinType.
     /// Criticality: Critical
-    /// Implementation: The deposit_coins function verifies if the recipient account exists. If the account does not
-    /// exist, the function creates one and ensures that the account becomes registered for the specified CointType.
-    /// Enforcement: Formally verified via [high-level-req-6](deposit_coins).
+    /// Implementation: The deposit_coins function creates the recipient account if `account::exists_at` is false (an
+    /// Account resource is created only when default account resources are disabled); when the deposit runs without
+    /// a hook, the paired primary store exists afterwards and holds the deposited amount.
+    /// Enforcement: Formally verified via [high-level-req-6.1](deposit_coins) and [high-level-req-6.2](deposit_coins).
     ///
     /// No.: 7
     /// Requirement: When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it
@@ -90,7 +92,7 @@ spec aptos_framework::aptos_account {
         pragma aborts_if_is_partial;
         include CreateAccountTransferAbortsIf;
         include AptTransfer;
-        /// [high-level-req-5]
+        /// [high-level-req-5.1]
         ensures account::spec_exists_at(to);
     }
 
@@ -117,44 +119,9 @@ spec aptos_framework::aptos_account {
     }
 
     spec batch_transfer(source: &signer, recipients: vector<address>, amounts: vector<u64>) {
-        //TODO: Can't verify the loop invariant in enumerate
-        pragma verify = false;
-        let account_addr_source = signer::address_of(source);
-        let coin_store_source = global<coin::CoinStore<AptosCoin>>(account_addr_source);
-        let balance_source = coin_store_source.coin.value;
-
-        // requires forall i in 0..len(recipients):
-        //     recipients[i] != account_addr_source;
-        // requires exists i in 0..len(recipients):
-        //     amounts[i] > 0;
-
-        // create account properties
+        // Partial: only the length check is specified; each transfer is specified by `transfer`.
+        pragma aborts_if_is_partial;
         aborts_if len(recipients) != len(amounts);
-        aborts_if exists i in 0..len(recipients):
-                !account::spec_exists_at(recipients[i]) && length_judgment(recipients[i]);
-        aborts_if exists i in 0..len(recipients):
-                !account::spec_exists_at(recipients[i]) && (recipients[i] == @vm_reserved || recipients[i] == @aptos_framework || recipients[i] == @aptos_token);
-        ensures forall i in 0..len(recipients):
-                (!account::spec_exists_at(recipients[i]) ==> !length_judgment(recipients[i])) &&
-                    (!account::spec_exists_at(recipients[i]) ==> (recipients[i] != @vm_reserved && recipients[i] != @aptos_framework && recipients[i] != @aptos_token));
-
-        // coin::withdraw properties
-        aborts_if exists i in 0..len(recipients):
-            !exists<coin::CoinStore<AptosCoin>>(account_addr_source);
-        aborts_if exists i in 0..len(recipients):
-            coin_store_source.frozen;
-        aborts_if exists i in 0..len(recipients):
-            global<coin::CoinStore<AptosCoin>>(account_addr_source).coin.value < amounts[i];
-
-        // deposit properties
-        aborts_if exists i in 0..len(recipients):
-            exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<coin::CoinStore<AptosCoin>>(recipients[i]).frozen;
-
-        // guid properties
-        aborts_if exists i in 0..len(recipients):
-            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if exists i in 0..len(recipients):
-            account::spec_exists_at(recipients[i]) && !exists<coin::CoinStore<AptosCoin>>(recipients[i]) && global<account::Account>(recipients[i]).guid_creation_num + 2 > MAX_U64;
     }
 
     spec can_receive_direct_coin_transfers(account: address): bool {
@@ -185,10 +152,17 @@ spec aptos_framework::aptos_account {
         include CreateAccountTransferAbortsIf;
         include coin::AbortsIfNotExistCoinInfo<CoinType>;
         aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
-        /// [high-level-req-6]
+        /// [high-level-req-6.1]
         ensures account::spec_exists_at(to);
-        ensures existing && fungible_asset::spec_store_no_deposit_hook(store_addr) ==>
-            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + coins.value;
+        let no_alias = spec_no_apt_store_alias(to, std::option::borrow(paired).inner, store_addr);
+        // A deposit that pairs the coin creates the store for the new metadata.
+        let post post_paired = coin::spec_paired_metadata(type_info::type_of<CoinType>());
+        let post post_no_alias = old(spec_no_apt_store_alias(
+            to, std::option::borrow(post_paired).inner, coin::spec_paired_store_address(to, post_paired)
+        ));
+        /// [high-level-req-6.2]
+        include (if (std::option::is_some(paired)) { no_alias } else { post_no_alias }) ==>
+            coin::PairedDepositBalance<CoinType> { owner: to, amount: coins.value };
     }
 
     /// The asset is deposited into the primary store of `to`, creating the account if needed.
@@ -200,8 +174,8 @@ spec aptos_framework::aptos_account {
         include CreateAccountTransferAbortsIf;
         aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
         ensures account::spec_exists_at(to);
-        ensures existing && fungible_asset::spec_store_no_deposit_hook(store_addr) ==>
-            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + fa.amount;
+        let no_alias = spec_no_apt_store_alias(to, fa.metadata.inner, store_addr);
+        include no_alias ==> primary_fungible_store::PrimaryDepositBalance { owner: to };
     }
 
     /// Mints `amount` into the APT primary store of `account`, ignoring its frozen flag.
@@ -211,8 +185,10 @@ spec aptos_framework::aptos_account {
         let store_addr = spec_apt_store_address(account);
         let existing = exists<fungible_asset::FungibleStore>(store_addr);
         aborts_if amount != 0 && existing && global<fungible_asset::FungibleStore>(store_addr).metadata != ref.metadata;
-        ensures existing ==>
-            fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) + amount;
+        // A nonzero mint creates a missing store.
+        ensures existing || amount != 0 ==> exists<fungible_asset::FungibleStore>(store_addr)
+            && fungible_asset::spec_balance(store_addr)
+                == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + amount;
         ensures amount != 0 ==> fungible_asset::spec_supply(ref.metadata.inner)
             == old(fungible_asset::spec_supply(ref.metadata.inner)) + amount;
     }
@@ -228,18 +204,23 @@ spec aptos_framework::aptos_account {
         // The withdrawn asset is deposited into the primary store of its own metadata.
         let both = exists<fungible_asset::FungibleStore>(from_store) && exists<fungible_asset::FungibleStore>(to_store)
             && global<fungible_asset::FungibleStore>(from_store).metadata == metadata;
-        let plain = both && primary_fungible_store::spec_is_plain_transfer(from_store, to_store);
+        let plain = exists<fungible_asset::FungibleStore>(from_store)
+            && global<fungible_asset::FungibleStore>(from_store).metadata == metadata
+            && primary_fungible_store::spec_is_plain_transfer_to(from_store, to_store, metadata.inner)
+            && spec_no_apt_store_alias(to, metadata.inner, to_store);
         aborts_if exists<fungible_asset::FungibleStore>(from_store)
             && global<fungible_asset::FungibleStore>(from_store).frozen;
         aborts_if both && fungible_asset::spec_store_no_withdraw_hook(from_store)
             && global<fungible_asset::FungibleStore>(to_store).frozen;
         aborts_if plain && fungible_asset::spec_balance(from_store) < amount;
         ensures account::spec_exists_at(to);
-        include primary_fungible_store::PlainTransferBalances { from: from_store, to: to_store, amount, plain };
+        include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain };
     }
 
     spec batch_transfer_fungible_assets(from: &signer, metadata: Object<Metadata>, recipients: vector<address>, amounts: vector<u64>) {
-        pragma verify = false;
+        // Partial: only the length check is specified; each transfer is specified by `transfer_fungible_assets`.
+        pragma aborts_if_is_partial;
+        aborts_if len(recipients) != len(amounts);
     }
 
     /// Moves `amount` between the paired primary stores of `from` and `to`, creating the account if needed.
@@ -252,18 +233,19 @@ spec aptos_framework::aptos_account {
         let from_store = coin::spec_paired_store_address(signer::address_of(from), paired);
         let to_store = coin::spec_paired_store_address(to, paired);
         let plain = coin::spec_has_paired_store(signer::address_of(from), paired)
-            && coin::spec_has_paired_store(to, paired)
-            && primary_fungible_store::spec_is_plain_transfer(from_store, to_store);
+            && primary_fungible_store::spec_is_plain_transfer_to(
+                from_store, to_store, std::option::borrow(paired).inner
+            ) && spec_no_apt_store_alias(to, std::option::borrow(paired).inner, to_store);
         aborts_if coin::spec_has_paired_store(signer::address_of(from), paired)
             && global<fungible_asset::FungibleStore>(from_store).frozen;
         aborts_if plain && fungible_asset::spec_balance(from_store) < amount;
         ensures account::spec_exists_at(to);
-        include primary_fungible_store::PlainTransferBalances { from: from_store, to: to_store, amount, plain };
+        include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain };
     }
 
     spec register_apt(account_signer: &signer) {
-        // TODO: temporary mockup.
-        pragma verify = false;
+        // Partial: the abort conditions of creating the store are not specified.
+        pragma aborts_if_is_partial;
     }
 
     spec fungible_transfer_only(source: &signer, to: address, amount: u64) {
@@ -303,71 +285,39 @@ spec aptos_framework::aptos_account {
     }
 
 
+    /// Creating `owner`'s account adds its APT store, which may share the derived address `store_addr` of the
+    /// primary store for asset `m` only if that store already exists or `m` is APT.
+    spec fun spec_no_apt_store_alias(owner: address, m: address, store_addr: address): bool {
+        account::spec_exists_at(owner) || exists<fungible_asset::FungibleStore>(store_addr)
+            || m == @aptos_fungible_asset || store_addr != spec_apt_store_address(owner)
+    }
+
     /// The APT primary store of `account`.
     spec fun spec_apt_store_address(account: address): address {
         object::spec_create_user_derived_object_address(account, @aptos_fungible_asset)
     }
 
-    /// Moves `amount` between the APT primary stores of `source` and `to`, ignoring frozen flags and hooks.
+    /// Moves `amount` between the APT primary stores of `source` and `to`, ignoring frozen flags and hooks; a missing
+    /// store at `to` is created.
     spec schema AptTransfer {
         source: &signer;
         to: address;
         amount: u64;
         let from_store = spec_apt_store_address(signer::address_of(source));
         let to_store = spec_apt_store_address(to);
-        let both = exists<fungible_asset::FungibleStore>(from_store) && exists<fungible_asset::FungibleStore>(to_store);
-        aborts_if exists<fungible_asset::FungibleStore>(from_store)
-            && fungible_asset::spec_balance(from_store) < amount;
+        let existing = exists<fungible_asset::FungibleStore>(from_store);
+        let both = existing && exists<fungible_asset::FungibleStore>(to_store);
+        aborts_if existing && fungible_asset::spec_balance(from_store) < amount;
         aborts_if both && global<fungible_asset::FungibleStore>(from_store).metadata
             != global<fungible_asset::FungibleStore>(to_store).metadata;
-        include primary_fungible_store::PlainTransferBalances { from: from_store, to: to_store, amount, plain: both };
+        include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain: existing };
+        /// [high-level-req-5.2]
+        ensures exists<fungible_asset::FungibleStore>(to_store);
     }
 
     spec schema CreateAccountTransferAbortsIf {
         to: address;
         aborts_if !account::spec_exists_at(to) && length_judgment(to);
         aborts_if !account::spec_exists_at(to) && (to == @vm_reserved || to == @aptos_framework || to == @aptos_token);
-    }
-
-    spec schema WithdrawAbortsIf<CoinType> {
-        from: &signer;
-        amount: u64;
-        let account_addr_source = signer::address_of(from);
-        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
-        let balance_source = coin_store_source.coin.value;
-        aborts_if !exists<coin::CoinStore<CoinType>>(account_addr_source);
-        aborts_if coin_store_source.frozen;
-        aborts_if balance_source < amount;
-    }
-
-    spec schema GuidAbortsIf<CoinType> {
-        to: address;
-        let acc = global<account::Account>(to);
-        aborts_if account::spec_exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if account::spec_exists_at(to) && !exists<coin::CoinStore<CoinType>>(to) && acc.guid_creation_num + 2 > MAX_U64;
-    }
-
-    spec schema RegistCoinAbortsIf<CoinType> {
-        use aptos_std::type_info;
-        to: address;
-        // TODO(fa_migration)
-        // aborts_if !coin::spec_is_account_registered<CoinType>(to) && !type_info::spec_is_struct<CoinType>();
-        aborts_if exists<aptos_framework::account::Account>(to);
-        aborts_if type_info::type_of<CoinType>() != type_info::type_of<AptosCoin>();
-    }
-
-    spec schema TransferEnsures<CoinType> {
-        to: address;
-        account_addr_source: address;
-        amount: u64;
-
-        let if_exist_account = exists<account::Account>(to);
-        let if_exist_coin = exists<coin::CoinStore<CoinType>>(to);
-        let coin_store_to = global<coin::CoinStore<CoinType>>(to);
-        let coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
-        let post p_coin_store_to = global<coin::CoinStore<CoinType>>(to);
-        let post p_coin_store_source = global<coin::CoinStore<CoinType>>(account_addr_source);
-        ensures coin_store_source.coin.value - amount == p_coin_store_source.coin.value;
-        ensures if_exist_account && if_exist_coin ==> coin_store_to.coin.value + amount == p_coin_store_to.coin.value;
     }
 }

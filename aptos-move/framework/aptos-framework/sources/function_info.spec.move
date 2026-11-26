@@ -38,7 +38,6 @@ spec aptos_framework::function_info {
 
     spec load_function_value<FuncType>(self: &FunctionInfo): FuncType {
         // Uninterpreted, like `reflect::resolve`.
-        pragma verify = false;
         pragma opaque;
     }
 

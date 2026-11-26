@@ -1,0 +1,44 @@
+=== stackless ===
+// module 0x42::signer_eq
+
+fun differ(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: signer
+    r1: signer
+    r2: bool
+  code:
+  L0:
+    0: r2 := neq r0, r1 @2
+    1: ret [r2] @3
+}
+
+fun same(r0, r1): bool {
+  slots: params(2), locals(0), temps(1)
+    r0: signer
+    r1: signer
+    r2: bool
+  code:
+  L0:
+    0: r2 := eq r0, r1 @2
+    1: ret [r2] @3
+}
+=== micro-ops ===
+// module 0x42::signer_eq
+
+fun differ() {
+  frame_data_size: 72
+  entry_gas: 17
+  code:
+    0: IntCmp [64] <- [0] != u256 [32] @2
+    1: Move(1) [0] <- [64] @3
+    2: Return @3
+}
+
+fun same() {
+  frame_data_size: 72
+  entry_gas: 17
+  code:
+    0: IntCmp [64] <- [0] == u256 [32] @2
+    1: Move(1) [0] <- [64] @3
+    2: Return @3
+}

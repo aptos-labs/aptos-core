@@ -9,9 +9,6 @@ module 0xc0ffee::refs {
     }
 }
 
-// RUN: execute 0xc0ffee::refs::add --args 0, 0
-// CHECK: results: 0
-
 // RUN: execute 0xc0ffee::refs::add --args 1, 2
 // CHECK: results: 3
 

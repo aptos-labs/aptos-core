@@ -43,6 +43,24 @@ fun mut_borrow_kills_reverse(y: u64): u64
     move_loc tmp
     ret
 
+fun local_across_blocks(flag: bool, value: u64): u64
+    local saved: u64
+    copy_loc value
+    st_loc saved
+    move_loc flag
+    br_true l1
+    ld_u64 0
+    ret
+l1: move_loc saved
+    ret
+
+fun pre_borrow_copy(value: u64): u64
+    copy_loc value
+    ld_u64 99
+    mut_borrow_loc value
+    write_ref
+    ret
+
 // RUN: execute 0x66::borrow_soundness::borrow_loc_no_source_subst --args 7
 // CHECK: results: 7
 
@@ -54,3 +72,20 @@ fun mut_borrow_kills_reverse(y: u64): u64
 
 // RUN: execute 0x66::borrow_soundness::mut_borrow_kills_reverse --args 7
 // CHECK: results: 7
+
+// RUN: execute 0x66::borrow_soundness::borrow_loc_no_source_subst --args 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::borrow_soundness::borrow_loc_no_source_subst --args 18446744073709551615
+// CHECK: results: 18446744073709551615
+
+// RUN: execute 0x66::borrow_soundness::local_across_blocks --args true, 7
+// CHECK: results: 7
+// RUN: execute 0x66::borrow_soundness::local_across_blocks --args false, 7
+// CHECK: results: 0
+
+// RUN: execute 0x66::borrow_soundness::pre_borrow_copy --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::borrow_soundness::pre_borrow_copy --args 12345
+// CHECK: results: 12345

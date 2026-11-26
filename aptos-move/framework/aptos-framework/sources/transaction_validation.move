@@ -386,30 +386,6 @@ module aptos_framework::transaction_validation {
 
         let i = 0;
         while ({
-            // spec {
-            //     invariant i <= num_secondary_signers;
-            //     invariant forall j in 0..i:
-            //         account::exists_at(secondary_signer_addresses[j]);
-            //     invariant forall j in 0..i:
-            //         secondary_signer_public_key_hashes[j] == account::get_authentication_key(secondary_signer_addresses[j]) ||
-            //             (features::spec_simulation_enhancement_enabled() && is_simulation && vector::is_empty(secondary_signer_public_key_hashes[j]));
-            //         account::account_resource_exists_at(secondary_signer_addresses[j])
-            //         && secondary_signer_public_key_hashes[j]
-            //             == account::get_authentication_key(secondary_signer_addresses[j])
-            //             || features::account_abstraction_enabled() && account_abstraction::using_native_authenticator(
-            //             secondary_signer_addresses[j]
-            //         ) && option::spec_some(secondary_signer_public_key_hashes[j]) == account_abstraction::native_authenticator(
-            //         account::exists_at(secondary_signer_addresses[j])
-            //         && secondary_signer_public_key_hashes[j]
-            //             == account::spec_get_authentication_key(secondary_signer_addresses[j])
-            //             || features::spec_account_abstraction_enabled() && account_abstraction::using_native_authenticator(
-            //             secondary_signer_addresses[j]
-            //         ) && option::spec_some(
-            //             secondary_signer_public_key_hashes[j]
-            //         ) == account_abstraction::spec_native_authenticator(
-            //             secondary_signer_addresses[j]
-            //         );
-            // };
             (i < num_secondary_signers)
         }) {
             let secondary_address = secondary_signer_addresses[i];
@@ -430,7 +406,12 @@ module aptos_framework::transaction_validation {
             };
 
             i += 1;
-        }
+        } spec {
+            invariant i <= num_secondary_signers;
+            invariant forall j in 0..i: spec_secondary_signer_valid(
+                secondary_signer_addresses[j], secondary_signer_public_key_hashes[j], is_simulation
+            );
+        };
     }
 
     fun fee_payer_script_prologue(

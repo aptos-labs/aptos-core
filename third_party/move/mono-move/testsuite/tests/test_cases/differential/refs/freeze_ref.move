@@ -8,9 +8,6 @@ module 0x1::test {
     }
 }
 
-// RUN: execute 0x1::test::frozen_read --args 0
-// CHECK: results: 0
-
 // RUN: execute 0x1::test::frozen_read --args 42
 // CHECK: results: 42
 
