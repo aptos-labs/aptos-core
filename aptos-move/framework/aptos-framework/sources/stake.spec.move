@@ -37,7 +37,8 @@ spec aptos_framework::stake {
     /// Implementation: The on_new_epoch function is triggered at each epoch boundary to perform distribution of the
     /// transaction fee, updates to active/inactive stakes, updates to pending active/inactive validators and adjusts
     /// voting power of the validators without aborting.
-    /// Enforcement: Formally verified via [high-level-req-4](on_new_epoch). This also requires a manual review to verify the state updates of the stake pool.
+    /// Enforcement: Specified in [high-level-req-4](on_new_epoch), whose specification is not verified. Audited,
+    /// including the state updates of the stake pool.
     /// </high-level-req>
     ///
     // -----------------
@@ -45,7 +46,6 @@ spec aptos_framework::stake {
     // -----------------
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_partial;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==>
             validator_set_is_valid();
@@ -148,7 +148,6 @@ spec aptos_framework::stake {
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>
     ) {
-        // Partial: the abort conditions of creating the event handles are not specified.
         let pubkey_from_pop = bls12381::spec_public_key_from_bytes_with_pop(
             consensus_pubkey,
             proof_of_possession_from_bytes(proof_of_possession)
@@ -181,28 +180,13 @@ spec aptos_framework::stake {
 
     spec join_validator_set(operator: &signer, pool_address: address) {
         pragma disable_invariants_in_body;
-        aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
-        aborts_if !exists<StakePool>(pool_address);
-        aborts_if !exists<ValidatorConfig>(pool_address);
         aborts_if !exists<StakingConfig>(@aptos_framework);
-        aborts_if !exists<ValidatorSet>(@aptos_framework);
-        aborts_if reconfiguration_state::spec_is_in_progress();
+        aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
+        include JoinValidatorSetAbortsIf;
 
         let stake_pool = global<StakePool>(pool_address);
         let validator_set = global<ValidatorSet>(@aptos_framework);
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
-        aborts_if signer::address_of(operator) != stake_pool.operator_address;
-        aborts_if option::is_some(
-            spec_find_validator(validator_set.active_validators, pool_address)
-        )
-            || option::is_some(
-                spec_find_validator(validator_set.pending_inactive, pool_address)
-            )
-            || option::is_some(
-                spec_find_validator(validator_set.pending_active, pool_address)
-            );
-
-        let config = staking_config::get();
         let merge_expired_pending_inactive = stake_pool.locked_until_secs > 0
             && timestamp::spec_now_seconds() >= stake_pool.locked_until_secs;
         let effective_pending_inactive = if (merge_expired_pending_inactive) {
@@ -213,30 +197,7 @@ spec aptos_framework::stake {
         let voting_power = stake_pool.active.value
             + stake_pool.pending_active.value
             + effective_pending_inactive;
-
-        let minimum_stake = config.minimum_stake;
-        let maximum_stake = config.maximum_stake;
-        aborts_if voting_power < minimum_stake;
-        aborts_if voting_power > maximum_stake;
-
         let validator_config = global<ValidatorConfig>(pool_address);
-        aborts_if vector::is_empty(validator_config.consensus_pubkey);
-
-        let validator_set_size = vector::length(validator_set.active_validators)
-            + vector::length(validator_set.pending_active) + 1;
-        aborts_if validator_set_size > MAX_VALIDATOR_SET_SIZE;
-
-        let voting_power_increase_limit = (
-            staking_config::get_voting_power_increase_limit(config) as u128
-        );
-
-        aborts_if (validator_set.total_joining_power + (voting_power as u128)) > MAX_U128;
-        aborts_if validator_set.total_voting_power * voting_power_increase_limit
-            > MAX_U128;
-        aborts_if validator_set.total_voting_power > 0
-            && (validator_set.total_joining_power + (voting_power as u128)) * 100
-                > validator_set.total_voting_power * voting_power_increase_limit;
-
         let post p_validator_info = ValidatorInfo {
             addr: pool_address,
             voting_power,
@@ -249,8 +210,6 @@ spec aptos_framework::stake {
     }
 
     spec join_validator_set_internal(operator: &signer, pool_address: address) {
-        pragma aborts_if_is_partial = false;
-        let config = global<StakingConfig>(@aptos_framework);
         let stake_pool = global<StakePool>(pool_address);
         let validator_set = global<ValidatorSet>(@aptos_framework);
         let validator_config = global<ValidatorConfig>(pool_address);
@@ -261,30 +220,9 @@ spec aptos_framework::stake {
             && timestamp::spec_now_seconds() >= stake_pool.locked_until_secs;
         let voting_power = stake_pool.active.value + stake_pool.pending_active.value
             + if (settle) { 0 } else { stake_pool.pending_inactive.value };
-        let limit = config.voting_power_increase_limit;
-        let total_voting_power = validator_set.total_voting_power;
         let total_joining_power = validator_set.total_joining_power + voting_power;
 
-        aborts_if reconfiguration_state::spec_is_in_progress();
-        aborts_if !exists<StakePool>(pool_address);
-        aborts_if signer::address_of(operator) != stake_pool.operator_address;
-        aborts_if !exists<ValidatorSet>(@aptos_framework);
-        aborts_if spec_contains(validator_set.pending_active, pool_address)
-            || spec_contains(validator_set.active_validators, pool_address)
-            || spec_contains(validator_set.pending_inactive, pool_address);
-        aborts_if !exists<StakingConfig>(@aptos_framework);
-        aborts_if stake_pool.locked_until_secs > 0
-            && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
-        aborts_if settle && stake_pool.inactive.value + stake_pool.pending_inactive.value > MAX_U64;
-        aborts_if voting_power < config.minimum_stake;
-        aborts_if voting_power > config.maximum_stake;
-        aborts_if total_joining_power > MAX_U128;
-        aborts_if total_voting_power > 0 && total_voting_power * limit > MAX_U128;
-        aborts_if total_voting_power > 0 && total_joining_power > total_voting_power * limit / 100;
-        aborts_if !exists<ValidatorConfig>(pool_address);
-        aborts_if vector::is_empty(validator_config.consensus_pubkey);
-        aborts_if len(validator_set.active_validators) + len(validator_set.pending_active) + 1
-            > MAX_VALIDATOR_SET_SIZE;
+        include JoinValidatorSetAbortsIf;
 
         modifies global<StakePool>(pool_address);
         modifies global<ValidatorSet>(@aptos_framework);
@@ -303,8 +241,52 @@ spec aptos_framework::stake {
                 vec(ValidatorInfo { addr: pool_address, voting_power, config: validator_config })));
     }
 
+    /// The operator of an existing stake pool with enough stake queues it to join the validator set.
+    spec schema JoinValidatorSetAbortsIf {
+        operator: signer;
+        pool_address: address;
+        include JoinValidatorSetStakeAbortsIf { operator_address: signer::address_of(operator) };
+        aborts_if !exists<ValidatorConfig>(pool_address);
+        aborts_if vector::is_empty(global<ValidatorConfig>(pool_address).consensus_pubkey);
+    }
+
+    /// The aborts of joining the validator set other than those of the validator config.
+    spec schema JoinValidatorSetStakeAbortsIf {
+        operator_address: address;
+        pool_address: address;
+        let config = global<StakingConfig>(@aptos_framework);
+        let stake_pool = global<StakePool>(pool_address);
+        let validator_set = global<ValidatorSet>(@aptos_framework);
+        let settle = stake_pool.locked_until_secs > 0
+            && timestamp::spec_now_seconds() >= stake_pool.locked_until_secs;
+        let voting_power = stake_pool.active.value + stake_pool.pending_active.value
+            + if (settle) { 0 } else { stake_pool.pending_inactive.value };
+        let limit = config.voting_power_increase_limit;
+        let total_voting_power = validator_set.total_voting_power;
+        let total_joining_power = validator_set.total_joining_power + voting_power;
+        aborts_if reconfiguration_state::spec_is_in_progress();
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if operator_address != stake_pool.operator_address;
+        aborts_if !exists<ValidatorSet>(@aptos_framework);
+        aborts_if spec_contains(validator_set.pending_active, pool_address)
+            || spec_contains(validator_set.active_validators, pool_address)
+            || spec_contains(validator_set.pending_inactive, pool_address);
+        aborts_if !exists<StakingConfig>(@aptos_framework);
+        aborts_if stake_pool.locked_until_secs > 0
+            && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if settle && stake_pool.inactive.value + stake_pool.pending_inactive.value > MAX_U64;
+        aborts_if voting_power < config.minimum_stake;
+        aborts_if voting_power > config.maximum_stake;
+        aborts_if total_joining_power > MAX_U128;
+        aborts_if total_voting_power > 0 && total_voting_power * limit > MAX_U128;
+        aborts_if total_voting_power > 0 && total_joining_power > total_voting_power * limit / 100;
+        aborts_if len(validator_set.active_validators) + len(validator_set.pending_active) + 1
+            > MAX_VALIDATOR_SET_SIZE;
+    }
+
     spec withdraw(owner: &signer, withdraw_amount: u64) {
         use aptos_framework::fungible_asset;
+        pragma aborts_if_is_partial;
         // Partial: the abort conditions of `coin::deposit` beyond its summary are not specified.
         let owner_address = signer::address_of(owner);
         let owner_cap = global<OwnerCapability>(owner_address);
@@ -325,7 +307,6 @@ spec aptos_framework::stake {
     }
 
     spec withdraw_with_cap(owner_cap: &OwnerCapability, withdraw_amount: u64): Coin<AptosCoin> {
-        pragma aborts_if_is_partial = false;
         include WithdrawWithCapAbortsIfAndEnsures;
         let pool_address = owner_cap.pool_address;
         let stake_pool = global<StakePool>(pool_address);
@@ -337,7 +318,6 @@ spec aptos_framework::stake {
 
     spec leave_validator_set(operator: &signer, pool_address: address) {
         pragma disable_invariants_in_body;
-        requires chain_status::is_operating();
         aborts_if reconfiguration_state::spec_is_in_progress();
         let config = staking_config::get();
         aborts_if !staking_config::get_allow_validator_set_change(config);
@@ -384,13 +364,11 @@ spec aptos_framework::stake {
     }
 
     spec initialize_owner(owner: &signer) {
-        // Partial: the abort conditions of creating the event handles are not specified.
         include InitializeOwnerAbortsIfAndEnsures;
     }
 
     spec extract_owner_cap(owner: &signer): OwnerCapability {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let owner_address = signer::address_of(owner);
         aborts_if !exists<OwnerCapability>(owner_address);
         modifies global<OwnerCapability>(owner_address);
@@ -400,7 +378,6 @@ spec aptos_framework::stake {
 
     spec deposit_owner_cap(owner: &signer, owner_cap: OwnerCapability) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let owner_address = signer::address_of(owner);
         aborts_if exists<OwnerCapability>(owner_address);
         modifies global<OwnerCapability>(owner_address);
@@ -410,7 +387,6 @@ spec aptos_framework::stake {
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
@@ -435,7 +411,6 @@ spec aptos_framework::stake {
     // Only active validator can update locked_until_secs.
     spec increase_lockup_with_cap(owner_cap: &OwnerCapability) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
@@ -485,7 +460,6 @@ spec aptos_framework::stake {
 
     spec set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let pool_address = owner_cap.pool_address;
         let post post_stake_pool = global<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
@@ -499,7 +473,6 @@ spec aptos_framework::stake {
 
     spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let pool_address = owner_cap.pool_address;
         include StakedValueNochange;
 
@@ -549,7 +522,6 @@ spec aptos_framework::stake {
 
     spec set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         let pool_address = owner_cap.pool_address;
         let post post_stake_pool = global<StakePool>(pool_address);
         include StakedValueNochange;
@@ -561,6 +533,14 @@ spec aptos_framework::stake {
             old(global<StakePool>(pool_address)), delegated_voter, new_voter);
     }
 
+    spec store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+        let addr = signer::address_of(aptos_framework);
+        aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if exists<AptosCoinCapabilities>(addr);
+        modifies global<AptosCoinCapabilities>(addr);
+        ensures global<AptosCoinCapabilities>(addr) == AptosCoinCapabilities { mint_cap };
+    }
+
     spec initialize_pending_transaction_fee {
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(framework));
         modifies global<PendingTransactionFee>(@aptos_framework);
@@ -568,7 +548,6 @@ spec aptos_framework::stake {
     }
 
     spec set_transaction_fee_config(framework: &signer, config: TransactionFeeConfig) {
-        pragma aborts_if_is_partial = false;
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(framework));
         ensures global<TransactionFeeConfig>(@aptos_framework) == config;
     }
@@ -578,6 +557,7 @@ spec aptos_framework::stake {
         fee_distribution_validator_indices: vector<u64>,
         fee_amounts_octa: vector<u64>
     ) {
+        pragma aborts_if_is_partial;
         // Partial: the abort conditions of updating the per-validator fees are not specified.
         aborts_if !system_addresses::is_vm(vm);
         aborts_if len(fee_distribution_validator_indices) != len(fee_amounts_octa);
@@ -586,6 +566,7 @@ spec aptos_framework::stake {
     }
 
     spec on_new_epoch {
+        pragma aborts_if_is_partial;
         pragma verify = false; // TODO: set because of timeout (property proved).
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
@@ -606,6 +587,7 @@ spec aptos_framework::stake {
     }
 
     spec update_performance_statistics {
+        pragma aborts_if_is_partial;
         // This function is expected to be used after genesis.
         requires chain_status::is_operating();
         // This function should never abort.
@@ -634,6 +616,7 @@ spec aptos_framework::stake {
         validator_index: u64,
         include_rewards: bool
     ): (u64, ValidatorInfo) {
+        pragma aborts_if_is_partial;
         include GetReconfigStartTimeRequirement;
         requires rewards_rate <= staking_config::MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
@@ -648,6 +631,7 @@ spec aptos_framework::stake {
     }
 
     spec next_validator_consensus_infos_v2 {
+        pragma aborts_if_is_partial;
         // Summarized for callers; the body simulates the whole next epoch.
         pragma opaque;
         aborts_if false;
@@ -679,6 +663,7 @@ spec aptos_framework::stake {
     }
 
     spec update_stake_pool {
+        pragma aborts_if_is_partial;
         modifies global<StakePool>(pool_address);
         modifies global<PendingTransactionFee>(@aptos_framework);
         modifies global<coin::CoinInfo<AptosCoin>>(
@@ -758,6 +743,7 @@ spec aptos_framework::stake {
     }
 
     spec distribute_rewards {
+        pragma aborts_if_is_partial;
         pragma opaque;
         include ResourceRequirement;
         requires rewards_rate <= MAX_REWARDS_RATE;
@@ -821,7 +807,6 @@ spec aptos_framework::stake {
 
     spec get_reconfig_start_time_secs(): u64 {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         include GetReconfigStartTimeRequirement;
         aborts_if false;
         ensures result == spec_get_reconfig_start_time_secs();
@@ -846,6 +831,7 @@ spec aptos_framework::stake {
     }
 
     spec calculate_rewards_amount {
+        pragma aborts_if_is_partial;
         pragma opaque;
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 300;
@@ -878,8 +864,6 @@ spec aptos_framework::stake {
 
     spec find_validator {
         pragma opaque;
-        // Override module-level `aborts_if_is_partial` so the declared `aborts_if false` is honored.
-        pragma aborts_if_is_partial = false;
         aborts_if false;
         ensures option::is_none(result) ==>
             (forall i in 0..len(v): v[i].addr != addr);
@@ -892,6 +876,7 @@ spec aptos_framework::stake {
     }
 
     spec append {
+        pragma aborts_if_is_partial;
         pragma opaque, verify = false;
         aborts_if false;
         ensures len(v1) == old(len(v1) + len(v2));
@@ -906,6 +891,7 @@ spec aptos_framework::stake {
     }
 
     spec remove_validators {
+        pragma aborts_if_is_partial;
         requires chain_status::is_operating();
         let validator_set = global<ValidatorSet>(@aptos_framework);
         let post post_validator_set = global<ValidatorSet>(@aptos_framework);
@@ -921,7 +907,6 @@ spec aptos_framework::stake {
 
     spec is_current_epoch_validator {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         aborts_if !spec_has_stake_pool(pool_address);
         aborts_if !exists<ValidatorSet>(@aptos_framework);
         ensures result == spec_is_current_epoch_validator(pool_address);
@@ -929,7 +914,6 @@ spec aptos_framework::stake {
 
     spec get_validator_state {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         aborts_if !exists<ValidatorSet>(@aptos_framework);
         let validator_set = global<ValidatorSet>(@aptos_framework);
         ensures result == if (spec_contains(validator_set.pending_active, pool_address)) {
@@ -991,6 +975,7 @@ spec aptos_framework::stake {
         owner: &signer, initial_stake_amount: u64, operator: address, voter: address
     ) {
         use aptos_framework::fungible_asset;
+        pragma aborts_if_is_partial;
         // Partial: the abort conditions of creating the event handles and of `coin::withdraw` beyond its summary
         // are not specified.
         let addr = signer::address_of(owner);
@@ -1029,7 +1014,6 @@ spec aptos_framework::stake {
 
     spec update_voting_power_increase(increase_amount: u64) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         requires !reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<ValidatorSet>(@aptos_framework);
         aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
@@ -1065,7 +1049,6 @@ spec aptos_framework::stake {
 
     spec assert_stake_pool_exists(pool_address: address) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         aborts_if !stake_pool_exists(pool_address);
     }
 
@@ -1079,12 +1062,12 @@ spec aptos_framework::stake {
 
     spec assert_owner_cap_exists(owner: address) {
         pragma opaque;
-        pragma aborts_if_is_partial = false;
         aborts_if !exists<OwnerCapability>(owner);
     }
 
     spec validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<
         ValidatorConsensusInfo> {
+        pragma aborts_if_is_partial;
         aborts_if false;
         invariant spec_validator_indices_are_valid_config(
             validator_set.active_validators,
@@ -1197,6 +1180,10 @@ spec aptos_framework::stake {
         aborts_if !spec_is_allowed(addr);
         aborts_if exists<StakePool>(addr);
         aborts_if exists<OwnerCapability>(addr);
+        // The stake pool holds twelve event handles of the owner account.
+        include account::NewEventHandleAbortsIf { account: owner };
+        aborts_if exists<account::Account>(addr)
+            && global<account::Account>(addr).guid_creation_num + 12 >= account::MAX_GUID_CREATION_NUM;
     }
 
     /// An allowed account without a stake pool gets an empty stake pool that it owns, operates and votes for.
@@ -1363,6 +1350,7 @@ spec aptos_framework::stake {
     }
 
     spec get_pending_transaction_fee {
+        pragma aborts_if_is_partial;
         // Partial: the fees are read in a loop over the fee table.
         aborts_if !exists<PendingTransactionFee>(@aptos_framework);
     }

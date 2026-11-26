@@ -36,13 +36,16 @@ spec aptos_framework::aptos_coin {
     }
 
     spec initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
-
+        pragma aborts_if_is_partial = false;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if !string::spec_internal_check_utf8(b"Aptos Coin");
         aborts_if !string::spec_internal_check_utf8(b"APT");
         aborts_if exists<MintCapStore>(addr);
         aborts_if exists<coin::CoinInfo<AptosCoin>>(addr);
+        modifies global<coin::CoinInfo<AptosCoin>>(addr);
+        modifies global<MintCapStore>(addr);
+        modifies global<aptos_framework::aggregator_factory::AggregatorFactory>(@aptos_framework);
         /// [high-level-req-1]
         ensures exists<MintCapStore>(addr);
         // property 3: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
@@ -54,6 +57,7 @@ spec aptos_framework::aptos_coin {
     }
 
     spec destroy_mint_cap {
+        pragma aborts_if_is_partial = false;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if !exists<MintCapStore>(@aptos_framework);
@@ -105,6 +109,7 @@ spec aptos_framework::aptos_coin {
 
     /// Consumes the delegation to the signer and grants it a copy of the mint capability.
     spec claim_mint_capability(account: &signer) {
+        pragma aborts_if_is_partial = false;
         let addr = signer::address_of(account);
         let inner = global<Delegations>(@core_resources).inner;
         let post post_inner = global<Delegations>(@core_resources).inner;
@@ -121,10 +126,12 @@ spec aptos_framework::aptos_coin {
 
     /// Returns the index of a delegation to `addr`, if any.
     spec find_delegation(addr: address): Option<u64> {
+        pragma aborts_if_is_partial = false;
         let inner = global<Delegations>(@core_resources).inner;
         aborts_if !exists<Delegations>(@core_resources);
         ensures option::is_some(result) ==> option::borrow(result) < len(inner)
             && inner[option::borrow(result)].to == addr;
+        ensures option::is_none(result) ==> (forall i in 0..len(inner): inner[i].to != addr);
     }
 
     spec schema ExistsAptosCoin {

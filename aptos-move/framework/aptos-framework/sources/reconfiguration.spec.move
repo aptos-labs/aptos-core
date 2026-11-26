@@ -31,14 +31,16 @@ spec aptos_framework::reconfiguration {
     /// Implementation: The reconfigure() function may only execute to perform successful reconfiguration when genesis
     /// has started and when reconfiguration is enabled. Without satisfying both conditions, the function returns early
     /// without executing any further actions.
-    /// Enforcement: Formally verified via [high-level-req-4](reconfigure).
+    /// Enforcement: Specified in [high-level-req-4](reconfigure), whose specification is not verified at the default
+    /// timeout. Audited.
     ///
     /// No.: 5
     /// Requirement: Consecutive reconfigurations without the passage of time are not permitted.
     /// Criticality: High
     /// Implementation: The reconfigure() function enforces the restriction that reconfiguration may only be performed
     /// when the current time is not equal to the last_reconfiguration_time.
-    /// Enforcement: Formally verified via [high-level-req-5](reconfigure).
+    /// Enforcement: Specified in [high-level-req-5](reconfigure), whose specification is not verified at the default
+    /// timeout. Audited.
     /// </high-level-req>
     ///
 

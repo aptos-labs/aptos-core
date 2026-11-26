@@ -339,6 +339,10 @@ spec aptos_framework::primary_fungible_store {
         project_uri: String,
     ) {
         let addr = constructor_ref.self;
+        modifies global<Metadata>(addr);
+        modifies global<fungible_asset::Supply>(addr);
+        modifies global<fungible_asset::ConcurrentSupply>(addr);
+        modifies global<DeriveRefPod>(addr);
         include fungible_asset::AddFungibilityAbortsIf;
         aborts_if exists<DeriveRefPod>(addr);
         /// [high-level-req-1.1]

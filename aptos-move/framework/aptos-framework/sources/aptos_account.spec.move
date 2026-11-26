@@ -14,7 +14,8 @@ spec aptos_framework::aptos_account {
     /// Criticality: Critical
     /// Implementation: The create_account function creates a new account for the particular address and registers
     /// AptosCoin.
-    /// Enforcement: Audited that create_account creates the APT primary fungible store of the new account.
+    /// Enforcement: Formally verified via [high-level-req-2](create_account) that create_account creates the APT
+    /// primary fungible store of the new account.
     ///
     /// No.: 3
     /// Requirement: An account may receive a direct transfer of coins they have not registered for if and only if the
@@ -68,15 +69,18 @@ spec aptos_framework::aptos_account {
     /// The Account does not exist under the auth_key before creating the account.
     /// Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_toke.
     spec create_account(auth_key: address) {
-        pragma aborts_if_is_partial;
         /// [high-level-req-1]
         include CreateAccountAbortsIf;
-        // ensures exists<account::Account>(auth_key);
+        include RegisterAptAbortsIf { owner: auth_key };
+        ensures account::spec_exists_at(auth_key);
+        /// [high-level-req-2]
+        ensures exists<fungible_asset::FungibleStore>(spec_apt_store_address(auth_key));
     }
     spec schema CreateAccountAbortsIf {
+        use std::features;
         auth_key: address;
         aborts_if exists<account::Account>(auth_key);
-        // aborts_if length_judgment(auth_key);
+        aborts_if !features::spec_is_enabled(features::DEFAULT_ACCOUNT_RESOURCE) && length_judgment(auth_key);
         aborts_if auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
     }
 
@@ -88,8 +92,6 @@ spec aptos_framework::aptos_account {
     }
 
     spec transfer(source: &signer, to: address, amount: u64) {
-        // Partial: the abort conditions of creating the primary stores are not specified.
-        pragma aborts_if_is_partial;
         include CreateAccountTransferAbortsIf;
         include AptTransfer;
         /// [high-level-req-5.1]
@@ -180,11 +182,16 @@ spec aptos_framework::aptos_account {
 
     /// Mints `amount` into the APT primary store of `account`, ignoring its frozen flag.
     spec mint_to_fungible_store_for_gas(ref: &MintRef, account: address, amount: u64) {
-        // Partial: the abort conditions of creating the store and of the supply update are not specified.
-        pragma aborts_if_is_partial;
         let store_addr = spec_apt_store_address(account);
         let existing = exists<fungible_asset::FungibleStore>(store_addr);
+        include amount != 0 ==> RegisterAptAbortsIf { owner: account };
+        include fungible_asset::IncreaseSupplyAbortsIf { metadata_addr: ref.metadata.inner };
         aborts_if amount != 0 && existing && global<fungible_asset::FungibleStore>(store_addr).metadata != ref.metadata;
+        // A missing store is created with the APT metadata.
+        aborts_if amount != 0 && !existing && ref.metadata.inner != @aptos_fungible_asset;
+        include amount != 0 && existing ==> fungible_asset::UncheckedDepositAbortsIf {
+            store_addr, fa: FungibleAsset { metadata: ref.metadata, amount }
+        };
         // A nonzero mint creates a missing store.
         ensures existing || amount != 0 ==> exists<fungible_asset::FungibleStore>(store_addr)
             && fungible_asset::spec_balance(store_addr)
@@ -243,14 +250,28 @@ spec aptos_framework::aptos_account {
         include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain };
     }
 
+    /// Creates the APT primary store of the signer if missing.
     spec register_apt(account_signer: &signer) {
-        // Partial: the abort conditions of creating the store are not specified.
-        pragma aborts_if_is_partial;
+        let store_addr = spec_apt_store_address(signer::address_of(account_signer));
+        include RegisterAptAbortsIf { owner: signer::address_of(account_signer) };
+        ensures exists<fungible_asset::FungibleStore>(store_addr);
+    }
+
+    /// Creating the APT primary store of `owner` when it is missing.
+    spec schema RegisterAptAbortsIf {
+        owner: address;
+        let store_addr = spec_apt_store_address(owner);
+        let m = @aptos_fungible_asset;
+        let missing = !exists<fungible_asset::FungibleStore>(store_addr);
+        aborts_if missing && (!exists<object::ObjectCore>(m) || !exists<fungible_asset::Metadata>(m));
+        aborts_if missing && !exists<primary_fungible_store::DeriveRefPod>(m);
+        aborts_if missing && exists<object::ObjectCore>(store_addr);
+        aborts_if missing && exists<object::Untransferable>(store_addr);
+        aborts_if missing && std::features::spec_is_enabled(std::features::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
+            && exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
     }
 
     spec fungible_transfer_only(source: &signer, to: address, amount: u64) {
-        // Partial: the abort conditions of creating the primary stores are not specified.
-        pragma aborts_if_is_partial;
         include AptTransfer;
     }
 
@@ -306,10 +327,31 @@ spec aptos_framework::aptos_account {
         let from_store = spec_apt_store_address(signer::address_of(source));
         let to_store = spec_apt_store_address(to);
         let existing = exists<fungible_asset::FungibleStore>(from_store);
-        let both = existing && exists<fungible_asset::FungibleStore>(to_store);
+        let to_existing = exists<fungible_asset::FungibleStore>(to_store);
+        let both = existing && to_existing;
+        let apt = @aptos_fungible_asset;
+        let to_store_rec = global<fungible_asset::FungibleStore>(to_store);
+        let to_concurrent = global<fungible_asset::ConcurrentFungibleBalance>(to_store).balance;
+        include RegisterAptAbortsIf { owner: signer::address_of(source) };
+        include to_store != from_store ==> RegisterAptAbortsIf { owner: to };
         aborts_if existing && fungible_asset::spec_balance(from_store) < amount;
+        aborts_if !existing && amount != 0;
         aborts_if both && global<fungible_asset::FungibleStore>(from_store).metadata
             != global<fungible_asset::FungibleStore>(to_store).metadata;
+        // A missing store is created with the APT metadata.
+        aborts_if existing && !to_existing && global<fungible_asset::FungibleStore>(from_store).metadata.inner != apt;
+        aborts_if !existing && to_existing && to_store_rec.metadata.inner != apt;
+        aborts_if amount != 0 && to_existing && from_store != to_store
+            && fungible_asset::spec_is_concurrent_balance(to_store)
+            && aptos_framework::aggregator_v2::spec_get_value(to_concurrent) + amount
+                > aptos_framework::aggregator_v2::spec_get_max_value(to_concurrent);
+        aborts_if amount != 0 && to_existing && from_store != to_store
+            && !fungible_asset::spec_is_concurrent_balance(to_store) && to_store_rec.balance + amount > MAX_U64;
+        // For a self-transfer the deposit runs on the reduced balance.
+        aborts_if amount != 0 && existing && from_store == to_store
+            && fungible_asset::spec_is_concurrent_balance(to_store)
+            && aptos_framework::aggregator_v2::spec_get_value(to_concurrent)
+                > aptos_framework::aggregator_v2::spec_get_max_value(to_concurrent);
         include primary_fungible_store::PlainTransferBalancesToNew { from: from_store, to: to_store, amount, plain: existing };
         /// [high-level-req-5.2]
         ensures exists<fungible_asset::FungibleStore>(to_store);

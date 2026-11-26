@@ -28,10 +28,6 @@ spec aptos_framework::aptos_governance {
     /// Enforcement: Formally verified in [high-level-req-4](AddApprovedScriptHash).
     /// </high-level-req>
     ///
-    spec module {
-        pragma aborts_if_is_partial;
-    }
-
     spec store_signer_cap(
         aptos_framework: &signer,
         signer_address: address,
@@ -64,9 +60,10 @@ spec aptos_framework::aptos_governance {
         let register_account = global<account::Account>(addr);
 
         aborts_if exists<voting::VotingForum<GovernanceProposal>>(addr);
-        // aborts_if !exists<account::Account>(addr);
-        // aborts_if register_account.guid_creation_num + 7 > MAX_U64;
-        // aborts_if register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
+        // The forum and the governance events hold seven event handles of the account.
+        include account::NewEventHandleAbortsIf { account: aptos_framework };
+        aborts_if exists<account::Account>(addr)
+            && register_account.guid_creation_num + 7 >= account::MAX_GUID_CREATION_NUM;
         aborts_if !type_info::spec_is_struct<GovernanceProposal>();
 
         include InitializeAbortIf;
@@ -138,6 +135,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
+        pragma aborts_if_is_partial;
         pragma verify = false; // TODO: set because of timeout (property proved).
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
@@ -253,6 +251,14 @@ spec aptos_framework::aptos_governance {
         let total_supply = aptos_framework::optional_aggregator::optional_aggregator_value(supply)
             + if (option::is_some(paired)) { aptos_framework::fungible_asset::spec_supply(option::borrow(paired).inner) } else { 0 };
         let early_resolution_vote_threshold_value = total_supply / 2 + 1;
+        // verify coin::supply
+        let fa_addr = option::borrow(paired).inner;
+        aborts_if option::is_some(paired) && fa_addr != @aptos_fungible_asset
+            && exists<aptos_framework::fungible_asset::DeriveSupply>(fa_addr);
+        aborts_if option::is_some(paired) && option::is_some(maybe_supply)
+            && !exists<aptos_framework::fungible_asset::ConcurrentSupply>(fa_addr)
+            && !exists<aptos_framework::fungible_asset::Supply>(fa_addr);
+        aborts_if option::is_some(paired) && option::is_some(maybe_supply) && total_supply > MAX_U128;
 
         // verify voting::create_proposal_v2
         aborts_if option::is_some(maybe_supply) && governance_config.min_voting_threshold > early_resolution_vote_threshold_value;
@@ -541,6 +547,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
+        pragma aborts_if_is_partial;
         pragma verify = false; // TODO: set because of timeout (property proved).
         aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
         include reconfiguration_with_dkg::FinishRequirement {
@@ -791,6 +798,7 @@ spec aptos_framework::aptos_governance {
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
         use std::signer;
+        pragma aborts_if_is_partial;
         pragma verify = false; // TODO: set because of timeout (property proved).
         let address = signer::address_of(aptos_framework);
         include reconfiguration_with_dkg::FinishRequirement {
@@ -803,6 +811,7 @@ spec aptos_framework::aptos_governance {
     }
 
     spec force_end_epoch_test_only {
+        pragma aborts_if_is_partial;
         pragma verify = false;
     }
 
@@ -812,6 +821,7 @@ spec aptos_framework::aptos_governance {
         proposal_id: u64,
         should_pass: bool,
     ) {
+        pragma aborts_if_is_partial;
         // Partial: each pool is voted by `vote_internal` inside a loop.
     }
 
@@ -822,6 +832,7 @@ spec aptos_framework::aptos_governance {
         voting_power: u64,
         should_pass: bool,
     ) {
+        pragma aborts_if_is_partial;
         // Partial: each pool is voted by `vote_internal` inside a loop.
     }
 }
