@@ -70,6 +70,25 @@ module 0x99::chained_variant_field_fusion {
         let f = if (sel == 0) { F::Fa { x: 1 } } else { F::Fb { x: 1, y: Inner { a: 7, b: 9 } } };
         read_f(&f)
     }
+    fun imm_ref(holder: &E): &u8 {
+        &holder.p.b
+    }
+
+    fun mut_ref(holder: &mut E): &mut u8 {
+        &mut holder.p.b
+    }
+
+    fun read_via_imm_ref(sel: u64, value: u8): u8 {
+        let holder = mk_e(sel, value);
+        *imm_ref(&holder)
+    }
+
+    fun bump_via_mut_ref(sel: u64, value: u8): u8 {
+        let holder = mk_e(sel, value);
+        let field_ref = mut_ref(&mut holder);
+        *field_ref = *field_ref + 1;
+        *field_ref
+    }
 }
 
 // Uniform chain: same result on either variant.
@@ -97,3 +116,15 @@ module 0x99::chained_variant_field_fusion {
 // RUN: execute 0x99::chained_variant_field_fusion::run_read_f --args 0
 // CHECK-V1-SUBSTR: STRUCT_VARIANT_MISMATCH
 // CHECK-V2-SUBSTR: enum variant mismatch
+
+// RUN: execute 0x99::chained_variant_field_fusion::read_via_imm_ref --args 0, 33
+// CHECK: results: 33
+
+// RUN: execute 0x99::chained_variant_field_fusion::read_via_imm_ref --args 1, 33
+// CHECK: results: 33
+
+// RUN: execute 0x99::chained_variant_field_fusion::bump_via_mut_ref --args 0, 40
+// CHECK: results: 41
+
+// RUN: execute 0x99::chained_variant_field_fusion::bump_via_mut_ref --args 1, 40
+// CHECK: results: 41

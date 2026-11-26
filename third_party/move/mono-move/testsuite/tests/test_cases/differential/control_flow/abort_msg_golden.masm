@@ -1,0 +1,16 @@
+// `abort_msg` with the abort code taken from a parameter and a constant message. The golden
+// pins how the abort lowers.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x1::abort_msg_golden
+
+fun abort_with(code: u64)
+    move_loc code
+    ld_const<vector<u8>> [104, 105]
+    abort_msg
+
+// RUN: execute 0x1::abort_msg_golden::abort_with --args 42
+// CHECK: aborted: code 42 (hi) in 0x1::abort_msg_golden
+
+// RUN: execute 0x1::abort_msg_golden::abort_with --args 0
+// CHECK: aborted: code 0 (hi) in 0x1::abort_msg_golden

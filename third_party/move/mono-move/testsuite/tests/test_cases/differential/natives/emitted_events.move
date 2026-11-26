@@ -221,6 +221,16 @@ module 0x1::event {
         let evs = emitted_events<MyEvent>();
         summarize(&evs)
     }
+    struct Tagged<phantom T> has drop, store {
+        a: u64,
+    }
+    fun do_emit_function_type_arg() {
+        write_module_event_to_store(Tagged<|u8|(u8, u16) has copy + drop> { a: 11 });
+    }
+
+    public fun emit_module_function_type_arg() {
+        do_emit_function_type_arg();
+    }
 }
 
 // RUN: execute 0x1::event::module_events
@@ -252,3 +262,6 @@ module 0x1::event {
 // RUN: execute 0x1::event::many_events --heap-size 704
 // CHECK: results: 0x0800040001020301040102030402040203040503040304050604040405060705040506070806040607080907040708090a | events: module 0x1::event::MyEvent 0x00000000000000000400010203; module 0x1::event::MyEvent 0x01000000000000000401020304; module 0x1::event::MyEvent 0x02000000000000000402030405; module 0x1::event::MyEvent 0x03000000000000000403040506; module 0x1::event::MyEvent 0x04000000000000000404050607; module 0x1::event::MyEvent 0x05000000000000000405060708; module 0x1::event::MyEvent 0x06000000000000000406070809; module 0x1::event::MyEvent 0x0700000000000000040708090a
 // CHECK-GC-COUNT: 1
+
+// RUN: execute 0x1::event::emit_module_function_type_arg
+// CHECK: events: module 0x1::event::Tagged<|u8|(u8, u16) has copy + drop> 0x0b00000000000000

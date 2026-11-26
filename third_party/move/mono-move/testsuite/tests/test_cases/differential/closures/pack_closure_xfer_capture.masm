@@ -1,0 +1,43 @@
+// A closure that captures a call's result and is passed straight on to the next call. The
+// golden pins how the capture and the call lower. The last two steps put `combine`'s result
+// just below and just past the u64 maximum.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::pack_closure_xfer_capture
+
+fun id(value: u64): u64
+    move_loc value
+    ret
+
+// Position-sensitive: first is the captured value, second the supplied one.
+fun combine(first: u64, second: u64): u64
+    move_loc first
+    ld_u64 100
+    mul
+    move_loc second
+    add
+    ret
+
+fun apply(func: |u64|u64 has drop, arg: u64): u64
+    move_loc arg
+    move_loc func
+    call_closure <|u64|u64 has drop>
+    ret
+
+public fun run(value: u64): u64
+    move_loc value
+    call id
+    pack_closure combine, 1
+    ld_u64 3
+    call apply
+    ret
+
+// RUN: execute 0x66::pack_closure_xfer_capture::run --args 39
+// CHECK: results: 3903
+
+// RUN: execute 0x66::pack_closure_xfer_capture::run --args 184467440737095516
+// CHECK: results: 18446744073709551603
+
+// RUN: execute 0x66::pack_closure_xfer_capture::run --args 184467440737095517
+// CHECK-V1-SUBSTR: ARITHMETIC_ERROR
+// CHECK-ERROR-PARITY

@@ -1,0 +1,55 @@
+=== stackless ===
+// module 0x1::test
+
+fun max_val(): i64 {
+  slots: params(0), locals(0), temps(1)
+    r0: i64
+  code:
+  L0:
+    0: r0 := ld_i64 9223372036854775807 @0
+    1: ret [r0] @1
+}
+
+fun min_val(): i64 {
+  slots: params(0), locals(0), temps(1)
+    r0: i64
+  code:
+  L0:
+    0: r0 := ld_i64 -9223372036854775808 @0
+    1: ret [r0] @1
+}
+
+fun neg(): i64 {
+  slots: params(0), locals(0), temps(1)
+    r0: i64
+  code:
+  L0:
+    0: r0 := ld_i64 -5 @0
+    1: ret [r0] @1
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun max_val() {
+  frame_data_size: 8
+  entry_gas: 56
+  code:
+    0: StoreImm8 [0] <- #9223372036854775807 @0
+    1: Return @1
+}
+
+fun min_val() {
+  frame_data_size: 8
+  entry_gas: 56
+  code:
+    0: StoreImm8 [0] <- #9223372036854775808 @0
+    1: Return @1
+}
+
+fun neg() {
+  frame_data_size: 8
+  entry_gas: 56
+  code:
+    0: StoreImm8 [0] <- #18446744073709551611 @0
+    1: Return @1
+}

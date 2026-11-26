@@ -7,7 +7,7 @@ use crate::{
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
-        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_8,
+        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_51, RELEASE_V1_8,
         RELEASE_V1_9_SKIPPED, TESTNET_RESET_OCT_2026,
     },
 };
@@ -364,6 +364,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 40960],
+        [reflect_resolve_per_byte: InternalGasPerByte, { RELEASE_V1_51.. => "reflect.resolve_per_byte" }, 30],
+        // Matches `storage_io_per_state_slot_read`: a lookup of a missing module reads storage.
+        [reflect_resolve_not_found: InternalGas, { RELEASE_V1_51.. => "reflect.resolve_not_found" }, 3023850],
 
         // Init module
         [init_get_caller_address_and_module_id_base: InternalGas, { TESTNET_RESET_OCT_2026.. => "init.get_caller_address_and_module_id.base" }, 7350],

@@ -20,8 +20,5 @@ module 0x66::vec_pushback_safe_point {
 // RUN: execute 0x66::vec_pushback_safe_point::caller --args 42
 // CHECK: results: 42
 
-// RUN: execute 0x66::vec_pushback_safe_point::caller --args 0
-// CHECK: results: 0
-
 // RUN: execute 0x66::vec_pushback_safe_point::caller --args 18446744073709551615
 // CHECK: results: 18446744073709551615

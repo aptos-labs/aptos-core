@@ -118,3 +118,24 @@ fun test_is_left() {
     2: []
     14: []
 }
+
+fun unpack_as_left() {
+  frame_data_size: 40
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @8 [0] != u64 #0 gas_taken=17 gas_fallthrough=36 @1
+    1: StoreImm8 [16] <- #7 @4
+    2: EnumNew [8] desc=3 tag #0 @5
+    3: HeapMoveTo8 [8]+8 <- [16] @5
+    4: EnumCheckVariant assert [8].tag == #0 @8
+    5: HeapMoveFrom8 [16] <- [8]+8 @8
+    6: Move8 [0] <- [16] @9
+    7: Return @9
+    8: StoreImm1 [24] <- #1 @10
+    9: EnumNew [8] desc=3 tag #1 @11
+    10: HeapMoveTo [8]+8 <- [24] (size=1) @11
+    11: Jump @4 gas=88 @13
+  safe_point_layouts:
+    2: []
+    9: []
+}

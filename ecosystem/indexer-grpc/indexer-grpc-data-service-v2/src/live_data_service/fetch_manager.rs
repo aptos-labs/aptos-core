@@ -17,17 +17,20 @@ pub(super) struct FetchManager<'a> {
     data_manager: Arc<RwLock<DataManager>>,
     data_client: Arc<DataClient>,
     pub(super) fetching_latest_data_task: RwLock<Option<FetchTask<'a>>>,
+    empty_response_retry_delay: Duration,
 }
 
 impl<'a> FetchManager<'a> {
     pub(super) fn new(
         data_manager: Arc<RwLock<DataManager>>,
         connection_manager: Arc<ConnectionManager>,
+        empty_response_retry_delay: Duration,
     ) -> Self {
         Self {
             data_manager,
             data_client: Arc::new(DataClient::new(connection_manager)),
             fetching_latest_data_task: RwLock::new(None),
+            empty_response_retry_delay,
         }
     }
 
@@ -82,7 +85,7 @@ impl<'a> FetchManager<'a> {
                 info!("Finished fetching latest data, got {num_transactions} num_transactions starting from version {version}.");
                 return num_transactions;
             }
-            tokio::time::sleep(Duration::from_millis(200)).await;
+            tokio::time::sleep(self.empty_response_retry_delay).await;
         }
     }
 }

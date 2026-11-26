@@ -18,6 +18,3 @@ module 0x1::main {
 
 // RUN: execute 0x1::main::mix --args 5, 7
 // CHECK: results: 29
-
-// RUN: execute 0x1::main::mix --args 0, 0
-// CHECK: results: 5

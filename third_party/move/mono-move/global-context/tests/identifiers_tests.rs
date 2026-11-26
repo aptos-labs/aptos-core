@@ -37,6 +37,18 @@ fn test_different_identifiers() {
 }
 
 #[test]
+// Not run under Miri. Blocker: `dashmap` and `parking_lot` both depend on
+// `parking_lot_core` 0.9. When a thread waits for a contended lock on Linux,
+// 0.9 calls `syscall(SYS_futex, ...)` with `&AtomicI32` as the futex address,
+// where `*mut u32` is expected. Miri reports undefined behavior: "incorrect
+// c-variadic argument type". That is dependency code, not MonoMove code, and
+// `parking_lot_core` 0.10 fixes it.
+// TODO(testing): remove the ignore once both depend on `parking_lot_core`
+// >= 0.10.
+#[cfg_attr(
+    miri,
+    ignore = "dashmap and parking_lot depend on parking_lot_core 0.9: futex call is UB under Miri"
+)]
 fn test_concurrent_same_identifiers() {
     let num_threads = 4;
 
@@ -71,6 +83,18 @@ fn test_concurrent_same_identifiers() {
 }
 
 #[test]
+// Not run under Miri. Blocker: `dashmap` and `parking_lot` both depend on
+// `parking_lot_core` 0.9. When a thread waits for a contended lock on Linux,
+// 0.9 calls `syscall(SYS_futex, ...)` with `&AtomicI32` as the futex address,
+// where `*mut u32` is expected. Miri reports undefined behavior: "incorrect
+// c-variadic argument type". That is dependency code, not MonoMove code, and
+// `parking_lot_core` 0.10 fixes it.
+// TODO(testing): remove the ignore once both depend on `parking_lot_core`
+// >= 0.10.
+#[cfg_attr(
+    miri,
+    ignore = "dashmap and parking_lot depend on parking_lot_core 0.9: futex call is UB under Miri"
+)]
 fn test_concurrent_different_identifiers() {
     let num_threads = 4;
 

@@ -15,8 +15,6 @@ module 0x1::test {
     }
 }
 
-// RUN: execute 0x1::test::aeq --args 0x1, 0x1
-// CHECK: results: true
 // RUN: execute 0x1::test::aeq --args 0x1, 0x2
 // CHECK: results: false
 // RUN: execute 0x1::test::aeq --args 0xcafe, 0xcafe

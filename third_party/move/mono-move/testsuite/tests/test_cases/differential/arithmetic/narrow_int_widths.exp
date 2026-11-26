@@ -176,16 +176,6 @@ fun neg_i32(r0): i32 {
     1: ret [r1] @2
 }
 
-fun shl_u16_imm(r0): u16 {
-  slots: params(1), locals(0), temps(1)
-    r0: u16
-    r1: u16
-  code:
-  L0:
-    0: r1 := shl r0, #3u8 @2
-    1: ret [r1] @3
-}
-
 fun shr_u32_var(r0, r1): u32 {
   slots: params(2), locals(0), temps(1)
     r0: u32
@@ -368,15 +358,6 @@ fun neg_i32() {
     0: IntNegate.i32 [4] <- -[0] @1
     1: Move(4) [0] <- [4] @2
     2: Return @2
-}
-
-fun shl_u16_imm() {
-  frame_data_size: 8
-  entry_gas: 23
-  code:
-    0: IntShl.u16 [2] <- [0] << #3 @2
-    1: Move(2) [0] <- [2] @3
-    2: Return @3
 }
 
 fun shr_u32_var() {

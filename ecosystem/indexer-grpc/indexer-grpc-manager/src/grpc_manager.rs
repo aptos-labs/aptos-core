@@ -72,6 +72,7 @@ impl GrpcManager {
                 config.cache_config.clone(),
                 metadata_manager.clone(),
                 config.allow_fn_fallback,
+                Duration::from_millis(config.empty_response_delay_ms),
             )
             .await,
         );

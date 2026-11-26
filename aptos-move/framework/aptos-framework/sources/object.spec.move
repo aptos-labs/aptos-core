@@ -5,21 +5,24 @@ spec aptos_framework::object {
     /// Criticality: Critical
     /// Implementation: The create_object_internal function includes an assertion to ensure that the object being
     /// created does not already exist at the specified address.
-    /// Enforcement: Formally verified via [high-level-req-1](create_object_internal).
+    /// Enforcement: Formally verified via [high-level-req-1.1](create_object_internal) and
+    /// [high-level-req-1.2](create_sticky_object_at_address).
     ///
     /// No.: 2
     /// Requirement: Only its owner may transfer an object.
     /// Criticality: Critical
     /// Implementation: The transfer function mandates that the transaction be signed by the owner's address, ensuring
     /// that only the rightful owner may initiate the object transfer.
-    /// Enforcement: Audited that it aborts if anyone other than the owner attempts to transfer.
+    /// Enforcement: Formally verified via [high-level-req-2](transfer_raw) that it aborts unless the signer is reached by
+    /// the owner chain of the object within the nesting limit.
     ///
     /// No.: 3
     /// Requirement: The indirect owner of an object may transfer the object.
     /// Criticality: Medium
     /// Implementation: The owns function evaluates to true when the given address possesses either direct or indirect
     /// ownership of the specified object.
-    /// Enforcement: Audited that it aborts if address transferring is not indirect owner.
+    /// Enforcement: Formally verified via [high-level-req-3](transfer_raw) that the abort set is exact: an indirect owner
+    /// whose chain allows ungated transfer at every object can transfer; `owns` is characterised exactly as well.
     ///
     /// No.: 4
     /// Requirement: Objects may never change the address which houses them.
@@ -329,7 +332,7 @@ spec aptos_framework::object {
     }
 
     spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
-        /// [high-level-req-1]
+        /// [high-level-req-1.2]
         aborts_if exists<ObjectCore>(object_address);
         ensures exists<ObjectCore>(object_address);
         ensures global<ObjectCore>(object_address).guid_creation_num == INIT_GUID_CREATION_NUM + 1;
@@ -342,8 +345,8 @@ spec aptos_framework::object {
         can_delete: bool,
     ): ConstructorRef {
         // property 1: Creating an object twice on the same address must never occur.
-        /// [high-level-req-1]
         pragma opaque;
+        /// [high-level-req-1.1]
         aborts_if exists<ObjectCore>(object);
         ensures exists<ObjectCore>(object);
         // property 6: Object addresses must not overlap with other addresses in different domains.
@@ -488,12 +491,8 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
-        let owner_address = signer::address_of(owner);
-        aborts_if !exists<ObjectCore>(object);
-        aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
+        include TransferRawAbortsIf { owner_address: signer::address_of(owner) };
+        ensures global<ObjectCore>(object).owner == to;
     }
 
     spec transfer<T: key>(
@@ -501,13 +500,8 @@ spec aptos_framework::object {
         object: Object<T>,
         to: address,
     ) {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
-        let owner_address = signer::address_of(owner);
-        let object_address = object.inner;
-        aborts_if !exists<ObjectCore>(object_address);
-        aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
+        include TransferRawAbortsIf { owner_address: signer::address_of(owner), object: object.inner };
+        ensures global<ObjectCore>(object.inner).owner == to;
     }
 
     spec transfer_raw(
@@ -515,12 +509,15 @@ spec aptos_framework::object {
         object: address,
         to: address,
     ) {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
         let owner_address = signer::address_of(owner);
         aborts_if !exists<ObjectCore>(object);
         aborts_if !global<ObjectCore>(object).allow_ungated_transfer;
+        let first_owner = global<ObjectCore>(object).owner;
+        /// [high-level-req-2]
+        aborts_if !spec_owns_at(owner_address, first_owner, 0);
+        /// [high-level-req-3]
+        aborts_if !spec_ungated_descendant_at(owner_address, first_owner, 0);
+        ensures global<ObjectCore>(object).owner == to;
     }
 
     spec transfer_to_object<O: key, T: key> (
@@ -528,13 +525,16 @@ spec aptos_framework::object {
         object: Object<O>,
         to: Object<T>,
     ) {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
-        let owner_address = signer::address_of(owner);
-        let object_address = object.inner;
-        aborts_if !exists<ObjectCore>(object_address);
-        aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
+        include TransferRawAbortsIf { owner_address: signer::address_of(owner), object: object.inner };
+        ensures global<ObjectCore>(object.inner).owner == to.inner;
+    }
+
+    /// The signer is reached by the owner walk from `object`, and `object` and every object passed on
+    /// the way allow ungated transfer.
+    spec schema TransferRawAbortsIf {
+        owner_address: address;
+        object: address;
+        aborts_if !spec_ungated_descendant(owner_address, object);
     }
 
     spec burn<T: key>(owner: &signer, object: Object<T>) {
@@ -567,29 +567,55 @@ spec aptos_framework::object {
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
-        pragma unroll = MAXIMUM_OBJECT_NESTING;
-        aborts_if !exists<ObjectCore>(destination);
-        aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
-        // aborts_if exists i in 0..g_roll:
-        //     owner != global<ObjectCore>(destination).owner && !exists<ObjectCore>(get_transfer_address(destination, i));
-        // aborts_if exists i in 0..g_roll:
-        //     owner != global<ObjectCore>(destination).owner && !global<ObjectCore>(get_transfer_address(destination, i)).allow_ungated_transfer;
-        // property 3: The 'indirect' owner of an object may transfer the object.
-        // ensures exists i in 0..MAXIMUM_OBJECT_NESTING:
-        //     owner == get_transfer_address(destination, i);
+        pragma opaque;
+        aborts_if !spec_ungated_descendant(owner, destination);
     }
 
-    // Helper function for property 3
-    // spec fun get_transfer_address(addr: address, roll: u64): address {
-    //     let i = roll;
-    //     if ( i > 0 )
-    //     { get_transfer_address(global<ObjectCore>(addr).owner, i - 1) }
-    //     else
-    //     { global<ObjectCore>(addr).owner }
-    // }
+    /// `destination` exists, allows ungated transfer, and its owner chain reaches `owner` within the
+    /// nesting limit with every intermediate object allowing ungated transfer.
+    spec fun spec_ungated_descendant(owner: address, destination: address): bool {
+        exists<ObjectCore>(destination) && global<ObjectCore>(destination).allow_ungated_transfer
+            && spec_ungated_descendant_at(owner, global<ObjectCore>(destination).owner, 0)
+    }
+
+    /// The walk from `current`, after `count` hops, reaches `owner` within the nesting limit through
+    /// objects that allow ungated transfer.
+    spec fun spec_ungated_descendant_at(owner: address, current: address, count: num): bool {
+        if (current == owner) {
+            true
+        } else if (count + 1 >= MAXIMUM_OBJECT_NESTING) {
+            false
+        } else {
+            exists<ObjectCore>(current) && global<ObjectCore>(current).allow_ungated_transfer
+                && spec_ungated_descendant_at(owner, global<ObjectCore>(current).owner, count + 1)
+        }
+    }
+
+    /// The owner walk from `current`, after `count` hops, reaches `owner` within the nesting limit.
+    spec fun spec_owns_at(owner: address, current: address, count: num): bool {
+        if (current == owner) {
+            true
+        } else if (count + 1 >= MAXIMUM_OBJECT_NESTING) {
+            false
+        } else if (!exists<ObjectCore>(current)) {
+            false
+        } else {
+            spec_owns_at(owner, global<ObjectCore>(current).owner, count + 1)
+        }
+    }
+
+    /// The owner walk from `current`, after `count` hops, runs into the nesting limit.
+    spec fun spec_owns_limit_at(owner: address, current: address, count: num): bool {
+        if (current == owner) {
+            false
+        } else if (count + 1 >= MAXIMUM_OBJECT_NESTING) {
+            true
+        } else if (!exists<ObjectCore>(current)) {
+            false
+        } else {
+            spec_owns_limit_at(owner, global<ObjectCore>(current).owner, count + 1)
+        }
+    }
 
     spec ungated_transfer_allowed<T: key>(self: Object<T>): bool {
         pragma opaque;
@@ -608,15 +634,27 @@ spec aptos_framework::object {
         ensures result == global<ObjectCore>(self.inner).owner;
     }
 
+    /// The end of the ownership chain is not an object.
+    spec root_owner<T: key>(self: Object<T>): address {
+        aborts_if !exists<ObjectCore>(self.inner);
+        ensures !exists<ObjectCore>(result);
+    }
+
     spec owns<T: key>(object: Object<T>, owner: address): bool {
-        // Partial: the abort conditions of the ownership chain walk (nesting limit, missing
-        // `ObjectCore` on the chain) are not specified.
-        pragma aborts_if_is_partial;
-        let current_address_0 = object.inner;
-        let object_0 = global<ObjectCore>(current_address_0);
-        let current_address = object_0.owner;
-        aborts_if object.inner != owner && !exists<ObjectCore>(object.inner);
-        ensures current_address_0 == owner ==> result == true;
+        pragma opaque;
+        aborts_if spec_owns_aborts(object.inner, owner);
+        ensures result == spec_owns(object.inner, owner);
+    }
+
+    /// `owns` aborts: the object does not exist, or the walk runs into the nesting limit.
+    spec fun spec_owns_aborts(object: address, owner: address): bool {
+        !exists<ObjectCore>(object)
+            || object != owner && spec_owns_limit_at(owner, global<ObjectCore>(object).owner, 0)
+    }
+
+    /// `owner` owns `object` directly or indirectly within the nesting limit.
+    spec fun spec_owns(object: address, owner: address): bool {
+        object == owner || spec_owns_at(owner, global<ObjectCore>(object).owner, 0)
     }
 
     // Helper function

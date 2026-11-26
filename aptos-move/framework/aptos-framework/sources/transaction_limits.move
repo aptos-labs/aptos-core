@@ -129,6 +129,10 @@ module aptos_framework::transaction_limits {
                 error::invalid_argument(ETHRESHOLDS_NOT_MONOTONIC)
             );
             i += 1;
+        } spec {
+            invariant i >= 1;
+            invariant len == 0 || i <= len;
+            invariant forall j in 1..i: spec_tier_ordered(tiers, j);
         };
     }
 
@@ -152,6 +156,13 @@ module aptos_framework::transaction_limits {
         while (i < len) {
             tiers.push_back(new_tier(min_stakes[i], multipliers_percent[i]));
             i += 1;
+        } spec {
+            invariant i <= len;
+            invariant std::vector::length(tiers) == i;
+            invariant forall j in 0..i:
+                tiers[j].min_stake == min_stakes[j]
+                    && tiers[j].multiplier_percent == multipliers_percent[j];
+            invariant forall j in 0..i: spec_valid_multiplier(multipliers_percent[j]);
         };
         validate_tiers(&tiers);
 

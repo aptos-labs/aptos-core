@@ -5,7 +5,7 @@
 
 use crate::{polymorphic_natives, NativeEntry};
 use aptos_types::move_stdlib::{
-    reflect::{is_forbidden_to_reflect, INVALID_IDENTIFIER},
+    reflect::{is_forbidden_to_reflect, parse_name, INVALID_IDENTIFIER},
     result::{ERR_TAG as RESULT_ERR_TAG, OK_TAG as RESULT_OK_TAG},
 };
 use mono_move_core::{
@@ -15,6 +15,7 @@ use mono_move_core::{
     },
     DescriptorId, VMResult, TRIVIAL_DESCRIPTOR_ID,
 };
+use move_binary_format::file_format_common::IDENTIFIER_SIZE_MAX;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 
 /// `0x1::reflect::native_resolve<FuncType>(addr: address, module_name: &String,
@@ -52,16 +53,19 @@ pub fn native_resolve<C: NativeContext>(ctx: &C) -> VMResult<NativeStatus> {
     Ok(NativeStatus::Success)
 }
 
-/// Reads the `&String` argument at `i` as a Move identifier, or [`None`] if its
-/// bytes do not spell one.
-fn read_name<C: NativeContext>(ctx: &C, i: usize) -> VMResult<Option<Identifier>> {
+/// Reads the `&String` argument at `index` as a Move identifier, or [`None`] if
+/// its bytes do not spell one or exceed the identifier size limit.
+//
+// TODO(correctness): before production, verify that the gas feature version is
+// at least `RELEASE_V1_51` and `LIMIT_MAX_IDENTIFIER_LENGTH` is enabled. The
+// legacy VM caps names at `IDENTIFIER_SIZE_MAX` only then.
+fn read_name<C: NativeContext>(ctx: &C, index: usize) -> VMResult<Option<Identifier>> {
     // SAFETY: the argument is `&String`, flattened to `vector<u8>`.
-    let s: Ref<Vector<u8>> = unsafe { ctx.arg(i)? };
-    let v = s.borrow();
-    // SAFETY: the bytes are copied out immediately, so GC cannot relocate them
-    // while the slice is held.
-    let bytes = unsafe { v.as_bytes() }.to_vec();
-    Ok(Identifier::from_utf8(bytes).ok())
+    let string_ref: Ref<Vector<u8>> = unsafe { ctx.arg(index)? };
+    let bytes = string_ref.borrow();
+    // SAFETY: `parse_name` copies the bytes out before returning and allocates
+    // nothing on the VM heap, so GC cannot relocate them while the slice is held.
+    Ok(parse_name(unsafe { bytes.as_bytes() }, IDENTIFIER_SIZE_MAX))
 }
 
 /// Returns `Result::Err(code)` from the native.

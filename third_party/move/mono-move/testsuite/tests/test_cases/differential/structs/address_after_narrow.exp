@@ -1,0 +1,123 @@
+=== micro-ops ===
+// module 0x42::addr_offsets
+
+fun accessors() {
+  frame_data_size: 336
+  entry_gas: 1943
+  code:
+    0: StoreImm1 [256] <- #1 @0
+    1: StoreImm1 [257] <- #165 @2
+    2: StoreImm2 [258] <- #48879 @4
+    3: Move(2) [208] <- [258] @5
+    4: Move(32) [176] <- [64] @5
+    5: Move(1) [168] <- [257] @5
+    6: Move(32) [136] <- [0] @5
+    7: Move(1) [128] <- [256] @5
+    8: SlotBorrow [360] <- &[128] @7
+    9: Move(32) [376] <- [32] @9
+    10: CallByNameExempt 0x42::addr_offsets::set_addr @9
+    11: SlotBorrow [360] <- &[128] @10
+    12: Move(32) [376] <- [0] @12
+    13: CallByNameExempt 0x42::addr_offsets::set_who @12
+    14: StoreImm1 [257] <- #90 @13
+    15: Move(32) [224] <- [96] @15
+    16: Move(1) [216] <- [257] @15
+    17: SlotBorrow [360] <- &[128] @17
+    18: CallByNameExempt 0x42::addr_offsets::flag_of @18
+    19: Move(1) [256] <- [360] @18
+    20: SlotBorrow [360] <- &[128] @19
+    21: CallByNameExempt 0x42::addr_offsets::addr_of @20
+    22: Move(32) [264] <- [360] @20
+    23: SlotBorrow [360] <- &[128] @21
+    24: CallByNameExempt 0x42::addr_offsets::tag_of @22
+    25: Move(1) [257] <- [360] @22
+    26: SlotBorrow [360] <- &[128] @23
+    27: CallByNameExempt 0x42::addr_offsets::who_of @24
+    28: Move(32) [296] <- [360] @24
+    29: SlotBorrow [360] <- &[128] @25
+    30: CallByNameExempt 0x42::addr_offsets::tail_of @26
+    31: Move(2) [258] <- [360] @26
+    32: Move(1) [328] <- [216] @27
+    33: SlotBorrow [360] <- &[216] @30
+    34: CallByNameExempt 0x42::addr_offsets::big_of @31
+    35: Move(1) [0] <- [256] @32
+    36: Move(32) [8] <- [264] @32
+    37: Move(1) [40] <- [257] @32
+    38: Move(32) [48] <- [296] @32
+    39: Move(2) [80] <- [258] @32
+    40: Move(1) [82] <- [328] @32
+    41: Move(32) [88] <- [360] @32
+    42: Return @32
+}
+
+fun addr_of() {
+  frame_data_size: 48
+  entry_gas: 296
+  code:
+    0: ReadRefOffset [16] <- *([0]+8) (size=32) @1
+    1: Move(32) [0] <- [16] @3
+    2: Return @3
+}
+
+fun big_of() {
+  frame_data_size: 48
+  entry_gas: 296
+  code:
+    0: ReadRefOffset [16] <- *([0]+8) (size=32) @1
+    1: Move(32) [0] <- [16] @3
+    2: Return @3
+}
+
+fun flag_of() {
+  frame_data_size: 24
+  entry_gas: 17
+  code:
+    0: ReadRefOffset [16] <- *([0]+0) (size=1) @1
+    1: Move(1) [0] <- [16] @3
+    2: Return @3
+}
+
+fun set_addr() {
+  frame_data_size: 64
+  entry_gas: 102
+  code:
+    0: DeriveRefOffsetImm [48] <- [0]+8 @1
+    1: WriteRef *[48] <- [16] (size=32) @5
+    2: Return @6
+}
+
+fun set_who() {
+  frame_data_size: 64
+  entry_gas: 102
+  code:
+    0: DeriveRefOffsetImm [48] <- [0]+48 @1
+    1: WriteRef *[48] <- [16] (size=32) @5
+    2: Return @6
+}
+
+fun tag_of() {
+  frame_data_size: 24
+  entry_gas: 17
+  code:
+    0: ReadRefOffset [16] <- *([0]+40) (size=1) @1
+    1: Move(1) [0] <- [16] @3
+    2: Return @3
+}
+
+fun tail_of() {
+  frame_data_size: 24
+  entry_gas: 26
+  code:
+    0: ReadRefOffset [16] <- *([0]+80) (size=2) @1
+    1: Move(2) [0] <- [16] @3
+    2: Return @3
+}
+
+fun who_of() {
+  frame_data_size: 48
+  entry_gas: 296
+  code:
+    0: ReadRefOffset [16] <- *([0]+48) (size=32) @1
+    1: Move(32) [0] <- [16] @3
+    2: Return @3
+}

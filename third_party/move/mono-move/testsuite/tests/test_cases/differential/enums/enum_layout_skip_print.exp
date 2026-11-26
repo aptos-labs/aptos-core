@@ -1,0 +1,33 @@
+=== micro-ops ===
+// module 0x42::enum_skip
+
+fun check(): skipped (not all types are concrete)
+
+fun check_local() {
+  frame_data_size: 24
+  entry_gas: 3
+  code:
+    0: JumpIntCmp @7 [0] != u64 #0 gas_taken=10 gas_fallthrough=34 @1
+    1: EnumNew [8] desc=3 tag #0 @5
+    2: HeapMoveTo8 [8]+8 <- [0] @5
+    3: SlotBorrow [48] <- &[8] @7
+    4: CallByNameExempt 0x42::enum_skip::is_local_a @8
+    5: Move(1) [0] <- [48] @9
+    6: Return @9
+    7: EnumNew [8] desc=3 tag #1 @10
+    8: Jump @3 gas=74 @12
+  safe_point_layouts:
+    1: []
+    7: []
+}
+
+fun is_a(): skipped (enum layout not derivable)
+
+fun is_local_a() {
+  frame_data_size: 24
+  entry_gas: 16
+  code:
+    0: EnumTestTag [16] <- (*[0]).tag == #0 @1
+    1: Move(1) [0] <- [16] @2
+    2: Return @2
+}

@@ -61,6 +61,13 @@ pub struct LiveDataServiceConfig {
     pub num_slots: usize,
     #[serde(default = "LiveDataServiceConfig::default_size_limit_bytes")]
     pub size_limit_bytes: usize,
+    /// Serve transactions as soon as they are cached, without waiting for `known_latest_version`,
+    /// which only advances with heartbeats.
+    #[serde(default)]
+    pub skip_known_latest_version_check: bool,
+    /// How long to wait before polling the GrpcManager again after an empty response.
+    #[serde(default = "LiveDataServiceConfig::default_empty_response_retry_delay_ms")]
+    pub empty_response_retry_delay_ms: u64,
 }
 
 impl LiveDataServiceConfig {
@@ -70,6 +77,10 @@ impl LiveDataServiceConfig {
 
     fn default_size_limit_bytes() -> usize {
         10_000_000_000
+    }
+
+    fn default_empty_response_retry_delay_ms() -> u64 {
+        200
     }
 }
 
