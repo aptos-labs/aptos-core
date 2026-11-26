@@ -6,14 +6,16 @@ spec aptos_framework::multisig_account {
     /// Criticality: Critical
     /// Implementation: While creating a MultisigAccount, the function create_with_owners_internal checks that
     /// num_signatures_required is in the span from 1 to total count of owners.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified via [high-level-req-1](global invariant) for every MultisigAccount, at creation
+    /// and across all owner and threshold updates.
     ///
     /// No.: 2
     /// Requirement: The list of owners for a multi-signature account should not contain any duplicate owners, and the
     /// multi-signature account itself cannot be listed as one of its owners.
     /// Criticality: Critical
     /// Implementation: The function validate_owners validates the owner vector that no duplicate entries exists.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified at creation via the aborts conditions of create_with_owners_internal. Audited
+    /// that removing owners preserves it.
     ///
     /// No.: 3
     /// Requirement: The current value of the next sequence number should not be present in the transaction table, until
@@ -21,7 +23,9 @@ spec aptos_framework::multisig_account {
     /// Criticality: Medium
     /// Implementation: The add_transaction function increases the next sequence number and only then adds the
     /// transaction with the old next sequence number to the transaction table.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified via [high-level-req-3](MultisigAccount) as a data invariant: the table
+    /// contains exactly the sequence numbers strictly between last_executed_sequence_number and
+    /// next_sequence_number.
     ///
     /// No.: 4
     /// Requirement: When the last executed sequence number is smaller than the next sequence number by only one unit, no
@@ -29,8 +33,8 @@ spec aptos_framework::multisig_account {
     /// Criticality: High
     /// Implementation: The get_pending_transactions function retrieves pending transactions by iterating through the
     /// transactions table, starting from the last_executed_sequence_number + 1 to the next_sequence_number.
-    /// Enforcement: Audited that MultisigAccount.transactions is empty when
-    /// last_executed_sequence_number == next_sequence_number -1
+    /// Enforcement: Formally verified via [high-level-req-3](MultisigAccount), whose interval is empty when
+    /// last_executed_sequence_number == next_sequence_number - 1.
     ///
     /// No.: 5
     /// Requirement: The last executed sequence number is always smaller than the next sequence number.
@@ -38,7 +42,7 @@ spec aptos_framework::multisig_account {
     /// Implementation: When creating a new MultisigAccount, the last_executed_sequence_number and next_sequence_number
     /// are assigned with 0 and 1 respectively, and from there both these values increase monotonically when a
     /// transaction is executed and removed from the table and when new transaction are added respectively.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified via [high-level-req-5](MultisigAccount) as a data invariant.
     ///
     /// No.: 6
     /// Requirement: The number of pending transactions should be equal to the difference between the next sequence number
@@ -46,14 +50,19 @@ spec aptos_framework::multisig_account {
     /// Criticality: High
     /// Implementation: When a transaction is added, next_sequence_number is incremented. And when a transaction is
     /// removed after execution, last_executed_sequence_number is incremented.
-    /// Enforcement: This has been audited.
+    /// Enforcement: Formally verified via [high-level-req-6.1](MultisigAccount) that the stored transactions are
+    /// exactly those numbered last_executed_sequence_number + 1 to next_sequence_number - 1, and via
+    /// [high-level-req-6.2](get_pending_transactions) that it returns next_sequence_number -
+    /// last_executed_sequence_number - 1 transactions.
     ///
     /// No.: 7
     /// Requirement: Only transactions with valid sequence number should be fetched.
     /// Criticality: Medium
     /// Implementation: Functions such as: 1. get_transaction 2. can_be_executed 3. can_be_rejected 4. vote always
     /// validate the given sequence number and only then fetch the associated transaction.
-    /// Enforcement: Audited that it aborts if the sequence number is not valid.
+    /// Enforcement: Formally verified via [high-level-req-7.1](ValidSequenceNumberAbortsIf) and
+    /// [high-level-req-7.2](ValidSequenceNumberAbortsIf), included by get_transaction, vote and the can_* functions,
+    /// that it aborts if the sequence number is not valid.
     ///
     /// No.: 8
     /// Requirement: The execution or rejection of a transaction should enforce that the minimum number of required
@@ -61,7 +70,11 @@ spec aptos_framework::multisig_account {
     /// Criticality: Critical
     /// Implementation: The functions can_be_executed and can_be_rejected perform validation on the number of votes
     /// required for execution or rejection.
-    /// Enforcement: Audited that these functions return the correct value.
+    /// Enforcement: Formally verified via [high-level-req-8.1](can_be_executed), [high-level-req-8.2](can_be_rejected),
+    /// [high-level-req-8.3](can_execute) and [high-level-req-8.4](can_reject) that the result is exactly: the
+    /// transaction is the next one to resolve, and the approvals (resp. rejections) cast by current owners, counting
+    /// the given owner's vote as cast for can_execute and can_reject, reach num_signatures_required, and for execution
+    /// the timelock admits it. The abort conditions of these functions are only partly specified.
     ///
     /// No.: 9
     /// Requirement: The creation of a multi-signature account properly initializes the resources and then it gets
@@ -70,7 +83,11 @@ spec aptos_framework::multisig_account {
     /// Implementation: When creating a MultisigAccount via one of the functions: create_with_existing_account,
     /// create_with_existing_account_and_revoke_auth_key, create_with_owners, create, the MultisigAccount data is
     /// initialized properly and published to the multisig_account (new or existing).
-    /// Enforcement: Audited that the MultisigAccount is initialized properly.
+    /// Enforcement: Formally verified via [high-level-req-9.1](CreateMultisigAccountAbortsIfAndEnsures), included by
+    /// create_with_owners and the create_with_existing_account variants, that the MultisigAccount is published with
+    /// the given owners and number of signatures required, and via [high-level-req-9.2](create_with_owners_internal)
+    /// that its sequence numbers start at 0 and 1. Audited that the metadata, the transaction table and the event
+    /// handles are initialized properly.
     ///
     /// No.: 10
     /// Requirement: Creation of a multi-signature account on top of an existing account should revoke auth key and any
@@ -78,7 +95,10 @@ spec aptos_framework::multisig_account {
     /// Criticality: Critical
     /// Implementation: The function create_with_existing_account_and_revoke_auth_key, after successfully creating the
     /// MultisigAccount, rotates the account to ZeroAuthKey and revokes any offered capabilities of that account.
-    /// Enforcement: Audited that the account's auth key and the offered capabilities are revoked.
+    /// Enforcement: Formally verified via [high-level-req-10.1](create_with_existing_account_and_revoke_auth_key),
+    /// [high-level-req-10.2](create_with_existing_account_and_revoke_auth_key) and
+    /// [high-level-req-10.3](create_with_existing_account_and_revoke_auth_key) that the account's auth key and the
+    /// offered capabilities are revoked; create_with_existing_account_and_revoke_auth_key_call has the same conditions.
     ///
     /// No.: 11
     /// Requirement: Upon the creation of a multi-signature account from a bootstrapping account, the ownership of the
@@ -112,8 +132,9 @@ spec aptos_framework::multisig_account {
     /// and uses add_transaction function to gives approval on behalf of the creator and increments the
     /// next_sequence_number and finally adds the transaction to the MultsigAccount: create_transaction_with_hash,
     /// create_transaction.
-    /// Enforcement: Audited it aborts if the caller is not in the owner's list of the account.
-    /// (create_transaction_with_hash, create_transaction) Audited that the transaction is successfully stored in the
+    /// Enforcement: Formally verified via [high-level-req-13.1](create_transaction) and
+    /// [high-level-req-13.2](create_transaction_with_hash) that it aborts if the caller is not in the owner's list of
+    /// the account. Audited that the transaction is successfully stored in the
     /// MultisigAccount.(create_transaction_with_hash, create_transaction, add_transaction) Audited that the creators
     /// voted to approve the transaction. (create_transaction_with_hash, create_transaction, add_transaction) Audited
     /// that the next_sequence_number increases monotonically. (create_transaction_with_hash, create_transaction,
@@ -125,10 +146,11 @@ spec aptos_framework::multisig_account {
     /// Implementation: Any owner of the MultisigAccount can either approve (approve_transaction) or reject
     /// (reject_transaction) a transaction. Both these functions use a generic function to vote for the transaction
     /// which validates the caller and the transaction id and adds/updates the vote.
-    /// Enforcement: Audited that it aborts if the caller is not in the owner's list (approve_transaction,
-    /// reject_transaction, vote_transaction, assert_is_owner). Audited that it aborts if the transaction with the given
-    /// sequence number doesn't exist in the account (approve_transaction, reject_transaction, vote_transaction).
-    /// Audited that the vote is recorded as intended.
+    /// Enforcement: Formally verified via [high-level-req-14.1](approve_transaction),
+    /// [high-level-req-14.2](reject_transaction) and [high-level-req-14.3](vote_transaction) that it aborts if the
+    /// caller is not in the owner's list, and via [high-level-req-14.4](vote_transaction) that vote_transaction aborts
+    /// if the transaction with the given sequence number doesn't exist in the account. Audited the latter for
+    /// approve_transaction and reject_transaction, and that the vote is recorded as intended.
     ///
     /// No.: 15
     /// Requirement: Only owners are allowed to execute a valid transaction, if the number of approvals meets the k-of-n
@@ -140,13 +162,13 @@ spec aptos_framework::multisig_account {
     /// MultisigAccount via remove_executed_transaction. VM validates the transaction via validate_multisig_transaction
     /// and cleans up the transaction via successful_transaction_execution_cleanup and
     /// failed_transaction_execution_cleanup.
-    /// Enforcement: Audited that it aborts if the caller is not in the owner's list (execute_rejected_transaction,
-    /// validate_multisig_transaction). Audited that it aborts if the transaction with the given sequence number doesn't
-    /// exist in the account (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if
-    /// the votes (approvals or rejections) are less than num_signatures_required (execute_rejected_transaction,
-    /// validate_multisig_transaction). Audited that the transaction is removed from the MultisigAccount
-    /// (execute_rejected_transaction, remove_executed_transaction, successful_transaction_execution_cleanup,
-    /// failed_transaction_execution_cleanup).
+    /// Enforcement: Formally verified via [high-level-req-15.1](execute_rejected_transaction) and
+    /// [high-level-req-15.2](validate_multisig_transaction) that it aborts if the caller is not in the owner's list,
+    /// via [high-level-req-15.3](validate_multisig_transaction) that validate_multisig_transaction aborts if the next
+    /// transaction doesn't exist in the account, and via [high-level-req-15.4](TransactionExecutionCleanup), included by
+    /// successful_transaction_execution_cleanup and failed_transaction_execution_cleanup, that the executed transaction
+    /// is removed. Audited that it aborts if the votes (approvals or rejections) are less than num_signatures_required,
+    /// that execute_rejected_transaction aborts if the transaction doesn't exist, and that it removes the transaction.
     ///
     /// No.: 16
     /// Requirement: Removing an executed transaction from the transactions list should increase the last sequence number
@@ -154,7 +176,8 @@ spec aptos_framework::multisig_account {
     /// Criticality: High
     /// Implementation: When transactions are removed via remove_executed_transaction (maybe called by VM cleanup or
     /// execute_rejected_transaction), the last_executed_sequence_number increases by 1.
-    /// Enforcement: Audited that last_executed_sequence_number is incremented.
+    /// Enforcement: Formally verified via [high-level-req-16.1](remove_executed_transaction) and
+    /// [high-level-req-16.2](TransactionExecutionCleanup) that last_executed_sequence_number is incremented by one.
     ///
     /// No.: 17
     /// Requirement: The voting and transaction creation operations should only be available if a multi-signature account
@@ -162,7 +185,10 @@ spec aptos_framework::multisig_account {
     /// Criticality: Low
     /// Implementation: The function assert_multisig_account_exists validates the existence of MultisigAccount under the
     /// account.
-    /// Enforcement: Audited that it aborts if the MultisigAccount doesn't exist on the account.
+    /// Enforcement: Formally verified via [high-level-req-17.1](create_transaction),
+    /// [high-level-req-17.2](create_transaction_with_hash), [high-level-req-17.3](approve_transaction),
+    /// [high-level-req-17.4](reject_transaction) and [high-level-req-17.5](vote_transaction) that it aborts if the
+    /// MultisigAccount doesn't exist on the account.
     /// </high-level-req>
 
     spec module {
@@ -171,6 +197,23 @@ spec aptos_framework::multisig_account {
         /// multisig account exists before publishing the timelock resource.
         invariant forall a: address where exists<MultisigAccountTimeLock>(a):
             exists<MultisigAccount>(a);
+    }
+
+    spec module {
+        /// [high-level-req-1]
+        invariant [suspendable] forall a: address {exists<MultisigAccount>(a)} where exists<MultisigAccount>(a):
+            1 <= global<MultisigAccount>(a).num_signatures_required
+                && global<MultisigAccount>(a).num_signatures_required <= len(global<MultisigAccount>(a).owners);
+    }
+
+    spec MultisigAccount {
+        /// [high-level-req-5]
+        invariant last_executed_sequence_number < next_sequence_number;
+        /// [high-level-req-3]
+        /// [high-level-req-6.1]
+        invariant forall i: u64 {table::spec_contains(transactions, i)}:
+            table::spec_contains(transactions, i) <==>
+                last_executed_sequence_number < i && i < next_sequence_number;
     }
 
     spec metadata(multisig_account: address): SimpleMap<String, vector<u8>> {
@@ -198,10 +241,28 @@ spec aptos_framework::multisig_account {
         sequence_number: u64,
     ): MultisigTransaction {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        aborts_if !exists<MultisigAccount>(multisig_account);
-        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
+        include ValidSequenceNumberAbortsIf;
         ensures result == table::spec_get(multisig_account_resource.transactions, sequence_number);
+    }
+
+    spec get_pending_transactions(multisig_account: address): vector<MultisigTransaction> {
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        let last = multisig_account_resource.last_executed_sequence_number;
+        aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-6.2]
+        ensures len(result) == multisig_account_resource.next_sequence_number - last - 1;
+    }
+
+    /// The account exists, `sequence_number` is in its queue range and the transaction is stored.
+    spec schema ValidSequenceNumberAbortsIf {
+        multisig_account: address;
+        sequence_number: u64;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-7.1]
+        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
+        /// [high-level-req-7.2]
+        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
     }
 
     spec get_next_transaction_payload(
@@ -217,9 +278,9 @@ spec aptos_framework::multisig_account {
     }
 
     spec get_next_multisig_account_address(creator: address): address {
-        //pragma aborts_if_is_partial;
-        //aborts_if !exists<account::Account>(creator);
-        let owner_nonce = global<account::Account>(creator).sequence_number;
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
+        aborts_if !exists<account::Account>(creator) && !features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        ensures result == spec_next_multisig_account_address(creator);
     }
 
     spec last_resolved_sequence_number(multisig_account: address): u64 {
@@ -240,9 +301,7 @@ spec aptos_framework::multisig_account {
         owner: address
     ): (bool, bool) {
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        aborts_if !exists<MultisigAccount>(multisig_account);
-        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
+        include ValidSequenceNumberAbortsIf;
         let transaction = table::spec_get(multisig_account_resource.transactions, sequence_number);
         let votes = transaction.votes;
         let voted = simple_map::spec_contains_key(votes, owner);
@@ -259,15 +318,96 @@ spec aptos_framework::multisig_account {
     spec can_execute(owner: address, multisig_account: address, sequence_number: u64): bool {
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
-        // assert_valid_sequence_number borrows the resource and validates the range.
-        aborts_if !exists<MultisigAccount>(multisig_account);
-        aborts_if sequence_number == 0 || sequence_number >= multisig_account_resource.next_sequence_number;
-        // The owner-side checks must hold whenever the function returns true. The timelock and
-        // approval-count parts of the conjunction depend on transaction state and the optional
-        // MultisigAccountTimeLock resource — those remain abstract here.
+        include ValidSequenceNumberAbortsIf;
+        let votes = table::spec_get(multisig_account_resource.transactions, sequence_number).votes;
+        // The owner's own approval is counted as if cast now.
+        let num_approvals = spec_num_approvals(multisig_account_resource.owners, votes)
+            + if (simple_map::spec_contains_key(votes, owner) && simple_map::spec_get(votes, owner)) 0 else 1;
+        /// [high-level-req-8.3]
+        ensures result == (vector::spec_contains(multisig_account_resource.owners, owner)
+            && sequence_number == multisig_account_resource.last_executed_sequence_number + 1
+            && num_approvals >= multisig_account_resource.num_signatures_required
+            && spec_timelock_admits(multisig_account, sequence_number, num_approvals));
+    }
+
+    spec can_be_executed(multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count and timelock aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
+        let votes = table::spec_get(multisig_account_resource.transactions, sequence_number).votes;
+        let num_approvals = spec_num_approvals(multisig_account_resource.owners, votes);
+        /// [high-level-req-8.1]
+        ensures result == (sequence_number == multisig_account_resource.last_executed_sequence_number + 1
+            && num_approvals >= multisig_account_resource.num_signatures_required
+            && spec_timelock_admits(multisig_account, sequence_number, num_approvals));
+    }
+
+    /// The number of approvals cast by `owners`.
+    spec fun spec_num_approvals(owners: vector<address>, votes: SimpleMap<address, bool>): u64 {
+        vector::spec_fold<address, u64>(
+            |acc, owner| if (simple_map::spec_contains_key(votes, owner) && simple_map::spec_get(votes, owner)) {
+                acc + 1u64
+            } else acc,
+            owners, 0u64, len(owners))
+    }
+
+    /// Whether the timelock of `multisig_account`, if any, admits executing transaction `sequence_number` with
+    /// `num_approvals` approvals now.
+    spec fun spec_timelock_admits(multisig_account: address, sequence_number: u64, num_approvals: u64): bool {
+        if (exists<MultisigAccountTimeLock>(multisig_account)) {
+            let timelock = global<MultisigAccountTimeLock>(multisig_account);
+            let creation_time_secs = table::spec_get(
+                global<MultisigAccount>(multisig_account).transactions, sequence_number).creation_time_secs;
+            (option::spec_is_some(timelock.override_threshold)
+                && num_approvals >= option::spec_borrow(timelock.override_threshold))
+                || aptos_framework::timestamp::spec_now_seconds() - creation_time_secs >= timelock.timelock_period
+        } else {
+            true
+        }
+    }
+
+    /// The number of rejections cast by `owners`.
+    spec fun spec_num_rejections(owners: vector<address>, votes: SimpleMap<address, bool>): u64 {
+        vector::spec_fold<address, u64>(
+            |acc, owner| if (simple_map::spec_contains_key(votes, owner)) {
+                if (simple_map::spec_get(votes, owner)) acc else acc + 1u64
+            } else acc,
+            owners, 0u64, len(owners))
+    }
+
+    spec can_be_rejected(multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
+        let votes = table::spec_get(multisig_account_resource.transactions, sequence_number).votes;
+        /// [high-level-req-8.2]
+        ensures result == (sequence_number == multisig_account_resource.last_executed_sequence_number + 1
+            && spec_num_rejections(multisig_account_resource.owners, votes)
+                >= multisig_account_resource.num_signatures_required);
+    }
+
+    spec can_reject(owner: address, multisig_account: address, sequence_number: u64): bool {
+        // Partial: the vote-count aborts are not specified.
+        pragma aborts_if_is_partial;
+        let multisig_account_resource = global<MultisigAccount>(multisig_account);
+        include ValidSequenceNumberAbortsIf;
+        aborts_if vector::spec_contains(multisig_account_resource.owners, owner)
+            && multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
         ensures result ==>
             vector::spec_contains(multisig_account_resource.owners, owner) &&
             sequence_number == multisig_account_resource.last_executed_sequence_number + 1;
+        let votes = table::spec_get(multisig_account_resource.transactions, sequence_number).votes;
+        // The owner's own rejection is counted as if cast now.
+        let num_rejections = spec_num_rejections(multisig_account_resource.owners, votes)
+            + if (simple_map::spec_contains_key(votes, owner) && !simple_map::spec_get(votes, owner)) 0 else 1;
+        /// [high-level-req-8.4]
+        ensures result == (vector::spec_contains(multisig_account_resource.owners, owner)
+            && sequence_number == multisig_account_resource.last_executed_sequence_number + 1
+            && num_rejections >= multisig_account_resource.num_signatures_required);
     }
 
     spec timelock_period(multisig_account: address): u64 {
@@ -378,16 +518,80 @@ spec aptos_framework::multisig_account {
 
     ////////////////////////// Creation function specs ///////////////////////////////
 
-    spec schema CreateMultisigAccountAbortsIfAndEnsures {
+    spec schema CreateMultisigAccountAbortsIf {
         multisig_address: address;
         owners: vector<address>;
         num_signatures_required: u64;
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
         aborts_if exists<MultisigAccount>(multisig_address);
+    }
+
+    spec schema CreateMultisigAccountAbortsIfAndEnsures {
+        multisig_address: address;
+        owners: vector<address>;
+        num_signatures_required: u64;
+        include CreateMultisigAccountAbortsIf;
         let post multisig = global<MultisigAccount>(multisig_address);
+        /// [high-level-req-9.1]
         ensures exists<MultisigAccount>(multisig_address);
         ensures multisig.owners == owners;
         ensures multisig.num_signatures_required == num_signatures_required;
+    }
+
+    spec create_with_owners(
+        owner: &signer,
+        additional_owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        use std::signer;
+        // Partial: the aborts of creating the resource account and of the metadata are not specified.
+        pragma aborts_if_is_partial;
+        let owner_addr = signer::address_of(owner);
+        let owners = concat(additional_owners, vec(owner_addr));
+        let multisig_address = spec_next_multisig_account_address(owner_addr);
+        include CreateMultisigAccountAbortsIfAndEnsures;
+        aborts_if exists i in 0..len(owners), j in 0..len(owners):
+            i < j && owners[i] == owners[j];
+        aborts_if exists<account::Account>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures multisig.last_executed_sequence_number == 0;
+        ensures multisig.next_sequence_number == 1;
+        ensures option::is_some(multisig.signer_cap) && option::spec_borrow(multisig.signer_cap).account == multisig_address;
+    }
+
+    spec create_with_owners_then_remove_bootstrapper(
+        bootstrapper: &signer,
+        owners: vector<address>,
+        num_signatures_required: u64,
+        metadata_keys: vector<String>,
+        metadata_values: vector<vector<u8>>,
+    ) {
+        use std::signer;
+        // Partial: the aborts of creating the resource account and of the metadata are not specified; removing
+        // the bootstrapper goes through a closure loop, so the final owner list is not specified.
+        pragma aborts_if_is_partial;
+        let bootstrapper_addr = signer::address_of(bootstrapper);
+        let all_owners = concat(owners, vec(bootstrapper_addr));
+        let multisig_address = spec_next_multisig_account_address(bootstrapper_addr);
+        include CreateMultisigAccountAbortsIf { owners: all_owners };
+        aborts_if exists i in 0..len(all_owners), j in 0..len(all_owners):
+            i < j && all_owners[i] == all_owners[j];
+        aborts_if exists<account::Account>(multisig_address);
+        let post multisig = global<MultisigAccount>(multisig_address);
+        ensures exists<MultisigAccount>(multisig_address);
+        ensures multisig.num_signatures_required == num_signatures_required;
+        ensures len(multisig.owners) >= num_signatures_required;
+        ensures multisig.next_sequence_number == 1;
+    }
+
+    /// The address `create_multisig_account` uses; the seed mirrors `create_multisig_account_seed`.
+    spec fun spec_next_multisig_account_address(creator: address): address {
+        let nonce = if (exists<account::Account>(creator)) {
+            global<account::Account>(creator).sequence_number
+        } else { 0 };
+        account::spec_create_resource_address(creator, concat(concat(vec<u8>(), DOMAIN_SEPARATOR), std::bcs::to_bytes((nonce as u64))))
     }
 
     spec create_with_existing_account(
@@ -415,10 +619,17 @@ spec aptos_framework::multisig_account {
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
     ) {
-        // Transaction-context and signature-verification aborts and the auth-key revocation
-        // are not specified.
+        // Transaction-context and signature-verification aborts are not specified.
         pragma aborts_if_is_partial;
         include CreateMultisigAccountAbortsIfAndEnsures;
+        // The auth key is rotated to zero and any signer or rotation capability offer is revoked.
+        let post account_resource = global<account::Account>(multisig_address);
+        /// [high-level-req-10.1]
+        ensures account_resource.authentication_key == ZERO_AUTH_KEY;
+        /// [high-level-req-10.2]
+        ensures option::is_none(account_resource.signer_capability_offer.for);
+        /// [high-level-req-10.3]
+        ensures option::is_none(account_resource.rotation_capability_offer.for);
     }
 
     spec create_with_existing_account_and_revoke_auth_key_call(
@@ -429,11 +640,15 @@ spec aptos_framework::multisig_account {
         metadata_values:vector<vector<u8>>,
     ) {
         use std::signer;
-        // Owner validation, metadata and account-resource aborts and the auth-key revocation are
-        // not specified.
+        // Owner validation, metadata and account-resource aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_address = signer::address_of(multisig_account);
         include CreateMultisigAccountAbortsIfAndEnsures;
+        // The auth key is rotated to zero and any signer or rotation capability offer is revoked.
+        let post account_resource = global<account::Account>(multisig_address);
+        ensures account_resource.authentication_key == ZERO_AUTH_KEY;
+        ensures option::is_none(account_resource.signer_capability_offer.for);
+        ensures option::is_none(account_resource.rotation_capability_offer.for);
     }
 
     ////////////////////////// Core entry function specs ///////////////////////////////
@@ -444,8 +659,10 @@ spec aptos_framework::multisig_account {
         // Payload cannot be empty.
         aborts_if len(payload) == 0;
         // Must be a multisig account.
+        /// [high-level-req-17.1]
         aborts_if !exists<MultisigAccount>(multisig_account);
         // Caller must be an owner.
+        /// [high-level-req-13.1]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
     }
 
@@ -455,22 +672,28 @@ spec aptos_framework::multisig_account {
         // Hash must be exactly 32 bytes.
         aborts_if len(payload_hash) != 32;
         // Must be a multisig account.
+        /// [high-level-req-17.2]
         aborts_if !exists<MultisigAccount>(multisig_account);
         // Caller must be an owner.
+        /// [high-level-req-13.2]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
     }
 
     spec approve_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
         use std::signer;
         pragma aborts_if_is_partial;
+        /// [high-level-req-17.3]
         aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-14.1]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
     }
 
     spec reject_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
         use std::signer;
         pragma aborts_if_is_partial;
+        /// [high-level-req-17.4]
         aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-14.2]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
     }
 
@@ -487,8 +710,11 @@ spec aptos_framework::multisig_account {
     spec vote_transaction(owner: &signer, multisig_account: address, sequence_number: u64, approved: bool) {
         use std::signer;
         pragma aborts_if_is_partial;
+        /// [high-level-req-17.5]
         aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-14.3]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
+        /// [high-level-req-14.4]
         aborts_if !table::spec_contains(global<MultisigAccount>(multisig_account).transactions, sequence_number);
     }
 
@@ -496,7 +722,57 @@ spec aptos_framework::multisig_account {
         use std::signer;
         pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
+        /// [high-level-req-15.1]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
+    }
+
+    spec vote_transactions(
+        owner: &signer,
+        multisig_account: address,
+        starting_sequence_number: u64,
+        final_sequence_number: u64,
+        approved: bool
+    ) {
+        use std::signer;
+        use std::features;
+        // Partial: the per-transaction aborts after the first vote are not specified.
+        pragma aborts_if_is_partial;
+        let pre = global<MultisigAccount>(multisig_account);
+        let post post_r = global<MultisigAccount>(multisig_account);
+        let voting = starting_sequence_number <= final_sequence_number;
+        aborts_if !features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT);
+        aborts_if voting && !exists<MultisigAccount>(multisig_account);
+        aborts_if voting && !vector::spec_contains(pre.owners, signer::address_of(owner));
+        // Only votes change.
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
+        ensures post_r.last_executed_sequence_number == pre.last_executed_sequence_number;
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.metadata == pre.metadata;
+    }
+
+    spec execute_rejected_transactions(
+        owner: &signer,
+        multisig_account: address,
+        final_sequence_number: u64,
+    ) {
+        use std::signer;
+        use std::features;
+        // Partial: the rejection-count aborts of each removal are not specified.
+        pragma aborts_if_is_partial;
+        let pre = global<MultisigAccount>(multisig_account);
+        let post post_r = global<MultisigAccount>(multisig_account);
+        aborts_if !features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT);
+        aborts_if !exists<MultisigAccount>(multisig_account);
+        aborts_if pre.last_executed_sequence_number >= final_sequence_number;
+        aborts_if final_sequence_number >= pre.next_sequence_number;
+        aborts_if !vector::spec_contains(pre.owners, signer::address_of(owner));
+        // All transactions up to `final_sequence_number` are resolved; the owner set is unchanged.
+        ensures post_r.last_executed_sequence_number == final_sequence_number;
+        ensures post_r.next_sequence_number == pre.next_sequence_number;
+        ensures post_r.owners == pre.owners;
+        ensures post_r.num_signatures_required == pre.num_signatures_required;
+        ensures post_r.metadata == pre.metadata;
     }
 
     ////////////////////////// VM prologue specs ///////////////////////////////
@@ -517,11 +793,13 @@ spec aptos_framework::multisig_account {
         // The multisig account must exist (assert_multisig_account_exists).
         aborts_if !exists<MultisigAccount>(multisig_account);
         // The signer must be an owner of the multisig account (assert_is_owner).
+        /// [high-level-req-15.2]
         aborts_if !vector::spec_contains(multisig_account_resource.owners, owner_addr);
         // Sequence-number arithmetic must not overflow.
         aborts_if multisig_account_resource.last_executed_sequence_number + 1 > MAX_U64;
         // The pending transaction must exist at the next sequence number
         // (assert_transaction_exists).
+        /// [high-level-req-15.3]
         aborts_if !table::spec_contains(multisig_account_resource.transactions, sequence_number);
     }
 
@@ -557,7 +835,9 @@ spec aptos_framework::multisig_account {
         aborts_if sequence_number > MAX_U64;
         aborts_if sequence_number >= pre.next_sequence_number;
         aborts_if !table::spec_contains(pre.transactions, sequence_number);
+        /// [high-level-req-16.2]
         ensures post_r.last_executed_sequence_number == sequence_number;
+        /// [high-level-req-15.4]
         ensures !table::spec_contains(post_r.transactions, sequence_number);
         ensures post_r.next_sequence_number == pre.next_sequence_number;
         ensures post_r.owners == pre.owners;
@@ -587,6 +867,7 @@ spec aptos_framework::multisig_account {
         let post multisig = global<MultisigAccount>(multisig_address);
         ensures multisig.owners == owners;
         ensures multisig.num_signatures_required == num_signatures_required;
+        /// [high-level-req-9.2]
         ensures multisig.last_executed_sequence_number == 0;
         ensures multisig.next_sequence_number == 1;
     }
@@ -617,10 +898,25 @@ spec aptos_framework::multisig_account {
 
     spec validate_owners(owners: &vector<address>, multisig_account: address) {
         pragma opaque;
-        pragma verify = false;
         aborts_if [abstract] exists i in 0..len(owners): owners[i] == multisig_account;
         aborts_if [abstract] exists i in 0..len(owners), j in 0..len(owners) where i < j:
             owners[i] == owners[j];
+    }
+
+    spec create_multisig_account(owner: &signer): (signer, SignerCapability) {
+        use std::signer;
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
+        use aptos_std::type_info;
+        let owner_addr = signer::address_of(owner);
+        let multisig_address = spec_next_multisig_account_address(owner_addr);
+        aborts_if !exists<account::Account>(owner_addr) && !features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        aborts_if exists<account::Account>(multisig_address);
+        include account::EnsureResourceExistsAbortsIf { addr: multisig_address };
+        aborts_if len(account::ZERO_AUTH_KEY) != 32;
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(type_info::type_of<AptosCoin>().account_address);
+        ensures signer::address_of(result_1) == multisig_address;
+        ensures result_2.account == multisig_address;
+        ensures exists<account::Account>(multisig_address);
     }
 
     spec remove_executed_transaction(multisig_account_resource: &mut MultisigAccount): (u64, u64) {
@@ -633,7 +929,18 @@ spec aptos_framework::multisig_account {
             multisig_account_resource.last_executed_sequence_number + 1
         );
         // After removal, last_executed_sequence_number increments by 1.
+        /// [high-level-req-16.1]
         ensures multisig_account_resource.last_executed_sequence_number ==
             old(multisig_account_resource).last_executed_sequence_number + 1;
+    }
+
+    spec update_owner_schema(
+        multisig_address: address,
+        new_owners: vector<address>,
+        owners_to_remove: vector<address>,
+        optional_new_num_signatures_required: Option<u64>,
+    ) {
+        // The owner list and threshold may be invalid between the update and the checks that abort on it.
+        pragma disable_invariants_in_body;
     }
 }

@@ -1,0 +1,2 @@
+# The repo-wide `run_*` rule would otherwise ignore this crate's `run_*.rs` sources.
+!run_*.rs

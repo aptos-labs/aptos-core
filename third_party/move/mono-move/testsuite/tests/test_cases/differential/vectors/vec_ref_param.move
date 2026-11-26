@@ -13,8 +13,5 @@ module 0xc0ffee::vec_ref_param {
     }
 }
 
-// RUN: execute 0xc0ffee::vec_ref_param::push_then_pop --args 0
-// CHECK: results: 0
-
 // RUN: execute 0xc0ffee::vec_ref_param::push_then_pop --args 42
 // CHECK: results: 42

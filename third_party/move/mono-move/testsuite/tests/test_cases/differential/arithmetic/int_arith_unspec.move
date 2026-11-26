@@ -17,6 +17,10 @@ module 0x1::test {
     fun i64_sub(a: i64, b: i64): i64 { a - b }
     fun i128_mul(a: i128, b: i128): i128 { a * b }
     fun i256_add(a: i256, b: i256): i256 { a + b }
+
+    fun i64_neg(value: i64): i64 { -value }
+    fun i128_neg(value: i128): i128 { -value }
+    fun i256_neg(value: i256): i256 { -value }
 }
 
 // RUN: execute 0x1::test::u128_add --args 100, 50
@@ -63,3 +67,15 @@ module 0x1::test {
 // MAX - 1 stays in range when produced via mul.
 // RUN: execute 0x1::test::i128_mul --args -85070591730234615865843651857942052863, 2
 // CHECK: results: -170141183460469231731687303715884105726
+
+// RUN: execute 0x1::test::i64_neg --args -42
+// CHECK: results: 42
+
+// RUN: execute 0x1::test::i128_neg --args 42
+// CHECK: results: -42
+
+// RUN: execute 0x1::test::i256_neg --args 1234567
+// CHECK: results: -1234567
+
+// RUN: execute 0x1::test::i256_neg --args 0
+// CHECK: results: 0

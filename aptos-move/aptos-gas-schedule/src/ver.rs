@@ -8,6 +8,11 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V56 (`RELEASE_V1_51`):
+///   - New `reflect.resolve_per_byte` parameter: `reflect::resolve` charges per byte of the
+///     module and function names, and rejects names over the identifier size limit
+///   - New `reflect.resolve_not_found` parameter: `reflect::resolve` charges it when the module
+///     or function does not exist
 /// - V55 (`RELEASE_V1_50`):
 ///   - New `txn.high_limit_txn_excess_price_multiplier` parameter: transactions with a
 ///     staking-backed limits request pay this multiple of the gas price for execution and IO gas

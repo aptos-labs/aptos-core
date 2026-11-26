@@ -98,6 +98,13 @@ module aptos_framework::randomness {
             v.reverse_append(blob);
 
             c += 32;
+        } spec {
+            invariant c % 32 == 0;
+            invariant c < n + 32;
+            invariant len(v) == c;
+            invariant c > 0 ==> exists<PerBlockRandomness>(@aptos_framework)
+                && option::is_some(global<PerBlockRandomness>(@aptos_framework).seed)
+                && spec_is_unbiasable();
         };
 
         if (c > n) {

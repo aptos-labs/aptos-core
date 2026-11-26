@@ -1,0 +1,17 @@
+// Returning three arguments of mixed widths in rotated order. The golden pins how the return
+// reorders them, which needs two values set aside at once.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::ret_two_scratch_saves
+
+fun perm(value: u64, first: u8, second: u8): (u8, u8, u64)
+    move_loc first
+    move_loc second
+    move_loc value
+    ret
+
+// RUN: execute 0x66::ret_two_scratch_saves::perm --args 18446744073709551615, 7, 9
+// CHECK: results: 7, 9, 18446744073709551615
+
+// RUN: execute 0x66::ret_two_scratch_saves::perm --args 1, 255, 0
+// CHECK: results: 255, 0, 1

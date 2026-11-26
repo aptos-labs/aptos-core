@@ -60,6 +60,25 @@ fun write_computed() {
     2: Return @6
 }
 
+fun write_field() {
+  frame_data_size: 88
+  entry_gas: 156
+  code:
+    0: EnumNew [16] desc=3 tag #0 @1
+    1: HeapMoveTo8 [16]+8 <- [0] @1
+    2: SlotBorrow [40] <- &[16] @3
+    3: HeapBorrow [24] <- &[40]+8 @4
+    4: ReadRef [56] <- *[24] (size=8) @7
+    5: AddU64 [56] <- [56] + [8] @9
+    6: WriteRef *[24] <- [56] (size=8) @11
+    7: SlotBorrow [64] <- &[16] @12
+    8: HeapReadOffset(8) [56] <- (*[64]).8 @13
+    9: Move8 [0] <- [56] @15
+    10: Return @15
+  safe_point_layouts:
+    0: []
+}
+
 fun write_simple() {
   frame_data_size: 40
   entry_gas: 30

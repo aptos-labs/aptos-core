@@ -146,3 +146,9 @@ fun shr_imm(x: u64): u64
 
 // RUN: execute 0x66::test::shr_imm --args 64
 // CHECK: results: 16
+
+// RUN: execute 0x66::test::shl_values --args 3, 4
+// CHECK: results: 48
+
+// RUN: execute 0x66::test::shr_values --args 48, 4
+// CHECK: results: 3

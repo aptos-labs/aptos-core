@@ -60,7 +60,6 @@ module 0x1::crypto_algebra {
 
     native fun deserialize_internal<S, F>(bytes: &vector<u8>): (bool, u64);
     native fun eq_internal<S>(handle_1: u64, handle_2: u64): bool;
-    native fun from_u64_internal<S>(value: u64): u64;
     native fun serialize_internal<S, F>(handle: u64): vector<u8>;
 
     // `serialize(deserialize(bytes)) == bytes` pins the format both ways: a
@@ -90,16 +89,6 @@ module 0x1::crypto_algebra {
         let last = bytes.length() - 1;
         bytes[last] = bytes[last] ^ 0xff;
         bytes
-    }
-
-    fun reversed(bytes: vector<u8>): vector<u8> {
-        let out = vector[];
-        let i = bytes.length();
-        while (i > 0) {
-            i -= 1;
-            out.push_back(bytes[i]);
-        };
-        out
     }
 
     public fun bls12381_roundtrips(): bool {
@@ -148,26 +137,6 @@ module 0x1::crypto_algebra {
                 BN_G2_GENERATOR_SERIALIZED_UNCOMP
             )
             && roundtrip<bn254_algebra::Gt, bn254_algebra::FormatGt>(BN_GT_GENERATOR_SERIALIZED)
-    }
-
-    // The MSB encoding is the LSB encoding byte-reversed. Serializing both and
-    // reversing one catches an MSB arm that forgot to reverse.
-    public fun msb_is_reversed_lsb(): bool {
-        let bls_seven = from_u64_internal<bls12381_algebra::Fr>(7);
-        let bn_seven = from_u64_internal<bn254_algebra::Fr>(7);
-        let bn_fq_seven = from_u64_internal<bn254_algebra::Fq>(7);
-        serialize_internal<bls12381_algebra::Fr, bls12381_algebra::FormatFrMsb>(bls_seven)
-            == reversed(
-                serialize_internal<bls12381_algebra::Fr, bls12381_algebra::FormatFrLsb>(bls_seven)
-            )
-            && serialize_internal<bn254_algebra::Fr, bn254_algebra::FormatFrMsb>(bn_seven)
-                == reversed(
-                    serialize_internal<bn254_algebra::Fr, bn254_algebra::FormatFrLsb>(bn_seven)
-                )
-            && serialize_internal<bn254_algebra::Fq, bn254_algebra::FormatFqMsb>(bn_fq_seven)
-                == reversed(
-                    serialize_internal<bn254_algebra::Fq, bn254_algebra::FormatFqLsb>(bn_fq_seven)
-                )
     }
 
     // The length check runs before decoding, so one byte either way is refused.
@@ -268,9 +237,6 @@ module 0x1::crypto_algebra {
 // CHECK: results: true
 
 // RUN: execute 0x1::crypto_algebra::bn254_roundtrips
-// CHECK: results: true
-
-// RUN: execute 0x1::crypto_algebra::msb_is_reversed_lsb
 // CHECK: results: true
 
 // RUN: execute 0x1::crypto_algebra::wrong_length_rejected

@@ -1,0 +1,40 @@
+// A call returns a `u8` and a struct `S { x: u8, y: u64 }`, and the struct is unpacked
+// straight into the next call's arguments. Each field, of a different width, must reach
+// the right argument (321 = 1 + 2 * 10 + 3 * 100). The golden pins how the unpack lowers.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::unpack_xfer_backward_shift
+
+struct S has drop
+  x: u8
+  y: u64
+
+fun mk(): (u8, S)
+    ld_u8 1
+    ld_u8 2
+    ld_u64 3
+    pack S
+    ret
+
+fun use3(ones: u8, tens: u8, hundreds: u64): u64
+    move_loc ones
+    cast_u64
+    move_loc tens
+    cast_u64
+    ld_u64 10
+    mul
+    add
+    move_loc hundreds
+    ld_u64 100
+    mul
+    add
+    ret
+
+public fun trigger(): u64
+    call mk
+    unpack S
+    call use3
+    ret
+
+// RUN: execute 0x66::unpack_xfer_backward_shift::trigger
+// CHECK: results: 321
