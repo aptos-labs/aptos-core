@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/receiver_call_inferred.move:32:9
+   │
+32 │         ensures forall x in vector[s]: len(x.values()) == result + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/receiver_call_inferred.move:30: in_quantifier_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/receiver_call_inferred.move:35: len_of
+   =         s = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/receiver_call_inferred.move:32: in_quantifier_incorrect (spec)

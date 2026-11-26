@@ -1,0 +1,41 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/schema_include_receiver_call.move:18:9: error: the specification clause `ensures result == s.get_f() + 1` is not established
+tests/sources/functional/schema_include_receiver_call.move:39:5: error: verex verification failed: the automatic verification of `f_of_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+  verify f_of_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_include_receiver_call.move:18:9: error: the specification clause `ensures s.get_f() > 0 ==> result == s.f + 1` is not established
+tests/sources/functional/schema_include_receiver_call.move:55:5: error: verex verification failed: the automatic verification of `f_or_zero_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+  verify f_or_zero_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_include_receiver_call.move:18:9: error: the specification clause `ensures !(s.get_f() > 0) ==> result == 1` is not established
+tests/sources/functional/schema_include_receiver_call.move:60:5: error: verex verification failed: the automatic verification of `f_or_zero_if_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+  verify f_or_zero_if_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_2 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_include_receiver_call.move:18:9: error: the specification clause `ensures [export] result == s.get_f()` is not established
+tests/sources/functional/schema_include_receiver_call.move:3:1: error: verex verification failed: the automatic verification of `applied_f_off_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+  verify applied_f_off_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/schema_include_receiver_call.move:24:9: error: the data invariant `invariant s.get_f() <= lim` does not hold where a value is constructed
+tests/sources/functional/schema_include_receiver_call.move:104:5: error: verex verification failed: the automatic verification of `make_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+  verify make_incorrect by lean =>
+    verex_obligations
+    verex_on
+    | data_invariant_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
