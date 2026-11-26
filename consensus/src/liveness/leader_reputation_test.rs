@@ -15,7 +15,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{CheckpointStateReader, DbReader};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -481,6 +481,8 @@ impl MockDbReader {
         *self.fetched.lock()
     }
 }
+
+impl CheckpointStateReader for MockDbReader {}
 
 impl DbReader for MockDbReader {
     fn get_latest_block_events(

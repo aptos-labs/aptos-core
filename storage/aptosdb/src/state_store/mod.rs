@@ -70,7 +70,7 @@ use aptos_storage_interface::{
         versioned_state_value::StateUpdateRef,
         HotStateShardUpdates, HotStateUpdates,
     },
-    AptosDbError, DbReader, Result, StateSnapshotReceiver,
+    AptosDbError, CheckpointStateReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -223,34 +223,9 @@ impl Deref for StateStore {
     }
 }
 
-// "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
-// ref: https://github.com/rust-lang/rust/issues/65991
-impl DbReader for StateDb {
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.state_merkle_db
-            .get_state_snapshot_version_before(next_version)?
-            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
-            .transpose()
-    }
-
-    // Only checkpoint reads: a single seek in state KV is only guaranteed to be exact at a block
-    // end. Reads at any version go through `AptosDB`.
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        Ok(self
-            .get_state_value_with_version_at_checkpoint(state_key, version)?
-            .map(|(_, value)| value))
-    }
-
+// A single seek in state KV is only guaranteed to be exact at a block end. Reads at any version
+// go through `AptosDB`.
+impl CheckpointStateReader for StateDb {
     fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
@@ -316,8 +291,10 @@ impl DbReader for StateDb {
         };
         Ok((value, proof))
     }
+}
 
-    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+impl StateDb {
+    pub fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(match self.ledger_db.metadata_db().get_usage(version) {
                 Ok(data) => data,
@@ -328,78 +305,18 @@ impl DbReader for StateDb {
             })
         })
     }
-}
-
-impl DbReader for StateStore {
-    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
-        Ok(self.live()?.persisted_state.get_state())
-    }
-
-    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
-        Ok(self.live()?.persisted_state.get_state_summary())
-    }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
+    pub fn get_state_snapshot_before(
         &self,
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.deref().get_state_snapshot_before(next_version)
+        self.state_merkle_db
+            .get_state_snapshot_version_before(next_version)?
+            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
+            .transpose()
     }
 
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        self.deref()
-            .get_state_value_at_checkpoint(state_key, version)
-    }
-
-    fn get_state_value_with_version_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        self.deref()
-            .get_state_value_with_version_at_checkpoint(state_key, version)
-    }
-
-    /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version_ext(
-        &self,
-        key_hash: &HashValue,
-        version: Version,
-        root_depth: usize,
-        use_hot_state: bool,
-    ) -> Result<SparseMerkleProofExt> {
-        self.deref()
-            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
-    }
-
-    /// Get the state value with proof extension given the state key and version
-    fn get_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
-    }
-
-    fn get_hot_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
-    }
-}
-
-impl StateDb {
     fn expect_value_by_version(
         &self,
         state_key: &StateKey,
@@ -1031,6 +948,14 @@ impl LiveState {
 }
 
 impl StateStore {
+    pub fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
+        Ok(self.live()?.persisted_state.get_state())
+    }
+
+    pub fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        Ok(self.live()?.persisted_state.get_state_summary())
+    }
+
     /// Replaces the in-memory state with one loaded from disk, after a restore wrote state
     /// underneath it.
     pub fn reload(&self) {

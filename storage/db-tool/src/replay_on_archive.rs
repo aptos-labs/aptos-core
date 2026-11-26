@@ -671,7 +671,7 @@ mod tests {
     use super::*;
     use aptos_crypto::HashValue;
     use aptos_executor_test_helpers::integration_test_impl::test_execution_with_storage_impl_inner;
-    use aptos_storage_interface::Result as DbResult;
+    use aptos_storage_interface::{CheckpointStateReader, Result as DbResult};
     use aptos_types::{
         block_metadata::BlockMetadata,
         transaction::{ChangeSet, ExecutionStatus, WriteSetPayload},
@@ -723,6 +723,8 @@ mod tests {
             &self.block_ends[start..end]
         }
     }
+
+    impl CheckpointStateReader for MockDb {}
 
     impl DbReader for MockDb {
         fn get_transaction_iterator(

@@ -22,7 +22,7 @@ use aptos_network::{
         },
     },
 };
-use aptos_storage_interface::{DbReader, LedgerSummary, StateKind};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, LedgerSummary, StateKind};
 use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -232,6 +232,15 @@ fn get_random_network_id() -> NetworkId {
 // mock test crate to be shared across the codebase.
 mock! {
     pub DatabaseReader {}
+
+    impl CheckpointStateReader for DatabaseReader {
+        fn get_state_value_with_proof_by_version(
+            &self,
+            state_key: &StateKey,
+            version: Version,
+        ) -> aptos_storage_interface::Result<(Option<StateValue>, SparseMerkleProof)>;
+    }
+
     impl DbReader for DatabaseReader {
         fn get_epoch_ending_ledger_infos(
             &self,
@@ -297,12 +306,6 @@ mock! {
         ) -> aptos_storage_interface::Result<StateProof>;
 
         fn get_state_proof(&self, known_version: u64) -> aptos_storage_interface::Result<StateProof>;
-
-        fn get_state_value_with_proof_by_version(
-            &self,
-            state_key: &StateKey,
-            version: Version,
-        ) -> aptos_storage_interface::Result<(Option<StateValue>, SparseMerkleProof)>;
 
         fn get_pre_committed_ledger_summary(&self) -> aptos_storage_interface::Result<LedgerSummary>;
 

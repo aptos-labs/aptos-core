@@ -9,7 +9,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_scratchpad::SparseMerkleTree;
-use aptos_storage_interface::{DbReader, Result};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
