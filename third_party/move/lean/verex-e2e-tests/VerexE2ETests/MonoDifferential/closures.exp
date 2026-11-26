@@ -49,13 +49,11 @@ step 9: 0x4c::closures::mutated(1, 5)
   round trip: returned 11
 
 step 10: 0x4c::closures::same(4, 4)
-  mono:       error (adapter run failure: equality is not supported for this operand type)
+  mono:       returned true
   VIR:        returned true
   round trip: returned true
-  ERROR: mono and VIR diverge
 
 step 11: 0x4c::closures::same(4, 5)
-  mono:       error (adapter run failure: equality is not supported for this operand type)
+  mono:       returned false
   VIR:        returned false
   round trip: returned false
-  ERROR: mono and VIR diverge

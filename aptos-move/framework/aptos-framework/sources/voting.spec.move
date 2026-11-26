@@ -69,12 +69,11 @@ spec aptos_framework::voting {
         early_resolution_vote_threshold: Option<u128>,
         metadata: SimpleMap<String, vector<u8>>,
     ): u64 {
-        use aptos_framework::chain_status;
         pragma opaque;
         pragma aborts_if_is_partial = false;
 
-        requires chain_status::is_operating();
         include CreateProposalAbortsIfAndEnsures<ProposalType>{is_multi_step_proposal: false};
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         // property 1: Verify the proposal_id of the newly created proposal.
         /// [high-level-req-1]
         ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
@@ -96,10 +95,8 @@ spec aptos_framework::voting {
         metadata: SimpleMap<String, vector<u8>>,
         is_multi_step_proposal: bool,
     ): u64 {
-        use aptos_framework::chain_status;
-
-        requires chain_status::is_operating();
         include CreateProposalAbortsIfAndEnsures<ProposalType>;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         // property 1: Verify the proposal_id of the newly created proposal.
         ensures result == old(global<VotingForum<ProposalType>>(voting_forum_address)).next_proposal_id;
     }
@@ -146,10 +143,6 @@ spec aptos_framework::voting {
         num_votes: u64,
         should_pass: bool,
     ) {
-        use aptos_framework::chain_status;
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
-
         // property 2: While voting, it ensures that only the governance module that defines ProposalType may initiate voting
         // and that the proposal under vote exists in the specified voting forum.
         /// [high-level-req-2]
@@ -186,9 +179,6 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ) {
-        use aptos_framework::chain_status;
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
         include IsProposalResolvableAbortsIf<ProposalType>;
     }
 
@@ -197,6 +187,7 @@ spec aptos_framework::voting {
         proposal_id: u64;
 
         include AbortsIfNotContainProposalID<ProposalType>;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
 
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
@@ -218,10 +209,6 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): ProposalType {
-        use aptos_framework::chain_status;
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
-
         include IsProposalResolvableAbortsIf<ProposalType>;
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
@@ -249,11 +236,6 @@ spec aptos_framework::voting {
         proposal_id: u64,
         next_execution_hash: vector<u8>,
     ) {
-        use aptos_framework::chain_status;
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
-
         include IsProposalResolvableAbortsIf<ProposalType>;
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
@@ -292,12 +274,17 @@ spec aptos_framework::voting {
     }
 
     spec is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
-        use aptos_framework::chain_status;
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
         include AbortsIfNotContainProposalID<ProposalType>;
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        include AbortsIfNoClockWhenNotResolvedEarly<ProposalType>;
         ensures result == spec_is_voting_closed<ProposalType>(voting_forum_address, proposal_id);
+    }
+
+    /// The clock is only read when the proposal cannot be resolved early.
+    spec schema AbortsIfNoClockWhenNotResolvedEarly<ProposalType> {
+        voting_forum_address: address;
+        proposal_id: u64;
+        let proposal = table::spec_get(global<VotingForum<ProposalType>>(voting_forum_address).proposals, proposal_id);
+        aborts_if !spec_can_be_resolved_early<ProposalType>(proposal) && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
     }
 
     spec fun spec_is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool {
@@ -354,13 +341,10 @@ spec aptos_framework::voting {
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 {
-        use aptos_framework::chain_status;
-
         pragma addition_overflow_unchecked;
-        // Ensures existence of Timestamp
-        requires chain_status::is_operating();
 
         include AbortsIfNotContainProposalID<ProposalType>;
+        include AbortsIfNoClockWhenNotResolvedEarly<ProposalType>;
 
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         ensures result == spec_get_proposal_state(voting_forum_address, proposal_id, voting_forum);
@@ -504,9 +488,7 @@ spec aptos_framework::voting {
     }
 
     spec is_voting_period_over<ProposalType: store>(proposal: &Proposal<ProposalType>): bool {
-        use aptos_framework::chain_status;
-        requires chain_status::is_operating();
-        aborts_if false;
+        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         ensures result == (timestamp::spec_now_seconds() > proposal.expiration_secs);
     }
 }

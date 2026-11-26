@@ -37,7 +37,8 @@ spec aptos_framework::vesting {
     /// Implementation: The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs.
     /// The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff
     /// period.
-    /// Enforcement: Audited the check for the end of vesting cliff: [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566](vest) module.
+    /// Enforcement: Formally verified via [high-level-req-4](vest) that before the cliff ends or before the next period
+    /// completes, vest leaves the vesting schedule and the remaining grant unchanged.
     ///
     /// No.: 5
     /// Requirement: In order to retrieve the total accumulated rewards that have not been distributed, the accumulated
@@ -64,8 +65,8 @@ spec aptos_framework::vesting {
     /// Criticality: High
     /// Implementation: When vesting, the last_completed_period is checked against the next period to vest. This allows
     /// to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.
-    /// Enforcement: Audited that vesting doesn't skip periods, but gradually increments to allow shareholders to
-    /// retrieve all the vested tokens.
+    /// Enforcement: Formally verified via [high-level-req-7](vest) that each vest advances last_vested_period by exactly
+    /// one once a period is due, so no period is skipped.
     ///
     /// No.: 8
     /// Requirement: Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing
@@ -91,7 +92,9 @@ spec aptos_framework::vesting {
     /// Implementation: The create_vesting_contract function ensures that the withdrawal_address is not a reserved
     /// address, that it is registered for apt, that the list of shareholders is non-empty, and that the amount of
     /// shareholders matches the amount of buy_ins.
-    /// Enforcement: Formally verified via [high-level-req-10](create_vesting_contract).
+    /// Enforcement: Audited that create_vesting_contract performs these checks. Its
+    /// [high-level-req-10](create_vesting_contract) spec is not verified: the grant pool built by the shareholder loop
+    /// is not tracked, so the pool's shareholder limit cannot be established for the new contract.
     ///
     /// No.: 11
     /// Requirement: Creating a vesting contract account should require the signer (admin) to own an admin store and should
@@ -108,7 +111,8 @@ spec aptos_framework::vesting {
         pragma aborts_if_is_partial;
         // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         /// [high-level-spec-2]
-        invariant forall a: address where exists<VestingContract>(a):
+        // Explicit trigger: an inferred one matches every address term.
+        invariant forall a: address {exists<VestingContract>(a)} where exists<VestingContract>(a):
             global<VestingContract>(a).grant_pool.shareholders_limit <= MAXIMUM_SHAREHOLDERS;
     }
 
@@ -239,20 +243,25 @@ spec aptos_framework::vesting {
     }
 
     spec unlock_rewards_many(contract_addresses: vector<address>) {
-        // TODO: Calls `unlock_rewards` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec vest(contract_address: address) {
-        // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = false;
         include UnlockRewardsAbortsIf;
+        let pre = global<VestingContract>(contract_address);
+        let post post_vc = global<VestingContract>(contract_address);
+        let schedule = pre.vesting_schedule;
+        let now = timestamp::spec_now_seconds();
+        let not_due = schedule.start_timestamp_secs > now
+            || (now - schedule.start_timestamp_secs) / schedule.period_duration < schedule.last_vested_period + 1;
+        /// [high-level-req-4]
+        ensures not_due ==> post_vc.vesting_schedule == schedule && post_vc.remaining_grant == pre.remaining_grant;
+        /// [high-level-req-7]
+        ensures !not_due ==> post_vc.vesting_schedule.last_vested_period == schedule.last_vested_period + 1;
+        ensures post_vc.remaining_grant <= pre.remaining_grant;
     }
 
     spec vest_many(contract_addresses: vector<address>) {
-        // TODO: Calls `vest` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
@@ -265,18 +274,19 @@ spec aptos_framework::vesting {
     }
 
     spec distribute_many(contract_addresses: vector<address>) {
-        // TODO: Calls `distribute` in loop.
-        pragma verify = false;
         aborts_if len(contract_addresses) == 0;
     }
 
     spec terminate_vesting_contract(admin: &signer, contract_address: address) {
-        // TODO: Calls `staking_contract::distribute` which is not verified.
-        pragma verify = false;
+        // Partial: the aborts of the distribution loop, of reading the stake and of unlocking it are not specified.
         include ActiveVestingContractAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
         include WithdrawStakeAbortsIf { vesting_contract };
+        aborts_if signer::address_of(admin) != vesting_contract.admin;
+        let post post_vesting_contract = global<VestingContract>(contract_address);
+        ensures post_vesting_contract.state == VESTING_POOL_TERMINATED;
+        ensures post_vesting_contract.remaining_grant == 0;
     }
 
     spec admin_withdraw(admin: &signer, contract_address: address) {
@@ -339,7 +349,6 @@ spec aptos_framework::vesting {
         contract_address: address,
         new_voter: address,
     ) {
-        pragma verify_duration_estimate = 300;
         include VerifyAdminAbortsIf;
 
         let vesting_contract = global<VestingContract>(contract_address);
@@ -375,7 +384,6 @@ spec aptos_framework::vesting {
         shareholder: address,
         new_beneficiary: address,
     ) {
-        pragma verify_duration_estimate = 300;
         aborts_if !account::spec_exists_at(new_beneficiary);
         include VerifyAdminAbortsIf;
         let post vesting_contract = global<VestingContract>(contract_address);
@@ -439,13 +447,10 @@ spec aptos_framework::vesting {
         ensures signer::address_of(result) == vesting_contract.signer_cap.account;
     }
 
-    spec fun spec_get_vesting_account_signer(vesting_contract: VestingContract): signer;
-
     spec create_vesting_contract_account(
         admin: &signer,
         contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability) {
-        pragma verify_duration_estimate = 300;
         let admin_addr = signer::address_of(admin);
         let admin_store = global<AdminStore>(admin_addr);
         let seed = bcs::to_bytes(admin_addr);
@@ -473,7 +478,6 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
-        pragma verify_duration_estimate = 120;
         /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }

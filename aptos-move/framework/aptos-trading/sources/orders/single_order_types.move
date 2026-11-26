@@ -229,6 +229,24 @@ module aptos_trading::single_order_types {
         aborts_if self.order.order_request.remaining_size + size > MAX_U64;
         ensures self.order.order_request.remaining_size
             == old(self.order.order_request.remaining_size) + size;
+        /// The increase touches only the remaining size, as the decrease and
+        /// the set below.
+        ensures self.is_active == old(self.is_active);
+        ensures self.order.unique_priority_idx == old(self.order.unique_priority_idx);
+        ensures self.order.order_request.account == old(self.order.order_request.account);
+        ensures self.order.order_request.price == old(self.order.order_request.price);
+        ensures self.order.order_request.is_bid == old(self.order.order_request.is_bid);
+        ensures self.order.order_request.client_order_id
+            == old(self.order.order_request.client_order_id);
+        ensures self.order.order_request.order_id == old(self.order.order_request.order_id);
+        ensures self.order.order_request.orig_size == old(self.order.order_request.orig_size);
+        ensures self.order.order_request.trigger_condition
+            == old(self.order.order_request.trigger_condition);
+        ensures self.order.order_request.time_in_force
+            == old(self.order.order_request.time_in_force);
+        ensures self.order.order_request.creation_time_micros
+            == old(self.order.order_request.creation_time_micros);
+        ensures self.order.order_request.metadata == old(self.order.order_request.metadata);
     }
 
     public fun decrease_remaining_size_from_state<M: store + copy + drop>(

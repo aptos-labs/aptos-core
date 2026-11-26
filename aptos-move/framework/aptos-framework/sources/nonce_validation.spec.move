@@ -1,4 +1,30 @@
 spec aptos_framework::nonce_validation {
+    /// Creates the empty nonce history unless it exists.
+    spec initialize_nonce_table(aptos_framework: &signer) {
+        use std::signer;
+        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        ensures exists<NonceHistory>(@aptos_framework);
+        ensures old(exists<NonceHistory>(@aptos_framework)) ==>
+            global<NonceHistory>(@aptos_framework) == old(global<NonceHistory>(@aptos_framework));
+        ensures !old(exists<NonceHistory>(@aptos_framework)) ==>
+            global<NonceHistory>(@aptos_framework).next_key == 0;
+    }
+
+    spec empty_bucket(pre_allocate_slots: bool): Bucket {
+        // Partial: aborts of the slot pre-allocation are not modelled.
+        pragma aborts_if_is_partial;
+        ensures big_ordered_map::spec_len(result.nonces_ordered_by_exp_time) == 0;
+        ensures big_ordered_map::spec_len(result.nonce_to_exp_time_map) == 0;
+    }
+
+    spec add_nonce_buckets(count: u64) {
+        // Partial: aborts of the slot pre-allocation are not modelled.
+        pragma aborts_if_is_partial;
+        aborts_if !exists<NonceHistory>(@aptos_framework);
+        modifies global<NonceHistory>(@aptos_framework);
+        ensures exists<NonceHistory>(@aptos_framework);
+    }
+
     /// Returns false iff `(sender_address, nonce)` is in use; otherwise records it with `txn_expiration_time`.
     spec check_and_insert_nonce(sender_address: address, nonce: u64, txn_expiration_time: u64): bool {
         // Partial: the aborts of the bucket map operations are not specified.
