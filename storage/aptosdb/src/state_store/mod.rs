@@ -401,15 +401,15 @@ impl StateStore {
         squash_state_kv_writes_per_block: bool,
     ) -> Self {
         if mode == StateStoreMode::ReadWrite {
-            Self::sync_commit_progress(
-                Arc::clone(&ledger_db),
-                Arc::clone(&state_kv_db),
-                Arc::clone(&state_merkle_db),
-                Arc::clone(&hot_state_kv_db),
-                Arc::clone(&hot_state_merkle_db),
-                /*crash_if_difference_is_too_large=*/ true,
-                hot_state_config.delete_on_restart,
-            );
+            Self::sync_commit_progress()
+                .ledger_db(Arc::clone(&ledger_db))
+                .state_kv_db(Arc::clone(&state_kv_db))
+                .state_merkle_db(Arc::clone(&state_merkle_db))
+                .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+                .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+                .crash_if_difference_is_too_large(true)
+                .delete_hot_state_on_restart(hot_state_config.delete_on_restart)
+                .call();
         }
         let state_db = Arc::new(StateDb {
             ledger_db,
@@ -449,6 +449,7 @@ impl StateStore {
 
     // We commit the overall commit progress at the last, and use it as the source of truth of the
     // commit progress.
+    #[builder]
     pub fn sync_commit_progress(
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
@@ -622,6 +623,7 @@ impl StateStore {
     /// Rebuilds state from the latest snapshot like a regular open: replays the write sets
     /// committed after it, and rebuilds hot state if `delete_on_restart` wiped it.
     #[cfg(any(test, feature = "db-debugger"))]
+    #[builder]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Arc<StateMerkleDb>,

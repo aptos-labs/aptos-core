@@ -23,7 +23,9 @@ pub(crate) struct NativeStorePruner<T: NativeStoreSpec> {
         StateMerklePrunerManager<T::EpochSnapshotPruner, NativeMerkleDb<T>>,
 }
 
+#[bon::bon]
 impl<T: NativeStoreSpec> NativeStorePruner<T> {
+    #[builder(finish_fn = build)]
     pub(crate) fn new(
         kv_db: Arc<NativeKvDb<T>>,
         merkle_db: Arc<NativeMerkleDb<T>>,
@@ -112,26 +114,26 @@ mod tests {
             "overwrite leaves stale nodes"
         );
 
-        let pruner = NativeStorePruner::<PositionStore>::new(
-            kv_db,
-            Arc::clone(&merkle_db),
-            LedgerPrunerConfig {
+        let pruner = NativeStorePruner::<PositionStore>::builder()
+            .kv_db(kv_db)
+            .merkle_db(Arc::clone(&merkle_db))
+            .value_pruner_config(LedgerPrunerConfig {
                 enable: true,
                 prune_window: 0,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            },
-            StateMerklePrunerConfig {
+            })
+            .state_merkle_pruner_config(StateMerklePrunerConfig {
                 enable: true,
                 prune_window: 0,
                 batch_size: 1000,
-            },
-            StateMerklePrunerConfig {
+            })
+            .epoch_snapshot_pruner_config(StateMerklePrunerConfig {
                 enable: true,
                 prune_window: 0,
                 batch_size: 1000,
-            },
-        );
+            })
+            .build();
         pruner.state_merkle_pruner.wake_and_wait_pruner(1).unwrap();
 
         assert_eq!(stale_rows_up_to(&merkle_db, 1), 0, "stale nodes pruned");

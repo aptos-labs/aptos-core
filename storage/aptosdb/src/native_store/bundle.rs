@@ -128,13 +128,15 @@ impl<T: NativeStoreSpec> NativeStoreBundle<T> {
         let merkle_db = Arc::new(merkle_db);
 
         let pruner = (!readonly).then(|| {
-            Arc::new(NativeStorePruner::new(
-                Arc::clone(&kv_db),
-                Arc::clone(&merkle_db),
-                configs.value_pruner_config,
-                configs.state_merkle_pruner_config,
-                configs.epoch_snapshot_pruner_config,
-            ))
+            Arc::new(
+                NativeStorePruner::builder()
+                    .kv_db(Arc::clone(&kv_db))
+                    .merkle_db(Arc::clone(&merkle_db))
+                    .value_pruner_config(configs.value_pruner_config)
+                    .state_merkle_pruner_config(configs.state_merkle_pruner_config)
+                    .epoch_snapshot_pruner_config(configs.epoch_snapshot_pruner_config)
+                    .build(),
+            )
         });
 
         let (state_store, persisted) = match pruner.as_ref() {

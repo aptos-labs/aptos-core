@@ -19,32 +19,24 @@ pub struct DbDir {
 
 impl DbDir {
     pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
-        let env = None;
-        let block_cache = None;
-        StateMerkleDb::new(
-            &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfig::default(),
-            env,
-            block_cache,
-            /* read_only = */ false,
-            /* max_nodes_per_lru_cache_shard = */ 0,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )
+        StateMerkleDb::builder()
+            .db_paths(&StorageDirPaths::from_path(&self.db_dir))
+            .state_merkle_db_config(RocksdbConfig::default())
+            .readonly(false)
+            .max_nodes_per_lru_cache_shard(0)
+            .is_hot(false)
+            .delete_on_restart(false)
+            .build()
     }
 
     pub fn open_state_kv_db(&self) -> Result<StateKvDb> {
-        let env = None;
-        let block_cache = None;
-        StateKvDb::new(
-            &StorageDirPaths::from_path(&self.db_dir),
-            RocksdbConfig::default(),
-            env,
-            block_cache,
-            /* read_only = */ true,
-            /* is_hot = */ false,
-            /* delete_on_restart = */ false,
-        )
+        StateKvDb::builder()
+            .db_paths(&StorageDirPaths::from_path(&self.db_dir))
+            .state_kv_db_config(RocksdbConfig::default())
+            .readonly(true)
+            .is_hot(false)
+            .delete_on_restart(false)
+            .build()
     }
 
     pub fn open_ledger_db(&self) -> Result<LedgerDb> {

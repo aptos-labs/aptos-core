@@ -47,7 +47,9 @@ use std::{
     time::Instant,
 };
 
+#[bon::bon]
 impl AptosDB {
+    #[builder(finish_fn = build)]
     fn new_with_dbs(
         ledger_db: LedgerDb,
         hot_state_merkle_db: StateMerkleDb,
@@ -121,6 +123,7 @@ impl AptosDB {
         }
     }
 
+    #[builder(finish_fn = build)]
     pub(super) fn open_internal(
         db_paths: &StorageDirPaths,
         readonly: bool,
@@ -184,19 +187,19 @@ impl AptosDB {
         } else {
             StateStoreMode::ReadWrite
         };
-        let mut myself = Self::new_with_dbs(
-            ledger_db,
-            hot_state_merkle_db,
-            state_merkle_db,
-            hot_state_kv_db,
-            state_kv_db,
-            pruner_config,
-            buffered_state_target_items,
-            state_store_mode,
-            internal_indexer_db,
-            hot_state_config,
-            rocksdb_configs.squash_state_kv_writes_per_block,
-        );
+        let mut myself = Self::new_with_dbs()
+            .ledger_db(ledger_db)
+            .hot_state_merkle_db(hot_state_merkle_db)
+            .state_merkle_db(state_merkle_db)
+            .hot_state_kv_db(hot_state_kv_db)
+            .state_kv_db(state_kv_db)
+            .pruner_config(pruner_config)
+            .buffered_state_target_items(buffered_state_target_items)
+            .state_store_mode(state_store_mode)
+            .maybe_internal_indexer_db(internal_indexer_db)
+            .hot_state_config(hot_state_config)
+            .squash_state_kv_writes_per_block(rocksdb_configs.squash_state_kv_writes_per_block)
+            .build();
 
         if enable_trading_native {
             myself.init_native_position(
@@ -367,26 +370,26 @@ impl AptosDB {
         )?;
         ledger_db.metadata_db().write_schemas(batch)?;
 
-        StateStore::sync_commit_progress(
-            Arc::clone(&ledger_db),
-            Arc::clone(&state_kv_db),
-            Arc::clone(&state_merkle_db),
-            Arc::clone(&hot_state_kv_db),
-            Arc::clone(&hot_state_merkle_db),
-            /*crash_if_difference_is_too_large=*/ false,
-            hot_state_config.delete_on_restart,
-        );
+        StateStore::sync_commit_progress()
+            .ledger_db(Arc::clone(&ledger_db))
+            .state_kv_db(Arc::clone(&state_kv_db))
+            .state_merkle_db(Arc::clone(&state_merkle_db))
+            .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+            .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+            .crash_if_difference_is_too_large(false)
+            .delete_hot_state_on_restart(hot_state_config.delete_on_restart)
+            .call();
 
         // Runs even if the state merkle DB is at `target_version`, to rebuild deleted hot state.
         if get_current_version_in_state_merkle_db(&state_merkle_db)?.is_some() {
-            StateStore::catch_up_state_merkle_db(
-                ledger_db,
-                hot_state_merkle_db,
-                state_merkle_db,
-                hot_state_kv_db,
-                state_kv_db,
-                hot_state_config,
-            )?;
+            StateStore::catch_up_state_merkle_db()
+                .ledger_db(ledger_db)
+                .hot_state_merkle_db(hot_state_merkle_db)
+                .state_merkle_db(state_merkle_db)
+                .hot_state_kv_db(hot_state_kv_db)
+                .state_kv_db(state_kv_db)
+                .hot_state_config(hot_state_config)
+                .call()?;
         }
 
         Ok(())
