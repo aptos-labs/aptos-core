@@ -67,6 +67,7 @@ impl ProcessorManager {
         data_service_url: Url,
         postgres_connection_string: String,
     ) -> Result<Self> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let processor_config = get_processor_config(processor_name)?;
         let config = IndexerProcessorConfig {
             processor_config,
@@ -83,6 +84,8 @@ impl ProcessorManager {
                 reconnection_config: Default::default(),
                 transaction_filter: Default::default(),
                 backup_endpoints: Default::default(),
+                primary_failback_interval_secs:
+                    TransactionStreamConfig::default_primary_failback_interval(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
                 connection_string: postgres_connection_string,
@@ -91,6 +94,7 @@ impl ProcessorManager {
             processor_mode: ProcessorMode::Default(BootStrapConfig {
                 initial_starting_version: 0,
             }),
+            progress_health_config: None,
         };
         let manager = Self {
             config,
@@ -128,6 +132,9 @@ impl ProcessorManager {
             DbConfig::ParquetConfig(_) => {
                 bail!("Parquet is not supported in the localnet");
             },
+            DbConfig::NoneConfig => {
+                bail!("NoneConfig is not supported in the localnet");
+            },
         };
 
         tokio::task::spawn_blocking(move || {
@@ -156,6 +163,9 @@ impl ServiceManager for ProcessorManager {
             DbConfig::PostgresConfig(postgres_config) => postgres_config.connection_string.clone(),
             DbConfig::ParquetConfig(_) => {
                 panic!("Parquet is not supported in the localnet");
+            },
+            DbConfig::NoneConfig => {
+                panic!("NoneConfig is not supported in the localnet");
             },
         };
         hashset! {HealthChecker::Processor(

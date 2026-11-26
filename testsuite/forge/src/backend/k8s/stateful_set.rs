@@ -58,13 +58,13 @@ pub async fn wait_stateful_set(
     desired_replicas: u64,
     retry_policy: RetryPolicy,
 ) -> Result<()> {
-    let stateful_set_api = Arc::new(K8sApi::<StatefulSet>::from_client(
+    let stateful_set_api = Arc::new(K8sApi::<StatefulSet>::from_client_namespaced(
         kube_client.clone(),
-        Some(kube_namespace.to_string()),
+        kube_namespace,
     ));
-    let pod_api = Arc::new(K8sApi::<Pod>::from_client(
+    let pod_api = Arc::new(K8sApi::<Pod>::from_client_namespaced(
         kube_client.clone(),
-        Some(kube_namespace.to_string()),
+        kube_namespace,
     ));
     retry_policy
         .retry_if(
@@ -92,7 +92,7 @@ async fn check_stateful_set_status(
 ) -> Result<(), WorkloadScalingError> {
     match stateful_set_api.get(sts_name).await {
         Ok(s) => {
-            let sts_name = &s.name();
+            let sts_name = &s.name_any();
             // get the StatefulSet status
             if let Some(sts_status) = s.status {
                 let ready_replicas = sts_status.ready_replicas.unwrap_or(0) as u64;
@@ -254,7 +254,9 @@ pub async fn set_identity(
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
     let patch_op = PatchOperation::Replace(ReplaceOperation {
         // The json path below should match `terraform/helm/aptos-node/templates/validator.yaml`.
-        path: "/spec/template/spec/volumes/1/secret/secretName".to_string(),
+        path: "/spec/template/spec/volumes/1/secret/secretName"
+            .parse()
+            .expect("valid JSON pointer"),
         value: json!(k8s_secret_name),
     });
     let patch: Patch<Value> = Patch::Json(JsonPatch(vec![patch_op]));

@@ -566,7 +566,7 @@ impl BufferManager {
         self.previous_commit_time = Instant::now();
         self.commit_proof_rb_handle.take();
         // purge the incoming blocks queue
-        while let Ok(Some(blocks)) = self.block_rx.try_next() {
+        while let Ok(blocks) = self.block_rx.try_recv() {
             for b in blocks.ordered_blocks {
                 if let Some(futs) = b.abort_pipeline() {
                     futs.wait_until_finishes().await;

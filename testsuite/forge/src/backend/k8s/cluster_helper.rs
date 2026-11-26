@@ -198,7 +198,7 @@ async fn wait_node_haproxy(
                     format!("{}-{}-haproxy", APTOS_NODE_HELM_RELEASE_NAME, i);
                 match deployments_api.get_status(&haproxy_deployment_name).await {
                     Ok(s) => {
-                        let deployment_name = s.name();
+                        let deployment_name = s.name_any();
                         if let Some(deployment_status) = s.status {
                             let ready_replicas = deployment_status.ready_replicas.unwrap_or(0);
                             info!(
@@ -266,7 +266,7 @@ where
         .await?
     {
         either::Left(list) => {
-            let names: Vec<_> = list.iter().map(ResourceExt::name).collect();
+            let names: Vec<_> = list.iter().map(ResourceExt::name_any).collect();
             info!("Deleting collection of {}: {:?}", name, names);
         },
         either::Right(status) => {
@@ -859,19 +859,19 @@ where
                 return Err(ApiError::RetryableError(format!(
                     "Resource {:?}, {} is being deleted (Terminating), will retry",
                     std::any::type_name::<T>(),
-                    resource.name()
+                    resource.name_any()
                 )));
             }
             info!(
                 "Resource {:?}, {} already exists, continuing with it",
                 std::any::type_name::<T>(),
-                resource.name()
+                resource.name_any()
             );
         } else {
             return Err(ApiError::RetryableError(format!(
                 "Failed to use existing resource{:?} {}: {:?}",
                 std::any::type_name::<T>(),
-                resource.name(),
+                resource.name_any(),
                 api_err
             )));
         }
@@ -929,7 +929,7 @@ pub async fn create_management_configmap(
     cleanup_duration: Duration,
 ) -> Result<()> {
     let kube_client = create_k8s_client().await?;
-    let namespaces_api = Arc::new(K8sApi::<Namespace>::from_client(kube_client.clone(), None));
+    let namespaces_api = Arc::new(K8sApi::<Namespace>::from_client_all(kube_client.clone()));
     let other_kube_namespace = kube_namespace.clone();
 
     // try to create a new namespace
@@ -944,9 +944,9 @@ pub async fn create_management_configmap(
         )
         .await?;
 
-    let configmap_api = Arc::new(K8sApi::<ConfigMap>::from_client(
+    let configmap_api = Arc::new(K8sApi::<ConfigMap>::from_client_namespaced(
         kube_client.clone(),
-        Some(kube_namespace.clone()),
+        &kube_namespace,
     ));
 
     let management_configmap_name = format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, kube_namespace);
@@ -1016,7 +1016,7 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
         .items
         .into_iter()
         .filter(|configmap| {
-            let configmap_name = configmap.name();
+            let configmap_name = configmap.name_any();
             let configmap_namespace = configmap.namespace().unwrap();
             if !configmap_name.contains(MANAGEMENT_CONFIGMAP_PREFIX) {
                 return false;
@@ -1048,20 +1048,20 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
         .await?
         .items
         .into_iter()
-        .filter(|namespace| namespace.name().starts_with("forge-"))
+        .filter(|namespace| namespace.name_any().starts_with("forge-"))
         .collect::<Vec<Namespace>>();
     // print all namespace names
     for namespace in &forge_namespaces {
-        info!("Found forge namespace: {}", namespace.name());
+        info!("Found forge namespace: {}", namespace.name_any());
     }
     let pods_api: Api<Pod> = Api::namespaced(kube_client.clone(), "default");
     let lp = ListParams::default().labels("app.kubernetes.io/name=forge");
     let orphan_forge_test_runner_pods_to_delete =
         pods_api.list(&lp).await?.items.into_iter().filter(|pod| {
-            let pod_name = pod.name();
+            let pod_name = pod.name_any();
             // check if the pod is older than 5min
             if let Some(time) = &pod.metadata.creation_timestamp {
-                let pod_creation_time = time.0.timestamp() as u64;
+                let pod_creation_time = time.0.as_second() as u64;
                 let pod_uptime = time_since_the_epoch - pod_creation_time;
                 // If it's not older than the threshold time, it's not elegible for deletion
                 if pod_uptime < ORPHAN_POD_CLEANUP_THRESHOLD_SECS {
@@ -1074,9 +1074,9 @@ pub async fn cleanup_cluster_with_management(dry_run: bool) -> Result<()> {
                 .any(|namespace| pod_name.starts_with(namespace.metadata.name.as_ref().unwrap()))
         });
     for pod in orphan_forge_test_runner_pods_to_delete {
-        let pod_name = pod.name();
+        let pod_name = pod.name_any();
         let pod_age =
-            time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.timestamp() as u64;
+            time_since_the_epoch - pod.metadata.creation_timestamp.unwrap().0.as_second() as u64;
         info!(
             "Deleting orphaned pod {} with age {} without any corresponding namespace",
             pod_name, pod_age

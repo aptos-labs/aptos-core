@@ -111,9 +111,31 @@ pub async fn start_cpu_profiling(
             .write_to_vec(&mut body)
             .map_err(|e| anyhow!("Failed to serialize proto report: {e:?}."))?;
     } else {
-        report
-            .flamegraph(&mut body)
+        let lines: Vec<String> = report
+            .data
+            .iter()
+            .map(|(key, value)| {
+                use std::fmt::Write;
+                let mut line = key.thread_name_or_id();
+                line.push(';');
+                for frame in key.frames.iter().rev() {
+                    for symbol in frame.iter().rev() {
+                        write!(&mut line, "{};", symbol).unwrap();
+                    }
+                }
+                line.pop().unwrap_or_default();
+                write!(&mut line, " {}", value).unwrap();
+                line
+            })
+            .collect();
+        if !lines.is_empty() {
+            inferno::flamegraph::from_lines(
+                &mut inferno::flamegraph::Options::default(),
+                lines.iter().map(|s| s.as_str()),
+                &mut body,
+            )
             .map_err(|e| anyhow!("Failed to generate flamegraph report: {e:?}."))?;
+        }
     }
 
     info!("Cpu profiling is done.");

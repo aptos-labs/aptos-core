@@ -5,7 +5,7 @@ use super::super::session::FlowSession;
 use crate::{candidate::CandidateCheckConfig, experiment::evaluate_candidate};
 use rmcp::{
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, ContentBlock as Content},
     schemars, tool, tool_router,
 };
 

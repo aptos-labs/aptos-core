@@ -17,6 +17,9 @@ async fn move_package_query_invalid_query() {
         serde_json::json!({ "package_path": dir, "query": "nonsense" }),
     )
     .await;
-    let formatted = common::format_service_error(&result.unwrap_err());
+    let formatted = match result {
+        Ok(tool_result) => common::format_tool_result(&tool_result),
+        Err(err) => common::format_service_error(&err),
+    };
     common::check_baseline(file!(), &formatted);
 }

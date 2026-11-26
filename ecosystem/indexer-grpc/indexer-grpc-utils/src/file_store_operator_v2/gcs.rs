@@ -3,19 +3,29 @@
 
 use crate::file_store_operator_v2::common::{IFileStoreReader, IFileStoreWriter};
 use anyhow::{bail, Result};
-use cloud_storage::{Bucket, ListRequest, Object};
-use futures::StreamExt;
-use std::{env, path::PathBuf};
+use gcloud_storage::{
+    client::{google_cloud_auth::credentials::CredentialsFile, Client, ClientConfig},
+    http::{
+        buckets::get::GetBucketRequest,
+        objects::{
+            download::Range,
+            get::GetObjectRequest,
+            list::ListObjectsRequest,
+            upload::{Media, UploadObjectRequest, UploadType},
+        },
+        Error,
+    },
+};
+use std::path::PathBuf;
 use tokio::time::Duration;
 use tracing::{info, trace};
 
 const JSON_FILE_TYPE: &str = "application/json";
-// The environment variable to set the service account path.
-const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
 
 pub struct GcsFileStore {
     bucket_name: String,
     bucket_sub_dir: Option<PathBuf>,
+    gcs_client: Client,
 }
 
 impl GcsFileStore {
@@ -24,17 +34,25 @@ impl GcsFileStore {
         bucket_sub_dir: Option<PathBuf>,
         service_account_path: String,
     ) -> Self {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe {
-            env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
-        }
+        let creds = CredentialsFile::new_from_file(service_account_path)
+            .await
+            .expect("Failed to read GCS service account file.");
+        let gcs_config = ClientConfig::default()
+            .with_credentials(creds)
+            .await
+            .expect("Failed to create GCS client config.");
+        let gcs_client = Client::new(gcs_config);
 
         info!(
             bucket_name = bucket_name,
             "Verifying the bucket exists for GcsFileStore."
         );
 
-        Bucket::read(&bucket_name)
+        gcs_client
+            .get_bucket(&GetBucketRequest {
+                bucket: bucket_name.clone(),
+                ..Default::default()
+            })
             .await
             .expect("Failed to read bucket.");
 
@@ -45,6 +63,7 @@ impl GcsFileStore {
         Self {
             bucket_name,
             bucket_sub_dir,
+            gcs_client,
         }
     }
 
@@ -66,7 +85,8 @@ impl IFileStoreReader for GcsFileStore {
     }
 
     async fn is_initialized(&self) -> bool {
-        let request = ListRequest {
+        let request = ListObjectsRequest {
+            bucket: self.bucket_name.clone(),
             max_results: Some(1),
             prefix: self
                 .bucket_sub_dir
@@ -75,21 +95,19 @@ impl IFileStoreReader for GcsFileStore {
             ..Default::default()
         };
 
-        let response = Object::list(&self.bucket_name, request)
+        let response = self
+            .gcs_client
+            .list_objects(&request)
             .await
             .unwrap_or_else(|e| {
                 panic!(
                     "Failed to list bucket. Bucket name: {}, sub_dir: {:?}, error: {e:?}.",
                     self.bucket_name, self.bucket_sub_dir
                 )
-            })
-            .boxed()
-            .next()
-            .await
-            .expect("Expect response.")
-            .unwrap_or_else(|e| panic!("Got error in response: {e:?}."));
+            });
 
-        !response.prefixes.is_empty() || !response.items.is_empty()
+        response.prefixes.as_ref().is_some_and(|p| !p.is_empty())
+            || response.items.as_ref().is_some_and(|i| !i.is_empty())
     }
 
     async fn get_raw_file(&self, file_path: PathBuf) -> Result<Option<Vec<u8>>> {
@@ -99,14 +117,22 @@ impl IFileStoreReader for GcsFileStore {
             self.bucket_name,
             path.as_str()
         );
-        match Object::download(&self.bucket_name, path.as_str()).await {
+        match self
+            .gcs_client
+            .download_object(
+                &GetObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    object: path.clone(),
+                    ..Default::default()
+                },
+                &Range::default(),
+            )
+            .await
+        {
             Ok(file) => Ok(Some(file)),
-            Err(cloud_storage::Error::Other(err)) => {
-                if err.contains("No such object: ") {
-                    Ok(None)
-                } else {
-                    bail!("[Indexer File] Error happens when downloading file at {path:?}. {err}",);
-                }
+            Err(Error::Response(err)) if err.code == 404 => Ok(None),
+            Err(Error::HttpClient(err)) if err.status().map(|s| s.as_u16()) == Some(404) => {
+                Ok(None)
             },
             Err(err) => {
                 bail!("[Indexer File] Error happens when downloading file at {path:?}. {err}");
@@ -124,14 +150,21 @@ impl IFileStoreWriter for GcsFileStore {
             self.bucket_name,
             path.as_str()
         );
-        Object::create(
-            self.bucket_name.as_str(),
-            data,
-            path.as_str(),
-            JSON_FILE_TYPE,
-        )
-        .await
-        .map_err(anyhow::Error::msg)?;
+        self.gcs_client
+            .upload_object(
+                &UploadObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    ..Default::default()
+                },
+                data,
+                &UploadType::Simple(Media {
+                    name: path.into(),
+                    content_type: JSON_FILE_TYPE.into(),
+                    content_length: None,
+                }),
+            )
+            .await
+            .map_err(anyhow::Error::msg)?;
 
         Ok(())
     }

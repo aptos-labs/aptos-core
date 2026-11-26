@@ -23,9 +23,9 @@ static PROMETHEUS_RETRY_POLICY: Lazy<RetryPolicy> = Lazy::new(|| {
 pub async fn get_prometheus_client() -> Result<PrometheusClient> {
     // read from the environment
     let kube_client = create_k8s_client().await?;
-    let secrets_api = Arc::new(K8sApi::<Secret>::from_client(
+    let secrets_api = Arc::new(K8sApi::<Secret>::from_client_namespaced(
         kube_client,
-        Some("default".to_string()),
+        "default",
     ));
     create_prometheus_client_from_environment(secrets_api).await
 }

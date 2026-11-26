@@ -16,7 +16,9 @@ pub fn logger() -> Log<impl Fn(Info) + Copy> {
     let func = move |info: Info| {
         let status = info.status().as_u16();
         let log = HttpRequestLog {
-            remote_addr: info.remote_addr(),
+            remote_addr: info
+                .remote_addr()
+                .or_else(crate::webserver::tls_remote_addr),
             method: info.method().to_string(),
             path: info.path().to_string(),
             status,

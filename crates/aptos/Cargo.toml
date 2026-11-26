@@ -81,6 +81,7 @@ processor = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+rustls = { workspace = true }
 self_update = { version = "1.3.3", default-features = false, features = [
     "archive-zip",
     "compression-zip-deflate",

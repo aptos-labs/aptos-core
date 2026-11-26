@@ -1,7 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use cloud_storage::Object;
+use gcloud_storage::{
+    client::{google_cloud_auth::credentials::CredentialsFile, Client, ClientConfig},
+    http::objects::{
+        download::Range,
+        get::GetObjectRequest,
+        upload::{Media, UploadObjectRequest, UploadType},
+    },
+};
 use serde::{Deserialize, Serialize};
 
 // The maximum number of transactions to store in a single blob.
@@ -21,8 +28,36 @@ pub struct FileStoreMetadata {
     pub version: u64,
 }
 
+async fn create_gcs_client() -> Client {
+    let config = match std::env::var("SERVICE_ACCOUNT") {
+        Ok(service_account_path) => {
+            let creds = CredentialsFile::new_from_file(service_account_path)
+                .await
+                .expect("[indexer gcs] Failed to read SERVICE_ACCOUNT credentials.");
+            ClientConfig::default()
+                .with_credentials(creds)
+                .await
+                .expect("[indexer gcs] Failed to create GCS client config.")
+        },
+        Err(_) => ClientConfig::default()
+            .with_auth()
+            .await
+            .expect("[indexer gcs] Failed to create GCS client config."),
+    };
+    Client::new(config)
+}
+
 pub async fn get_file_store_metadata(bucket_name: String) -> FileStoreMetadata {
-    let metadata = Object::download(&bucket_name, METADATA_FILE_NAME)
+    let client = create_gcs_client().await;
+    let metadata = client
+        .download_object(
+            &GetObjectRequest {
+                bucket: bucket_name,
+                object: METADATA_FILE_NAME.to_string(),
+                ..Default::default()
+            },
+            &Range::default(),
+        )
         .await
         .expect("[indexer gcs] Failed to get file store metadata.");
 
@@ -31,15 +66,23 @@ pub async fn get_file_store_metadata(bucket_name: String) -> FileStoreMetadata {
 
 /// Uploads the metadata to the bucket. If the metadata is not updated, the indexer will be restarted.
 pub async fn upload_file_store_metadata(bucket_name: String, metadata: FileStoreMetadata) {
+    let client = create_gcs_client().await;
     // If the metadata is not updated, the indexer will be restarted.
-    Object::create(
-        bucket_name.as_str(),
-        serde_json::to_vec(&metadata).unwrap(),
-        METADATA_FILE_NAME,
-        JSON_FILE_TYPE,
-    )
-    .await
-    .unwrap();
+    client
+        .upload_object(
+            &UploadObjectRequest {
+                bucket: bucket_name,
+                ..Default::default()
+            },
+            serde_json::to_vec(&metadata).unwrap(),
+            &UploadType::Simple(Media {
+                name: METADATA_FILE_NAME.into(),
+                content_type: JSON_FILE_TYPE.into(),
+                content_length: None,
+            }),
+        )
+        .await
+        .unwrap();
 }
 
 #[derive(Serialize, Deserialize)]

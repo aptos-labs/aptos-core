@@ -6,20 +6,32 @@ use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, METADATA_FILE_NAME},
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use aptos_protos::transaction::v1::Transaction;
-use cloud_storage::{Bucket, Object};
-use std::{env, path::PathBuf};
+use gcloud_storage::{
+    client::{google_cloud_auth::credentials::CredentialsFile, Client, ClientConfig},
+    http::{
+        buckets::get::GetBucketRequest,
+        objects::{
+            download::Range,
+            get::GetObjectRequest,
+            upload::{Media, UploadObjectRequest, UploadType},
+        },
+        Error,
+    },
+};
+use std::{path::PathBuf, sync::Arc};
+use tokio::sync::OnceCell;
 
 const JSON_FILE_TYPE: &str = "application/json";
-// The environment variable to set the service account path.
-const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
 const FILE_STORE_METADATA_TIMEOUT_MILLIS: u128 = 200;
 
 #[derive(Clone)]
 pub struct GcsFileStoreOperator {
     bucket_name: String,
     bucket_sub_dir: Option<PathBuf>,
+    service_account_path: String,
+    gcs_client: Arc<OnceCell<Client>>,
     file_store_metadata_last_updated: std::time::Instant,
     storage_format: StorageFormat,
     metadata_file_path: PathBuf,
@@ -32,10 +44,6 @@ impl GcsFileStoreOperator {
         service_account_path: String,
         enable_compression: bool,
     ) -> Self {
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe {
-            env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
-        }
         let storage_format = if enable_compression {
             StorageFormat::Lz4CompressedProto
         } else {
@@ -56,10 +64,27 @@ impl GcsFileStoreOperator {
         Self {
             bucket_name,
             bucket_sub_dir,
+            service_account_path,
+            gcs_client: Arc::new(OnceCell::new()),
             file_store_metadata_last_updated: std::time::Instant::now(),
             storage_format,
             metadata_file_path,
         }
+    }
+
+    async fn client(&self) -> anyhow::Result<&Client> {
+        self.gcs_client
+            .get_or_try_init(|| async {
+                let creds = CredentialsFile::new_from_file(self.service_account_path.clone())
+                    .await
+                    .context("Failed to read GCS service account file")?;
+                let config = ClientConfig::default()
+                    .with_credentials(creds)
+                    .await
+                    .context("Failed to create GCS client config")?;
+                Ok(Client::new(config))
+            })
+            .await
     }
 
     /// Given a version number, builds the key path for the file entry. This is dependent on the storage format and whether we opt
@@ -78,6 +103,11 @@ impl GcsFileStoreOperator {
     }
 }
 
+fn is_not_found(err: &Error) -> bool {
+    matches!(err, Error::Response(e) if e.code == 404)
+        || matches!(err, Error::HttpClient(e) if e.status().map(|s| s.as_u16()) == Some(404))
+}
+
 #[async_trait::async_trait]
 impl FileStoreOperator for GcsFileStoreOperator {
     /// Bootstraps the file store operator. This is required before any other operations.
@@ -87,7 +117,13 @@ impl FileStoreOperator for GcsFileStoreOperator {
             "Before file store operator starts, verify the bucket exists."
         );
         // Verifies the bucket exists.
-        Bucket::read(&self.bucket_name)
+        self.client()
+            .await
+            .expect("Failed to create GCS client.")
+            .get_bucket(&GetBucketRequest {
+                bucket: self.bucket_name.clone(),
+                ..Default::default()
+            })
             .await
             .expect("Failed to read bucket.");
     }
@@ -102,21 +138,25 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key_path = self.get_file_entry_key_path(version);
-        match Object::download(&self.bucket_name, file_entry_key_path.as_str()).await {
+        let client = self.client().await?;
+        match client
+            .download_object(
+                &GetObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    object: file_entry_key_path,
+                    ..Default::default()
+                },
+                &Range::default(),
+            )
+            .await
+        {
             Ok(file) => Ok(file),
-            Err(cloud_storage::Error::Other(err)) => {
-                if err.contains("No such object: ") {
-                    anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
-                } else {
-                    anyhow::bail!(
-                        "[Indexer File] Error happens when downloading transaction file. {}",
-                        err
-                    );
-                }
+            Err(err) if is_not_found(&err) => {
+                anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
             },
             Err(err) => {
                 anyhow::bail!(
-                    "[Indexer File] Error happens when transaction file. {}",
+                    "[Indexer File] Error happens when downloading transaction file. {}",
                     err
                 );
             },
@@ -125,30 +165,28 @@ impl FileStoreOperator for GcsFileStoreOperator {
 
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata> {
-        match Object::download(
-            &self.bucket_name,
-            self.metadata_file_path
-                .to_str()
-                .expect("Expected metadata file path to be valid."),
-        )
-        .await
+        let client = self.client().await.expect("Failed to create GCS client.");
+        match client
+            .download_object(
+                &GetObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    object: self
+                        .metadata_file_path
+                        .to_str()
+                        .expect("Expected metadata file path to be valid.")
+                        .to_string(),
+                    ..Default::default()
+                },
+                &Range::default(),
+            )
+            .await
         {
             Ok(metadata) => {
                 let metadata: FileStoreMetadata =
                     serde_json::from_slice(&metadata).expect("Expected metadata to be valid JSON.");
                 Some(metadata)
             },
-            Err(cloud_storage::Error::Other(err)) => {
-                if err.contains("No such object: ") {
-                    // Metadata is not found.
-                    None
-                } else {
-                    panic!(
-                        "[Indexer File] Error happens when accessing metadata file. {}",
-                        err
-                    );
-                }
-            },
+            Err(err) if is_not_found(&err) => None,
             Err(e) => {
                 panic!(
                     "[Indexer File] Error happens when accessing metadata file. {}",
@@ -188,16 +226,27 @@ impl FileStoreOperator for GcsFileStoreOperator {
         version: u64,
     ) -> anyhow::Result<()> {
         let metadata = FileStoreMetadata::new(chain_id, version, self.storage_format);
+        let client = self.client().await?;
         // If the metadata is not updated, the indexer will be restarted.
-        Object::create(
-            self.bucket_name.as_str(),
-            serde_json::to_vec(&metadata).unwrap(),
-            self.metadata_file_path
-                .to_str()
-                .expect("Expected metadata file path to be valid."),
-            JSON_FILE_TYPE,
-        )
-        .await?;
+        let metadata_name = self
+            .metadata_file_path
+            .to_str()
+            .expect("Expected metadata file path to be valid.")
+            .to_string();
+        client
+            .upload_object(
+                &UploadObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    ..Default::default()
+                },
+                serde_json::to_vec(&metadata).unwrap(),
+                &UploadType::Simple(Media {
+                    name: metadata_name.into(),
+                    content_type: JSON_FILE_TYPE.into(),
+                    content_length: None,
+                }),
+            )
+            .await?;
         self.file_store_metadata_last_updated = std::time::Instant::now();
         Ok(())
     }
@@ -236,13 +285,21 @@ impl FileStoreOperator for GcsFileStoreOperator {
             Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
             None,
         );
-        Object::create(
-            bucket_name.clone().as_str(),
-            file_entry.into_inner(),
-            file_entry_key_path.as_str(),
-            JSON_FILE_TYPE,
-        )
-        .await?;
+        let client = self.client().await?;
+        client
+            .upload_object(
+                &UploadObjectRequest {
+                    bucket: bucket_name,
+                    ..Default::default()
+                },
+                file_entry.into_inner(),
+                &UploadType::Simple(Media {
+                    name: file_entry_key_path.into(),
+                    content_type: JSON_FILE_TYPE.into(),
+                    content_length: None,
+                }),
+            )
+            .await?;
         Ok((start_version, end_version))
     }
 

@@ -22,7 +22,13 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         ProcessorName::AnsProcessor => {
             bail!("ANS processor is not supported in the localnet")
         },
+        ProcessorName::ConfidentialAssetProcessor => {
+            bail!("ConfidentialAssetProcessor is not supported in the localnet")
+        },
         ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor(Default::default()),
+        ProcessorName::EventFileProcessor => {
+            bail!("EventFileProcessor is not supported in the localnet")
+        },
         ProcessorName::FungibleAssetProcessor => {
             ProcessorConfig::FungibleAssetProcessor(Default::default())
         },
@@ -68,6 +74,9 @@ pub fn get_processor_config(processor_name: &ProcessorName) -> Result<ProcessorC
         },
         ProcessorName::ParquetStakeProcessor => {
             bail!("ParquetStakeProcessor is not supported in the localnet")
+        },
+        ProcessorName::ShelbyBlobsProcessor => {
+            bail!("ShelbyBlobsProcessor is not supported in the localnet")
         },
         ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor(StakeProcessorConfig {
             default_config: Default::default(),

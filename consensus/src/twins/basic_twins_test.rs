@@ -105,10 +105,7 @@ fn drop_config_test() {
         assert!(node0_commit.is_some());
 
         // Check that the commit log for n2 is empty
-        let node2_commit = match nodes[2].commit_cb_receiver.try_next() {
-            Ok(Some(node_commit)) => Some(node_commit),
-            _ => None,
-        };
+        let node2_commit = nodes[2].commit_cb_receiver.try_recv().ok();
         assert!(node2_commit.is_none());
     });
 }
@@ -167,7 +164,7 @@ fn twins_vote_dedup_test() {
         // have been created
         let mut commit_seen = false;
         for node in &mut nodes {
-            if let Ok(Some(_node_commit)) = node.commit_cb_receiver.try_next() {
+            if let Ok(_node_commit) = node.commit_cb_receiver.try_recv() {
                 commit_seen = true;
             }
         }

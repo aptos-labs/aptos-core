@@ -57,6 +57,7 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
+                let _ = rustls::crypto::ring::default_provider().install_default();
                 let backoff = backoff::ExponentialBackoff {
                     max_elapsed_time: Some(Duration::from_secs(5)),
                     ..Default::default()
@@ -75,6 +76,8 @@ impl HealthChecker {
                         reconnection_config: Default::default(),
                         transaction_filter: None,
                         backup_endpoints: Default::default(),
+                        primary_failback_interval_secs:
+                            TransactionStreamConfig::default_primary_failback_interval(),
                     };
                     get_chain_id(transaction_stream_config)
                         .await

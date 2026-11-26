@@ -548,7 +548,7 @@ impl SecretShareManager {
                 }
                 Some(reset) = reset_rx.next() => {
                     let mut dropped = 0;
-                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {
+                    while incoming_blocks.try_recv().is_ok() {
                         dropped += 1;
                     }
                     if dropped > 0 {

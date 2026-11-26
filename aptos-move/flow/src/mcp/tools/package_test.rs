@@ -27,7 +27,7 @@ use move_unit_test::{
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use rmcp::{
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, ContentBlock as Content},
     schemars, tool, tool_router,
 };
 use std::{

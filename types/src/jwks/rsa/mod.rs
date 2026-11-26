@@ -4,13 +4,15 @@
 use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD_INDIFFERENT, Engine as _};
+use base64::{
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD_INDIFFERENT},
+    Engine as _,
+};
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use once_cell::sync::Lazy;
 use poem_openapi_derive::Object;
 use ring::signature::RsaKeyPair;
-use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 use serde::{Deserialize, Serialize};
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
@@ -41,12 +43,12 @@ pub static INSECURE_TEST_RSA_JWK: Lazy<RSA_JWK> =
     Lazy::new(|| get_jwk_from_str(include_str!("insecure_test_jwk.json")));
 
 pub static INSECURE_TEST_RSA_KEY_PAIR: Lazy<RsaKeyPair> = Lazy::new(|| {
-    // TODO(keyless): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
-    let der = rsa::RsaPrivateKey::from_pkcs8_pem(include_str!("insecure_test_jwk_private_key.txt"))
-        .unwrap()
-        .to_pkcs1_der()
-        .unwrap();
-    RsaKeyPair::from_der(der.as_bytes()).unwrap()
+    let pem_body: String = include_str!("insecure_test_jwk_private_key.txt")
+        .lines()
+        .filter(|line| !line.starts_with("-----"))
+        .collect();
+    let der = STANDARD.decode(pem_body).unwrap();
+    RsaKeyPair::from_pkcs8(&der).unwrap()
 });
 
 impl RSA_JWK {

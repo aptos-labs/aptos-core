@@ -41,22 +41,22 @@ impl ForgeDeployerManager {
         image_repo: String,
         image_tag: Option<String>,
     ) -> Self {
-        let jobs_api = Arc::new(K8sApi::from_client(
+        let jobs_api = Arc::new(K8sApi::from_client_namespaced(
             kube_client.clone(),
-            Some(namespace.clone()),
+            &namespace,
         ));
-        let config_maps_api = Arc::new(K8sApi::from_client(
+        let config_maps_api = Arc::new(K8sApi::from_client_namespaced(
             kube_client.clone(),
-            Some(namespace.clone()),
+            &namespace,
         ));
-        let namespace_api = Arc::new(K8sApi::from_client(kube_client.clone(), None));
-        let serviceaccount_api = Arc::new(K8sApi::from_client(
+        let namespace_api = Arc::new(K8sApi::from_client_all(kube_client.clone()));
+        let serviceaccount_api = Arc::new(K8sApi::from_client_namespaced(
             kube_client.clone(),
-            Some(namespace.clone()),
+            &namespace,
         ));
-        let rolebinding_api = Arc::new(K8sApi::from_client(
+        let rolebinding_api = Arc::new(K8sApi::from_client_namespaced(
             kube_client.clone(),
-            Some(namespace.clone()),
+            &namespace,
         ));
         // ensure it lives long enough between async
         Self {
@@ -136,7 +136,7 @@ impl ForgeDeployerManager {
                                 value_from: Some(k8s_openapi::api::core::v1::EnvVarSource {
                                     config_map_key_ref: Some(
                                         k8s_openapi::api::core::v1::ConfigMapKeySelector {
-                                            name: Some(configmap_name),
+                                            name: configmap_name,
                                             key: "deploy-values.json".to_string(),
                                             ..Default::default()
                                         },
@@ -177,12 +177,15 @@ impl ForgeDeployerManager {
             .await?;
         self.cleanup_deployer_resources().await;
         let config_map = self.build_forge_deployer_k8s_config_map(config)?;
-        let job = self.build_forge_deployer_k8s_job(config_map.name())?;
-        info!("Creating forge deployer configmap: {}", config_map.name());
+        let job = self.build_forge_deployer_k8s_job(config_map.name_any())?;
+        info!(
+            "Creating forge deployer configmap: {}",
+            config_map.name_any()
+        );
         self.config_maps_api
             .create(&PostParams::default(), &config_map)
             .await?;
-        info!("Creating forge deployer job: {}", job.name());
+        info!("Creating forge deployer job: {}", job.name_any());
         self.jobs_api.create(&PostParams::default(), &job).await?;
         Ok(())
     }
@@ -273,12 +276,12 @@ impl ForgeDeployerManager {
     async fn ensure_namespace_prepared(&self) -> Result<(), ApiError> {
         info!("Ensuring namespace is prepared");
         let namespace = self.build_namespace();
-        info!("Creating namespace: {}", namespace.name());
+        info!("Creating namespace: {}", namespace.name_any());
         maybe_create_k8s_resource(self.namespace_api.clone(), namespace.clone()).await?;
         let service_account = self.build_service_account();
         info!(
             "Creating service account and role binding: {}",
-            service_account.name()
+            service_account.name_any()
         );
         maybe_create_k8s_resource(self.serviceaccount_api.clone(), service_account).await?;
         let role_binding = self.build_role_binding();

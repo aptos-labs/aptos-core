@@ -5,7 +5,7 @@
 
 use aptos_types::account_address::AccountAddress;
 use move_model::model::{FunctionEnv, GlobalEnv};
-use rmcp::model::{CallToolResult, Content};
+use rmcp::model::{CallToolResult, ContentBlock};
 use std::fmt::Write;
 
 /// Format an `anyhow::Error` with its full cause chain.
@@ -25,7 +25,7 @@ pub(crate) fn format_error_chain(err: &anyhow::Error) -> String {
 /// `#[tool]` methods that delegate to an `_impl` method.
 pub(crate) fn tool_error(e: rmcp::ErrorData) -> CallToolResult {
     log::error!("{}", e.message);
-    CallToolResult::error(vec![Content::text(e.message.to_string())])
+    CallToolResult::error(vec![ContentBlock::text(e.message.to_string())])
 }
 
 /// Shorthand for creating an `rmcp::ErrorData` internal error.

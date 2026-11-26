@@ -60,6 +60,7 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
     let fut_prerequisites_ = fut_prerequisites.clone();
     let processor_name_ = processor_name.to_owned();
     let handle_processor = tokio::spawn(async move {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let (postgres_port, indexer_grpc_port) = fut_prerequisites_.await?;
 
         no_panic_println!("Starting processor {}..", processor_name_);
@@ -79,6 +80,8 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
                 reconnection_config: Default::default(),
                 transaction_filter: Default::default(),
                 backup_endpoints: Default::default(),
+                primary_failback_interval_secs:
+                    TransactionStreamConfig::default_primary_failback_interval(),
             },
             db_config: DbConfig::PostgresConfig(PostgresConfig {
                 connection_string: get_postgres_connection_string(postgres_port),
@@ -87,6 +90,7 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
             processor_mode: ProcessorMode::Default(BootStrapConfig {
                 initial_starting_version: 0,
             }),
+            progress_health_config: None,
         };
 
         config.run().await

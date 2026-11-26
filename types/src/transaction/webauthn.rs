@@ -241,12 +241,11 @@ mod tests {
     use move_core_types::account_address::AccountAddress;
     use p256::pkcs8::DecodePublicKey;
     use passkey_authenticator::{
-        public_key_der_from_cose_key, Authenticator, UserValidationMethod,
+        public_key_der_from_cose_key, Authenticator, UiHint, UserCheck, UserValidationMethod,
     };
     use passkey_client::Client;
     use passkey_types::{
-        ctap2,
-        ctap2::Aaguid,
+        ctap2::{self, Aaguid, Ctap2Error},
         rand::random_vec,
         webauthn::{
             AttestationConveyancePreference, AuthenticatedPublicKeyCredential, CollectedClientData,
@@ -266,12 +265,18 @@ mod tests {
     struct MyUserValidationMethod {}
     #[async_trait::async_trait]
     impl UserValidationMethod for MyUserValidationMethod {
-        async fn check_user_verification(&self) -> bool {
-            true
-        }
+        type PasskeyItem = Passkey;
 
-        async fn check_user_presence(&self) -> bool {
-            true
+        async fn check_user<'a>(
+            &self,
+            _hint: UiHint<'a, Self::PasskeyItem>,
+            presence: bool,
+            verification: bool,
+        ) -> Result<UserCheck, Ctap2Error> {
+            Ok(UserCheck {
+                presence,
+                verification,
+            })
         }
 
         fn is_presence_enabled(&self) -> bool {

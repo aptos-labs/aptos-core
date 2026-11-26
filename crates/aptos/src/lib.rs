@@ -85,6 +85,7 @@ pub enum Tool {
 
 impl Tool {
     pub async fn execute(self) -> CliResult {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         use Tool::*;
         match self {
             Account(tool) => tool.execute().await,

@@ -34,7 +34,7 @@ diesel_migrations = { workspace = true }
 enum_dispatch = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
-google-cloud-storage = { workspace = true }
+gcloud-storage = { workspace = true }
 image = { workspace = true }
 once_cell = { workspace = true }
 rayon = { workspace = true }

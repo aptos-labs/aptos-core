@@ -24,6 +24,7 @@ tracing = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+inferno = { workspace = true }
 pprof = { workspace = true }
 regex = { workspace = true }
 rstack-self = { workspace = true }

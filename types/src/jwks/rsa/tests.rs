@@ -97,3 +97,11 @@ fn rsa_jwk_as_move_any() {
     };
     assert_eq!(expected, actual);
 }
+
+#[test]
+fn insecure_test_rsa_key_pair_loads() {
+    assert_eq!(
+        super::INSECURE_TEST_RSA_KEY_PAIR.public().modulus_len(),
+        RSA_JWK::RSA_MODULUS_BYTES
+    );
+}

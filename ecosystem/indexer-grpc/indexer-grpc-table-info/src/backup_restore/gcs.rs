@@ -8,7 +8,7 @@ use super::{
 use anyhow::Context;
 use aptos_logger::{error, info};
 use futures::TryFutureExt;
-use google_cloud_storage::{
+use gcloud_storage::{
     client::{Client, ClientConfig},
     http::{
         buckets::get::GetBucketRequest,
@@ -20,7 +20,6 @@ use google_cloud_storage::{
         Error,
     },
 };
-use hyper::StatusCode;
 use std::{borrow::Cow::Borrowed, env, path::PathBuf, time::Duration};
 use tokio::{
     fs::{self, File},
@@ -67,13 +66,7 @@ impl GcsBackupRestoreOperator {
     pub async fn get_metadata(&self) -> Option<BackupRestoreMetadata> {
         match self.download_metadata_object().await {
             Ok(metadata) => Some(metadata),
-            Err(Error::HttpClient(err)) => {
-                if err.status() == Some(StatusCode::NOT_FOUND) {
-                    None
-                } else {
-                    panic!("Error happens when accessing metadata file. {}", err);
-                }
-            },
+            Err(err) if is_not_found(&err) => None,
             Err(e) => {
                 panic!("Error happens when accessing metadata file. {}", e);
             },
@@ -89,20 +82,16 @@ impl GcsBackupRestoreOperator {
                 assert!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
                 Ok(metadata)
             },
-            Err(Error::HttpClient(err)) => {
-                let is_file_missing = err.status() == Some(StatusCode::NOT_FOUND);
-                if is_file_missing {
-                    self.update_metadata(expected_chain_id, 0)
-                        .await
-                        .expect("Update metadata failed.");
-                    Ok(BackupRestoreMetadata::new(expected_chain_id, 0))
-                } else {
-                    Err(anyhow::Error::msg(format!(
-                        "Metadata not found or gcs operator is not in write mode. {}",
-                        err
-                    )))
-                }
+            Err(err) if is_not_found(&err) => {
+                self.update_metadata(expected_chain_id, 0)
+                    .await
+                    .expect("Update metadata failed.");
+                Ok(BackupRestoreMetadata::new(expected_chain_id, 0))
             },
+            Err(Error::HttpClient(err)) => Err(anyhow::Error::msg(format!(
+                "Metadata not found or gcs operator is not in write mode. {}",
+                err
+            ))),
             Err(err) => Err(anyhow::Error::from(err)),
         }
     }
@@ -312,4 +301,9 @@ impl GcsBackupRestoreOperator {
             Err(e) => Err(anyhow::Error::new(e)),
         }
     }
+}
+
+fn is_not_found(err: &Error) -> bool {
+    matches!(err, Error::Response(e) if e.code == 404)
+        || matches!(err, Error::HttpClient(e) if e.status().map(|s| s.as_u16()) == Some(404))
 }

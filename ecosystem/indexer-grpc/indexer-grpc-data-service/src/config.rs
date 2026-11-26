@@ -138,6 +138,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
     }
 
     async fn run(&self) -> Result<()> {
+        aptos_indexer_grpc_utils::ensure_rustls_crypto_provider();
         let reflection_service = tonic_reflection::server::Builder::configure()
             // Note: It is critical that the file descriptor set is registered for every
             // file that the top level API proto depends on recursively. If you don't,
@@ -240,5 +241,35 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
 
     fn get_server_name(&self) -> String {
         SERVER_NAME.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TEST_CERT_PEM: &str = "-----BEGIN CERTIFICATE-----\n\
+MIIBMDCB16ADAgECAgEBMAoGCCqGSM49BAMCMBQxEjAQBgNVBAMMCWxvY2FsaG9z\n\
+dDAgFw0yMDAxMDEwMDAwMDBaGA8yMTIwMDEwMTAwMDAwMFowFDESMBAGA1UEAwwJ\n\
+bG9jYWxob3N0MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+YMhYAY1WKXhZKOi\n\
+aPgYx2DIWTdufeZy4YPJru05/Rup1ydx0860Z+ePIxiRvAN04CdTVYzDkq9NlUvz\n\
+Qb17zKMYMBYwFAYDVR0RBA0wC4IJbG9jYWxob3N0MAoGCCqGSM49BAMCA0gAMEUC\n\
+IG0Ix+sNHqgRuU7UzzlJgWp6ob67M4l9m8VlAZ+0L5xxAiEA+U1G1GAOQ2L0WN/x\n\
+FWthD3mCFqMXDKpSou8V8lGKyQQ=\n\
+-----END CERTIFICATE-----\n";
+
+    const TEST_KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgTLdI94joKIg5H/wd\n\
+d7NgMrdPo7NfQNJ+Xp9bGD61OyehRANCAAT5gyFgBjVYpeFko6Jo+BjHYMhZN259\n\
+5nLhg8mu7Tn9G6nXJ3HTzrRn548jGJG8A3TgJ1NVjMOSr02VS/NBvXvM\n\
+-----END PRIVATE KEY-----\n";
+
+    #[test]
+    fn test_tls_server_builder_succeeds_with_crypto_provider() {
+        aptos_indexer_grpc_utils::ensure_rustls_crypto_provider();
+        let identity = tonic::transport::Identity::from_pem(TEST_CERT_PEM, TEST_KEY_PEM);
+        Server::builder()
+            .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))
+            .expect("TLS config should build without panicking");
     }
 }

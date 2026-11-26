@@ -21,7 +21,7 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     PgConnection,
 };
-use google_cloud_storage::client::Client as GCSClient;
+use gcloud_storage::client::Client as GCSClient;
 use image::ImageFormat;
 use serde_json::Value;
 use std::sync::Arc;

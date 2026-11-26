@@ -47,7 +47,8 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 blake2-rfc = { workspace = true }
 digest = { workspace = true }
-ethers = { workspace = true }
+ethers-core = { workspace = true }
+ethers-signers = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-core-types = { workspace = true }

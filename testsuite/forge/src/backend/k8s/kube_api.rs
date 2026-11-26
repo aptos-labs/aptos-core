@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use kube::{
     api::{Api, DeleteParams, ListParams, PostParams},
     client::Client as K8sClient,
+    core::NamespaceResourceScope,
     Error as KubeError, Resource as ApiResource,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -20,18 +21,22 @@ impl<K> K8sApi<K>
 where
     K: ApiResource,
 {
-    pub fn from_client(kube_client: K8sClient, kube_namespace: Option<String>) -> Self
+    pub fn from_client_namespaced(kube_client: K8sClient, kube_namespace: &str) -> Self
+    where
+        K: ApiResource<Scope = NamespaceResourceScope>,
+        <K as ApiResource>::DynamicType: Default,
+    {
+        K8sApi {
+            api: Api::namespaced(kube_client, kube_namespace),
+        }
+    }
+
+    pub fn from_client_all(kube_client: K8sClient) -> Self
     where
         <K as ApiResource>::DynamicType: Default,
     {
-        if let Some(kube_namespace) = kube_namespace {
-            K8sApi {
-                api: Api::namespaced(kube_client, &kube_namespace),
-            }
-        } else {
-            K8sApi {
-                api: Api::all(kube_client),
-            }
+        K8sApi {
+            api: Api::all(kube_client),
         }
     }
 }
@@ -84,7 +89,7 @@ pub mod mocks {
     use k8s_openapi::Metadata;
     use kube::{
         api::{DeleteParams, ListParams, ObjectMeta, PostParams},
-        error::ErrorResponse,
+        core::Status,
         Error as KubeError,
     };
     use std::{collections::BTreeMap, sync::Arc};
@@ -156,12 +161,14 @@ pub mod mocks {
             if let Some(resource) = resources.get(name) {
                 Ok(resource.clone())
             } else {
-                Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: format!("Resource with name {} could not be found", name),
-                    reason: "not_found".to_string(),
-                    code: 404,
-                }))
+                Err(KubeError::Api(
+                    Status::failure(
+                        &format!("Resource with name {} could not be found", name),
+                        "not_found",
+                    )
+                    .with_code(404)
+                    .boxed(),
+                ))
             }
         }
 
@@ -174,12 +181,11 @@ pub mod mocks {
                     .as_ref()
                     .expect("Expected metadata to have name"),
             ) {
-                return Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: "Resource with same name already exists".to_string(),
-                    reason: "already_exists".to_string(),
-                    code: 409,
-                }));
+                return Err(KubeError::Api(
+                    Status::failure("Resource with same name already exists", "already_exists")
+                        .with_code(409)
+                        .boxed(),
+                ));
             }
             resources.insert(
                 resource
@@ -198,12 +204,14 @@ pub mod mocks {
             if resources.remove(name).is_some() {
                 Ok(())
             } else {
-                Err(KubeError::Api(ErrorResponse {
-                    status: "failed".to_string(),
-                    message: format!("Resource with name {} could not be found", name),
-                    reason: "not_found".to_string(),
-                    code: 404,
-                }))
+                Err(KubeError::Api(
+                    Status::failure(
+                        &format!("Resource with name {} could not be found", name),
+                        "not_found",
+                    )
+                    .with_code(404)
+                    .boxed(),
+                ))
             }
         }
 
@@ -235,52 +243,50 @@ pub mod mocks {
     {
         async fn get(&self, _name: &str) -> Result<T, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to get resource".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
+            Err(KubeError::Api(
+                Status::failure("Failed to get resource", "Failed to parse error data")
+                    .with_code(status.as_u16())
+                    .boxed(),
+            ))
         }
 
         async fn create(&self, _pp: &PostParams, _resource: &T) -> Result<T, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to create resource".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
+            Err(KubeError::Api(
+                Status::failure("Failed to create resource", "Failed to parse error data")
+                    .with_code(status.as_u16())
+                    .boxed(),
+            ))
         }
 
         async fn delete(&self, _name: &str, _dp: &DeleteParams) -> Result<(), KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to delete resource".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
+            Err(KubeError::Api(
+                Status::failure("Failed to delete resource", "Failed to parse error data")
+                    .with_code(status.as_u16())
+                    .boxed(),
+            ))
         }
 
         async fn get_status(&self, _name: &str) -> Result<T, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to get resource status".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
+            Err(KubeError::Api(
+                Status::failure(
+                    "Failed to get resource status",
+                    "Failed to parse error data",
+                )
+                .with_code(status.as_u16())
+                .boxed(),
+            ))
         }
 
         async fn list(&self, _lp: &ListParams) -> Result<Vec<T>, KubeError> {
             let status = StatusCode::from_u16(self.status_code).unwrap();
-            Err(KubeError::Api(ErrorResponse {
-                status: status.to_string(),
-                code: status.as_u16(),
-                message: "Failed to list resources".to_string(),
-                reason: "Failed to parse error data".into(),
-            }))
+            Err(KubeError::Api(
+                Status::failure("Failed to list resources", "Failed to parse error data")
+                    .with_code(status.as_u16())
+                    .boxed(),
+            ))
         }
     }
 }

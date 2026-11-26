@@ -266,6 +266,7 @@ pub enum WorkspaceCommand {
 
 impl WorkspaceCommand {
     pub async fn run(self) -> Result<()> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         match self {
             WorkspaceCommand::Run { timeout } => run_all_services(timeout).await,
         }

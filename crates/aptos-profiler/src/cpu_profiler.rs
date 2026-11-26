@@ -54,7 +54,7 @@ impl Profiler for CpuProfiler<'static> {
 
         if let Ok(report) = guard.report().build() {
             let file = create_file_with_parents(self.svg_result_path.as_path())?;
-            let _result = report.flamegraph(file);
+            write_flamegraph(&report, file);
         };
 
         Ok(())
@@ -76,7 +76,7 @@ impl Profiler for CpuProfiler<'static> {
                 .build()
             {
                 let file = create_file_with_parents(self.svg_result_path.as_path())?;
-                let _result = report.flamegraph(file);
+                write_flamegraph(&report, file);
             }
             self.destory_guard()?;
         }
@@ -91,5 +91,32 @@ impl Profiler for CpuProfiler<'static> {
     /// Expose the results as SVG
     fn expose_svg_results(&self) -> Result<String> {
         convert_svg_to_string(self.svg_result_path.as_path())
+    }
+}
+
+fn write_flamegraph<W: std::io::Write>(report: &pprof::Report, writer: W) {
+    let lines: Vec<String> = report
+        .data
+        .iter()
+        .map(|(key, value)| {
+            use std::fmt::Write;
+            let mut line = key.thread_name_or_id();
+            line.push(';');
+            for frame in key.frames.iter().rev() {
+                for symbol in frame.iter().rev() {
+                    write!(&mut line, "{};", symbol).unwrap();
+                }
+            }
+            line.pop().unwrap_or_default();
+            write!(&mut line, " {}", value).unwrap();
+            line
+        })
+        .collect();
+    if !lines.is_empty() {
+        let _result = inferno::flamegraph::from_lines(
+            &mut inferno::flamegraph::Options::default(),
+            lines.iter().map(|s| s.as_str()),
+            writer,
+        );
     }
 }

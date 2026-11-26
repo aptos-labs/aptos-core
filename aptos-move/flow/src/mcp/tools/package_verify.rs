@@ -18,7 +18,7 @@ use move_model::{ast::ExpData, model::GlobalEnv};
 use move_prover_bytecode_pipeline::spec_inference::LOOP_INVARIANT_EVIDENCE_NOTE;
 use rmcp::{
     handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
+    model::{CallToolResult, ContentBlock as Content},
     schemars, tool, tool_router,
 };
 use std::time::{Duration, Instant};
