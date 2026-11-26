@@ -619,7 +619,7 @@ firebase-token = { git = "https://github.com/aptos-labs/firebase-token", rev = "
 firestore = "0.43.0"
 fixed = "1.31.0"
 flate2 = "1.0.24"
-flexi_logger = "0.31.10"
+flexi_logger = "0.32.0"
 float-cmp = "0.10.0"
 fs2 = "0.4.3"
 futures = "0.3.29"
@@ -708,8 +708,8 @@ nalgebra = "0.35.0"
 named-lock = "0.4.1"
 native-tls = "0.2.10"
 neptune = { version = "13.0.0", default-features = false }
-nix = { version = "0.31", features = ["signal"] }
-notify = "8.2.0"
+nix = { version = "0.32", features = ["signal"] }
+notify = "9.0.0"
 ntest = "0.10.0"
 num = "0.4.0"
 num-bigint = { version = "0.3.2", features = ["rand"] }
@@ -783,12 +783,12 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 ring = { version = "0.17.14", features = ["std"] }
 ripemd = "0.1.1"
-rlimit = "0.11.0"
+rlimit = "0.12.0"
 rmcp = { version = "0.16", features = ["server", "transport-io"] }
 rocksdb = { version = "0.24.0", features = ["lz4"] }
 rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default-features = false }
-rstest = { version = "0.28.0", default-features = false }
+rstest = { version = "0.29.0", default-features = false }
 rustc-hash = "2"
 rustversion = "1.0.14"
 rusty-fork = "0.3.0"
