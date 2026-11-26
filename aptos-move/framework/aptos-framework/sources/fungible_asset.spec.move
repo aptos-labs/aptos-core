@@ -293,6 +293,9 @@ spec aptos_framework::fungible_asset {
         let addr = constructor_ref.self;
         let concurrent = features::spec_is_enabled(features::CONCURRENT_FUNGIBLE_ASSETS);
         let post supply = global<ConcurrentSupply>(addr).current;
+        modifies global<Metadata>(addr);
+        modifies global<Supply>(addr);
+        modifies global<ConcurrentSupply>(addr);
         include AddFungibilityAbortsIf;
         /// [high-level-req-2.1]
         ensures exists<Metadata>(addr) && (concurrent ==> exists<ConcurrentSupply>(addr))
