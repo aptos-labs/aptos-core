@@ -1160,6 +1160,7 @@ module aptos_framework::multisig_account {
             invariant i <= num_attributes;
             invariant forall k in 0..i: simple_map::spec_contains_key(metadata, keys[k]);
             invariant forall m in 0..i, n in 0..i: m != n ==> keys[m] != keys[n];
+            invariant forall k: String: simple_map::spec_contains_key(metadata, k) ==> (exists j in 0..i: keys[j] == k);
         };
 
         if (emit_event) {

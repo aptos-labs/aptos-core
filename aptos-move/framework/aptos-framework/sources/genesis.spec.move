@@ -101,22 +101,63 @@ spec aptos_framework::genesis {
     }
 
     spec initialize_aptos_coin {
+        use std::option;
+        use aptos_std::type_info;
         pragma opaque;
         // property 3: The Aptos coin should be initialized during genesis and only the Aptos framework account should
         // own the mint and burn capabilities for the APT token.
         /// [high-level-req-3]
         requires !exists<stake::AptosCoinCapabilities>(@aptos_framework);
+        let addr = std::signer::address_of(aptos_framework);
+        // The paired metadata object of APT, at the APT address or, as `coin::create_pairing` frames it, at its
+        // named address.
+        let apt = @aptos_fungible_asset;
+        let named = aptos_framework::object::spec_create_object_address(apt, type_info::type_name<AptosCoin>().bytes);
+        let paired = coin::spec_paired_metadata(type_info::type_of<AptosCoin>());
+        modifies global<coin::CoinInfo<AptosCoin>>(addr);
+        modifies global<aptos_coin::MintCapStore>(addr);
+        modifies global<coin::CoinConversionMap>(@aptos_framework);
+        modifies global<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        modifies global<stake::AptosCoinCapabilities>(addr);
+        modifies global<transaction_fee::AptosFABurnCapabilities>(addr);
+        modifies global<transaction_fee::AptosFAMintCapabilities>(addr);
+        modifies global<transaction_fee::AptosCoinMintCapability>(addr);
+        modifies global<aptos_framework::object::ObjectCore>(apt);
+        modifies global<aptos_framework::object::ObjectCore>(named);
+        modifies global<aptos_framework::fungible_asset::Metadata>(apt);
+        modifies global<aptos_framework::fungible_asset::Metadata>(named);
+        modifies global<aptos_framework::fungible_asset::Supply>(apt);
+        modifies global<aptos_framework::fungible_asset::Supply>(named);
+        modifies global<aptos_framework::fungible_asset::ConcurrentSupply>(apt);
+        modifies global<aptos_framework::fungible_asset::ConcurrentSupply>(named);
+        modifies global<aptos_framework::primary_fungible_store::DeriveRefPod>(apt);
+        modifies global<aptos_framework::primary_fungible_store::DeriveRefPod>(named);
+        modifies global<coin::PairedCoinType>(apt);
+        modifies global<coin::PairedCoinType>(named);
+        modifies global<coin::PairedFungibleAssetRefs>(apt);
+        modifies global<coin::PairedFungibleAssetRefs>(named);
+        // The burn ref is taken from the paired metadata of APT, which exists after the pairing.
+        modifies global<coin::PairedFungibleAssetRefs>(
+            if (option::is_some(paired)) { option::borrow(paired).inner } else { apt }
+        );
         ensures exists<stake::AptosCoinCapabilities>(@aptos_framework);
     }
 
     spec initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
         use aptos_framework::reconfiguration_state;
-        // Aborts of the key validation and of joining the validator set are not specified.
-        pragma aborts_if_is_partial;
+        use aptos_std::bls12381;
+        use std::option;
+        use std::vector;
         aborts_if reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<stake::StakePool>(pool_address);
         aborts_if !exists<stake::ValidatorConfig>(pool_address);
         aborts_if validator.operator_address != global<stake::StakePool>(pool_address).operator_address;
+        aborts_if !option::is_some(bls12381::spec_public_key_from_bytes_with_pop(
+            validator.consensus_pubkey,
+            bls12381::proof_of_possession_from_bytes(validator.proof_of_possession)
+        ));
+        aborts_if vector::is_empty(validator.consensus_pubkey);
+        include stake::JoinValidatorSetStakeAbortsIf { operator_address: validator.operator_address };
         let post config = global<stake::ValidatorConfig>(pool_address);
         ensures config.consensus_pubkey == validator.consensus_pubkey;
         ensures config.network_addresses == validator.network_addresses;

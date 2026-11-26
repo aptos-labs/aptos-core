@@ -143,7 +143,7 @@ spec aptos_framework::staking_contract {
     }
 
     spec get_expected_stake_pool_address {
-        pragma aborts_if_is_partial;
+        aborts_if false;
     }
 
     spec fun spec_staking_contract_exists(staker: address, operator: address): bool {
@@ -320,10 +320,44 @@ spec aptos_framework::staking_contract {
 
     /// Unless the amount is zero, the staking_contract must exist for the staker/operator pair.
     spec unlock_stake(staker: &signer, operator: address, amount: u64) {
+        // Opaque, so that callers do not reason through the distribution and deposit code.
+        pragma opaque;
         // Partial: the aborts of distributing, paying the commission and unlocking the stake are not specified.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
         include amount != 0 ==> ContractExistsAbortsIf { staker: staker_address };
+        let contract = simple_map::spec_get(global<Store>(staker_address).staking_contracts, operator);
+        include amount != 0 ==> DistributeInternalAbortsIf { staker: staker_address, staking_contract: contract };
+        // The aborts are partial, so callers learn the conditions above from these.
+        ensures amount != 0 ==> old(exists<Store>(staker_address))
+            && old(simple_map::spec_contains_key(global<Store>(staker_address).staking_contracts, operator))
+            && !old(spec_distribute_internal_aborts(contract));
+    }
+
+    /// Aborts of distributing the inactive stake, up to the distribution loop.
+    spec schema DistributeInternalAbortsIf {
+        staker: address;
+        operator: address;
+        staking_contract: StakingContract;
+        aborts_if spec_distribute_internal_aborts(staking_contract);
+    }
+
+    spec fun spec_distribute_internal_aborts(staking_contract: StakingContract): bool {
+        let pool_address = staking_contract.pool_address;
+        let stake_pool = global<stake::StakePool>(pool_address);
+        // The pool of the owner capability, from which the stake is withdrawn.
+        let cap_pool_address = staking_contract.owner_cap.pool_address;
+        let cap_pool = global<stake::StakePool>(cap_pool_address);
+        let validator_set = global<stake::ValidatorSet>(@aptos_framework);
+        let inactive_state = !stake::spec_contains(validator_set.pending_active, cap_pool_address)
+            && !stake::spec_contains(validator_set.active_validators, cap_pool_address)
+            && !stake::spec_contains(validator_set.pending_inactive, cap_pool_address);
+        !exists<stake::StakePool>(pool_address)
+            || stake_pool.inactive.value + stake_pool.pending_inactive.value > MAX_U64
+            || !exists<stake::StakePool>(cap_pool_address)
+            || !exists<stake::ValidatorSet>(@aptos_framework)
+            || (inactive_state && aptos_framework::timestamp::spec_now_seconds() >= cap_pool.locked_until_secs
+                && cap_pool.inactive.value + cap_pool.pending_inactive.value > MAX_U64)
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -506,18 +540,17 @@ spec aptos_framework::staking_contract {
     /// The Account exists under the staker.
     /// The guid_creation_num of the account resource is up to MAX_U64.
     spec new_staking_contracts_holder(staker: &signer): Store {
-        pragma aborts_if_is_partial;
         include NewStakingContractsHolderAbortsIf;
     }
 
+    /// The store holds nine event handles of the staker account.
     spec schema NewStakingContractsHolderAbortsIf {
         staker: signer;
 
         let addr = signer::address_of(staker);
-        // let account = global<account::Account>(addr);
-        // aborts_if !exists<account::Account>(addr);
-        // aborts_if account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
-        // aborts_if account.guid_creation_num + 9 > MAX_U64;
+        include account::NewEventHandleAbortsIf { account: staker };
+        aborts_if exists<account::Account>(addr)
+            && global<account::Account>(addr).guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
     }
 
     /// The Store exists under the staker.
