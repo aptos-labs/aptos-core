@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Result};
 use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
-use aptos_storage_interface::{DbReader, Result as DbResult};
+use aptos_storage_interface::{CheckpointStateReader, DbReader, Result as DbResult};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -50,6 +50,23 @@ impl GenesisStateReader {
             .collect();
         Ok(Self { values })
     }
+
+    /// Genesis is the only version this holds, so reads at any version land here.
+    fn get(&self, state_key: &StateKey) -> Option<(Version, StateValue)> {
+        self.values
+            .get(state_key)
+            .map(|value| (Self::VERSION, value.clone()))
+    }
+}
+
+impl CheckpointStateReader for GenesisStateReader {
+    fn get_state_value_with_version_at_checkpoint(
+        &self,
+        state_key: &StateKey,
+        _version: Version,
+    ) -> DbResult<Option<(Version, StateValue)>> {
+        Ok(self.get(state_key))
+    }
 }
 
 impl DbReader for GenesisStateReader {
@@ -58,7 +75,7 @@ impl DbReader for GenesisStateReader {
         state_key: &StateKey,
         _version: Version,
     ) -> DbResult<Option<StateValue>> {
-        Ok(self.values.get(state_key).cloned())
+        Ok(self.get(state_key).map(|(_, value)| value))
     }
 
     fn get_state_value_with_version_by_version(
@@ -66,10 +83,7 @@ impl DbReader for GenesisStateReader {
         state_key: &StateKey,
         _version: Version,
     ) -> DbResult<Option<(Version, StateValue)>> {
-        Ok(self
-            .values
-            .get(state_key)
-            .map(|value| (Self::VERSION, value.clone())))
+        Ok(self.get(state_key))
     }
 
     fn get_state_storage_usage(&self, _version: Option<Version>) -> DbResult<StateStorageUsage> {
