@@ -57,6 +57,7 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
+                let _ = rustls::crypto::ring::default_provider().install_default();
                 let backoff = backoff::ExponentialBackoff {
                     max_elapsed_time: Some(Duration::from_secs(5)),
                     ..Default::default()

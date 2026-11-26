@@ -33,6 +33,7 @@ impl ServerArgs {
     where
         C: RunnableConfig,
     {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         // Set up the server.
         setup_logging(None);
         setup_panic_handler();
@@ -48,6 +49,7 @@ pub async fn run_server_with_config<C>(config: GenericConfig<C>) -> Result<()>
 where
     C: RunnableConfig,
 {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let health_port = config.health_check_port;
     // Start liveness and readiness probes.
     let config_clone = config.clone();

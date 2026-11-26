@@ -27,6 +27,10 @@ use url::Url;
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
+pub fn ensure_rustls_crypto_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 /// The default file storage format is JsonBase64UncompressedProto.
 /// This is only used in file store metadata for backward compatibility.
 pub fn default_file_storage_format() -> compression_util::StorageFormat {
@@ -35,6 +39,7 @@ pub fn default_file_storage_format() -> compression_util::StorageFormat {
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: Url) -> GrpcClientType {
+    ensure_rustls_crypto_provider();
     backoff::future::retry(backoff::ExponentialBackoff::default(), || async {
         match FullnodeDataClient::connect(address.to_string()).await {
             Ok(client) => {
@@ -71,6 +76,7 @@ pub async fn create_data_service_grpc_client(
     address: Url,
     max_elapsed_time: Option<Duration>,
 ) -> Result<GrpcDataServiceClientType> {
+    ensure_rustls_crypto_provider();
     let mut backoff = backoff::ExponentialBackoff::default();
     if let Some(max_elapsed_time) = max_elapsed_time {
         backoff.max_elapsed_time = Some(max_elapsed_time);

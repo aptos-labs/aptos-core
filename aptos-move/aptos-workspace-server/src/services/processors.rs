@@ -60,6 +60,7 @@ fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Se
     let fut_prerequisites_ = fut_prerequisites.clone();
     let processor_name_ = processor_name.to_owned();
     let handle_processor = tokio::spawn(async move {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let (postgres_port, indexer_grpc_port) = fut_prerequisites_.await?;
 
         no_panic_println!("Starting processor {}..", processor_name_);

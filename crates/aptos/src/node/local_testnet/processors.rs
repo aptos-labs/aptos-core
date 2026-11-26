@@ -67,6 +67,7 @@ impl ProcessorManager {
         data_service_url: Url,
         postgres_connection_string: String,
     ) -> Result<Self> {
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let processor_config = get_processor_config(processor_name)?;
         let config = IndexerProcessorConfig {
             processor_config,

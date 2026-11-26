@@ -35,6 +35,7 @@ prost = { workspace = true }
 redis = { workspace = true }
 redis-test = { workspace = true }
 ripemd = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
