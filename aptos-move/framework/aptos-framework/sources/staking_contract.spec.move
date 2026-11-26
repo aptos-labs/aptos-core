@@ -56,9 +56,9 @@ spec aptos_framework::staking_contract {
     /// Implementation: The switch_operator function initiates the commission payout from the stake pool associated with
     /// the old operator, ensuring a smooth transition. Paying out the commission before the switch guarantees that the
     /// staker receives the appropriate commission amount and maintains the integrity of the staking process.
-    /// Enforcement: Audited that the commission is paid to the old operator. Formally verified via
-    /// [high-level-req-7](switch_operator) that the contract moves from the old to the new operator, keeping its
-    /// stake pool.
+    /// Enforcement: Formally verified via [high-level-req-7](switch_operator) that the contract is re-keyed to the new
+    /// operator with the same pool and its principal reset to the active stake minus the old operator's commission.
+    /// Audited that the commission is paid to the old operator.
     ///
     /// No.: 8
     /// Requirement: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
@@ -394,6 +394,10 @@ spec aptos_framework::staking_contract {
         /// [high-level-req-7]
         ensures post_contract.pool_address == pre_contract.pool_address;
         ensures post_contract.commission_percentage == new_commission_percentage;
+        let pre_pool = global<stake::StakePool>(pre_contract.pool_address);
+        let pre_active = coin::value(pre_pool.active) + coin::value(pre_pool.pending_active);
+        let commission = (pre_active - pre_contract.principal) * pre_contract.commission_percentage / 100;
+        ensures post_contract.principal == pre_active - commission;
     }
 
     /// Requires the operator beneficiary change feature.
@@ -428,14 +432,25 @@ spec aptos_framework::staking_contract {
         operator: address,
         staking_contract: &mut StakingContract,
     ) {
+        // Opaque, so that callers do not reason through the distribution loop and the deposits.
+        pragma opaque;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
+        include DistributeInternalAbortsIf;
+        // The aborts are partial, so callers learn the conditions above from this.
+        ensures !old(spec_distribute_internal_aborts(staking_contract));
+        // Only the inactive stake is withdrawn and only the distribution pool changes.
         let pool_address = staking_contract.pool_address;
-        let stake_pool = borrow_global<stake::StakePool>(pool_address);
-        aborts_if !exists<stake::StakePool>(pool_address);
-        aborts_if stake_pool.inactive.value + stake_pool.pending_inactive.value
-            > MAX_U64;
-        aborts_if !exists<stake::StakePool>(staking_contract.owner_cap.pool_address);
+        let stake_pool = global<stake::StakePool>(pool_address);
+        let post post_stake_pool = global<stake::StakePool>(pool_address);
+        ensures exists<stake::StakePool>(pool_address);
+        ensures post_stake_pool.active == stake_pool.active;
+        ensures post_stake_pool.pending_active == stake_pool.pending_active;
+        ensures staking_contract.principal == old(staking_contract).principal;
+        ensures staking_contract.pool_address == old(staking_contract).pool_address;
+        ensures staking_contract.owner_cap == old(staking_contract).owner_cap;
+        ensures staking_contract.signer_cap == old(staking_contract).signer_cap;
+        ensures staking_contract.commission_percentage == old(staking_contract).commission_percentage;
     }
 
     /// Staking_contract exists the stacker/operator pair.

@@ -402,13 +402,16 @@ spec aptos_token::token {
     }
 
     spec deposit_token(account: &signer, token: Token) {
-        // TODO: boogie error: invalid type for argument 1 in application of $ResourceExists: $1_account_Account (expected: int)
-        pragma verify = false;
         let account_addr = signer::address_of(account);
         include !exists<TokenStore>(account_addr) ==> InitializeTokenStore;
         let token_id = token.id;
         let token_amount = token.amount;
-        include DirectDepositAbortsIf;
+        aborts_if token_amount <= 0;
+        // A freshly created store holds no tokens, so only an existing store can reject the deposit.
+        include exists<TokenStore>(account_addr) ==> DirectDepositAbortsIf;
+        ensures exists<TokenStore>(account_addr);
+        ensures spec_balance_of(account_addr, token_id)
+            == old(spec_balance_of(account_addr, token_id)) + token_amount;
     }
 
     /// The token can direct_transfer.
@@ -429,22 +432,43 @@ spec aptos_token::token {
         token_id: TokenId,
         amount: u64,
     ) {
-        //TODO: Unable to get thef value of token.
-        pragma verify = false;
+        let sender_addr = signer::address_of(sender);
+        let receiver_addr = signer::address_of(receiver);
+        let stored = table::spec_get(global<TokenStore>(sender_addr).tokens, token_id);
+        // Withdrawing the whole entry moves the stored token, which carries its own id.
+        let moved_id = if (stored.amount > amount) { token_id } else { stored.id };
+        include WithdrawWithEventInternalAbortsIf { account_addr: sender_addr, id: token_id };
+        include sender_addr != receiver_addr && exists<TokenStore>(receiver_addr) ==> DirectDepositAbortsIf {
+            account_addr: receiver_addr,
+            token_id: moved_id,
+            token_amount: amount,
+        };
+        ensures exists<TokenStore>(receiver_addr);
+        ensures sender_addr != receiver_addr ==> spec_balance_of(sender_addr, token_id)
+            == old(spec_balance_of(sender_addr, token_id)) - amount;
+        ensures sender_addr != receiver_addr ==> spec_balance_of(receiver_addr, moved_id)
+            == old(spec_balance_of(receiver_addr, moved_id)) + amount;
+        ensures sender_addr == receiver_addr && stored.id == token_id ==>
+            spec_balance_of(sender_addr, token_id) == old(spec_balance_of(sender_addr, token_id));
     }
 
     spec initialize_token_store(account: &signer) {
         include InitializeTokenStore;
     }
 
+    /// Creating a missing store creates four event handles, bumping the account's GUID counter four times.
     spec schema InitializeTokenStore {
         account: signer;
 
         let addr = signer::address_of(account);
-        let account_addr = global<account::Account>(addr);
-        // aborts_if !exists<TokenStore>(addr) && !exists<account::Account>(addr);
-        // aborts_if !exists<TokenStore>(addr) && account_addr.guid_creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
-        // aborts_if !exists<TokenStore>(addr) && account_addr.guid_creation_num + 4 > MAX_U64;
+        let store_missing = !exists<TokenStore>(addr);
+        include store_missing ==> account::NewEventHandleAbortsIf;
+        let creation_num = if (exists<account::Account>(addr)) {
+            global<account::Account>(addr).guid_creation_num
+        } else {
+            2
+        };
+        aborts_if store_missing && creation_num + 4 >= account::MAX_GUID_CREATION_NUM;
     }
 
     spec merge(dst_token: &mut Token, source_token: Token) {
@@ -584,8 +608,6 @@ spec aptos_token::token {
         property_values: vector<vector<u8>>,
         property_types: vector<String>
     ): TokenDataId {
-        // TODO: Complex abort condition in "roperty_map::new".
-        pragma verify = false;
         let account_addr = signer::address_of(account);
         let collections = global<Collections>(account_addr);
         let token_data_id = spec_create_token_data_id(account_addr, collection, name);
@@ -685,17 +707,16 @@ spec aptos_token::token {
         token_data_id: TokenDataId,
         amount: u64,
     ): TokenId {
-        //TODO: Cannot get the value of Token for deposit_token function.
-        // pragma aborts_if_is_partial;
-        pragma verify = false;
-        // include MintTokenAbortsIf;
-        // let addr = signer::address_of(account);
-        // let creator_addr = token_data_id.creator;
-        // aborts_if token_data_id.creator != addr;
-        // aborts_if !table::spec_contains(all_token_data, token_data_id);
-        // let token_data = table::spec_get(all_token_data, token_data_id);
-        // let all_token_data = global<Collections>(creator_addr).token_data;
-        // aborts_if token_data.maximum > 0 ==> token_data.supply + amount > token_data.maximum;
+        include MintTokenAbortsIf;
+        let addr = signer::address_of(account);
+        let token_data = table::spec_get(global<Collections>(token_data_id.creator).token_data, token_data_id);
+        let post post_token_data = table::spec_get(
+            global<Collections>(token_data_id.creator).token_data, token_data_id
+        );
+        ensures result == create_token_id(token_data_id, 0);
+        ensures token_data.maximum > 0 ==> post_token_data.supply == token_data.supply + amount;
+        ensures token_data.maximum == 0 ==> post_token_data.supply == token_data.supply;
+        ensures spec_balance_of(addr, result) == old(spec_balance_of(addr, result)) + amount;
     }
 
     spec schema MintTokenAbortsIf {
@@ -715,13 +736,11 @@ spec aptos_token::token {
         include InitializeTokenStore;
 
         let token_id = create_token_id(token_data_id, 0);
-        // aborts_if !exists<TokenStore>(addr);
-        // let token_store = global<TokenStore>(addr);
-        // let recipient_token = table::spec_get(token_store.tokens, token_id);
-        // let b = table::spec_contains(token_store.tokens, token_id);
-        // aborts_if amount <= 0;
-        // aborts_if b && recipient_token.id != token_id;
-        // aborts_if b && recipient_token.amount + amount > MAX_U64;
+        include exists<TokenStore>(addr) ==> DirectDepositAbortsIf {
+            account_addr: addr,
+            token_id,
+            token_amount: amount,
+        };
     }
 
     spec mint_token_to(
@@ -938,18 +957,23 @@ spec aptos_token::token {
         aborts_if !table::spec_contains(all_token_data, token_data_id);
     }
 
+    /// No key may start with the reserved prefix `TOKEN_`.
     spec assert_non_standard_reserved_property(keys: &vector<String>) {
-        // TODO: Can't handle abort in loop.
-        pragma verify = false;
+        aborts_if exists i in 0..len(keys): spec_has_reserved_prefix(keys[i]);
+    }
+
+    /// Whether the first six bytes of `key`, as cut by `string::sub_string`, are `TOKEN_`.
+    spec fun spec_has_reserved_prefix(key: String): bool {
+        len(key.bytes) >= 6 && string::spec_internal_sub_string(key.bytes, 0, 6) == b"TOKEN_"
     }
 
     /// Deprecated function
     spec initialize_token_script(_account: &signer) {
-        pragma verify = false;
+        aborts_if true;
     }
 
     /// Deprecated function
     spec initialize_token(_account: &signer, _token_id: TokenId) {
-        pragma verify = false;
+        aborts_if true;
     }
 }

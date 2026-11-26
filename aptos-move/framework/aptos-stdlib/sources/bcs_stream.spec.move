@@ -77,7 +77,6 @@ spec aptos_std::bcs_stream {
     }
 
     spec deserialize_u128(stream: &mut BCSStream): u128 {
-        pragma verify = false;
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if stream.cur + (16 as u64) > MAX_U64;
@@ -87,7 +86,6 @@ spec aptos_std::bcs_stream {
     }
 
     spec deserialize_u256(stream: &mut BCSStream): u256 {
-        pragma verify = false;
         pragma opaque;
         pragma aborts_if_is_partial;
         aborts_if stream.cur + (32 as u64) > MAX_U64;

@@ -65,15 +65,6 @@ spec aptos_std::smart_vector {
         use aptos_std::type_info;
         use aptos_std::table_with_length;
         pragma opaque;
-        // Body verification is infeasible: BigVector's bucket-layout struct invariants
-        // (`forall i in 0..n-1: len(bucket[i]) == bucket_size`) are injected by
-        // DataInvariantInstrumentationProcessor at every PackRefDeep site in the
-        // multi-branch body. These `forall`-over-table-contents quantifiers, combined
-        // with the `spec_at` ground terms from `big_vector::push_back`'s postconditions,
-        // cause Z3 quantifier-instantiation cascades that exceed 40s in the full package.
-        // `pragma verify = false` prevents the data-invariant processor from running
-        // on this function while preserving all aborts_if/ensures for callers.
-        pragma verify = false;
         // (A) Computing self.length() can overflow when big_vec contributes elements.
         aborts_if self.big_vec.is_some()
             && len(self.inline_vec) + option::borrow(self.big_vec).length<T>() > MAX_U64;

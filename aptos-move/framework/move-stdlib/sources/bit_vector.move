@@ -111,10 +111,6 @@ module std::bit_vector {
             };
         }
     }
-    spec shift_left {
-        // TODO: set to false because data invariant cannot be proved with inline function. Will remove it once inline is supported
-        pragma verify = false;
-    }
 
     /// Return the value of the bit at `bit_index` in the `self`. `true`
     /// represents "1" and `false` represents a 0
