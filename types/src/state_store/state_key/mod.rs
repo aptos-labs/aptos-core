@@ -497,7 +497,13 @@ impl Eq for StateKey {}
 
 impl Hash for StateKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        state.write(self.crypto_hash_ref().as_ref())
+        // Already uniform; the tail avoids the shard nibble and JMT prefix.
+        let bytes = self.crypto_hash_ref().as_ref();
+        state.write_u64(u64::from_ne_bytes(
+            bytes[HashValue::LENGTH - 8..]
+                .try_into()
+                .expect("32-byte hash"),
+        ))
     }
 }
 
