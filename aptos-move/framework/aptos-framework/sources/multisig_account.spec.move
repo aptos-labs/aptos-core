@@ -316,6 +316,9 @@ spec aptos_framework::multisig_account {
     /// at every call site. Its preconditions and result are therefore captured here via the
     /// `can_execute` spec rather than via a standalone spec block.
     spec can_execute(owner: address, multisig_account: address, sequence_number: u64): bool {
+        // Opaque, so that callers use the vote-count summary instead of the counting loop.
+        pragma opaque;
+        // Partial: the vote-count and timelock aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
         include ValidSequenceNumberAbortsIf;
@@ -331,6 +334,8 @@ spec aptos_framework::multisig_account {
     }
 
     spec can_be_executed(multisig_account: address, sequence_number: u64): bool {
+        // Opaque, so that callers use the vote-count summary instead of the counting loop.
+        pragma opaque;
         // Partial: the vote-count and timelock aborts are not specified.
         pragma aborts_if_is_partial;
         let multisig_account_resource = global<MultisigAccount>(multisig_account);
@@ -430,7 +435,6 @@ spec aptos_framework::multisig_account {
     spec upsert_timelock(multisig_account: &signer, timelock_period: u64, override_threshold: Option<u64>) {
         use std::signer;
         use std::features;
-        pragma aborts_if_is_partial;
         let multisig_address = signer::address_of(multisig_account);
         let timelock_enabled = features::spec_multisig_timelock_enabled();
         // Feature flag must be enabled.
@@ -483,7 +487,7 @@ spec aptos_framework::multisig_account {
         override_threshold: Option<u64>,
     ) {
         use std::features;
-        pragma aborts_if_is_partial;
+        include CreateWithOwnersAbortsIf;
         // The creator is appended to the owner set before create_with_owners_internal runs.
         let total_owners = len(additional_owners) + 1;
         // Feature flag must be enabled.
@@ -546,19 +550,44 @@ spec aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) {
         use std::signer;
-        // Partial: the aborts of creating the resource account and of the metadata are not specified.
-        pragma aborts_if_is_partial;
         let owner_addr = signer::address_of(owner);
         let owners = concat(additional_owners, vec(owner_addr));
         let multisig_address = spec_next_multisig_account_address(owner_addr);
         include CreateMultisigAccountAbortsIfAndEnsures;
-        aborts_if exists i in 0..len(owners), j in 0..len(owners):
-            i < j && owners[i] == owners[j];
-        aborts_if exists<account::Account>(multisig_address);
+        include CreateWithOwnersAbortsIf;
         let post multisig = global<MultisigAccount>(multisig_address);
         ensures multisig.last_executed_sequence_number == 0;
         ensures multisig.next_sequence_number == 1;
         ensures option::is_some(multisig.signer_cap) && option::spec_borrow(multisig.signer_cap).account == multisig_address;
+    }
+
+    /// The aborts of creating a multisig account for `owner` and the other owners beyond the signature count.
+    spec schema CreateWithOwnersAbortsIf {
+        use std::signer;
+        use std::features::{Self, DEFAULT_ACCOUNT_RESOURCE};
+        use aptos_std::type_info;
+        owner: &signer;
+        additional_owners: vector<address>;
+        metadata_keys: vector<String>;
+        metadata_values: vector<vector<u8>>;
+        let owner_addr = signer::address_of(owner);
+        let owners = concat(additional_owners, vec(owner_addr));
+        let multisig_address = spec_next_multisig_account_address(owner_addr);
+        aborts_if exists i in 0..len(owners), j in 0..len(owners):
+            i < j && owners[i] == owners[j];
+        aborts_if exists i in 0..len(owners): owners[i] == multisig_address;
+        aborts_if exists<account::Account>(multisig_address);
+        // Creating the resource account.
+        aborts_if !exists<account::Account>(owner_addr) && !features::spec_is_enabled(DEFAULT_ACCOUNT_RESOURCE);
+        include account::EnsureResourceExistsAbortsIf { addr: multisig_address };
+        aborts_if len(account::ZERO_AUTH_KEY) != 32;
+        aborts_if !exists<coin::CoinInfo<AptosCoin>>(type_info::type_of<AptosCoin>().account_address);
+        // Creating the multisig account.
+        aborts_if !features::spec_is_enabled(features::MULTISIG_ACCOUNTS);
+        aborts_if exists<MultisigAccount>(multisig_address);
+        aborts_if len(metadata_keys) != len(metadata_values);
+        aborts_if exists m in 0..len(metadata_keys), n in 0..len(metadata_keys):
+            m < n && metadata_keys[m] == metadata_keys[n];
     }
 
     spec create_with_owners_then_remove_bootstrapper(
@@ -604,8 +633,10 @@ spec aptos_framework::multisig_account {
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
     ) {
-        // Transaction-context and signature-verification aborts are not specified.
+        // Partial: the signature-verification aborts are not specified.
         pragma aborts_if_is_partial;
+        // The creation proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         include CreateMultisigAccountAbortsIfAndEnsures;
     }
 
@@ -619,8 +650,10 @@ spec aptos_framework::multisig_account {
         metadata_keys: vector<String>,
         metadata_values: vector<vector<u8>>,
     ) {
-        // Transaction-context and signature-verification aborts are not specified.
+        // Partial: the signature-verification aborts are not specified.
         pragma aborts_if_is_partial;
+        // The creation proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         include CreateMultisigAccountAbortsIfAndEnsures;
         // The auth key is rotated to zero and any signer or rotation capability offer is revoked.
         let post account_resource = global<account::Account>(multisig_address);
@@ -655,7 +688,7 @@ spec aptos_framework::multisig_account {
 
     spec create_transaction(owner: &signer, multisig_account: address, payload: vector<u8>) {
         use std::signer;
-        pragma aborts_if_is_partial;
+        include AddTransactionAbortsIf;
         // Payload cannot be empty.
         aborts_if len(payload) == 0;
         // Must be a multisig account.
@@ -668,7 +701,7 @@ spec aptos_framework::multisig_account {
 
     spec create_transaction_with_hash(owner: &signer, multisig_account: address, payload_hash: vector<u8>) {
         use std::signer;
-        pragma aborts_if_is_partial;
+        include AddTransactionAbortsIf;
         // Hash must be exactly 32 bytes.
         aborts_if len(payload_hash) != 32;
         // Must be a multisig account.
@@ -679,27 +712,39 @@ spec aptos_framework::multisig_account {
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
     }
 
+    /// Queueing a transaction needs queue capacity, a fresh sequence number and the clock.
+    spec schema AddTransactionAbortsIf {
+        use std::features;
+        multisig_account: address;
+        let res = global<MultisigAccount>(multisig_account);
+        let num_pending = res.next_sequence_number - res.last_executed_sequence_number - 1;
+        aborts_if exists<MultisigAccount>(multisig_account)
+            && features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT)
+            && num_pending >= MAX_PENDING_TRANSACTIONS;
+        aborts_if exists<MultisigAccount>(multisig_account) && res.next_sequence_number + 1 > MAX_U64;
+        aborts_if !exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+    }
+
     spec approve_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
         use std::signer;
-        pragma aborts_if_is_partial;
         /// [high-level-req-17.3]
         aborts_if !exists<MultisigAccount>(multisig_account);
         /// [high-level-req-14.1]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
+        aborts_if !table::spec_contains(global<MultisigAccount>(multisig_account).transactions, sequence_number);
     }
 
     spec reject_transaction(owner: &signer, multisig_account: address, sequence_number: u64) {
         use std::signer;
-        pragma aborts_if_is_partial;
         /// [high-level-req-17.4]
         aborts_if !exists<MultisigAccount>(multisig_account);
         /// [high-level-req-14.2]
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
+        aborts_if !table::spec_contains(global<MultisigAccount>(multisig_account).transactions, sequence_number);
     }
 
     spec vote_transanction(owner: &signer, multisig_account: address, sequence_number: u64, approved: bool) {
         use std::signer;
-        pragma aborts_if_is_partial;
         aborts_if !exists<MultisigAccount>(multisig_account);
         // Caller must be an owner.
         aborts_if !vector::spec_contains(global<MultisigAccount>(multisig_account).owners, signer::address_of(owner));
@@ -709,7 +754,8 @@ spec aptos_framework::multisig_account {
 
     spec vote_transaction(owner: &signer, multisig_account: address, sequence_number: u64, approved: bool) {
         use std::signer;
-        pragma aborts_if_is_partial;
+        use std::features;
+        aborts_if !features::spec_is_enabled(features::MULTISIG_V2_ENHANCEMENT);
         /// [high-level-req-17.5]
         aborts_if !exists<MultisigAccount>(multisig_account);
         /// [high-level-req-14.3]
@@ -855,14 +901,22 @@ spec aptos_framework::multisig_account {
         metadata_values: vector<vector<u8>>,
     ) {
         use std::signer;
+        use std::features;
         pragma verify = true;
-        pragma aborts_if_is_partial;
         let multisig_address = signer::address_of(multisig_account);
+        aborts_if !features::spec_is_enabled(features::MULTISIG_ACCOUNTS);
         aborts_if num_signatures_required == 0 || num_signatures_required > len(owners);
         aborts_if exists<MultisigAccount>(multisig_address);
         aborts_if exists i in 0..len(owners): owners[i] == multisig_address;
         aborts_if exists i in 0..len(owners), j in 0..len(owners):
             i < j && owners[i] == owners[j];
+        // The account holds nine event handles of the multisig account.
+        include account::NewEventHandleAbortsIf { account: multisig_account };
+        aborts_if exists<account::Account>(multisig_address)
+            && global<account::Account>(multisig_address).guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
+        aborts_if len(metadata_keys) != len(metadata_values);
+        aborts_if exists m in 0..len(metadata_keys), n in 0..len(metadata_keys):
+            m < n && metadata_keys[m] == metadata_keys[n];
         ensures exists<MultisigAccount>(multisig_address);
         let post multisig = global<MultisigAccount>(multisig_address);
         ensures multisig.owners == owners;
@@ -880,10 +934,10 @@ spec aptos_framework::multisig_account {
     ) {
         use std::signer;
         pragma opaque;
-        pragma aborts_if_is_partial;
         let multisig_address = signer::address_of(multisig_account);
         aborts_if len(keys) != len(values);
         aborts_if !exists<MultisigAccount>(multisig_address);
+        aborts_if exists m in 0..len(keys), n in 0..len(keys): m < n && keys[m] == keys[n];
         modifies global<MultisigAccount>(multisig_address);
         let pre = global<MultisigAccount>(multisig_address);
         let post post_r = global<MultisigAccount>(multisig_address);

@@ -95,13 +95,17 @@ spec aptos_framework::code {
     }
 
     spec check_upgradability(old_pack: &PackageMetadata, new_pack: &PackageMetadata, new_modules: &vector<String>) {
+        pragma aborts_if_is_partial = false;
         /// [high-level-req-4.1]
         aborts_if old_pack.upgrade_policy.policy >= upgrade_policy_immutable().policy;
         /// [high-level-req-4.2]
         aborts_if !can_change_upgrade_policy_to(old_pack.upgrade_policy, new_pack.upgrade_policy);
+        // Every module of the old package must be kept.
+        aborts_if exists i in 0..len(old_pack.modules): !vector::spec_contains(new_modules, old_pack.modules[i].name);
     }
 
     spec get_module_names(pack: &PackageMetadata): vector<String> {
+        pragma aborts_if_is_partial = false;
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] len(result) == len(pack.modules);

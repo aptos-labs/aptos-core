@@ -23,8 +23,18 @@ spec aptos_framework::coin {
     /// Requirement: The supply of a coin is only affected by burn and mint operations.
     /// Criticality: High
     /// Implementation: Only mint and burn operations on a coin alter the total supply of coins.
-    /// Enforcement: Audited that the coin supply changes only through mint and burn, including those of coin and
-    /// fungible asset conversion.
+    /// Enforcement: Formally Verified via [high-level-req-4.1](CoinSupplyUnchanged) that every function of this
+    /// module except mint, burn, initialization, the conversions between coin and fungible asset and the functions
+    /// converting internally (deposit, deposit_with_signer, deposit_for_gas_fee, withdraw and the migrations) keeps
+    /// the supply recorded in `CoinInfo` and the value held in coins unchanged; the excepted functions change both by
+    /// exactly the minted, burned or converted amount. Formally Verified via [high-level-req-4.2](TotalSupplyUnchanged)
+    /// that, for a tracked coin supply and an existing pairing, every function of this module except mint, burn,
+    /// burn_from and initialization keeps the coin supply plus the paired fungible asset supply unchanged; for
+    /// [high-level-req-4.3](fungible_asset_to_coin) this is verified when the converted asset is the paired one, and
+    /// for deposit, deposit_with_signer, transfer and withdraw when the stores involved hold the paired asset and
+    /// no deposit or withdraw hook runs. Audited: conversions that create the pairing,
+    /// migrate_coin_store_to_fungible_store, and mint and burn of the paired fungible asset through refs held outside
+    /// this module.
     ///
     /// No.: 5
     /// Requirement: Users may register an account for a coin multiple times idempotently.
@@ -66,11 +76,21 @@ spec aptos_framework::coin {
     spec module {
         pragma verify = true;
         pragma aborts_if_is_partial;
+        /// The total value of all `Coin<CoinType>` values.
         global supply<CoinType>: num;
-        global aggregate_supply<CoinType>: num;
         // TODO: `migrate_coin_store_to_fungible_store` migrates in an inline `for_each`
         // loop; the schema needs a loop invariant that cannot be attached there.
         apply TotalSupplyTracked<CoinType> to *<CoinType> except initialize, initialize_internal, initialize_with_parallelizable_supply, migrate_coin_store_to_fungible_store;
+        /// [high-level-req-4.1]
+        apply CoinSupplyUnchanged<CoinType> to *<CoinType> except mint, mint_internal, burn, burn_internal,
+            coin_to_fungible_asset, fungible_asset_to_coin, deposit, deposit_with_signer, deposit_for_gas_fee, withdraw,
+            maybe_convert_to_fungible_store, migrate_to_fungible_store, migrate_coin_store_to_fungible_store,
+            initialize, initialize_internal, initialize_with_parallelizable_supply;
+        /// [high-level-req-4.2]
+        apply TotalSupplyUnchanged<CoinType> to *<CoinType> except mint, mint_internal, burn, burn_internal,
+            burn_from, burn_from_for_gas, fungible_asset_to_coin, deposit, deposit_with_signer, transfer, withdraw,
+            migrate_coin_store_to_fungible_store, initialize, initialize_internal,
+            initialize_with_parallelizable_supply;
     }
 
     spec fun spec_fun_supply_tracked<CoinType>(val: u64, supply: Option<OptionalAggregator>): bool {
@@ -84,16 +104,61 @@ spec aptos_framework::coin {
     spec schema TotalSupplyTracked<CoinType> {
         ensures old(
             spec_fun_supply_tracked<CoinType>(
-                supply<CoinType> + aggregate_supply<CoinType>,
+                supply<CoinType>,
                 global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
                 .supply
             )
         ) ==>
             spec_fun_supply_tracked<CoinType>(
-                supply<CoinType> + aggregate_supply<CoinType>,
+                supply<CoinType>,
                 global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address)
                 .supply
             );
+    }
+
+    /// The supply recorded in `CoinInfo<CoinType>`, none if it is not tracked.
+    spec fun spec_coin_supply<CoinType>(coin_addr: address): Option<u128> {
+        let maybe_supply = global<CoinInfo<CoinType>>(coin_addr).supply;
+        if (option::is_some(maybe_supply)) {
+            option::spec_some(optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply)))
+        } else {
+            option::spec_none()
+        }
+    }
+
+    /// Neither the recorded supply nor the value held in coins changes.
+    spec schema CoinSupplyUnchanged<CoinType> {
+        let coin_addr = type_info::type_of<CoinType>().account_address;
+        ensures spec_coin_supply<CoinType>(coin_addr) == old(spec_coin_supply<CoinType>(coin_addr));
+        ensures supply<CoinType> == old(supply<CoinType>);
+    }
+
+    /// The recorded coin supply plus the supply of the paired fungible asset, if any.
+    spec fun spec_total_supply<CoinType>(coin_type: TypeInfo): num {
+        let maybe_supply = global<CoinInfo<CoinType>>(coin_type.account_address).supply;
+        let metadata = spec_paired_metadata(coin_type);
+        optional_aggregator::optional_aggregator_value(option::borrow(maybe_supply))
+            + if (option::is_some(metadata)) { fungible_asset::spec_supply(option::borrow(metadata).inner) } else { 0 }
+    }
+
+    /// If the coin supply is tracked and the coin is paired, the total supply does not change.
+    spec schema TotalSupplyUnchanged<CoinType> {
+        let coin_type = type_info::type_of<CoinType>();
+        let tracked = option::is_some(global<CoinInfo<CoinType>>(coin_type.account_address).supply)
+            && option::is_some(spec_paired_metadata(coin_type));
+        ensures tracked ==> spec_total_supply<CoinType>(coin_type) == old(spec_total_supply<CoinType>(coin_type));
+    }
+
+    /// The recorded supply, if tracked, changes by `added - removed`.
+    spec schema CoinSupplyDelta<CoinType> {
+        added: num;
+        removed: num;
+        let coin_addr = type_info::type_of<CoinType>().account_address;
+        let maybe_supply = spec_coin_supply<CoinType>(coin_addr);
+        let post post_maybe_supply = spec_coin_supply<CoinType>(coin_addr);
+        ensures option::is_some(post_maybe_supply) == option::is_some(maybe_supply);
+        ensures option::is_some(maybe_supply) ==>
+            option::borrow(post_maybe_supply) == option::borrow(maybe_supply) + added - removed;
     }
 
     spec AggregatableCoin {
@@ -102,21 +167,25 @@ spec aptos_framework::coin {
     }
 
     spec mint {
+        // Partial: the supply overflow abort is assumed away in `mint_internal`.
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if (amount != 0) && !type_info::spec_is_struct<CoinType>();
         aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
         ensures supply<CoinType> == old(supply<CoinType>) + amount;
+        include CoinSupplyDelta<CoinType> { added: amount, removed: 0 };
         ensures result.value == amount;
         ensures exists<CoinInfo<CoinType>>(addr) == old(exists<CoinInfo<CoinType>>(addr));
     }
 
     spec mint_internal {
+        // Partial: the supply overflow abort is assumed away in `mint_internal`.
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if (amount != 0) && !type_info::spec_is_struct<CoinType>();
         aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
         ensures supply<CoinType> == old(supply<CoinType>) + amount;
+        include CoinSupplyDelta<CoinType> { added: amount, removed: 0 };
         ensures result.value == amount;
         ensures exists<CoinInfo<CoinType>>(addr) == old(exists<CoinInfo<CoinType>>(addr));
     }
@@ -131,6 +200,7 @@ spec aptos_framework::coin {
 
     /// Can only be updated by `@aptos_framework`.
     spec allow_supply_upgrades(_aptos_framework: &signer, _allowed: bool) {
+        pragma aborts_if_is_partial = false;
         aborts_if true;
     }
 
@@ -146,6 +216,16 @@ spec aptos_framework::coin {
 
     spec fun spec_has_paired_store(owner: address, paired: Option<Object<Metadata>>): bool {
         option::is_some(paired) && exists<fungible_asset::FungibleStore>(spec_paired_store_address(owner, paired))
+    }
+
+    /// A deposit into the paired primary store of `owner`, created if missing, runs without a deposit hook.
+    spec fun spec_paired_deposit_no_hook(owner: address, paired: Option<Object<Metadata>>): bool {
+        let store_addr = spec_paired_store_address(owner, paired);
+        option::is_some(paired) && if (exists<fungible_asset::FungibleStore>(store_addr)) {
+            fungible_asset::spec_store_no_deposit_hook(store_addr)
+        } else {
+            primary_fungible_store::spec_metadata_no_deposit_hook(option::borrow(paired).inner)
+        }
     }
 
     spec fun spec_fa_balance(owner: address, paired: Option<Object<Metadata>>): u64 {
@@ -217,7 +297,32 @@ spec aptos_framework::coin {
     spec create_coin_conversion_map(aptos_framework: &signer) {
         pragma aborts_if_is_partial = false;
         aborts_if signer::address_of(aptos_framework) != @aptos_framework;
+        modifies global<CoinConversionMap>(@aptos_framework);
         ensures exists<CoinConversionMap>(@aptos_framework);
+    }
+
+    /// Writes only the conversion map and the new metadata object, at the APT address or the coin's named address.
+    spec create_pairing<CoinType>(aptos_framework: &signer) {
+        use aptos_framework::object::ObjectCore;
+        use aptos_framework::fungible_asset::{Supply, ConcurrentSupply};
+        use aptos_framework::primary_fungible_store::DeriveRefPod;
+        let apt = @aptos_fungible_asset;
+        let named = object::spec_create_object_address(apt, type_info::type_name<CoinType>().bytes);
+        modifies global<CoinConversionMap>(@aptos_framework);
+        modifies global<ObjectCore>(apt);
+        modifies global<ObjectCore>(named);
+        modifies global<Metadata>(apt);
+        modifies global<Metadata>(named);
+        modifies global<Supply>(apt);
+        modifies global<Supply>(named);
+        modifies global<ConcurrentSupply>(apt);
+        modifies global<ConcurrentSupply>(named);
+        modifies global<DeriveRefPod>(apt);
+        modifies global<DeriveRefPod>(named);
+        modifies global<PairedCoinType>(apt);
+        modifies global<PairedCoinType>(named);
+        modifies global<PairedFungibleAssetRefs>(apt);
+        modifies global<PairedFungibleAssetRefs>(named);
     }
 
     /// `CoinType` is paired and its metadata object holds the paired refs.
@@ -372,6 +477,7 @@ spec aptos_framework::coin {
     }
 
     spec decimals<CoinType>(): u8 {
+        pragma aborts_if_is_partial = false;
         include AbortsIfNotExistCoinInfo<CoinType>;
     }
 
@@ -489,6 +595,17 @@ spec aptos_framework::coin {
         /// [high-level-req-8.3]
         aborts_if existing && global<fungible_asset::FungibleStore>(store_addr).frozen;
         include PairedDepositBalance<CoinType> { owner: account_addr, amount: coin.value };
+        ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        include CoinSupplyDelta<CoinType> { added: 0, removed: coin.value };
+        include spec_paired_deposit_no_hook(account_addr, paired) ==> TotalSupplyUnchanged<CoinType>;
+    }
+
+    spec deposit_with_signer<CoinType>(account: &signer, coin: Coin<CoinType>) {
+        // Partial: as for `deposit`.
+        let paired = spec_paired_metadata(type_info::type_of<CoinType>());
+        ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        include CoinSupplyDelta<CoinType> { added: 0, removed: coin.value };
+        include spec_paired_deposit_no_hook(signer::address_of(account), paired) ==> TotalSupplyUnchanged<CoinType>;
     }
 
     /// Without a deposit hook, `amount` lands in the paired primary store of `owner`, which is created if missing.
@@ -535,6 +652,7 @@ spec aptos_framework::coin {
         ensures option::is_some(post_metadata);
         ensures result == FungibleAsset { metadata: option::borrow(post_metadata), amount: coin.value };
         ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        include CoinSupplyDelta<CoinType> { added: 0, removed: coin.value };
         ensures option::is_some(metadata) ==>
             fungible_asset::spec_supply(fa_addr) == old(fungible_asset::spec_supply(fa_addr)) + coin.value;
     }
@@ -554,6 +672,10 @@ spec aptos_framework::coin {
         include amount != 0 ==> CoinAddAbortsIf<CoinType> { amount };
         ensures result.value == fungible_asset.amount;
         ensures supply<CoinType> == old(supply<CoinType>) + fungible_asset.amount;
+        include CoinSupplyDelta<CoinType> { added: fungible_asset.amount, removed: 0 };
+        /// [high-level-req-4.3]
+        include fungible_asset.metadata == option::borrow(spec_paired_metadata(type_info::type_of<CoinType>())) ==>
+            TotalSupplyUnchanged<CoinType>;
         ensures fungible_asset::spec_supply(metadata_addr)
             == old(fungible_asset::spec_supply(metadata_addr)) - fungible_asset.amount;
     }
@@ -572,6 +694,18 @@ spec aptos_framework::coin {
         ensures moved ==> global<fungible_asset::FungibleStore>(store_addr).frozen == coin_store.frozen
             && fungible_asset::spec_balance(store_addr)
                 == old(fungible_asset::spec_balance(store_addr)) + coin_store.coin.value;
+        let removed = if (exists<CoinStore<CoinType>>(account)) { coin_store.coin.value } else { 0 };
+        ensures supply<CoinType> == old(supply<CoinType>) - removed;
+        include CoinSupplyDelta<CoinType> { added: 0, removed };
+    }
+
+    spec migrate_to_fungible_store<CoinType>(account: &signer) {
+        // Partial: as for `maybe_convert_to_fungible_store`.
+        let addr = signer::address_of(account);
+        let removed = if (exists<CoinStore<CoinType>>(addr)) { global<CoinStore<CoinType>>(addr).coin.value } else { 0 };
+        ensures !exists<CoinStore<CoinType>>(addr);
+        ensures supply<CoinType> == old(supply<CoinType>) - removed;
+        include CoinSupplyDelta<CoinType> { added: 0, removed };
     }
 
     /// The coin is converted and deposited into the paired primary store of `account_addr`, ignoring its frozen flag.
@@ -594,6 +728,8 @@ spec aptos_framework::coin {
         ensures option::is_none(paired) ==> exists<fungible_asset::FungibleStore>(post_store)
             && fungible_asset::spec_balance(post_store)
                 == (if (post_existing) { old(fungible_asset::spec_balance(post_store)) } else { 0 }) + coin.value;
+        ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
+        include CoinSupplyDelta<CoinType> { added: 0, removed: coin.value };
     }
 
     /// The value of `zero_coin` must be 0.
@@ -622,6 +758,7 @@ spec aptos_framework::coin {
     spec freeze_coin_store<CoinType>(
         account_addr: address, _freeze_cap: &FreezeCapability<CoinType>
     ) {
+        pragma aborts_if_is_partial = false;
         modifies global<CoinStore<CoinType>>(account_addr);
         /// [high-level-req-6.3]
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
@@ -632,6 +769,7 @@ spec aptos_framework::coin {
     spec unfreeze_coin_store<CoinType>(
         account_addr: address, _freeze_cap: &FreezeCapability<CoinType>
     ) {
+        pragma aborts_if_is_partial = false;
         modifies global<CoinStore<CoinType>>(account_addr);
         /// [high-level-req-6.4]
         aborts_if !exists<CoinStore<CoinType>>(account_addr);
@@ -663,6 +801,7 @@ spec aptos_framework::coin {
     }
 
     spec initialize {
+        pragma aborts_if_is_partial = false;
         let account_addr = signer::address_of(account);
         /// [high-level-req-1.2]
         /// [high-level-req-2]
@@ -671,6 +810,7 @@ spec aptos_framework::coin {
             symbol: symbol.bytes
         };
         modifies global<CoinInfo<CoinType>>(account_addr);
+        modifies global<aptos_framework::aggregator_factory::AggregatorFactory>(@aptos_framework);
         ensures exists<CoinInfo<CoinType>>(account_addr);
         ensures result_1 == BurnCapability<CoinType> {};
         ensures result_2 == FreezeCapability<CoinType> {};
@@ -729,6 +869,7 @@ spec aptos_framework::coin {
         parallelizable: bool
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         use aptos_framework::aggregator_factory;
+        pragma aborts_if_is_partial = false;
         include InitializeInternalSchema<CoinType> {
             name: name.bytes,
             symbol: symbol.bytes
@@ -739,6 +880,7 @@ spec aptos_framework::coin {
         let post value = optional_aggregator::optional_aggregator_value(supply);
         let post limit = optional_aggregator::optional_aggregator_limit(supply);
         modifies global<CoinInfo<CoinType>>(account_addr);
+        modifies global<aggregator_factory::AggregatorFactory>(@aptos_framework);
         aborts_if monitor_supply
             && parallelizable
             && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
@@ -787,6 +929,10 @@ spec aptos_framework::coin {
         include TransferAbortsIfAndEnsures<CoinType> { from: signer::address_of(from) };
         aborts_if both && fungible_asset::spec_store_no_withdraw_hook(from_store)
             && global<fungible_asset::FungibleStore>(to_store).frozen;
+        let plain = spec_has_paired_store(signer::address_of(from), paired)
+            && global<fungible_asset::FungibleStore>(from_store).metadata == option::borrow(paired)
+            && primary_fungible_store::spec_is_plain_transfer_to(from_store, to_store, option::borrow(paired).inner);
+        include plain ==> TotalSupplyUnchanged<CoinType>;
     }
 
     /// Transfer of `amount` between the paired primary stores of `from` and `to`: the source store must not be
@@ -838,5 +984,9 @@ spec aptos_framework::coin {
         aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
         ensures plain ==> result.value == amount
             && fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
+        ensures supply<CoinType> == old(supply<CoinType>) + result.value;
+        include CoinSupplyDelta<CoinType> { added: result.value, removed: 0 };
+        include plain && global<fungible_asset::FungibleStore>(store_addr).metadata == option::borrow(paired) ==>
+            TotalSupplyUnchanged<CoinType>;
     }
 }

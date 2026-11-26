@@ -7,8 +7,8 @@ spec aptos_framework::account {
     /// Implementation: Initialization of the account module creates a valid address_map table and moves the resources
     /// to the OriginatingAddress under the aptos_framework account.
     /// Enforcement: Formally verified via [high-level-req-1.1](initialize) and [high-level-req-1.2](initialize) that
-    /// only the Aptos framework account can initialize the module and that OriginatingAddress is published under it.
-    /// Audited that the address_map table starts empty.
+    /// only the Aptos framework account can initialize the module and that OriginatingAddress is published under it,
+    /// and via [high-level-req-1.3](initialize) that its address_map table starts empty.
     ///
     /// No.: 2
     /// Requirement: After successfully creating an account, the account resources should initialize with the default data,
@@ -122,6 +122,8 @@ spec aptos_framework::account {
         aborts_if exists<OriginatingAddress>(aptos_addr);
         /// [high-level-req-1.2]
         ensures exists<OriginatingAddress>(aptos_addr);
+        /// [high-level-req-1.3]
+        ensures forall k: address: !table::spec_contains(global<OriginatingAddress>(aptos_addr).address_map, k);
     }
 
     /// Ensure that the account exists at the end of the call.
@@ -348,8 +350,8 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
-        pragma aborts_if_is_partial;
+        // A sequence-number-based proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         let addr = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr };
         /// [high-level-req-5.1]
@@ -416,8 +418,8 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
-        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
-        pragma aborts_if_is_partial;
+        // A sequence-number-based proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
         let offerer_account_resource = global<Account>(rotation_cap_offerer_address);
@@ -471,8 +473,8 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) {
-        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
-        pragma aborts_if_is_partial;
+        // A sequence-number-based proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
@@ -529,8 +531,8 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
-        pragma aborts_if_is_partial;
+        // A sequence-number-based proof is rejected where it could be replayed.
+        aborts_if transaction_context::spec_is_orderless_txn() || transaction_context::spec_is_multisig_payload_txn();
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
         let current_auth_key_bytes = spec_get_authentication_key(source_address);
