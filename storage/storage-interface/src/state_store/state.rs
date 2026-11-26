@@ -275,7 +275,7 @@ impl State {
                             eviction_config.max_items(shard_id),
                             eviction_config.max_bytes(shard_id),
                         );
-                        for (key_hash, slot) in lru.maybe_evict() {
+                        for (key_hash, slot) in lru.maybe_evict(*ckpt_version) {
                             assert!(slot.is_hot());
                             shard_updates
                                 .evict(key_hash, HotEvictionOp {
@@ -376,12 +376,14 @@ impl State {
     ) -> Option<HotInsertionOp> {
         let key_hash = *key.crypto_hash_ref();
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            let superseded_version =
-                lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
+            let slot = update.to_result_slot((*key).clone()).unwrap();
+            let cold_copy = slot.expect_cold_copy();
+            let superseded_version = lru.insert(key, slot);
             return Some(HotInsertionOp {
                 state_key: (*key).clone(),
                 value: HotStateValue::new(state_value_opt.cloned(), update.version),
                 value_version: state_value_opt.map(|_| update.version),
+                cold_copy,
                 superseded_version,
             });
         }
@@ -404,12 +406,14 @@ impl State {
             };
             if refreshed {
                 let value_version = slot_to_insert.value_version_opt();
+                let cold_copy = slot_to_insert.expect_cold_copy();
                 let value = HotStateValue::clone_from_slot(&slot_to_insert);
                 let superseded_version = lru.insert(key, slot_to_insert);
                 Some(HotInsertionOp {
                     state_key: (*key).clone(),
                     value,
                     value_version,
+                    cold_copy,
                     superseded_version,
                 })
             } else {
@@ -420,12 +424,14 @@ impl State {
             assert!(slot.is_cold());
             let value_version = slot.value_version_opt();
             let slot = slot.to_hot(update.version);
+            let cold_copy = slot.expect_cold_copy();
             let value = HotStateValue::clone_from_slot(&slot);
             let superseded_version = lru.insert(key, slot);
             Some(HotInsertionOp {
                 state_key: (*key).clone(),
                 value,
                 value_version,
+                cold_copy,
                 superseded_version,
             })
         }
@@ -579,7 +585,11 @@ mod tests {
     use crate::state_store::state_view::hot_state_view::EmptyHotState;
     use aptos_types::{
         on_chain_config::{HotStateConfigV1, OnChainHotStateConfig},
-        state_store::{state_slot::StateSlotKind, state_value::StateValue},
+        state_store::{
+            hot_state::LRUEntry,
+            state_slot::{ColdCopy, StateSlotKind},
+            state_value::StateValue,
+        },
         write_set::{BaseStateOp, WriteOp},
     };
     use std::{iter::once, num::NonZeroUsize};
@@ -690,6 +700,7 @@ mod tests {
         assert_eq!(result.value.value_opt(), Some(&val(b"v0")));
         assert_eq!(result.value.hot_since_version(), 7);
         assert_eq!(result.value_version, Some(7));
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
         assert_eq!(result.superseded_version, None);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
@@ -713,6 +724,7 @@ mod tests {
         assert_eq!(result.value.value_opt(), None);
         assert_eq!(result.value.hot_since_version(), 3);
         assert_eq!(result.value_version, None);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
         assert_eq!(result.superseded_version, None);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
@@ -773,6 +785,7 @@ mod tests {
         assert_eq!(result.value_version, Some(2));
         assert_eq!(result.value.value_opt(), Some(&val(b"v")));
         assert_eq!(result.value.hot_since_version(), 9);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
         assert!(slot.is_hot() && slot.is_occupied());
@@ -801,6 +814,7 @@ mod tests {
         assert_eq!(result.value_version, None);
         assert_eq!(result.value.value_opt(), None);
         assert_eq!(result.value.hot_since_version(), 4);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
         assert!(slot.is_hot() && !slot.is_occupied());
@@ -935,6 +949,47 @@ mod tests {
         let result =
             State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(100, &op), Version::MAX);
         assert!(result.is_none());
+    }
+
+    // ===== apply_one_update: cold copy =====
+
+    #[test]
+    fn test_cold_copy_kept_by_refresh_and_reset_by_write() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        let behind = ColdCopy::Behind { version: Some(1) };
+        lru.insert(
+            &k,
+            StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
+                value_version: 2,
+                value: val(b"v"),
+                hot_since_version: 2,
+                cold_copy: behind,
+                lru_info: LRUEntry::uninitialized(),
+            }),
+        );
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(20, &op), REFRESH)
+                .unwrap();
+        assert_eq!(result.cold_copy, behind);
+        assert_eq!(lru.get_slot(&khash(&k)).unwrap().expect_cold_copy(), behind);
+
+        // The write goes to cold too.
+        let op = BaseStateOp::Modification(val(b"v1"));
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(21, &op), REFRESH)
+                .unwrap();
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
+        assert_eq!(
+            lru.get_slot(&khash(&k)).unwrap().expect_cold_copy(),
+            ColdCopy::InSync
+        );
     }
 
     // ===== usage accounting =====

@@ -546,14 +546,17 @@ impl StateKvDb {
                 Some(HotStateEntry::Occupied {
                     value,
                     value_version,
+                    cold_copy,
                 }) => Some(StateSlotKind::HotOccupied {
                     value_version,
                     value,
                     hot_since_version,
+                    cold_copy,
                     lru_info: LRUEntry::uninitialized(),
                 }),
-                Some(HotStateEntry::Vacant) => Some(StateSlotKind::HotVacant {
+                Some(HotStateEntry::Vacant { cold_copy }) => Some(StateSlotKind::HotVacant {
                     hot_since_version,
+                    cold_copy,
                     lru_info: LRUEntry::uninitialized(),
                 }),
             } {

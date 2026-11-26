@@ -22,7 +22,9 @@ pub mod versioned_state_value;
 use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{
+        hot_state::HotStateValue, state_key::StateKey, state_slot::ColdCopy, NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use std::collections::HashMap;
@@ -33,6 +35,7 @@ pub struct HotInsertionOp {
     pub value: HotStateValue,
     /// `Some(version)` for occupied entries and `None` for vacant.
     pub value_version: Option<Version>,
+    pub cold_copy: ColdCopy,
     /// The `hot_since_version` of the DB entry being superseded.
     /// `None` means this is a first write (creation or promotion).
     pub superseded_version: Option<Version>,
@@ -133,6 +136,7 @@ mod tests {
             state_key: StateKey::raw(b"test"),
             value: HotStateValue::new(None, value_version.unwrap_or(0)),
             value_version,
+            cold_copy: ColdCopy::InSync,
             superseded_version: superseded,
         }
     }

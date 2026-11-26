@@ -23,7 +23,7 @@ use aptos_types::{
     state_store::{
         hot_state::{HotStateValue, THotStateSlot},
         state_key::StateKey,
-        state_slot::StateSlotKind,
+        state_slot::{ColdCopy, StateSlotKind},
         state_value::{StaleStateValueByKeyHashIndex, StateValue},
         NUM_STATE_SHARDS,
     },
@@ -112,6 +112,7 @@ fn test_insertion_write_read() {
         Some(HotStateEntry::Occupied {
             value: value.clone(),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     assert_eq!(
@@ -119,15 +120,25 @@ fn test_insertion_write_read() {
         Some(HotStateEntry::Occupied {
             value,
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         })
     );
 
     // Vacant entry
     let key2 = make_state_key(2);
-    put_hot_state_entry(&db, &key2, 20, Some(HotStateEntry::Vacant));
+    put_hot_state_entry(
+        &db,
+        &key2,
+        20,
+        Some(HotStateEntry::Vacant {
+            cold_copy: ColdCopy::InSync,
+        }),
+    );
     assert_eq!(
         get_hot_state_entry(&db, &key2, 20),
-        Some(HotStateEntry::Vacant),
+        Some(HotStateEntry::Vacant {
+            cold_copy: ColdCopy::InSync,
+        }),
     );
 }
 
@@ -146,6 +157,7 @@ fn test_eviction_write_read() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(3),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     put_hot_state_entry(&db, &key, 20, None);
@@ -168,6 +180,7 @@ fn test_multiple_versions() {
     let entry = HotStateEntry::Occupied {
         value: make_state_value(41),
         value_version: 1,
+        cold_copy: ColdCopy::InSync,
     };
 
     // Insertion at V1, refresh at V2.
@@ -177,6 +190,7 @@ fn test_multiple_versions() {
     let expected_entry = Some(HotStateEntry::Occupied {
         value: make_state_value(41),
         value_version: 1,
+        cold_copy: ColdCopy::InSync,
     });
 
     // Querying at Version::MAX should return the latest (V2).
@@ -264,6 +278,7 @@ fn test_load_single_entry() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(1),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -295,11 +310,19 @@ fn test_load_occupied_and_vacant() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(10),
             value_version: 50,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
     let key_vac = make_state_key(20);
-    put_hot_state_entry(&db, &key_vac, 200, Some(HotStateEntry::Vacant));
+    put_hot_state_entry(
+        &db,
+        &key_vac,
+        200,
+        Some(HotStateEntry::Vacant {
+            cold_copy: ColdCopy::InSync,
+        }),
+    );
 
     let shards = db.load_hot_state_kvs(300).unwrap();
 
@@ -330,6 +353,7 @@ fn test_load_total_value_bytes() {
         Some(HotStateEntry::Occupied {
             value: value1.clone(),
             value_version: 50,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -342,11 +366,19 @@ fn test_load_total_value_bytes() {
         Some(HotStateEntry::Occupied {
             value: value2.clone(),
             value_version: 60,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
     let key_vac = make_state_key(22);
-    put_hot_state_entry(&db, &key_vac, 200, Some(HotStateEntry::Vacant));
+    put_hot_state_entry(
+        &db,
+        &key_vac,
+        200,
+        Some(HotStateEntry::Vacant {
+            cold_copy: ColdCopy::InSync,
+        }),
+    );
 
     // Distinct sizes so the assertion checks a real per-value sum, not count * constant.
     assert_ne!(value1.size(), value2.size());
@@ -369,6 +401,7 @@ fn test_load_evicted_excluded() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(5),
             value_version: 3,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     put_hot_state_entry(&db, &key, 20, None);
@@ -392,6 +425,7 @@ fn test_load_at_exact_committed_version() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(6),
             value_version: 40,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -416,6 +450,7 @@ fn test_load_multiple_versions_same_key() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(71),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     // V20: refresh — same value but new hot_since_version
@@ -426,6 +461,7 @@ fn test_load_multiple_versions_same_key() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(72),
             value_version: 15,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -450,6 +486,7 @@ fn test_load_skips_future_entry_and_falls_back_to_older_version() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(91),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     put_hot_state_entry(
@@ -459,6 +496,7 @@ fn test_load_skips_future_entry_and_falls_back_to_older_version() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(92),
             value_version: 15,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -482,6 +520,7 @@ fn test_load_handles_max_key_hash() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(10),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     put_hot_state_entry_by_hash(
@@ -491,6 +530,7 @@ fn test_load_handles_max_key_hash() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(20),
             value_version: 15,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -548,6 +588,7 @@ fn test_load_with_prefix_bloom_loads_all_keys_in_shard() {
             Some(HotStateEntry::Occupied {
                 value: make_state_value(1),
                 value_version: 5,
+                cold_copy: ColdCopy::InSync,
             }),
         );
     }
@@ -583,6 +624,7 @@ fn test_load_snapshot_boundaries_across_eviction_and_reinsert() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(111),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     put_hot_state_entry(&db, &key, 20, None);
@@ -593,6 +635,7 @@ fn test_load_snapshot_boundaries_across_eviction_and_reinsert() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(112),
             value_version: 25,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -626,6 +669,7 @@ fn test_load_evict_then_reinsert() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(81),
             value_version: 5,
+            cold_copy: ColdCopy::InSync,
         }),
     );
     // V20: evict.
@@ -638,6 +682,7 @@ fn test_load_evict_then_reinsert() {
         Some(HotStateEntry::Occupied {
             value: make_state_value(82),
             value_version: 25,
+            cold_copy: ColdCopy::InSync,
         }),
     );
 
@@ -670,6 +715,7 @@ fn test_load_lru_chain_ordering() {
             Some(HotStateEntry::Occupied {
                 value: make_state_value(seed),
                 value_version: hot_since.saturating_sub(5),
+                cold_copy: ColdCopy::InSync,
             }),
         );
         keys_by_shard[shard_id].push((key, hot_since));
@@ -723,6 +769,7 @@ fn test_load_lru_chain_same_version_orders_by_key_hash() {
             Some(HotStateEntry::Occupied {
                 value: make_state_value(100),
                 value_version: 50,
+                cold_copy: ColdCopy::InSync,
             }),
         );
     }
@@ -762,6 +809,7 @@ fn test_load_cross_shard() {
             Some(HotStateEntry::Occupied {
                 value: make_state_value(seed),
                 value_version: 1,
+                cold_copy: ColdCopy::InSync,
             }),
         );
     }
@@ -788,13 +836,15 @@ fn test_load_write_then_load_roundtrip() {
 
     let mut shards = empty_hot_state_updates();
 
-    // key1: occupied at hot_since_version=100, value_version=50
+    // key1: occupied at hot_since_version=100, value_version=50, with cold behind at 40
+    let key1_cold_copy = ColdCopy::Behind { version: Some(40) };
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
+            cold_copy: key1_cold_copy,
             superseded_version: None,
         });
 
@@ -805,6 +855,7 @@ fn test_load_write_then_load_roundtrip() {
             state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
+            cold_copy: ColdCopy::InSync,
             superseded_version: None,
         });
 
@@ -822,6 +873,14 @@ fn test_load_write_then_load_roundtrip() {
     // Verify key1.
     let shard1 = &loaded_shards[key1.get_shard_id()];
     assert_hot_occupied(shard1, CryptoHash::hash(&key1), 100, 50, val1);
+    assert_eq!(
+        shard1
+            .map
+            .get(&CryptoHash::hash(&key1))
+            .unwrap()
+            .expect_cold_copy(),
+        key1_cold_copy,
+    );
     shard1.validate_lru_chain();
 
     // Verify key2.
@@ -829,9 +888,12 @@ fn test_load_write_then_load_roundtrip() {
     let slot2 = shard2.map.get(&CryptoHash::hash(&key2)).unwrap();
     match slot2.kind() {
         StateSlotKind::HotVacant {
-            hot_since_version, ..
+            hot_since_version,
+            cold_copy,
+            ..
         } => {
             assert_eq!(*hot_since_version, 200);
+            assert_eq!(*cold_copy, ColdCopy::InSync);
         },
         other => panic!("Expected HotVacant for key2, got {other:?}"),
     }
@@ -869,8 +931,11 @@ enum GenEntry {
     Occupied {
         value_seed: u8,
         value_version_delta: Version,
+        cold_copy: ColdCopy,
     },
-    Vacant,
+    Vacant {
+        cold_copy: ColdCopy,
+    },
     Evicted,
 }
 
@@ -880,11 +945,15 @@ impl GenEntry {
             GenEntry::Occupied {
                 value_seed,
                 value_version_delta,
+                cold_copy,
             } => Some(HotStateEntry::Occupied {
                 value: make_state_value(*value_seed),
                 value_version: hot_since_version.saturating_sub(*value_version_delta),
+                cold_copy: *cold_copy,
             }),
-            GenEntry::Vacant => Some(HotStateEntry::Vacant),
+            GenEntry::Vacant { cold_copy } => Some(HotStateEntry::Vacant {
+                cold_copy: *cold_copy,
+            }),
             GenEntry::Evicted => None,
         }
     }
@@ -892,13 +961,14 @@ impl GenEntry {
 
 fn arb_gen_entry() -> impl Strategy<Value = GenEntry> {
     prop_oneof![
-        3 => (any::<u8>(), 0u64..8).prop_map(|(value_seed, value_version_delta)| {
-            GenEntry::Occupied {
+        3 => (any::<u8>(), 0u64..8, any::<ColdCopy>()).prop_map(
+            |(value_seed, value_version_delta, cold_copy)| GenEntry::Occupied {
                 value_seed,
                 value_version_delta,
+                cold_copy,
             }
-        }),
-        1 => Just(GenEntry::Vacant),
+        ),
+        1 => any::<ColdCopy>().prop_map(|cold_copy| GenEntry::Vacant { cold_copy }),
         1 => Just(GenEntry::Evicted),
     ]
 }
@@ -974,18 +1044,26 @@ proptest! {
                     StateSlotKind::HotOccupied {
                         value,
                         value_version,
+                        cold_copy,
                         ..
                     },
                     HotStateEntry::Occupied {
                         value: exp_value,
                         value_version: exp_vv,
+                        cold_copy: exp_cold_copy,
                     },
                 ) => {
                     prop_assert_eq!(value, exp_value);
                     prop_assert_eq!(value_version, exp_vv);
+                    prop_assert_eq!(cold_copy, exp_cold_copy);
                     expected_total_value_bytes += exp_value.size();
                 },
-                (StateSlotKind::HotVacant { .. }, HotStateEntry::Vacant) => {},
+                (
+                    StateSlotKind::HotVacant { cold_copy, .. },
+                    HotStateEntry::Vacant {
+                        cold_copy: exp_cold_copy,
+                    },
+                ) => prop_assert_eq!(cold_copy, exp_cold_copy),
                 (actual, _) => prop_assert!(
                     false,
                     "kind mismatch for {key_hash}: {actual:?} vs {expected_entry:?}"
@@ -1078,6 +1156,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
+            cold_copy: ColdCopy::InSync,
             superseded_version: None,
         });
 
@@ -1088,6 +1167,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
             state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
+            cold_copy: ColdCopy::InSync,
             superseded_version: Some(80),
         });
 
@@ -1109,6 +1189,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
                 state_key: key4.clone(),
                 value: HotStateValue::new(Some(val4.clone()), hot_since_version),
                 value_version: Some(hot_since_version),
+                cold_copy: ColdCopy::InSync,
                 superseded_version,
             });
     }
@@ -1135,12 +1216,15 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
         HotStateEntry::Occupied {
             value: val1,
             value_version: 50,
+            cold_copy: ColdCopy::InSync,
         }
     );
     // key2: vacant
     assert_eq!(
         get_hot_state_entry(hot_state_kv_db, &key2, 200).unwrap(),
-        HotStateEntry::Vacant,
+        HotStateEntry::Vacant {
+            cold_copy: ColdCopy::InSync,
+        },
     );
     // key3: eviction (None)
     assert!(
@@ -1209,6 +1293,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
             HotStateEntry::Occupied {
                 value: val4.clone(),
                 value_version: version,
+                cold_copy: ColdCopy::InSync,
             }
         );
     }
@@ -1262,6 +1347,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val_old.clone()), 100),
             value_version: Some(100),
+            cold_copy: ColdCopy::InSync,
             superseded_version: None,
         });
     let updates1 = HotStateUpdates {
@@ -1279,6 +1365,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
             state_key: key1.clone(),
             value: HotStateValue::new(Some(val_new.clone()), 200),
             value_version: Some(200),
+            cold_copy: ColdCopy::InSync,
             superseded_version: Some(100),
         });
     let updates2 = HotStateUpdates {

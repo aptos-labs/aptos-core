@@ -699,7 +699,7 @@ mod tests {
     use aptos_types::state_store::{
         hot_state::LRUEntry,
         state_key::StateKey,
-        state_slot::{StateSlot, StateSlotKind},
+        state_slot::{ColdCopy, StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
         state_value::StateValue,
     };
@@ -716,6 +716,7 @@ mod tests {
             value_version: version,
             value: StateValue::new_legacy(value.to_vec().into()),
             hot_since_version: version,
+            cold_copy: ColdCopy::InSync,
             lru_info: LRUEntry::uninitialized(),
         })
     }
@@ -723,6 +724,7 @@ mod tests {
     fn make_hot_vacant(key: &StateKey, version: Version) -> StateSlot {
         StateSlot::new(key.clone(), StateSlotKind::HotVacant {
             hot_since_version: version,
+            cold_copy: ColdCopy::InSync,
             lru_info: LRUEntry::uninitialized(),
         })
     }

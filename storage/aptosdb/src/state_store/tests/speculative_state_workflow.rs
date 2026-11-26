@@ -24,7 +24,7 @@ use aptos_types::{
     state_store::{
         hot_state::{HotStateValue, HotStateValueRef, LRUEntry},
         state_key::StateKey,
-        state_slot::{StateSlot, StateSlotKind},
+        state_slot::{ColdCopy, StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
@@ -242,6 +242,7 @@ impl VersionState {
                 Op::Write(None) => {
                     let slot = StateSlot::new(k.clone(), StateSlotKind::HotVacant {
                         hot_since_version: version,
+                        cold_copy: ColdCopy::InSync,
                         lru_info: LRUEntry::uninitialized(),
                     });
                     hot_smt_updates
@@ -255,6 +256,7 @@ impl VersionState {
                         value_version: version,
                         value: v.clone(),
                         hot_since_version: version,
+                        cold_copy: ColdCopy::InSync,
                         lru_info: LRUEntry::uninitialized(),
                     });
                     hot_smt_updates
@@ -281,11 +283,13 @@ impl VersionState {
                                     value_version: *value_version,
                                     value: value.clone(),
                                     hot_since_version: version,
+                                    cold_copy: ColdCopy::InSync,
                                     lru_info: LRUEntry::uninitialized(),
                                 })
                             },
                             None => StateSlot::new(k.clone(), StateSlotKind::HotVacant {
                                 hot_since_version: version,
+                                cold_copy: ColdCopy::InSync,
                                 lru_info: LRUEntry::uninitialized(),
                             }),
                         };
@@ -402,30 +406,38 @@ impl StateByVersion {
             (
                 StateSlotKind::HotVacant {
                     hot_since_version: v1,
+                    cold_copy: c1,
                     ..
                 },
                 StateSlotKind::HotVacant {
                     hot_since_version: v2,
+                    cold_copy: c2,
                     ..
                 },
-            ) => assert_eq!(v1, v2),
+            ) => {
+                assert_eq!(v1, v2);
+                assert_eq!(c1, c2);
+            },
             (
                 StateSlotKind::HotOccupied {
                     value_version: vv1,
                     value: v1,
                     hot_since_version: h1,
+                    cold_copy: c1,
                     ..
                 },
                 StateSlotKind::HotOccupied {
                     value_version: vv2,
                     value: v2,
                     hot_since_version: h2,
+                    cold_copy: c2,
                     ..
                 },
             ) => {
                 assert_eq!(vv1, vv2);
                 assert_eq!(v1, v2);
                 assert_eq!(h1, h2);
+                assert_eq!(c1, c2);
             },
             (k1, k2) => assert_eq!(k1, k2),
         }
@@ -598,7 +610,7 @@ impl CheckpointStateReader for StateByVersion {
 ///  - `superseded_version` bijects with the hot state at the previous block end:
 ///    - key hot there with `hot_since == v`  ⟹  `superseded_version == Some(v)`
 ///    - key cold there                       ⟹  `superseded_version == None`
-///  - `value_version` matches the naive model's hot state slot at the block end.
+///  - `value_version` and `cold_copy` match the naive model's hot state slot at the block end.
 ///  - `value_version.is_some() == value.value_opt().is_some()`.
 ///  - `eviction_version` is the block end, and the key is absent from the naive hot state there.
 fn assert_hot_state_ops(
@@ -692,6 +704,7 @@ fn assert_hot_state_shard_ops(
             // must be present in the result.
             let result_slot = result_hot.get(key_hash).unwrap();
             assert_eq!(op.value_version, result_slot.value_version_opt());
+            assert_eq!(op.cold_copy, result_slot.expect_cold_copy());
         }
         for (key_hash, op) in &shard.evictions {
             assert_eq!(op.eviction_version, checkpoint_version);

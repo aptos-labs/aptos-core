@@ -357,7 +357,7 @@ impl StateDb {
                 Some((hot_since_version, Some(HotStateEntry::Occupied { value, .. }))) => {
                     Some(HotStateValue::new(Some(value), hot_since_version))
                 },
-                Some((hot_since_version, Some(HotStateEntry::Vacant))) => {
+                Some((hot_since_version, Some(HotStateEntry::Vacant { .. }))) => {
                     Some(HotStateValue::new(None, hot_since_version))
                 },
             },
@@ -1146,13 +1146,16 @@ impl StateStore {
                                 value_version: op
                                     .value_version
                                     .expect("occupied must have value_version"),
+                                cold_copy: op.cold_copy,
                             },
                             None => {
                                 assert!(
                                     op.value_version.is_none(),
                                     "vacant must not have value_version"
                                 );
-                                HotStateEntry::Vacant
+                                HotStateEntry::Vacant {
+                                    cold_copy: op.cold_copy,
+                                }
                             },
                         };
                         batch.put::<HotStateValueByKeyHashSchema>(
