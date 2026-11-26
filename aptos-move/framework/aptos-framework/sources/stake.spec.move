@@ -24,7 +24,10 @@ spec aptos_framework::stake {
     /// Implementation: The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive,
     /// pending_active, and pending_inactive. The stake value remains constant except during the execution of the
     /// add_stake_with_cap or withdraw_with_cap functions or on_new_epoch (which distributes the reward).
-    /// Enforcement: Formally specified in the schema [high-level-req-3](StakedValueNoChange).
+    /// Enforcement: Formally verified via the schema [high-level-req-3](StakedValueNochange) for unlock_with_cap,
+    /// increase_lockup_with_cap, reactivate_stake_with_cap, set_operator_with_cap, set_delegated_voter_with_cap,
+    /// rotate_consensus_key and update_network_and_fullnode_addresses, which include it. Audited for the other
+    /// functions.
     ///
     /// No.: 4
     /// Requirement: During each epoch, the following operations should be consistently performed without aborting: rewards

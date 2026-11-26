@@ -67,18 +67,46 @@ spec aptos_std::pool_u64 {
 
     spec buy_in(self: &mut Pool, shareholder: address, coins_amount: u64): u64 {
         pragma opaque = true;
-        // new_shares is computed from the pre-state.
-        // In aborts_if/include, self is already pre-state so we use it directly.
-        // In ensures, we use old(self) explicitly.
-        let new_shares = spec_amount_to_shares_with_total_coins(self, coins_amount, self.total_coins);
+        // The new shares are computed from the pre-state, stated without `let` so callers
+        // can consume the conditions as a summary.
         aborts_if self.total_coins + coins_amount > MAX_U64;
-        aborts_if self.total_shares + new_shares > MAX_U64;
-        include coins_amount > 0 ==> AddSharesAbortsIf { new_shares };
-        include coins_amount > 0 ==> AddSharesEnsures { new_shares };
+        aborts_if self.total_shares
+            + spec_amount_to_shares_with_total_coins(self, coins_amount, self.total_coins) > MAX_U64;
+        include coins_amount > 0 ==> AddSharesAbortsIf {
+            new_shares: spec_amount_to_shares_with_total_coins(self, coins_amount, self.total_coins)
+        };
+        include coins_amount > 0 ==> AddSharesEnsures {
+            new_shares: spec_amount_to_shares_with_total_coins(old(self), coins_amount, old(self).total_coins)
+        };
         ensures self.total_coins == old(self).total_coins + coins_amount;
         ensures self.total_shares == old(self).total_shares
             + spec_amount_to_shares_with_total_coins(old(self), coins_amount, old(self).total_coins);
         ensures result == spec_amount_to_shares_with_total_coins(old(self), coins_amount, old(self).total_coins);
+        // Complete functional effect, one conjunct per field.
+        ensures self.shareholders_limit == old(self).shareholders_limit;
+        ensures self.scaling_factor == old(self).scaling_factor;
+        ensures self.shares == spec_buy_in_shares(old(self), shareholder, coins_amount);
+        ensures self.shareholders == spec_buy_in_shareholders(old(self), shareholder, coins_amount);
+    }
+
+    /// The `shares` map after `buy_in(pool, shareholder, coins_amount)`.
+    spec fun spec_buy_in_shares(pool: Pool, shareholder: address, coins_amount: u64): SimpleMap<address, u64> {
+        let new_shares = spec_amount_to_shares_with_total_coins(pool, coins_amount, pool.total_coins);
+        if (coins_amount > 0 && (spec_contains(pool, shareholder) || new_shares > 0)) {
+            simple_map::spec_set(pool.shares, shareholder, spec_shares(pool, shareholder) + new_shares)
+        } else {
+            pool.shares
+        }
+    }
+
+    /// The `shareholders` vector after `buy_in(pool, shareholder, coins_amount)`.
+    spec fun spec_buy_in_shareholders(pool: Pool, shareholder: address, coins_amount: u64): vector<address> {
+        let new_shares = spec_amount_to_shares_with_total_coins(pool, coins_amount, pool.total_coins);
+        if (coins_amount > 0 && !spec_contains(pool, shareholder) && new_shares > 0) {
+            concat(pool.shareholders, vec(shareholder))
+        } else {
+            pool.shareholders
+        }
     }
 
     spec add_shares(self: &mut Pool, shareholder: address, new_shares: u64): u64 {
@@ -102,11 +130,10 @@ spec aptos_std::pool_u64 {
         new_shares: u64;
 
         // In aborts_if context, self is pre-state (no old() needed)
-        let key_exists = simple_map::spec_contains_key(self.shares, shareholder);
-        let current_shares = simple_map::spec_get(self.shares, shareholder);
-
-        aborts_if key_exists && current_shares + new_shares > MAX_U64;
-        aborts_if !key_exists && new_shares > 0 && len(self.shareholders) >= self.shareholders_limit;
+        aborts_if simple_map::spec_contains_key(self.shares, shareholder)
+            && simple_map::spec_get(self.shares, shareholder) + new_shares > MAX_U64;
+        aborts_if !simple_map::spec_contains_key(self.shares, shareholder)
+            && new_shares > 0 && len(self.shareholders) >= self.shareholders_limit;
     }
     spec schema AddSharesEnsures {
         self: Pool;

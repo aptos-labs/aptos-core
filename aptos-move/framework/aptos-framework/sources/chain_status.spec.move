@@ -4,8 +4,9 @@ spec aptos_framework::chain_status {
     /// Requirement: The end of genesis mark should persist throughout the entire life of the chain.
     /// Criticality: Medium
     /// Implementation: The Aptos framework account should never drop the GenesisEndMarker resource.
-    /// Enforcement: Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally
-    /// verified via [high-level-req-1](set_genesis_end) that GenesisEndMarker is published.
+    /// Enforcement: Formally verified via [high-level-req-1.1](set_genesis_end) that GenesisEndMarker is published, and
+    /// via [high-level-req-1.2](update invariant) that no verified function removes it once published. Audited that
+    /// the VM-called genesis::set_genesis_end, which delegates its invariants to its caller, does not remove it.
     ///
     /// No.: 2
     /// Requirement: The status of the chain should never be genesis and operating at the same time.
@@ -25,6 +26,8 @@ spec aptos_framework::chain_status {
         pragma aborts_if_is_strict;
         /// [high-level-req-2]
         invariant is_genesis() == !is_operating();
+        /// [high-level-req-1.2]
+        invariant update old(exists<GenesisEndMarker>(@aptos_framework)) ==> exists<GenesisEndMarker>(@aptos_framework);
     }
 
     spec set_genesis_end(aptos_framework: &signer) {
@@ -36,7 +39,7 @@ spec aptos_framework::chain_status {
         aborts_if addr != @aptos_framework;
         /// [high-level-req-3]
         aborts_if exists<GenesisEndMarker>(@aptos_framework);
-        /// [high-level-req-1]
+        /// [high-level-req-1.1]
         ensures exists<GenesisEndMarker>(@aptos_framework);
         ensures global<GenesisEndMarker>(@aptos_framework) == GenesisEndMarker {};
     }

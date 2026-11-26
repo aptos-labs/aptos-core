@@ -5,14 +5,20 @@ spec aptos_framework::staking_proxy {
     /// Criticality: Medium
     /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
     /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
-    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
+    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update. Formally
+    /// verified via [high-level-req-1](set_operator) for the owner's own units: afterwards the owner's staking
+    /// contract store has no contract with the old operator and the owner's stake pool has the new operator. The
+    /// updates of the individual vesting contracts in the loop remain audited.
     ///
     /// No.: 2
     /// Requirement: When updating the Vesting voter, it should be updated throughout all depending units.
     /// Criticality: Medium
     /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
     /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
-    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
+    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update. Formally
+    /// verified via [high-level-req-2](set_voter) for the owner's own units: afterwards the stake pools of the owner's
+    /// staking contract with the operator and of the owner's stake pool have the new voter. The updates of the
+    /// individual vesting contracts in the loop remain audited.
     ///
     /// No.: 3
     /// Requirement: The operator and voter of a Vesting Contract should only be updated by the owner of the contract.
@@ -29,7 +35,8 @@ spec aptos_framework::staking_proxy {
     /// Implementation: The owner-operator-voter model, as defined in the documentation, grants distinct abilities to
     /// each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or
     /// voter, to prevent the compromise of the StakePool.
-    /// Enforcement: Audited the patterns of updating operators and voters in the staking contract.
+    /// Enforcement: Formally verified via [high-level-req-4.1](set_staking_contract_operator) and
+    /// [high-level-req-4.2](set_staking_contract_voter) that no staking contract store other than the signer's changes.
     ///
     /// No.: 5
     /// Requirement: Staking Contract's operators should be unique inside a store.
@@ -44,22 +51,38 @@ spec aptos_framework::staking_proxy {
         pragma aborts_if_is_partial;
     }
 
-    /// Aborts if conditions of SetStakePoolOperator are not met
+    /// The owner's staking contract with `old_operator` is switched away from it and the owner's stake pool gets
+    /// `new_operator`.
     spec set_operator(owner: &signer, old_operator: address, new_operator: address) {
-        pragma verify = false;
-        // TODO: times out at 40s.
-        include SetStakePoolOperator;
-        include SetStakingContractOperator;
+        use aptos_std::simple_map;
+        use aptos_framework::staking_contract::{Store};
+        // The vesting-contract loop leaves the staking memory it writes unconstrained, so these facts are
+        // stated over the post-state, which the last two steps determine.
+        let owner_address = signer::address_of(owner);
+        let post post_store = global<Store>(owner_address);
+        /// [high-level-req-1]
+        ensures exists<Store>(owner_address) ==>
+            !simple_map::spec_contains_key(post_store.staking_contracts, old_operator);
+        ensures stake::stake_pool_exists(owner_address) ==>
+            global<stake::StakePool>(global<stake::OwnerCapability>(owner_address).pool_address).operator_address
+                == new_operator;
     }
 
-    /// Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf are not met
+    /// The voters of the owner's staking contract with `operator` and of the owner's stake pool are updated.
     spec set_voter(owner: &signer, operator: address, new_voter: address) {
-        // TODO: Can't verify: the vesting-contract loop in `set_vesting_contract_voter`
-        // modifies stake pool memory, and the conditions below need loop invariants
-        // that cannot be attached to the inline `for_each_ref` loop.
-        pragma verify = false;
-        include SetStakingContractVoter;
-        include SetStakePoolVoterAbortsIf;
+        use aptos_std::simple_map;
+        use aptos_framework::staking_contract::{Store};
+        // The vesting-contract loop leaves the staking memory it writes unconstrained, so these facts are
+        // stated over the post-state, which the last two steps determine.
+        let owner_address = signer::address_of(owner);
+        let post post_store = global<Store>(owner_address);
+        let post post_staking_contract = simple_map::spec_get(post_store.staking_contracts, operator);
+        /// [high-level-req-2]
+        ensures exists<Store>(owner_address) && simple_map::spec_contains_key(post_store.staking_contracts, operator) ==>
+            global<stake::StakePool>(post_staking_contract.owner_cap.pool_address).delegated_voter == new_voter;
+        ensures stake::stake_pool_exists(owner_address) ==>
+            global<stake::StakePool>(global<stake::OwnerCapability>(owner_address).pool_address).delegated_voter
+                == new_voter;
     }
 
     spec set_vesting_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
@@ -68,6 +91,18 @@ spec aptos_framework::staking_proxy {
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         include SetStakingContractOperator;
+        /// [high-level-req-4.1]
+        include OnlyOwnerStakingContractChanged { owner_address: signer::address_of(owner) };
+    }
+
+    /// No staking contract store other than the owner's changes.
+    spec schema OnlyOwnerStakingContractChanged {
+        use aptos_framework::staking_contract::{Store};
+
+        owner_address: address;
+
+        ensures forall a: address where a != owner_address:
+            exists<Store>(a) == old(exists<Store>(a)) && global<Store>(a) == old(global<Store>(a));
     }
 
     spec schema SetStakingContractOperator {
@@ -132,6 +167,8 @@ spec aptos_framework::staking_proxy {
 
     spec set_staking_contract_voter(owner: &signer, operator: address, new_voter: address) {
         include SetStakingContractVoter;
+        /// [high-level-req-4.2]
+        include OnlyOwnerStakingContractChanged { owner_address: signer::address_of(owner) };
     }
 
     /// Make sure staking_contract_exists first
