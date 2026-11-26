@@ -22,7 +22,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
-        hot_state::{HotStateValueRef, LRUEntry},
+        hot_state::{HotStateValue, HotStateValueRef, LRUEntry},
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
@@ -549,6 +549,35 @@ impl CheckpointStateReader for StateByVersion {
     ) -> DbResult<SparseMerkleProofExt> {
         Ok(self.get_state(Some(version)).summary.get_proof(key_hash))
     }
+
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        _root_depth: usize,
+    ) -> DbResult<(Option<StateValue>, SparseMerkleProofExt)> {
+        let state = self.get_state(Some(version));
+        let value = state
+            .state
+            .iter()
+            .find(|(k, _)| *k.crypto_hash_ref() == key_hash)
+            .map(|(_k, (_ver, val))| val.clone());
+        Ok((value, state.summary.get_proof(&key_hash)))
+    }
+
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        _root_depth: usize,
+    ) -> DbResult<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        let state = self.get_state(Some(version));
+        let value = state.hot_state[usize::from(key_hash.nibble(0))]
+            .iter()
+            .find(|(k, _)| *k.crypto_hash_ref() == key_hash)
+            .map(|(_k, slot)| HotStateValue::clone_from_slot(slot));
+        Ok((value, state.hot_summary.get_proof(&key_hash)))
+    }
 }
 
 /// Verifies `HotInsertionOp` / `HotEvictionOp` fields against the naive model.
@@ -740,7 +769,8 @@ fn update_state_summary(
 
         let next_summary = parent_summary
             .update(
-                &ProvableStateSummary::new(persisted_summary, state_by_version.as_ref()),
+                &ProvableStateSummary::new(persisted_summary, state_by_version.as_ref())
+                    .with_full_proof_one_in(2),
                 &hot_state_updates,
                 block.update_refs(),
             )
