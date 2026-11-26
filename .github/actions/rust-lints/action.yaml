@@ -13,6 +13,15 @@ runs:
     # Run the pre-commit checks
     - uses: pre-commit/action@v3.0.0
 
+    # TODO: temporary, remove before landing.
+    - name: Print cargo-machete version
+      shell: bash
+      run: |
+        set -x
+        command -v cargo-machete || true
+        cargo machete --version || true
+        cargo install --list | grep -A1 machete || true
+
     # Run the rust linters and cargo checks
     - name: Run cargo sort and rust lint checks
       shell: bash
