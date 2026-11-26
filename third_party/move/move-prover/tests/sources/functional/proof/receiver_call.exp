@@ -1,0 +1,133 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/receiver_call.move:105:9
+    │
+105 │         assume [trusted] s.get_f() == 5;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: proof uses trusted assumption
+    ┌─ tests/sources/functional/proof/receiver_call.move:112:9
+    │
+112 │         assume [trusted] s.get_f() == 4;
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: lemma requirement not satisfied
+   ┌─ tests/sources/functional/proof/receiver_call.move:63:9
+   │
+63 │         apply is_three(v);
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/receiver_call.move:57: f_let_incorrect
+   =     at tests/sources/functional/proof/receiver_call.move:62: f_let_incorrect (spec)
+   =     at tests/sources/functional/proof/receiver_call.move:59: f_let_incorrect (spec)
+   =     at tests/sources/functional/proof/receiver_call.move:57: f_let_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/proof/receiver_call.move:63: f_let_incorrect (spec)
+
+error: lemma requirement not satisfied
+   ┌─ tests/sources/functional/proof/receiver_call.move:83:13
+   │
+83 │             apply is_three(s.f);
+   │             ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/receiver_call.move:78: f_if_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/proof/receiver_call.move:83: f_if_incorrect (spec)
+
+error: proof assertion not satisfied
+   ┌─ tests/sources/functional/proof/receiver_call.move:98:9
+   │
+98 │         assert s.get_f() == s.f + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/receiver_call.move:94: f_assert_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/proof/receiver_call.move:98: f_assert_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/receiver_call.move:110:9
+    │
+110 │         ensures result == 5;
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:108: f_assume_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:112: f_assume_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:108: f_assume_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:110: f_assume_incorrect (spec)
+
+error: lemma requirement not satisfied
+    ┌─ tests/sources/functional/proof/receiver_call.move:128:9
+    │
+128 │         apply is_three(s.get_h());
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:123: f_apply_lemma_incorrect
+    =     at tests/sources/functional/proof/receiver_call.move:125: f_apply_lemma_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:123: f_apply_lemma_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:128: f_apply_lemma_incorrect (spec)
+
+error: proof assertion not satisfied
+    ┌─ tests/sources/functional/proof/receiver_call.move:142:9
+    │
+142 │         apply is_zero(s.get_f());
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:138: f_apply_spec_fun_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:142: f_apply_spec_fun_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/receiver_call.move:157:9
+    │
+157 │         ensures sum(s.h) < sum(s.f);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:154: f_forall_apply_incorrect
+    =     at tests/sources/functional/proof/receiver_call.move:156: f_forall_apply_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:154: f_forall_apply_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:159: f_forall_apply_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:154: f_forall_apply_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:157: f_forall_apply_incorrect (spec)
+
+error: lemma requirement not satisfied
+    ┌─ tests/sources/functional/proof/receiver_call.move:168:9
+    │
+168 │         apply needs_three(w.f, w == t.s);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:163: f_apply_arg_order_incorrect
+    =     at tests/sources/functional/proof/receiver_call.move:167: f_apply_arg_order_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:163: f_apply_arg_order_incorrect
+    =         t = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:168: f_apply_arg_order_incorrect (spec)
+
+error: calc step not satisfied
+    ┌─ tests/sources/functional/proof/receiver_call.move:185:9
+    │
+185 │ ╭         calc(
+186 │ │             s.get_f()
+187 │ │             == s.f + 1
+188 │ │         );
+    │ ╰──────────^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:181: f_calc_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:185: f_calc_incorrect (spec)
+
+error: post-condition does not hold
+    ┌─ tests/sources/functional/proof/receiver_call.move:203:9
+    │
+203 │         ensures result >= 10;
+    │         ^^^^^^^^^^^^^^^^^^^^^
+    │
+    =     at tests/sources/functional/proof/receiver_call.move:201: f_split_incorrect
+    =         s = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:205: f_split_incorrect (spec)
+    =     at tests/sources/functional/proof/receiver_call.move:201: f_split_incorrect
+    =         result = <redacted>
+    =     at tests/sources/functional/proof/receiver_call.move:203: f_split_incorrect (spec)

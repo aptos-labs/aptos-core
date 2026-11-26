@@ -1,0 +1,144 @@
+Move prover returns: exiting with compilation errors
+error: expected `W<u8>` but found a value of type `W<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:54:18
+   │
+54 │         apply w8(s.get_w());
+   │                  ^^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:61:18
+   │
+61 │         apply w8(get_w(s));
+   │                  ^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:68:16
+   │
+68 │         assert (if (b) s.get_w() else w) == w;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:75:16
+   │
+75 │         assert (if (b) get_w(s) else w) == w;
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:81:28
+   │
+81 │         include Check { v: s.values() };
+   │                            ^^^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:86:28
+   │
+86 │         include Check { v: values(s) };
+   │                            ^^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+   ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:95:18
+   │
+95 │         apply v8(s.values());
+   │                  ^^^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:103:18
+    │
+103 │         apply v8(values(s));
+    │                  ^^^^^^^^^
+
+error: expected `vector<vector<u8>>` but found a value of type `vector<vector<u64>>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:111:19
+    │
+111 │         apply vv8(s.nested());
+    │                   ^^^^^^^^^^
+
+error: expected `vector<vector<u8>>` but found a value of type `vector<vector<u64>>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:118:19
+    │
+118 │         apply vv8(nested(s));
+    │                   ^^^^^^^^^
+
+error: expected `vector<W<u8>>` but found a value of type `vector<W<u64>>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:126:19
+    │
+126 │         apply vw8(s.structs());
+    │                   ^^^^^^^^^^^
+
+error: expected `vector<W<u8>>` but found a value of type `vector<W<u64>>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:133:19
+    │
+133 │         apply vw8(structs(s));
+    │                   ^^^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:141:18
+    │
+141 │         apply w8(w.same());
+    │                  ^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:148:18
+    │
+148 │         apply w8(same(w));
+    │                  ^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:153:28
+    │
+153 │         include Check { v: w.wrap() };
+    │                            ^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:158:28
+    │
+158 │         include Check { v: wrap(w) };
+    │                            ^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:171:33
+    │
+171 │         assert { let x = arb(); x.values() == v && x == s } ==> true;
+    │                                 ^^^^^^^^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:182:43
+    │
+182 │         apply v8({ let x = arb(); let r = x.v; if (r == w && x == arb<S>()) r else r });
+    │                                           ^^^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:190:80
+    │
+190 │         apply v8({ let x: S = arb(); let r = x.v; if (r == w && x == arb<S>()) r else r });
+    │                                                                                ^
+
+error: expected `vector<u8>` but found a value of type `vector<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:190:87
+    │
+190 │         apply v8({ let x: S = arb(); let r = x.v; if (r == w && x == arb<S>()) r else r });
+    │                                                                                       ^
+
+error: cannot return `vector<u64>` from a function with result type `bool`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:194:44
+    │
+194 │     spec fun receiver_result(s: S): bool { s.values() }
+    │                                            ^^^^^^^^^^
+
+error: cannot return `vector<u64>` from a function with result type `bool`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:196:40
+    │
+196 │     spec fun call_result(s: S): bool { values(s) }
+    │                                        ^^^^^^^^^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:204:18
+    │
+204 │         apply w8(w);
+    │                  ^
+
+error: expected `W<u8>` but found a value of type `W<u64>`
+    ┌─ tests/sources/functional/proof/receiver_call_instance_err.move:212:18
+    │
+212 │         apply w8(w);
+    │                  ^

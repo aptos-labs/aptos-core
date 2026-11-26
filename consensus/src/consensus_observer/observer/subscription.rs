@@ -243,7 +243,7 @@ mod test {
         ProtocolId,
     };
     use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-    use aptos_storage_interface::Result;
+    use aptos_storage_interface::{CheckpointStateReader, Result};
     use aptos_types::{network_address::NetworkAddress, transaction::Version};
     use claims::assert_matches;
     use mockall::mock;
@@ -251,6 +251,9 @@ mod test {
     // This is a simple mock of the DbReader (it generates a MockDatabaseReader)
     mock! {
         pub DatabaseReader {}
+
+        impl CheckpointStateReader for DatabaseReader {}
+
         impl DbReader for DatabaseReader {
             fn get_latest_ledger_info_version(&self) -> Result<Version>;
         }

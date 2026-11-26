@@ -10,7 +10,7 @@ use crate::{
         state_with_summary::LedgerWithSummary,
         HotStateShardUpdates, HotStateUpdates,
     },
-    DbReader,
+    CheckpointStateReader, DbReader,
 };
 use anyhow::{bail, Result};
 use aptos_crypto::{
@@ -286,7 +286,8 @@ impl<'a, 'db> ColdProvableStateSummary<'a, 'db> {
 pub struct ProvableStateSummary<'db> {
     #[deref]
     state_summary: StateSummary,
-    db: &'db (dyn DbReader + Sync),
+    db: &'db (dyn CheckpointStateReader + Sync),
+    full_proof_one_in: usize,
 }
 
 impl<'db> ProvableStateSummary<'db> {
@@ -294,8 +295,20 @@ impl<'db> ProvableStateSummary<'db> {
         Ok(Self::new(db.get_persisted_state_summary()?, db))
     }
 
-    pub fn new(state_summary: StateSummary, db: &'db (dyn DbReader + Sync)) -> Self {
-        Self { state_summary, db }
+    pub fn new(state_summary: StateSummary, db: &'db (dyn CheckpointStateReader + Sync)) -> Self {
+        Self {
+            state_summary,
+            db,
+            full_proof_one_in: 10000,
+        }
+    }
+
+    /// Lets tests exercise the full proof path more often.
+    pub fn with_full_proof_one_in(self, full_proof_one_in: usize) -> Self {
+        Self {
+            full_proof_one_in,
+            ..self
+        }
     }
 
     fn get_proof(
@@ -305,8 +318,8 @@ impl<'db> ProvableStateSummary<'db> {
         root_depth: usize,
         use_hot_state: bool,
     ) -> Result<SparseMerkleProofExt> {
-        if rand::random::<usize>().is_multiple_of(10000) {
-            // 1 out of 10000 times, verify a full proof from the root.
+        if rand::random::<usize>().is_multiple_of(self.full_proof_one_in) {
+            // Occasionally verify a full proof from the root.
             if use_hot_state {
                 let (hot_value_opt, proof) =
                     self.db.get_hot_state_value_with_proof_by_version_ext(
@@ -364,7 +377,7 @@ impl ProofRead for ColdProvableStateSummary<'_, '_> {
 }
 
 /// Reads a native tree's proof at a version: the tree's analog of
-/// `DbReader::get_state_proof_by_version_ext`.
+/// `CheckpointStateReader::get_state_proof_by_version_ext`.
 type NativeProofFn = fn(
     &(dyn DbReader + Sync),
     &HashValue,

@@ -208,6 +208,11 @@ pub struct RocksdbConfigs {
     /// themselves.
     #[serde(default)]
     pub enable_trading_native: bool,
+    /// Write only the last write to each key within a block to the state KV DB. Binaries that
+    /// read such rows with a plain seek return stale values in the middle of a block, so a node
+    /// with this on must not roll back to one without exact reads by version.
+    #[serde(default)]
+    pub squash_state_kv_writes_per_block: bool,
     pub high_priority_background_threads: i32,
     pub low_priority_background_threads: i32,
     /// The size of the single block cache shared by all the DB instances in `AptosDB`.
@@ -243,6 +248,7 @@ impl Default for RocksdbConfigs {
             },
             enable_storage_sharding: true,
             enable_trading_native: false,
+            squash_state_kv_writes_per_block: false,
             high_priority_background_threads: 4,
             low_priority_background_threads: 4,
             shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
@@ -787,6 +793,12 @@ impl ConfigOptimizer for StorageConfig {
                 config.hot_state_config.delete_on_restart = false;
                 modified_config = true;
             }
+            if chain_id.is_devnet()
+                && config_yaml["rocksdb_configs"]["squash_state_kv_writes_per_block"].is_null()
+            {
+                config.rocksdb_configs.squash_state_kv_writes_per_block = true;
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
@@ -1070,6 +1082,8 @@ mod test {
             storage:
               hot_state_config:
                 delete_on_restart: true
+              rocksdb_configs:
+                squash_state_kv_writes_per_block: true
             "#,
         )
         .unwrap();
@@ -1083,5 +1097,87 @@ mod test {
         .unwrap();
         assert!(!modified_config);
         assert!(node_config.storage.hot_state_config.delete_on_restart);
+    }
+
+    #[test]
+    fn test_optimize_squash_state_kv_writes_per_block() {
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              rocksdb_configs:
+                enable_storage_sharding: true
+            "#,
+        )
+        .unwrap();
+
+        // Devnet enables it, including for the chain IDs devnet actually rotates through.
+        for chain_id in [
+            ChainId::new(NamedChain::DEVNET.id()),
+            ChainId::new(30),
+            ChainId::new(240),
+        ] {
+            let mut node_config = NodeConfig::default();
+            assert!(
+                !node_config
+                    .storage
+                    .rocksdb_configs
+                    .squash_state_kv_writes_per_block
+            );
+
+            let modified_config = StorageConfig::optimize(
+                &mut node_config,
+                &yaml,
+                NodeType::Validator,
+                Some(chain_id),
+            )
+            .unwrap();
+            assert!(modified_config);
+            assert!(
+                node_config
+                    .storage
+                    .rocksdb_configs
+                    .squash_state_kv_writes_per_block
+            );
+        }
+
+        // Other chains keep the default.
+        for chain_id in [ChainId::mainnet(), ChainId::testnet(), ChainId::test()] {
+            let mut node_config = NodeConfig::default();
+            StorageConfig::optimize(&mut node_config, &yaml, NodeType::Validator, Some(chain_id))
+                .unwrap();
+            assert!(
+                !node_config
+                    .storage
+                    .rocksdb_configs
+                    .squash_state_kv_writes_per_block
+            );
+        }
+
+        // An explicit setting in the local config wins over the optimizer.
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              hot_state_config:
+                delete_on_restart: false
+              rocksdb_configs:
+                squash_state_kv_writes_per_block: false
+            "#,
+        )
+        .unwrap();
+        let mut node_config = NodeConfig::default();
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &yaml,
+            NodeType::Validator,
+            Some(ChainId::new(NamedChain::DEVNET.id())),
+        )
+        .unwrap();
+        assert!(!modified_config);
+        assert!(
+            !node_config
+                .storage
+                .rocksdb_configs
+                .squash_state_kv_writes_per_block
+        );
     }
 }

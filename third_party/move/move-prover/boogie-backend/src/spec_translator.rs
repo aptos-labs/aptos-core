@@ -3845,11 +3845,25 @@ impl SpecTranslator<'_> {
         } else {
             boogie_field_update(&field_env, struct_inst)
         };
-        emit!(self.writer, "{}(", update_fun);
-        self.translate_exp(&args[0]);
-        emit!(self.writer, ", ");
-        self.translate_exp(&args[1]);
-        emit!(self.writer, ")");
+        // The update function is inlined by Boogie and its body names the
+        // receiver once per other field. A receiver which itself contains an
+        // update is therefore bound to a variable first; otherwise a chain of
+        // n updates of a struct with k fields expands to a term of size
+        // about k^n.
+        if args[0].any(&mut |e| matches!(e, ExpData::Call(_, Operation::UpdateField(..), _))) {
+            let receiver_var = self.fresh_var_name("upd");
+            emit!(self.writer, "(var {} := ", receiver_var);
+            self.translate_exp(&args[0]);
+            emit!(self.writer, "; {}({}, ", update_fun, receiver_var);
+            self.translate_exp(&args[1]);
+            emit!(self.writer, "))");
+        } else {
+            emit!(self.writer, "{}(", update_fun);
+            self.translate_exp(&args[0]);
+            emit!(self.writer, ", ");
+            self.translate_exp(&args[1]);
+            emit!(self.writer, ")");
+        }
     }
 
     fn translate_type_value(&self, node_id: NodeId) {

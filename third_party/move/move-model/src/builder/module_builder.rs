@@ -2113,7 +2113,12 @@ impl ModuleBuilder<'_, '_> {
                 add_proof_locals(&mut et, proof_locals);
                 let (_, translated) = et.translate_exp_free(exp);
                 let translated = translated.into_exp();
-                let ty = et.get_node_type(translated.node_id());
+                // The type is that of the translated expression, as before. It is read after
+                // post-processing, which records the type of a resolved receiver call on its
+                // node and changes no other node type.
+                let id = translated.node_id();
+                let translated = et.post_process_spec_exp(translated);
+                let ty = et.get_node_type(id);
                 et.finalize_types(true);
                 proof_locals.push((proof_loc.clone(), sym, ty));
                 Some(Proof::Let(proof_loc, sym, translated))
@@ -2130,6 +2135,7 @@ impl ModuleBuilder<'_, '_> {
                 }
                 add_proof_locals(&mut et, proof_locals);
                 let cond_exp = et.translate_exp(cond, &BOOL_TYPE).into_exp();
+                let cond_exp = et.post_process_spec_exp(cond_exp);
                 et.finalize_types(true);
                 // Save/restore proof_locals per branch so let bindings don't leak.
                 // Truncate before `?` so that a failing branch doesn't leak bindings
@@ -2182,6 +2188,7 @@ impl ModuleBuilder<'_, '_> {
                 }
                 add_proof_locals(&mut et, proof_locals);
                 let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                let translated = et.post_process_spec_exp(translated);
                 et.finalize_types(true);
                 Some(Proof::Assert(proof_loc, translated))
             },
@@ -2201,6 +2208,7 @@ impl ModuleBuilder<'_, '_> {
                 et.old_status = OldExpStatus::NotSupported;
                 add_proof_locals(&mut et, proof_locals);
                 let translated = et.translate_exp(exp, &BOOL_TYPE).into_exp();
+                let translated = et.post_process_spec_exp(translated);
                 et.finalize_types(true);
                 self.parent.env.diag(
                     Severity::Warning,
@@ -2252,6 +2260,7 @@ impl ModuleBuilder<'_, '_> {
                     add_proof_locals(&mut et, proof_locals);
                     let (_, translated) = et.translate_exp_free(exp);
                     let translated = translated.into_exp();
+                    let translated = et.post_process_spec_exp(translated);
                     et.finalize_types(true);
                     if let (Some(lhs), Some(relop)) = (prev_exp.take(), prev_op.take()) {
                         expanded.push((lhs, relop, translated.clone()));
@@ -2303,6 +2312,7 @@ impl ModuleBuilder<'_, '_> {
                 add_proof_locals(&mut et, proof_locals);
                 let (_, translated) = et.translate_exp_free(exp);
                 let translated = translated.into_exp();
+                let translated = et.post_process_spec_exp(translated);
                 et.finalize_types(true);
                 // Type validation (bool or enum) is deferred to spec instrumentation
                 // because the full struct env is not yet available during model building.
@@ -2389,6 +2399,12 @@ impl ModuleBuilder<'_, '_> {
                     et.translate_exp(a, &expected_ty).into_exp()
                 })
                 .collect();
+            // Post-process only after all arguments are translated, as later arguments can
+            // fix type variables that placeholders in earlier ones need.
+            let translated_args: Vec<Exp> = translated_args
+                .into_iter()
+                .map(|e| et.post_process_spec_exp(e))
+                .collect();
             et.finalize_types(true);
             let lemma_qid = QualifiedId {
                 module_id: mod_id,
@@ -2423,6 +2439,7 @@ impl ModuleBuilder<'_, '_> {
         }
         add_proof_locals(&mut et, proof_locals);
         let translated = et.translate_exp(&call_exp, &BOOL_TYPE).into_exp();
+        let translated = et.post_process_spec_exp(translated);
         et.finalize_types(true);
         Some(Proof::Assert(proof_loc.clone(), translated))
     }
@@ -2553,6 +2570,21 @@ impl ModuleBuilder<'_, '_> {
                     .unwrap_or(Type::Error);
                 et.translate_exp(a, &expected_ty).into_exp()
             })
+            .collect();
+        // Post-process only after all triggers and arguments are translated, as later ones can
+        // fix type variables that placeholders in earlier ones need.
+        let translated_patterns: Vec<Vec<Exp>> = translated_patterns
+            .into_iter()
+            .map(|group| {
+                group
+                    .into_iter()
+                    .map(|e| et.post_process_spec_exp(e))
+                    .collect()
+            })
+            .collect();
+        let translated_args: Vec<Exp> = translated_args
+            .into_iter()
+            .map(|e| et.post_process_spec_exp(e))
             .collect();
         et.finalize_types(true);
 
@@ -4276,9 +4308,9 @@ impl ModuleBuilder<'_, '_> {
                     et.define_local(&fdata.loc, *fname, fdata.ty.clone(), None, None);
                 }
             }
-            let translated = et.translate_exp(init_ea, &ghost_ty);
+            let init_exp = et.translate_exp(init_ea, &ghost_ty).into_exp();
+            let init_exp = et.post_process_spec_exp(init_exp);
             et.finalize_types(true);
-            let init_exp = translated.into_exp();
             if exp_contains_bitwise_op(&init_exp) {
                 self.parent.env.error(
                     &self.parent.env.get_node_loc(init_exp.node_id()),
@@ -4579,7 +4611,8 @@ impl ModuleBuilder<'_, '_> {
                 .clone();
             let mut et = ExpTranslator::new(self);
             et.define_type_params(loc, &entry.type_params, false);
-            let translated = et.translate_exp(exp, &entry.type_);
+            let translated = et.translate_exp(exp, &entry.type_).into_exp();
+            let translated = et.post_process_spec_exp(translated);
             et.finalize_types(true);
             // Store the translated init expression into the declaration.
             let decl = self
@@ -4587,7 +4620,7 @@ impl ModuleBuilder<'_, '_> {
                 .iter_mut()
                 .find(|d| d.name == sym.symbol)
                 .expect("spec var defined");
-            decl.init = Some(translated.into_exp())
+            decl.init = Some(translated)
         }
     }
 
@@ -4601,7 +4634,9 @@ impl ModuleBuilder<'_, '_> {
         // Type check and translate lhs and rhs. They must have the same type.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::Requires);
         let (expected_ty, translated_lhs) = et.translate_exp_free(lhs);
-        let translated_rhs = et.translate_exp(rhs, &expected_ty);
+        let translated_rhs = et.translate_exp(rhs, &expected_ty).into_exp();
+        let translated_lhs = et.post_process_spec_exp(translated_lhs.into_exp());
+        let translated_rhs = et.post_process_spec_exp(translated_rhs);
         et.finalize_types(true);
         if translated_lhs
             .extract_ghost_mem_access(self.parent.env)
@@ -4615,8 +4650,8 @@ impl ModuleBuilder<'_, '_> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: translated_rhs.into_exp(),
-                    additional_exps: vec![translated_lhs.into_exp()],
+                    exp: translated_rhs,
+                    additional_exps: vec![translated_lhs],
                 }],
                 PropertyBag::default(),
                 "",
@@ -4670,10 +4705,9 @@ impl ModuleBuilder<'_, '_> {
             // in Boogie (they are model-only and don't participate in
             // number-operation analysis). Emitting the update would yield an
             // ill-typed Boogie program, so reject at model build time.
-            let rhs_exp = translated_rhs.into_exp();
-            if exp_contains_bitwise_op(&rhs_exp) {
+            if exp_contains_bitwise_op(&translated_rhs) {
                 self.parent.error(
-                    &self.parent.env.get_node_loc(rhs_exp.node_id()),
+                    &self.parent.env.get_node_loc(translated_rhs.node_id()),
                     "bitvector expressions (|, &, ^, int2bv) cannot appear in a \
                      ghost field update expression (ghost integer fields are \
                      modeled as mathematical integers)",
@@ -4687,8 +4721,8 @@ impl ModuleBuilder<'_, '_> {
                     loc: loc.clone(),
                     kind: ConditionKind::Update,
                     properties: Default::default(),
-                    exp: rhs_exp,
-                    additional_exps: vec![translated_lhs.into_exp()],
+                    exp: translated_rhs,
+                    additional_exps: vec![translated_lhs],
                 }],
                 PropertyBag::default(),
                 "",
@@ -4990,6 +5024,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             ) => {
                 let mut et = self.exp_translator_for_schema(&loc, context_type_params, vars);
                 let lhs_exp = et.translate_exp(lhs, &BOOL_TYPE).into_exp();
+                let lhs_exp = et.post_process_spec_exp(lhs_exp);
                 et.finalize_types(true);
                 let path_cond = Some(self.extend_path_condition(&loc, path_cond, lhs_exp));
                 self.def_ana_schema_exp_oper(
@@ -5032,6 +5067,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             EA::Exp_::IfElse(c, t, e) => {
                 let mut et = self.exp_translator_for_schema(&loc, context_type_params, vars);
                 let c_exp = et.translate_exp(c, &BOOL_TYPE).into_exp();
+                let c_exp = et.post_process_spec_exp(c_exp);
                 et.finalize_types(true);
                 let t_path_cond =
                     Some(self.extend_path_condition(&loc, path_cond.clone(), c_exp.clone()));
@@ -5162,6 +5198,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                         // Note we currently only use the vars defined so far in this context. Variables
                         // which are introduced by schemas after the inclusion of this one are not in scope.
                         let exp = et.translate_exp(exp, &schema_type).into_exp();
+                        // Resolve placeholders such as receiver calls, as for conditions.
+                        let exp = et.post_process_spec_exp(exp);
                         et.finalize_types(true);
                         (schema_sym, exp)
                     })

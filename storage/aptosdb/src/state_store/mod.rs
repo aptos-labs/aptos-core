@@ -70,7 +70,7 @@ use aptos_storage_interface::{
         versioned_state_value::StateUpdateRef,
         HotStateShardUpdates, HotStateUpdates,
     },
-    AptosDbError, DbReader, Result, StateSnapshotReceiver,
+    AptosDbError, CheckpointStateReader, Result, StateSnapshotReceiver,
 };
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -89,6 +89,7 @@ use claims::{assert_ge, assert_le};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
+    borrow::Cow,
     ops::Deref,
     sync::{Arc, MutexGuard},
 };
@@ -199,6 +200,7 @@ pub(crate) struct StateStore {
     buffered_state_target_items: usize,
     internal_indexer_db: Option<InternalIndexerDB>,
     pub hot_state_config: HotStateConfig,
+    squash_state_kv_writes_per_block: bool,
 }
 
 /// In-memory state loaded from the latest snapshot on disk, and the pipeline persisting newer
@@ -223,34 +225,9 @@ impl Deref for StateStore {
     }
 }
 
-// "using an Arc<dyn DbReader> as an Arc<dyn StateReader>" is not allowed in stable Rust. Actually we
-// want another trait, `StateReader`, which is a subset of `DbReader` here but Rust does not support trait
-// upcasting coercion for now. Should change it to a different trait once upcasting is stabilized.
-// ref: https://github.com/rust-lang/rust/issues/65991
-impl DbReader for StateDb {
-    /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
-        &self,
-        next_version: Version,
-    ) -> Result<Option<(Version, HashValue)>> {
-        self.state_merkle_db
-            .get_state_snapshot_version_before(next_version)?
-            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
-            .transpose()
-    }
-
-    // Only checkpoint reads: a single seek in state KV is only guaranteed to be exact at a block
-    // end. Reads at any version go through `AptosDB`.
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        Ok(self
-            .get_state_value_with_version_at_checkpoint(state_key, version)?
-            .map(|(_, value)| value))
-    }
-
+// A single seek in state KV is only guaranteed to be exact at a block end. Reads at any version
+// go through `AptosDB`.
+impl CheckpointStateReader for StateDb {
     fn get_state_value_with_version_at_checkpoint(
         &self,
         state_key: &StateKey,
@@ -316,8 +293,10 @@ impl DbReader for StateDb {
         };
         Ok((value, proof))
     }
+}
 
-    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+impl StateDb {
+    pub fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
             Ok(match self.ledger_db.metadata_db().get_usage(version) {
                 Ok(data) => data,
@@ -328,78 +307,18 @@ impl DbReader for StateDb {
             })
         })
     }
-}
-
-impl DbReader for StateStore {
-    fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
-        Ok(self.live()?.persisted_state.get_state())
-    }
-
-    fn get_persisted_state_summary(&self) -> Result<StateSummary> {
-        Ok(self.live()?.persisted_state.get_state_summary())
-    }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
-    fn get_state_snapshot_before(
+    pub fn get_state_snapshot_before(
         &self,
         next_version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.deref().get_state_snapshot_before(next_version)
+        self.state_merkle_db
+            .get_state_snapshot_version_before(next_version)?
+            .map(|ver| Ok((ver, self.state_merkle_db.get_root_hash(ver)?)))
+            .transpose()
     }
 
-    fn get_state_value_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<StateValue>> {
-        self.deref()
-            .get_state_value_at_checkpoint(state_key, version)
-    }
-
-    fn get_state_value_with_version_at_checkpoint(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<Option<(Version, StateValue)>> {
-        self.deref()
-            .get_state_value_with_version_at_checkpoint(state_key, version)
-    }
-
-    /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version_ext(
-        &self,
-        key_hash: &HashValue,
-        version: Version,
-        root_depth: usize,
-        use_hot_state: bool,
-    ) -> Result<SparseMerkleProofExt> {
-        self.deref()
-            .get_state_proof_by_version_ext(key_hash, version, root_depth, use_hot_state)
-    }
-
-    /// Get the state value with proof extension given the state key and version
-    fn get_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
-    }
-
-    fn get_hot_state_value_with_proof_by_version_ext(
-        &self,
-        key_hash: HashValue,
-        version: Version,
-        root_depth: usize,
-    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
-        self.deref()
-            .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
-    }
-}
-
-impl StateDb {
     fn expect_value_by_version(
         &self,
         state_key: &StateKey,
@@ -479,6 +398,7 @@ impl StateStore {
         skip_usage: bool,
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
+        squash_state_kv_writes_per_block: bool,
     ) -> Self {
         if mode == StateStoreMode::ReadWrite {
             Self::sync_commit_progress(
@@ -523,6 +443,7 @@ impl StateStore {
             buffered_state_target_items,
             internal_indexer_db,
             hot_state_config,
+            squash_state_kv_writes_per_block,
         }
     }
 
@@ -1031,6 +952,14 @@ impl LiveState {
 }
 
 impl StateStore {
+    pub fn get_persisted_state(&self) -> Result<(Arc<dyn HotStateView>, State)> {
+        Ok(self.live()?.persisted_state.get_state())
+    }
+
+    pub fn get_persisted_state_summary(&self) -> Result<StateSummary> {
+        Ok(self.live()?.persisted_state.get_state_summary())
+    }
+
     /// Replaces the in-memory state with one loaded from disk, after a restore wrote state
     /// underneath it.
     pub fn reload(&self) {
@@ -1087,7 +1016,7 @@ impl StateStore {
 
         self.put_state_updates(
             &new_state,
-            &state_update_refs.per_version,
+            state_update_refs,
             &reads,
             ledger_batch,
             sharded_state_kv_batches,
@@ -1120,38 +1049,52 @@ impl StateStore {
                 self.state_db.clone(),
             )?;
 
+        let updates = self.state_kv_updates(state_update_refs);
         self.put_stats_and_indices(
             &base,
             &new_state,
-            &state_update_refs.per_version,
+            &updates,
             &reads,
             ledger_batch,
             sharded_state_kv_batches,
         )?;
-        self.put_state_values(&state_update_refs.per_version, sharded_state_kv_batches)
+        self.put_state_values(&updates, sharded_state_kv_batches)
     }
 
     pub fn put_state_updates(
         &self,
         state: &LedgerState,
-        state_update_refs: &PerVersionStateUpdateRefs,
+        state_update_refs: &StateUpdateRefs,
         state_reads: &ShardedStateCache,
         ledger_batch: &mut SchemaBatch,
         sharded_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_value_sets"]);
         let current_state = self.live()?.current_state_locked().state().clone();
+        let updates = self.state_kv_updates(state_update_refs);
 
         self.put_stats_and_indices(
             &current_state,
             state,
-            state_update_refs,
+            &updates,
             state_reads,
             ledger_batch,
             sharded_state_kv_batches,
         )?;
 
-        self.put_state_values(state_update_refs, sharded_state_kv_batches)
+        self.put_state_values(&updates, sharded_state_kv_batches)
+    }
+
+    /// The updates to persist to state KV.
+    fn state_kv_updates<'a, 'kv>(
+        &self,
+        state_update_refs: &'a StateUpdateRefs<'kv>,
+    ) -> Cow<'a, PerVersionStateUpdateRefs<'kv>> {
+        if self.squash_state_kv_writes_per_block {
+            Cow::Owned(state_update_refs.last_value_writes_per_block())
+        } else {
+            Cow::Borrowed(&state_update_refs.per_version)
+        }
     }
 
     pub fn put_state_values(

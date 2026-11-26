@@ -1,0 +1,6 @@
+Move prover returns: exiting with bytecode transformation errors
+error: `split` expression must be of type `bool` or an enum type
+   ┌─ tests/sources/functional/proof/receiver_call_split_err.move:18:15
+   │
+18 │         split s.get_f();
+   │               ^^^^^^^^^

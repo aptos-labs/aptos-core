@@ -1,0 +1,12 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/schema_include_receiver_fun.move:33:9
+   │
+33 │         ensures result == s.f + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/schema_include_receiver_fun.move:30: receiver_form_incorrect
+   =         s = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/schema_include_receiver_fun.move:15
+   =     at tests/sources/functional/schema_include_receiver_fun.move:33: receiver_form_incorrect (spec)
