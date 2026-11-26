@@ -17,7 +17,7 @@ use aptos_jellyfish_merkle::{
     node_type::{Node, NodeKey},
     TreeReader,
 };
-use aptos_storage_interface::{DbReader, DbWriter, StateKind, StateSnapshotReceiver};
+use aptos_storage_interface::{DbWriter, StateKind, StateSnapshotReceiver};
 use aptos_temppath::TempPath;
 use aptos_types::{
     nibble::nibble_path::NibblePath,

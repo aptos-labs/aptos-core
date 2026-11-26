@@ -266,6 +266,8 @@ impl SignerAndKeyPair {
 
 pub struct FakeDbReader {}
 
+impl aptos_storage_interface::CheckpointStateReader for FakeDbReader {}
+
 impl aptos_storage_interface::DbReader for FakeDbReader {}
 
 /**

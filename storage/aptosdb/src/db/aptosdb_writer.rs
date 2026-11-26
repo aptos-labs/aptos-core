@@ -36,7 +36,7 @@ use aptos_storage_interface::{
         orders::{decode_order_writes, OrderOverlay, ShardedOrderLayers},
         positions::{PositionOverlay, ShardedPositionLayers},
     },
-    AptosDbError, DbReader, DbWriter, Result, StateKind, StateSnapshotReceiver,
+    AptosDbError, DbWriter, Result, StateKind, StateSnapshotReceiver,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_types::transaction::TransactionAuxiliaryData;
@@ -763,7 +763,7 @@ impl AptosDB {
 
         self.state_store.put_state_updates(
             chunk.state,
-            &chunk.state_update_refs.per_version,
+            chunk.state_update_refs,
             chunk.state_reads,
             &mut ledger_metadata_batch,
             &mut sharded_state_kv_batches,
