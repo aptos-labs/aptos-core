@@ -341,7 +341,7 @@ spec aptos_framework::account {
         cap_rotate_key: vector<u8>,
         cap_update_table: vector<u8>,
     ) {
-        // The abort in orderless and multisig payload transactions is not specified.
+        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
         pragma aborts_if_is_partial;
         let addr = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr };
@@ -409,7 +409,7 @@ spec aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) {
-        // The abort in orderless and multisig payload transactions is not specified.
+        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
         pragma aborts_if_is_partial;
         aborts_if !exists<Account>(rotation_cap_offerer_address);
         let delegate_address = signer::address_of(delegate_signer);
@@ -464,7 +464,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address,
     ) {
-        // The abort in orderless and multisig payload transactions is not specified.
+        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
         pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };
@@ -522,7 +522,7 @@ spec aptos_framework::account {
         account_public_key_bytes: vector<u8>,
         recipient_address: address
     ) {
-        // The abort in orderless and multisig payload transactions is not specified.
+        // Partial: the replay-protection check aborts via the unspecified orderless and multisig payload natives.
         pragma aborts_if_is_partial;
         let source_address = signer::address_of(account);
         include EnsureResourceExistsAbortsIf { addr: source_address };

@@ -171,12 +171,13 @@ spec aptos_framework::staking_contract {
         // Partial: only the withdrawal from a paired store without a withdraw hook is specified, as in
         // `coin::withdraw`; the aborts of creating the contract are not specified.
         pragma aborts_if_is_partial;
-        include PreconditionsInCreateContract;
         let staker_address = signer::address_of(staker);
         let store_addr = stake::spec_apt_paired_store_address(staker_address);
         let plain = stake::spec_has_apt_paired_store(staker_address)
             && fungible_asset::spec_store_no_withdraw_hook(store_addr);
         aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
+        aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
+        aborts_if plain && amount != 0 && !exists<stake::ValidatorSet>(@aptos_framework);
         /// [high-level-req-1]
         ensures exists<Store>(staker_address);
     }
@@ -194,11 +195,13 @@ spec aptos_framework::staking_contract {
     ): address {
         pragma opaque;
         pragma aborts_if_is_partial;
-        include PreconditionsInCreateContract;
-        ensures exists<stake::ValidatorSet>(@aptos_framework);
-
         let amount = coins.value;
         include CreateStakingContractWithCoinsAbortsIfAndEnsures { amount };
+        aborts_if amount != 0 && !exists<stake::ValidatorSet>(@aptos_framework);
+        // The aborts are partial, so callers learn the read resources from these.
+        ensures old(exists<staking_config::StakingConfig>(@aptos_framework));
+        ensures amount != 0 ==> old(exists<stake::ValidatorSet>(@aptos_framework));
+        ensures exists<stake::ValidatorSet>(@aptos_framework) == old(exists<stake::ValidatorSet>(@aptos_framework));
 
         // TODO: this property causes timeout
         // let staker_address = signer::address_of(staker);
@@ -217,7 +220,6 @@ spec aptos_framework::staking_contract {
         // `coin::withdraw`; the other aborts of the withdrawal and the aborts and effects of adding the coins to the
         // stake pool are not specified.
         pragma aborts_if_is_partial;
-        include stake::ResourceRequirement;
         aborts_if reconfiguration_state::spec_is_in_progress();
 
         let staker_address = signer::address_of(staker);
@@ -229,6 +231,8 @@ spec aptos_framework::staking_contract {
         let plain = stake::spec_has_apt_paired_store(staker_address)
             && fungible_asset::spec_store_no_withdraw_hook(store_addr);
         aborts_if plain && fungible_asset::spec_balance(store_addr) < amount;
+        aborts_if plain && amount != 0 && !exists<stake::ValidatorSet>(@aptos_framework);
+        aborts_if plain && amount != 0 && !exists<staking_config::StakingConfig>(@aptos_framework);
 
         let post post_store = global<Store>(staker_address);
         let post post_staking_contract = simple_map::spec_get(
@@ -443,7 +447,6 @@ spec aptos_framework::staking_contract {
         voter: address,
         contract_creation_seed: vector<u8>
     ): (signer, SignerCapability, OwnerCapability) {
-        include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);
         // postconditions account::create_resource_account()
 
@@ -626,17 +629,6 @@ spec aptos_framework::staking_contract {
         let post post_staking_contracts = post_store.staking_contracts;
         // TODO: this property causes timeout
         // ensures simple_map::spec_contains_key(post_staking_contracts, operator);
-    }
-
-    spec schema PreconditionsInCreateContract {
-        requires exists<stake::ValidatorPerformance>(@aptos_framework);
-        requires exists<stake::ValidatorSet>(@aptos_framework);
-        requires exists<staking_config::StakingRewardsConfig>(@aptos_framework)
-            || !std::features::spec_periodical_reward_rate_decrease_enabled();
-        requires exists<aptos_framework::timestamp::CurrentTimeMicroseconds>(
-            @aptos_framework
-        );
-        requires exists<stake::AptosCoinCapabilities>(@aptos_framework);
     }
 
     spec schema CreateStakePoolAbortsIf {

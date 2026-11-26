@@ -161,6 +161,16 @@ spec aptos_framework::primary_fungible_store {
     }
 
     spec create_primary_store<T: key>(owner_addr: address, metadata: Object<T>): Object<FungibleStore> {
+        let store_addr = spec_primary_store_address(owner_addr, metadata);
+        include CreatePrimaryStoreAbortsIf<T>;
+        ensures result.inner == store_addr;
+        ensures global<object::ObjectCore>(store_addr).owner == owner_addr;
+        ensures !global<object::ObjectCore>(store_addr).allow_ungated_transfer;
+    }
+
+    spec schema CreatePrimaryStoreAbortsIf<T> {
+        owner_addr: address;
+        metadata: Object<T>;
         let metadata_addr = metadata.inner;
         let store_addr = spec_primary_store_address(owner_addr, metadata);
         aborts_if !exists<object::ObjectCore>(metadata_addr) || !exists<Metadata>(metadata_addr);
@@ -170,9 +180,6 @@ spec aptos_framework::primary_fungible_store {
         aborts_if exists<FungibleStore>(store_addr);
         aborts_if std::features::spec_is_enabled(std::features::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE)
             && exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
-        ensures result.inner == store_addr;
-        ensures global<object::ObjectCore>(store_addr).owner == owner_addr;
-        ensures !global<object::ObjectCore>(store_addr).allow_ungated_transfer;
     }
 
     spec withdraw<T: key>(owner: &signer, metadata: Object<T>, amount: u64): FungibleAsset {
@@ -291,5 +298,168 @@ spec aptos_framework::primary_fungible_store {
         let to = spec_primary_store_address(recipient, metadata);
         include PrimaryTransfer<T>;
         aborts_if spec_is_plain_transfer_to(from, to, metadata.inner) && from != to && amount < expected;
+    }
+
+    /// Makes the object a fungible asset whose primary stores can be derived from it.
+    spec create_primary_store_enabled_fungible_asset(
+        constructor_ref: &ConstructorRef,
+        maximum_supply: Option<u128>,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        icon_uri: String,
+        project_uri: String,
+    ) {
+        let addr = constructor_ref.self;
+        include fungible_asset::AddFungibilityAbortsIf;
+        aborts_if exists<DeriveRefPod>(addr);
+        ensures exists<DeriveRefPod>(addr);
+        ensures global<Metadata>(addr) == fungible_asset::Metadata { name, symbol, decimals, icon_uri, project_uri };
+    }
+
+    /// Returns the primary store of `owner`, creating it if missing.
+    spec ensure_primary_store_exists<T: key>(owner: address, metadata: Object<T>): Object<FungibleStore> {
+        let metadata_addr = metadata.inner;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<T> { owner_addr: owner };
+        ensures result.inner == store_addr;
+        ensures exists<FungibleStore>(store_addr);
+        ensures existing ==> global<FungibleStore>(store_addr) == old(global<FungibleStore>(store_addr));
+        ensures !existing ==> global<FungibleStore>(store_addr).metadata.inner == metadata_addr
+            && !global<FungibleStore>(store_addr).frozen
+            && fungible_asset::spec_balance(store_addr) == 0
+            && global<object::ObjectCore>(store_addr).owner == owner;
+    }
+
+    spec deposit_with_signer(owner: &signer, fa: FungibleAsset) {
+        // Partial: the abort conditions of store creation and a deposit hook are not specified.
+        pragma aborts_if_is_partial;
+        let store_addr = spec_primary_store_address(signer::address_of(owner), fa.metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        let store = global<FungibleStore>(store_addr);
+        aborts_if existing && store.frozen;
+        aborts_if existing && fungible_asset::spec_store_no_deposit_hook(store_addr)
+            && fa.metadata != store.metadata;
+        include PrimaryDepositBalance { owner: signer::address_of(owner) };
+    }
+
+    /// Mints `amount` into the primary store of `owner`, which is created if missing.
+    spec mint(mint_ref: &MintRef, owner: address, amount: u64) {
+        let metadata = mint_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
+        aborts_if existing && global<FungibleStore>(store_addr).frozen;
+        aborts_if existing && global<FungibleStore>(store_addr).metadata != metadata;
+        include fungible_asset::IncreaseSupplyAbortsIf { metadata_addr: metadata.inner };
+        // A new store starts empty, so only an existing one can overflow.
+        include existing ==> fungible_asset::UncheckedDepositAbortsIf {
+            store_addr, fa: FungibleAsset { metadata, amount }
+        };
+        ensures exists<FungibleStore>(store_addr);
+        ensures fungible_asset::spec_balance(store_addr)
+            == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + amount;
+        ensures amount != 0 ==> fungible_asset::spec_supply(metadata.inner)
+            == old(fungible_asset::spec_supply(metadata.inner)) + amount;
+    }
+
+    /// Burns `amount` from the primary store of `owner`, ignoring its frozen flag.
+    spec burn(burn_ref: &BurnRef, owner: address, amount: u64) {
+        let metadata = burn_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        aborts_if !exists<object::ObjectCore>(store_addr);
+        aborts_if !exists<FungibleStore>(store_addr);
+        aborts_if fungible_asset::spec_balance(store_addr) < amount;
+        aborts_if metadata != global<FungibleStore>(store_addr).metadata;
+        aborts_if amount != 0 && !exists<fungible_asset::ConcurrentSupply>(metadata.inner)
+            && !exists<fungible_asset::Supply>(metadata.inner);
+        aborts_if amount != 0 && fungible_asset::spec_supply(metadata.inner) < amount;
+        ensures fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
+        ensures amount != 0 ==> fungible_asset::spec_supply(metadata.inner)
+            == old(fungible_asset::spec_supply(metadata.inner)) - amount;
+    }
+
+    spec set_frozen_flag(transfer_ref: &TransferRef, owner: address, frozen: bool) {
+        let metadata = transfer_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
+        aborts_if exists<FungibleStore>(store_addr)
+            && global<FungibleStore>(store_addr).metadata != transfer_ref.metadata;
+        ensures exists<FungibleStore>(store_addr);
+        ensures global<FungibleStore>(store_addr).frozen == frozen;
+    }
+
+    /// Withdraws from the primary store of `owner`, ignoring its frozen flag.
+    spec withdraw_with_ref(transfer_ref: &TransferRef, owner: address, amount: u64): FungibleAsset {
+        let store_addr = spec_primary_store_address(owner, transfer_ref.metadata);
+        aborts_if !exists<object::ObjectCore>(store_addr);
+        aborts_if !exists<FungibleStore>(store_addr);
+        aborts_if transfer_ref.metadata != global<FungibleStore>(store_addr).metadata;
+        aborts_if fungible_asset::spec_balance(store_addr) < amount;
+        ensures fungible_asset::spec_balance(store_addr) == old(fungible_asset::spec_balance(store_addr)) - amount;
+        ensures result == FungibleAsset { metadata: transfer_ref.metadata, amount };
+    }
+
+    /// Deposits into the primary store of `owner`, which is created if missing, ignoring its frozen flag.
+    spec deposit_with_ref(transfer_ref: &TransferRef, owner: address, fa: FungibleAsset) {
+        let metadata = transfer_ref.metadata;
+        let store_addr = spec_primary_store_address(owner, metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: owner };
+        aborts_if transfer_ref.metadata != fa.metadata;
+        aborts_if existing && global<FungibleStore>(store_addr).metadata != fa.metadata;
+        // A new store starts empty, so only an existing one can overflow.
+        include existing ==> fungible_asset::UncheckedDepositAbortsIf { store_addr };
+        ensures exists<FungibleStore>(store_addr);
+        ensures fungible_asset::spec_balance(store_addr)
+            == (if (existing) { old(fungible_asset::spec_balance(store_addr)) } else { 0 }) + fa.amount;
+    }
+
+    /// Moves `amount` between the primary stores of `from` and `to`, ignoring their frozen flags.
+    spec transfer_with_ref(transfer_ref: &TransferRef, from: address, to: address, amount: u64) {
+        let metadata = transfer_ref.metadata;
+        let from_addr = spec_primary_store_address(from, metadata);
+        let to_addr = spec_primary_store_address(to, metadata);
+        let to_existing = exists<FungibleStore>(to_addr);
+        let to_concurrent = global<fungible_asset::ConcurrentFungibleBalance>(to_addr).balance;
+        aborts_if !exists<object::ObjectCore>(from_addr);
+        aborts_if !exists<FungibleStore>(from_addr);
+        aborts_if to_existing && !exists<object::ObjectCore>(to_addr);
+        include !to_existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: to };
+        aborts_if transfer_ref.metadata != global<FungibleStore>(from_addr).metadata;
+        aborts_if fungible_asset::spec_balance(from_addr) < amount;
+        // A new recipient store starts empty, so only an existing one can overflow.
+        include to_existing && from_addr != to_addr ==> fungible_asset::UncheckedDepositAbortsIf {
+            store_addr: to_addr, fa: FungibleAsset { metadata, amount }
+        };
+        // For a self-transfer the deposit runs on the reduced balance.
+        aborts_if amount != 0 && from_addr == to_addr && fungible_asset::spec_is_concurrent_balance(to_addr)
+            && aptos_framework::aggregator_v2::spec_get_value(to_concurrent)
+                > aptos_framework::aggregator_v2::spec_get_max_value(to_concurrent);
+        ensures from_addr != to_addr ==>
+            fungible_asset::spec_balance(from_addr) == old(fungible_asset::spec_balance(from_addr)) - amount
+            && fungible_asset::spec_balance(to_addr) == (if (old(exists<FungibleStore>(to_addr))) {
+                old(fungible_asset::spec_balance(to_addr))
+            } else { 0 }) + amount;
+        ensures from_addr == to_addr ==>
+            fungible_asset::spec_balance(from_addr) == old(fungible_asset::spec_balance(from_addr));
+    }
+
+    spec upgrade_to_concurrent(owner: &signer, metadata: Object<Metadata>) {
+        // Partial: the ownership check of an existing store walks the object owner chain, which is not specified.
+        pragma aborts_if_is_partial;
+        let store_addr = spec_primary_store_address(signer::address_of(owner), metadata);
+        let existing = exists<FungibleStore>(store_addr);
+        aborts_if existing && !exists<object::ObjectCore>(store_addr);
+        include !existing ==> CreatePrimaryStoreAbortsIf<Metadata> { owner_addr: signer::address_of(owner) };
+        ensures exists<fungible_asset::ConcurrentFungibleBalance>(store_addr);
+        ensures old(exists<FungibleStore>(store_addr)) ==> fungible_asset::spec_balance(store_addr)
+            == old(fungible_asset::spec_balance(store_addr));
     }
 }
