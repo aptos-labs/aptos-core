@@ -24,6 +24,7 @@ use crate::{
         transaction_info::TransactionInfoSchema, version_data::VersionDataSchema,
         write_set::WriteSetSchema,
     },
+    state_kv_db::StateKvDb,
     utils::truncation_helper::num_frozen_nodes_in_accumulator,
 };
 use aptos_config::config::{
@@ -32,6 +33,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_schemadb::schema::Schema;
 use aptos_storage_interface::{AptosDbError, CheckpointStateReader, DbReader, Order, StateKind};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -522,11 +524,19 @@ fn expected_state_kv(
 }
 
 fn state_kv_contents(db: &AptosDB) -> (StateKvRows, StaleStateValueIndices) {
+    kv_contents::<StateValueByKeyHashSchema>(&db.state_kv_db)
+}
+
+/// The rows of the value schema `S` and the stale indices in `db`.
+fn kv_contents<S: Schema>(db: &StateKvDb) -> (BTreeMap<S::Key, S::Value>, StaleStateValueIndices)
+where
+    S::Key: Ord,
+{
     let mut rows = BTreeMap::new();
     let mut indices = BTreeSet::new();
     for shard_id in 0..NUM_STATE_SHARDS {
-        let shard = db.state_kv_db.db_shard(shard_id);
-        let mut iter = shard.iter::<StateValueByKeyHashSchema>().unwrap();
+        let shard = db.db_shard(shard_id);
+        let mut iter = shard.iter::<S>().unwrap();
         iter.seek_to_first();
         for item in iter {
             let (key, value) = item.unwrap();
@@ -666,6 +676,55 @@ proptest! {
             prop_assert_eq!(&state_kv_contents(&db), &expected);
         }
     }
+
+    #[test]
+    fn test_hot_state_kv_contents(
+        blocks in arb_state_kv_blocks(),
+        make_hot in vec(0..8u8, 8),
+        blocks_per_chunk in 2..=3usize,
+    ) {
+        let (keys, mut blocks) = state_kv_blocks(blocks);
+        // Like a block epilogue, each block end promotes the keys in its bit mask.
+        for (block, mask) in blocks.iter_mut().zip(make_hot) {
+            block.last_mut().unwrap().write_set.add_hotness(
+                keys.iter()
+                    .enumerate()
+                    .filter(|(i, _key)| mask & (1 << i) != 0)
+                    .map(|(_i, key)| key.clone())
+                    .collect(),
+            );
+        }
+
+        // Rows and stale indices don't depend on how blocks are grouped into chunks.
+        let [expected, actual] = [1, blocks_per_chunk].map(|blocks_per_chunk| {
+            let tmp_dir = TempPath::new();
+            let db = open_hot_state_kv_test_db(&tmp_dir);
+            commit_blocks(&db, &blocks, 0, blocks_per_chunk);
+            kv_contents::<HotStateValueByKeyHashSchema>(&db.hot_state_kv_db)
+        });
+        prop_assert_eq!(actual, expected);
+    }
+}
+
+fn open_hot_state_kv_test_db(db_dir: &TempPath) -> AptosDB {
+    AptosDB::open(
+        StorageDirPaths::from_path(db_dir.path()),
+        /*readonly=*/ false,
+        NO_OP_STORAGE_PRUNER_CONFIG,
+        RocksdbConfigs::default(),
+        BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
+        DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+        None,
+        HotStateConfig {
+            // The test keys share a shard, so they keep evicting each other.
+            max_items_per_shard: 2,
+            // Short enough that promotions mix refreshes and no-ops.
+            refresh_interval_versions: 2,
+            delete_on_restart: false,
+            ..HotStateConfig::default()
+        },
+    )
+    .expect("Unable to open AptosDB")
 }
 
 pub fn test_state_merkle_pruning_impl(

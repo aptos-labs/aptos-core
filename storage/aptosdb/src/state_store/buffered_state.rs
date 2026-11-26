@@ -46,15 +46,6 @@ impl HotStateAccumulator {
             pending: empty_hot_state_updates(),
         }
     }
-
-    fn merge_hot_state_updates(
-        target: &mut [HotStateShardUpdates; NUM_STATE_SHARDS],
-        incoming: [HotStateShardUpdates; NUM_STATE_SHARDS],
-    ) {
-        for (t, i) in target.iter_mut().zip_eq(incoming) {
-            t.merge(i);
-        }
-    }
 }
 
 impl Default for HotStateAccumulator {
@@ -67,8 +58,10 @@ impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumul
     type ChunkInput = HotStateUpdates;
 
     fn absorb_chunk(&mut self, input: HotStateUpdates) {
-        if let Some(shards) = input.for_last_checkpoint {
-            Self::merge_hot_state_updates(&mut self.pending, shards);
+        for (pending, blocks) in self.pending.iter_mut().zip_eq(input.shards) {
+            for block in blocks {
+                pending.merge(block);
+            }
         }
     }
 

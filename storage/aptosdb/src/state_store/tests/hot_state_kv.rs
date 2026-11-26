@@ -809,7 +809,7 @@ fn test_load_write_then_load_roundtrip() {
         });
 
     let hot_state_updates = HotStateUpdates {
-        for_last_checkpoint: Some(shards),
+        shards: shards.map(|shard| vec![shard]),
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
@@ -1065,8 +1065,11 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     let val1 = make_state_value(10);
     let key2 = make_state_key(20);
     let key3 = make_state_key(30);
+    let key4 = make_state_key(40);
+    let val4 = make_state_value(40);
 
     let mut shards = empty_hot_state_updates();
+    let mut next_block = empty_hot_state_updates();
 
     // key1: first write (no superseded version) at hot_since_version=100
     shards[key1.get_shard_id()]
@@ -1096,8 +1099,28 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
             superseded_version: Some(150),
         });
 
+    // key4: written in two blocks, the second write superseding the first.
+    for (block, hot_since_version, superseded_version) in
+        [(&mut shards, 100, None), (&mut next_block, 400, Some(100))]
+    {
+        block[key4.get_shard_id()]
+            .insertions
+            .insert(*key4.crypto_hash_ref(), HotInsertionOp {
+                state_key: key4.clone(),
+                value: HotStateValue::new(Some(val4.clone()), hot_since_version),
+                value_version: Some(hot_since_version),
+                superseded_version,
+            });
+    }
+
     let hot_state_updates = HotStateUpdates {
-        for_last_checkpoint: Some(shards),
+        shards: shards
+            .into_iter()
+            .zip(next_block)
+            .map(|(first, next)| vec![first, next])
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap(),
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
@@ -1178,6 +1201,27 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     // Self-referential tombstone
     assert_eq!(key3_entries[1].stale_since_version, 300);
     assert_eq!(key3_entries[1].version, 300);
+
+    // key4: a row per block, and the second one supersedes the first.
+    for version in [100, 400] {
+        assert_eq!(
+            get_hot_state_entry(hot_state_kv_db, &key4, version).unwrap(),
+            HotStateEntry::Occupied {
+                value: val4.clone(),
+                value_version: version,
+            }
+        );
+    }
+    let mut key4_entries: Vec<_> = collect_stale_indices(hot_state_kv_db, key4.get_shard_id())
+        .into_iter()
+        .filter(|e| e.state_key_hash == CryptoHash::hash(&key4))
+        .map(|e| (e.stale_since_version, e.version))
+        .collect();
+    key4_entries.sort();
+    assert_eq!(key4_entries, vec![
+        (100, StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+        (400, 100),
+    ]);
 }
 
 #[test]
@@ -1221,7 +1265,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
             superseded_version: None,
         });
     let updates1 = HotStateUpdates {
-        for_last_checkpoint: Some(shards),
+        shards: shards.map(|shard| vec![shard]),
     };
     let mut batches = hot_state_kv_db.new_sharded_native_batches();
     StateStore::put_hot_state_updates(&updates1, &mut batches).unwrap();
@@ -1238,7 +1282,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
             superseded_version: Some(100),
         });
     let updates2 = HotStateUpdates {
-        for_last_checkpoint: Some(shards2),
+        shards: shards2.map(|shard| vec![shard]),
     };
     let mut batches2 = hot_state_kv_db.new_sharded_native_batches();
     StateStore::put_hot_state_updates(&updates2, &mut batches2).unwrap();

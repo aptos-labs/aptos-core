@@ -42,14 +42,13 @@ pub struct HotInsertionOp {
 pub struct HotEvictionOp {
     pub eviction_version: Version,
     /// The `hot_since_version` of the DB entry being superseded. `None` if the key was never
-    /// persisted to hot DB (e.g. promoted and evicted in the same batch, unlikely though).
+    /// persisted to hot DB (e.g. promoted and evicted in the same block, unlikely though).
     pub superseded_version: Option<Version>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateShardUpdates {
     pub insertions: HashMap<HashValue, HotInsertionOp>,
-    // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
     pub evictions: HashMap<HashValue, HotEvictionOp>,
 }
 
@@ -108,13 +107,15 @@ pub fn empty_hot_state_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
 
 #[derive(Clone, Debug)]
 pub struct HotStateUpdates {
-    pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
+    /// Per shard, the updates of each block in the chunk, in order. Blocks are kept apart so that
+    /// the hot state KV reflects every block end, not only the last one in the chunk.
+    pub shards: [Vec<HotStateShardUpdates>; NUM_STATE_SHARDS],
 }
 
 impl HotStateUpdates {
     pub fn new_empty() -> Self {
         Self {
-            for_last_checkpoint: None,
+            shards: std::array::from_fn(|_| Vec::new()),
         }
     }
 }

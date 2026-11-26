@@ -68,7 +68,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
-        HotStateShardUpdates, HotStateUpdates,
+        HotStateUpdates,
     },
     AptosDbError, CheckpointStateReader, Result, StateSnapshotReceiver,
 };
@@ -1128,23 +1128,18 @@ impl StateStore {
             })
     }
 
-    // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`)
-    // and only the last one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_hot_state_updates"]);
 
-        fn write_shard_updates(
-            shard_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
-            batches: &mut ShardedStateKvSchemaBatch,
-        ) -> Result<()> {
-            batches
-                .par_iter_mut()
-                .zip_eq(shard_updates.par_iter())
-                .try_for_each(|(batch, shard)| {
-                    for (key_hash, op) in &shard.insertions {
+        sharded_hot_state_kv_batches
+            .par_iter_mut()
+            .zip_eq(hot_state_updates.shards.par_iter())
+            .try_for_each(|(batch, blocks)| {
+                for block in blocks {
+                    for (key_hash, op) in &block.insertions {
                         let schema_value = match op.value.value_opt() {
                             Some(value) => HotStateEntry::Occupied {
                                 value: value.clone(),
@@ -1175,7 +1170,7 @@ impl StateStore {
                             &(),
                         )?;
                     }
-                    for (key_hash, op) in &shard.evictions {
+                    for (key_hash, op) in &block.evictions {
                         batch.put::<HotStateValueByKeyHashSchema>(
                             &(*key_hash, op.eviction_version),
                             &None,
@@ -1200,15 +1195,9 @@ impl StateStore {
                             &(),
                         )?;
                     }
-                    Ok(())
-                })
-        }
-
-        if let Some(updates) = &hot_state_updates.for_last_checkpoint {
-            write_shard_updates(updates, sharded_hot_state_kv_batches)?;
-        }
-
-        Ok(())
+                }
+                Ok(())
+            })
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
