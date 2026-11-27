@@ -16,6 +16,8 @@ l0: ld_u64 1
     st_loc l1
     ret
 
+//# publish
+module 0x1::N
 fun t1(l0: bool)
     local l1: u64
     local l2: &mut u64

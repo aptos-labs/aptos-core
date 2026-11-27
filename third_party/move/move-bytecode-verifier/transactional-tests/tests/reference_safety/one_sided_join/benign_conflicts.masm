@@ -1,0 +1,110 @@
+//# publish
+module 0x42::copy_after_join
+
+public fun f(flag: bool): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 7
+    st_loc x
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc x
+    st_loc r
+l_join:
+    copy_loc x
+    ret
+
+//# run 0x42::copy_after_join::f --args true
+
+//# publish
+module 0x42::overwrite_after_join
+
+public fun f(flag: bool): u64
+    local x: u64
+    local r: &mut u64
+    ld_u64 7
+    st_loc x
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc x
+    st_loc r
+l_join:
+    ld_u64 8
+    st_loc x
+    move_loc x
+    ret
+
+//# run 0x42::overwrite_after_join::f --args true
+
+//# publish
+module 0x42::borrow_global_after_join
+
+struct R has key
+    f: u64
+
+public fun publish(s: &signer)
+    move_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    ret
+
+public fun f(addr: address, flag: bool): u64 acquires R
+    local r: &mut R
+    move_loc flag
+    br_false l_join
+    copy_loc addr
+    mut_borrow_global R
+    st_loc r
+l_join:
+    move_loc addr
+    borrow_global R
+    borrow_field R, f
+    read_ref
+    ret
+
+//# run 0x42::borrow_global_after_join::publish --signers 0x42
+
+//# run 0x42::borrow_global_after_join::f --args @0x42 true
+
+//# publish
+module 0x42::param_after_join
+
+struct S
+    f: u64
+
+fun read(p: &mut S): u64
+    move_loc p
+    mut_borrow_field S, f
+    read_ref
+    ret
+
+fun f(p: &mut S, flag: bool): u64
+    local r: &mut u64
+    move_loc flag
+    br_false l_join
+    copy_loc p
+    mut_borrow_field S, f
+    st_loc r
+l_join:
+    move_loc p
+    call read
+    ret
+
+public fun run(flag: bool): u64
+    local s: S
+    local v: u64
+    ld_u64 3
+    pack S
+    st_loc s
+    mut_borrow_loc s
+    move_loc flag
+    call f
+    st_loc v
+    move_loc s
+    unpack S
+    pop
+    move_loc v
+    ret
+
+//# run 0x42::param_after_join::run --args true

@@ -224,6 +224,7 @@ impl<'a> CodeUnitVerifier<'a> {
         type_safety::verify(verifier_config, &self.resolver, &self.function_view, meter)?;
         locals_safety::verify(&self.resolver, &self.function_view, meter)?;
         reference_safety::verify(
+            verifier_config,
             &self.resolver,
             &self.function_view,
             self.name_def_map,

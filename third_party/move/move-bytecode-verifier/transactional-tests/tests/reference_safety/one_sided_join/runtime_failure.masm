@@ -1,0 +1,136 @@
+//# publish
+module 0x42::forward_unpack
+
+struct S
+    f: u64
+
+public fun f(flag: bool): u64
+    local s: S
+    local r: &mut S
+    ld_u64 1
+    pack S
+    st_loc s
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc s
+    st_loc r
+l_join:
+    move_loc s
+    unpack S
+    ret
+
+//# run 0x42::forward_unpack::f --args false
+
+//# run 0x42::forward_unpack::f --args true
+
+//# publish
+module 0x42::loop_unpack
+
+struct S
+    f: u64
+
+public fun f(n: u64): u64
+    local s: S
+    local r: &mut S
+    ld_u64 1
+    pack S
+    st_loc s
+l_head:
+    copy_loc n
+    ld_u64 0
+    eq
+    br_true l_exit
+    mut_borrow_loc s
+    st_loc r
+    move_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    branch l_head
+l_exit:
+    move_loc s
+    unpack S
+    ret
+
+//# run 0x42::loop_unpack::f --args 0
+
+//# run 0x42::loop_unpack::f --args 3
+
+//# publish
+module 0x42::loop_move_from
+
+struct R has key
+    f: u64
+
+public fun publish(s: &signer)
+    move_loc s
+    ld_u64 1
+    pack R
+    move_to R
+    ret
+
+public fun f(addr: address, n: u64): u64 acquires R
+    local r: &mut R
+l_head:
+    copy_loc n
+    ld_u64 0
+    eq
+    br_true l_exit
+    copy_loc addr
+    mut_borrow_global R
+    st_loc r
+    move_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    branch l_head
+l_exit:
+    move_loc addr
+    move_from R
+    unpack R
+    ret
+
+//# run 0x42::loop_move_from::publish --signers 0x42
+
+//# run 0x42::loop_move_from::f --args @0x42 3
+
+//# publish
+module 0x42::overwritten_parent
+
+struct S
+    f: u64
+
+// The one-sided reference is overwritten while a reference derived from it is still held.
+public fun f(flag: bool): u64
+    local s: S
+    local t: S
+    local r: &mut S
+    local c: &mut u64
+    ld_u64 1
+    pack S
+    st_loc s
+    ld_u64 2
+    pack S
+    st_loc t
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc s
+    st_loc r
+    copy_loc r
+    mut_borrow_field S, f
+    st_loc c
+l_join:
+    mut_borrow_loc t
+    st_loc r
+    move_loc r
+    pop
+    move_loc s
+    unpack S
+    move_loc t
+    unpack S
+    add
+    ret
+
+//# run 0x42::overwritten_parent::f --args false
+
+//# run 0x42::overwritten_parent::f --args true

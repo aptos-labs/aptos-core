@@ -183,6 +183,7 @@ pub enum FeatureFlag {
     DisableEagerModuleInitialization,
     CheckPhantomParamsBehindReferences,
     CheckBorrowFieldHandleShape,
+    KeepOneSidedRefsAtJoin,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -481,6 +482,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CheckBorrowFieldHandleShape => {
                 AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE
             },
+            FeatureFlag::KeepOneSidedRefsAtJoin => AptosFeatureFlag::KEEP_ONE_SIDED_REFS_AT_JOIN,
         }
     }
 }
@@ -706,6 +708,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE => {
                 FeatureFlag::CheckBorrowFieldHandleShape
             },
+            AptosFeatureFlag::KEEP_ONE_SIDED_REFS_AT_JOIN => FeatureFlag::KeepOneSidedRefsAtJoin,
         }
     }
 }

@@ -1,0 +1,44 @@
+processed 12 tasks
+task 0 lines 1-20:  publish [module 0x42::forward_unpack]
+task 1 lines 22-22:  run 0x42::forward_unpack::f --args false
+return values: 1
+task 2 lines 24-24:  run 0x42::forward_unpack::f --args true
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(2),
+    location: 0x42::forward_unpack,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 8)],
+}
+task 3 lines 26-53:  publish [module 0x42::loop_unpack]
+task 4 lines 55-55:  run 0x42::loop_unpack::f --args 0
+return values: 1
+task 5 lines 57-57:  run 0x42::loop_unpack::f --args 3
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(2),
+    location: 0x42::loop_unpack,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 15)],
+}
+task 6 lines 59-91:  publish [module 0x42::loop_move_from]
+task 7 lines 93-93:  run 0x42::loop_move_from::publish --signers 0x42
+task 8 lines 95-95:  run 0x42::loop_move_from::f --args @0x42 3
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(2),
+    location: 0x42::loop_move_from,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 13)],
+}
+task 9 lines 97-132:  publish [module 0x42::overwritten_parent]
+task 10 lines 134-134:  run 0x42::overwritten_parent::f --args false
+return values: 3
+task 11 lines 136-136:  run 0x42::overwritten_parent::f --args true
+Error: Function execution failed with VMError: {
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(2),
+    location: 0x42::overwritten_parent,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 18)],
+}

@@ -245,6 +245,10 @@ pub enum FeatureFlag {
     /// `INVALID_STRUCT_API_CODE`. Gated because it changes the recorded status of
     /// transactions that fail either way.
     CHECK_BORROW_FIELD_HANDLE_SHAPE = 132,
+    /// When enabled, where control-flow paths merge and a local holds a reference on only
+    /// some of those paths, the reference-safety verifier keeps the borrowed value borrowed
+    /// after the merge instead of ending the borrow.
+    KEEP_ONE_SIDED_REFS_AT_JOIN = 133,
 }
 
 /// Environment variable that adds [`FeatureFlag::ENABLE_MONO_MOVE`] to the default
@@ -379,6 +383,7 @@ impl FeatureFlag {
             Self::CHECK_FUNCTION_TYPE_ABILITIES,
             Self::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES,
             Self::CHECK_BORROW_FIELD_HANDLE_SHAPE,
+            Self::KEEP_ONE_SIDED_REFS_AT_JOIN,
         ];
         if mono_move_env_enabled() {
             features.push(Self::ENABLE_MONO_MOVE);

@@ -1,0 +1,16 @@
+//# run --args true
+script
+// `r` borrows `x` on only one edge into `l_join`.
+entry public fun main(flag: bool)
+    local x: u64
+    local r: &mut u64
+    ld_u64 7
+    st_loc x
+    move_loc flag
+    br_false l_join
+    mut_borrow_loc x
+    st_loc r
+l_join:
+    copy_loc x
+    pop
+    ret

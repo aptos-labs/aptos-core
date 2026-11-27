@@ -58,6 +58,8 @@ fn compatibility_test_features() -> Features {
     // TODO: remove once `CHECK_BORROW_FIELD_HANDLE_SHAPE` is on the newest
     // `aptos-release-v*` branch.
     features.disable(FeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE);
+    // TODO: remove once `KEEP_ONE_SIDED_REFS_AT_JOIN` is on the newest `aptos-release-v*` branch.
+    features.disable(FeatureFlag::KEEP_ONE_SIDED_REFS_AT_JOIN);
     features
 }
 

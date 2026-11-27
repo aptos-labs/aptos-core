@@ -53,6 +53,15 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 ..VerifierConfig::production_testing()
             },
         },
+        TestConfig {
+            name: "no-keep-one-sided-refs-at-join",
+            include: &["one_sided_join"],
+            exclude: &[],
+            verifier_config: VerifierConfig {
+                keep_one_sided_refs_at_join: false,
+                ..VerifierConfig::production_testing()
+            },
+        },
     ]
 });
 
@@ -65,6 +74,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
 const SEPARATE_BASELINE: &[&str] = &[
     "variant_field_handles",
     "phantom_params/behind_reference_bad",
+    "one_sided_join",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

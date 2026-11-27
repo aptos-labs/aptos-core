@@ -80,6 +80,11 @@ pub struct VerifierConfig {
     /// Checks the signature shape of every function handle with a borrow field struct API
     /// attribute, including imported ones, before reference safety trusts the attribute.
     pub check_borrow_field_handle_shape: bool,
+    /// Applies where control-flow paths merge and a local holds a reference on only some of
+    /// those paths, for example a reference stored in one branch of an `if`.
+    /// If true, the borrowed value stays borrowed after the merge, because the local may still
+    /// hold the reference at runtime. If false, the merge ends the borrow.
+    pub keep_one_sided_refs_at_join: bool,
 }
 
 /// Scope of verification.
@@ -288,6 +293,7 @@ impl VerifierConfig {
         max_type_depth: None,
 
         uniform_variant_field_handles: true,
+        keep_one_sided_refs_at_join: true,
     };
 }
 
@@ -341,6 +347,7 @@ impl VerifierConfig {
             max_type_depth: Some(20),
 
             uniform_variant_field_handles: true,
+            keep_one_sided_refs_at_join: true,
         }
     }
 

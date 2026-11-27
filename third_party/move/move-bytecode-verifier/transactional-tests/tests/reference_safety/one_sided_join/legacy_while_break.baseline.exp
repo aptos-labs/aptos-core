@@ -1,0 +1,49 @@
+processed 6 tasks
+task 0 lines 1-56:  publish [module 0x42::legacy_local]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::legacy_local'. Got VMError: {
+    major_status: BORROWLOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0x42::legacy_local,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 33)],
+}
+task 1 lines 58-122:  publish [module 0x42::legacy_global]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::legacy_global'. Got VMError: {
+    major_status: GLOBAL_REFERENCE_ERROR,
+    sub_status: None,
+    location: 0x42::legacy_global,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 33)],
+}
+task 2 lines 124-124:  run 0x42::legacy_local::local_read_after --args 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 126-126:  run 0x42::legacy_local::local_read_after --args 10
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 128-128:  run 0x42::legacy_global::publish --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 130-130:  run 0x42::legacy_global::global_call_after --args @0x42 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

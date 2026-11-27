@@ -182,6 +182,7 @@ pub fn aptos_prod_verifier_config(
         features.is_enabled(FeatureFlag::CHECK_PHANTOM_PARAMS_BEHIND_REFERENCES);
     let check_borrow_field_handle_shape =
         features.is_enabled(FeatureFlag::CHECK_BORROW_FIELD_HANDLE_SHAPE);
+    let keep_one_sided_refs_at_join = features.is_enabled(FeatureFlag::KEEP_ONE_SIDED_REFS_AT_JOIN);
     let enable_enum_types = features.is_enabled(FeatureFlag::ENABLE_ENUM_TYPES);
     // Resource access control was never enabled and has been removed. Access specifiers
     // are permanently rejected by the verifier.
@@ -252,6 +253,7 @@ pub fn aptos_prod_verifier_config(
             None
         },
         uniform_variant_field_handles,
+        keep_one_sided_refs_at_join,
     }
 }
 

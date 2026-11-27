@@ -17,6 +17,7 @@ use crate::{
     reference_safety::abstract_state::{
         STEP_BASE_COST, STEP_PER_GRAPH_ITEM_COST, STEP_PER_LOCAL_COST,
     },
+    verifier::VerifierConfig,
 };
 use abstract_state::{AbstractState, AbstractValue};
 use move_binary_format::{
@@ -56,12 +57,14 @@ impl<'a> ReferenceSafetyAnalysis<'a> {
 }
 
 pub(crate) fn verify<'a>(
+    verifier_config: &VerifierConfig,
     resolver: &'a BinaryIndexedView<'a>,
     function_view: &FunctionView,
     name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
-    let initial_state = AbstractState::new(function_view);
+    let initial_state =
+        AbstractState::new(function_view, verifier_config.keep_one_sided_refs_at_join);
     let mut verifier = ReferenceSafetyAnalysis::new(resolver, function_view, name_def_map);
     verifier.analyze_function(initial_state, function_view, meter)
 }

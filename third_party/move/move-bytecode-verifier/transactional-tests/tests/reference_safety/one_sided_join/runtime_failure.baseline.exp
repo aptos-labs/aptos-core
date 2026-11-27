@@ -1,0 +1,97 @@
+processed 12 tasks
+task 0 lines 1-20:  publish [module 0x42::forward_unpack]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::forward_unpack'. Got VMError: {
+    major_status: MOVELOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0x42::forward_unpack,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 7)],
+}
+task 1 lines 22-22:  run 0x42::forward_unpack::f --args false
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 24-24:  run 0x42::forward_unpack::f --args true
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 26-53:  publish [module 0x42::loop_unpack]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::loop_unpack'. Got VMError: {
+    major_status: MOVELOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0x42::loop_unpack,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 14)],
+}
+task 4 lines 55-55:  run 0x42::loop_unpack::f --args 0
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 57-57:  run 0x42::loop_unpack::f --args 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 59-91:  publish [module 0x42::loop_move_from]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::loop_move_from'. Got VMError: {
+    major_status: GLOBAL_REFERENCE_ERROR,
+    sub_status: None,
+    location: 0x42::loop_move_from,
+    indices: [(FunctionDefinition, 1)],
+    offsets: [(FunctionDefinitionIndex(1), 5)],
+}
+task 7 lines 93-93:  run 0x42::loop_move_from::publish --signers 0x42
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 95-95:  run 0x42::loop_move_from::f --args @0x42 3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 9 lines 97-132:  publish [module 0x42::overwritten_parent]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::overwritten_parent'. Got VMError: {
+    major_status: MOVELOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0x42::overwritten_parent,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 17)],
+}
+task 10 lines 134-134:  run 0x42::overwritten_parent::f --args false
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 11 lines 136-136:  run 0x42::overwritten_parent::f --args true
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
