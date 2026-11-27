@@ -38,10 +38,12 @@ aptos-vm-types = { workspace = true }
 
 [dev-dependencies]
 bcs = { workspace = true }
+rand = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 url = { workspace = true }
 
+aptos-crypto = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
 aptos-types = { workspace = true }
 move-core-types = { workspace = true }
