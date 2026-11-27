@@ -250,6 +250,13 @@ impl<SlotForm> CallClosureData<SlotForm> {
 ///   `local` is both a def and a place use (one field written, the rest
 ///   persist).
 ///
+/// An instruction behaves as if it writes its defs last. Its reads come
+/// first, including reads through references, and so does any write
+/// through a reference operand (for example, a callee writing through a
+/// `&mut` argument of a `Call`, before the call's results are written).
+/// Lowering must give the same result as writing the defs last, including
+/// when a def overlaps an operand or the referent of a reference operand.
+///
 /// # Type contract
 ///
 /// `struct_ty`, `enum_ty`, `owner_ty`, `resource_ty`, and the owners in a

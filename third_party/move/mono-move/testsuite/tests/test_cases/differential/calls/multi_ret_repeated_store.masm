@@ -1,0 +1,28 @@
+// A call returns (11, 22, 33). The caller stores 33 into `x`, then 22 into `x`,
+// then 11 into `y`. The later store to `x` wins: `x * 100 + y` is 2211.
+
+// RUN: publish --print(stackless)
+module 0x66::multi_ret_repeated_store
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 11
+    ld_u64 22
+    ld_u64 33
+    ret
+
+fun caller(): u64
+    local x: u64
+    local y: u64
+    call three_rets
+    st_loc x
+    st_loc x
+    st_loc y
+    move_loc x
+    ld_u64 100
+    mul
+    move_loc y
+    add
+    ret
+
+// RUN: execute 0x66::multi_ret_repeated_store::caller
+// CHECK: results: 2211
