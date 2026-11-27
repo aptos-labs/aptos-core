@@ -9,7 +9,7 @@ set -a
 set +a
 
 missing=()
-for tool in git curl jq zip unzip gh gcloud kubectl docker python python3 pip3 \
+for tool in git curl jq zip unzip gh aws gcloud kubectl docker python python3 pip3 \
   rustc cargo cargo-nextest protoc clang cmake pkg-config node boogie z3 cvc5; do
   if command -v "$tool" >/dev/null; then
     echo "ok: $tool -> $(command -v "$tool")"
@@ -38,6 +38,7 @@ if ((${#missing[@]})); then
   echo "missing for runner: ${missing[*]}" >&2
   exit 1
 fi
+aws --version
 rustc --version
 cargo nextest --version
 protoc --version
