@@ -91,6 +91,10 @@ pub struct VMConfig {
     /// When enabled, a storable closure records the serialized size of its captured layouts, so
     /// that it is priced by the bytes they serialize to.
     pub meter_closure_captured_layouts: bool,
+    /// When enabled, modules being published and scripts being executed are rejected if their
+    /// binary has trailing bytes. Modules loaded from storage are not yet checked, so that
+    /// modules published before this was enabled stay loadable.
+    pub reject_trailing_bytes_in_incoming_code: bool,
 }
 
 impl Default for VMConfig {
@@ -133,10 +137,22 @@ impl VMConfig {
         revalidate_resolved_closures: true,
         meter_closure_ty_args: true,
         meter_closure_captured_layouts: true,
+        reject_trailing_bytes_in_incoming_code: true,
     };
 }
 
 impl VMConfig {
+    // TODO: check modules loaded from storage as well, and use one deserializer config for all
+    // code.
+    /// Returns the config for deserializing modules being published and scripts being executed.
+    /// Modules loaded from storage use [`Self::deserializer_config`] instead.
+    pub fn incoming_code_deserializer_config(&self) -> DeserializerConfig {
+        DeserializerConfig {
+            reject_trailing_bytes: self.reject_trailing_bytes_in_incoming_code,
+            ..self.deserializer_config.clone()
+        }
+    }
+
     /// Set the paranoid reference checks flag.
     pub const fn set_paranoid_ref_checks(self, enable: bool) -> Self {
         Self {

@@ -121,7 +121,6 @@ use fail::fail_point;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     compatibility::Compatibility,
-    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format::CompiledScript,
     file_format_common::{VERSION_5, VERSION_MIN},
@@ -349,11 +348,6 @@ impl AptosVM {
     #[inline(always)]
     pub(crate) fn timed_features(&self) -> &TimedFeatures {
         self.env.timed_features()
-    }
-
-    #[inline(always)]
-    fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.env.vm_config().deserializer_config
     }
 
     #[inline(always)]
@@ -1568,12 +1562,10 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+        let config = self.env.vm_config().incoming_code_deserializer_config();
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize_with_config(
-                module_blob.code(),
-                self.deserializer_config(),
-            ) {
+            match CompiledModule::deserialize_with_config(module_blob.code(), &config) {
                 Ok(module) => {
                     result.push(module);
                 },

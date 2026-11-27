@@ -98,6 +98,7 @@ mod struct_def_count;
 mod swap_function_values;
 mod token_event_store;
 mod token_objects;
+mod trailing_bytes;
 mod transaction_context;
 mod transaction_limits;
 mod type_too_large;

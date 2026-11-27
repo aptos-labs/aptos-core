@@ -281,7 +281,7 @@ impl RuntimeEnvironment {
     pub fn deserialize_into_script(&self, serialized_script: &[u8]) -> VMResult<CompiledScript> {
         CompiledScript::deserialize_with_config(
             serialized_script,
-            &self.vm_config().deserializer_config,
+            &self.vm_config().incoming_code_deserializer_config(),
         )
         .map_err(|err| {
             let msg = format!("[VM] deserializer for script returned error: {:?}", err);

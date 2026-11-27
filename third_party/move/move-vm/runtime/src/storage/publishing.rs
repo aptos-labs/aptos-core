@@ -136,14 +136,16 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
         let is_framework_for_option_enabled = staged_runtime_environment
             .vm_config()
             .enable_framework_for_option;
-        let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
+        let deserializer_config = staged_runtime_environment
+            .vm_config()
+            .incoming_code_deserializer_config();
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
         // view such that added modules shadow any existing ones.
         let mut staged_modules = BTreeMap::new();
         for module_bytes in module_bundle {
             let compiled_module =
-                CompiledModule::deserialize_with_config(&module_bytes, deserializer_config)
+                CompiledModule::deserialize_with_config(&module_bytes, &deserializer_config)
                     .map(Arc::new)
                     .map_err(|err| {
                         err.append_message_with_separator(
