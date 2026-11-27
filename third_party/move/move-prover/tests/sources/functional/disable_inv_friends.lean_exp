@@ -1,10 +1,61 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/disable_inv_friends.move:25:10: error: the module invariant `invariant [global,
-    suspendable] ∀ (addr : Address), exists<R3>(addr) <==> exists<R2>(addr)` does not hold after a call that writes memory it reads
+    suspendable] ∀ (addr : Address), exists<R3>(addr) <==> exists<R2>(addr)` does not hold after a write of memory it reads
+tests/sources/functional/disable_inv_friends.move:20:5: error: verex verification failed: the automatic verification of `0x1::M3::f3` failed; provide a proof in the module:
+  verify 0x1::M3::f3 by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:25:10: error: the module invariant `invariant [global,
+    suspendable] ∀ (addr : Address), exists<R3>(addr) <==> exists<R2>(addr)` does not hold after a write of memory it reads
+tests/sources/functional/disable_inv_friends.move:20:5: error: verex verification failed: the automatic verification of `0x1::M2::f2` failed; provide a proof in the module:
+  verify 0x1::M2::f2 by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:20:5: error: the precondition of `0x1::M3::f3` at call 1 is not established
+tests/sources/functional/disable_inv_friends.move:20:5: error: verex verification failed: the automatic verification of `f1` failed; provide a proof in the module:
+  verify f1 by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_f3_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:25:10: error: the module invariant `invariant [global,
+    suspendable] ∀ (addr : Address), exists<R3>(addr) <==> exists<R2>(addr)` does not hold after a write of memory it reads
+tests/sources/functional/disable_inv_friends.move:81:5: error: verex verification failed: the automatic verification of `0x1::M2::f2` failed; provide a proof in the module:
+  verify 0x1::M2::f2 by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:25:10: error: the module invariant `invariant [global,
+    suspendable] ∀ (addr : Address), exists<R3>(addr) <==> exists<R2>(addr)` does not hold after a write of memory it reads
+tests/sources/functional/disable_inv_friends.move:81:5: error: verex verification failed: the automatic verification of `0x1::M3::f3` failed; provide a proof in the module:
+  verify 0x1::M3::f3 by lean =>
+    verex_obligations
+    verex_on
+    | module_invariant => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:81:5: error: the precondition of `0x1::M2::f2` at call 1 is not established
+tests/sources/functional/disable_inv_friends.move:81:5: error: verex verification failed: the automatic verification of `f4` failed; provide a proof in the module:
+  verify f4 by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_f2_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv_friends.move:89:5: error: the precondition of `0x1::M2::f2` at call 1 is not established
 tests/sources/functional/disable_inv_friends.move:89:5: error: verex verification failed: the automatic verification of `f5_incorrect` failed; provide a proof in the module:
   verify f5_incorrect by lean =>
     verex_obligations
     verex_on
-    | module_invariant => verex_prepare; sorry
+    | requires_of_f2_at_call_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
