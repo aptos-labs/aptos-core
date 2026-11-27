@@ -24,6 +24,7 @@ use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
+use std::collections::HashMap;
 
 /// The data structure through which the entire state at a given
 /// version can be summarized to a concise digest (the root hash).
@@ -158,12 +159,16 @@ impl StateSummary {
         let hot_smt_updates = hot_updates
             .shards
             .par_iter()
-            .flat_map(|shard| {
-                shard
-                    .insertions
-                    .iter()
-                    .map(|(k, op)| (k, Some(op.value.hash())))
-                    .chain(shard.evictions.keys().map(|k| (k, None)))
+            .flat_map(|blocks| {
+                // A later block overrides an earlier one, like `HotStateShardUpdates::merge`.
+                let mut latest = HashMap::new();
+                for block in blocks {
+                    latest.extend(block.insertions.iter().map(|(k, op)| (k, Some(&op.value))));
+                    latest.extend(block.evictions.keys().map(|k| (k, None)));
+                }
+                latest
+                    .into_iter()
+                    .map(|(k, value)| (k, value.map(|v| v.hash())))
                     .sorted_by_key(|(k, _)| *k)
                     .collect_vec()
             })

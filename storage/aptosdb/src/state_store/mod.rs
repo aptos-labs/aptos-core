@@ -1128,8 +1128,6 @@ impl StateStore {
             })
     }
 
-    // TODO(HotState): multiple writes to the same key in a chunk are batched and only the last
-    // one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
@@ -1139,62 +1137,64 @@ impl StateStore {
         sharded_hot_state_kv_batches
             .par_iter_mut()
             .zip_eq(hot_state_updates.shards.par_iter())
-            .try_for_each(|(batch, shard)| {
-                for (key_hash, op) in &shard.insertions {
-                    let schema_value = match op.value.value_opt() {
-                        Some(value) => HotStateEntry::Occupied {
-                            value: value.clone(),
-                            value_version: op
-                                .value_version
-                                .expect("occupied must have value_version"),
-                        },
-                        None => {
-                            assert!(
-                                op.value_version.is_none(),
-                                "vacant must not have value_version"
-                            );
-                            HotStateEntry::Vacant
-                        },
-                    };
-                    batch.put::<HotStateValueByKeyHashSchema>(
-                        &(*key_hash, op.value.hot_since_version()),
-                        &Some(schema_value),
-                    )?;
-                    batch.put::<StaleStateValueIndexByKeyHashSchema>(
-                        &StaleStateValueByKeyHashIndex {
-                            stale_since_version: op.value.hot_since_version(),
-                            version: op
-                                .superseded_version
-                                .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
-                            state_key_hash: *key_hash,
-                        },
-                        &(),
-                    )?;
-                }
-                for (key_hash, op) in &shard.evictions {
-                    batch.put::<HotStateValueByKeyHashSchema>(
-                        &(*key_hash, op.eviction_version),
-                        &None,
-                    )?;
-                    batch.put::<StaleStateValueIndexByKeyHashSchema>(
-                        &StaleStateValueByKeyHashIndex {
-                            stale_since_version: op.eviction_version,
-                            version: op
-                                .superseded_version
-                                .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
-                            state_key_hash: *key_hash,
-                        },
-                        &(),
-                    )?;
-                    // Self-referential stale entry for the eviction tombstone itself.
-                    batch.put::<StaleStateValueIndexByKeyHashSchema>(
-                        &StaleStateValueByKeyHashIndex {
-                            stale_since_version: op.eviction_version,
-                            version: op.eviction_version,
-                            state_key_hash: *key_hash,
-                        },
-                        &(),
-                    )?;
+            .try_for_each(|(batch, blocks)| {
+                for block in blocks {
+                    for (key_hash, op) in &block.insertions {
+                        let schema_value = match op.value.value_opt() {
+                            Some(value) => HotStateEntry::Occupied {
+                                value: value.clone(),
+                                value_version: op
+                                    .value_version
+                                    .expect("occupied must have value_version"),
+                            },
+                            None => {
+                                assert!(
+                                    op.value_version.is_none(),
+                                    "vacant must not have value_version"
+                                );
+                                HotStateEntry::Vacant
+                            },
+                        };
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(*key_hash, op.value.hot_since_version()),
+                            &Some(schema_value),
+                        )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.value.hot_since_version(),
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                    }
+                    for (key_hash, op) in &block.evictions {
+                        batch.put::<HotStateValueByKeyHashSchema>(
+                            &(*key_hash, op.eviction_version),
+                            &None,
+                        )?;
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op
+                                    .superseded_version
+                                    .unwrap_or(StaleStateValueByKeyHashIndex::NO_PREV_VERSION),
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                        // Self-referential stale entry for the eviction tombstone itself.
+                        batch.put::<StaleStateValueIndexByKeyHashSchema>(
+                            &StaleStateValueByKeyHashIndex {
+                                stale_since_version: op.eviction_version,
+                                version: op.eviction_version,
+                                state_key_hash: *key_hash,
+                            },
+                            &(),
+                        )?;
+                    }
                 }
                 Ok(())
             })

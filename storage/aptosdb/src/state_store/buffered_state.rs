@@ -58,8 +58,10 @@ impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumul
     type ChunkInput = HotStateUpdates;
 
     fn absorb_chunk(&mut self, input: HotStateUpdates) {
-        for (pending, shard) in self.pending.iter_mut().zip_eq(input.shards) {
-            pending.merge(shard);
+        for (pending, blocks) in self.pending.iter_mut().zip_eq(input.shards) {
+            for block in blocks {
+                pending.merge(block);
+            }
         }
     }
 

@@ -249,8 +249,9 @@ impl State {
                         hot_metadata.total_value_bytes,
                     );
                     let mut all_updates = per_version.iter();
-                    let mut shard_updates = HotStateShardUpdates::default();
+                    let mut updates_per_block = Vec::with_capacity(all_checkpoint_versions.len());
                     for ckpt_version in all_checkpoint_versions {
+                        let mut shard_updates = HotStateShardUpdates::default();
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
@@ -283,6 +284,7 @@ impl State {
                                 })
                                 .expect("LRU eviction must succeed.");
                         }
+                        updates_per_block.push(shard_updates);
                     }
                     assert!(
                         all_updates.next().is_none(),
@@ -302,7 +304,7 @@ impl State {
                         total_value_bytes: new_total_value_bytes,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    (((new_layer, new_metadata), new_usage), shard_updates)
+                    (((new_layer, new_metadata), new_usage), updates_per_block)
                 },
             )
             .unzip();
@@ -1182,9 +1184,13 @@ mod tests {
                     num_keys[shard_id].min(1)
                 };
                 assert_eq!(state.num_hot_items(shard_id), num_hot);
-                let evictions = &updates.shards[shard_id].evictions;
-                assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
+                let [before, at_change] = &updates.shards[shard_id][..] else {
+                    panic!("Expected two blocks.");
+                };
                 // None at v0, before the change.
+                assert!(before.evictions.is_empty());
+                let evictions = &at_change.evictions;
+                assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
                 assert!(evictions.values().all(|op| op.eviction_version == 1));
             }
             let config = state.hot_state_config;
@@ -1205,8 +1211,8 @@ mod tests {
         );
         let refreshed = |updates: &HotStateUpdates| {
             updates.shards[k.get_shard_id()]
-                .insertions
-                .contains_key(&khash(&k))
+                .iter()
+                .any(|block| block.insertions.contains_key(&khash(&k)))
         };
 
         // `k` became hot at v0. With the local refresh interval (100), a promotion at v1 doesn't
@@ -1265,5 +1271,57 @@ mod tests {
         }
         // The shrink did happen.
         assert!((0..NUM_STATE_SHARDS).all(|i| one_batch.last_checkpoint().num_hot_items(i) <= 2));
+    }
+
+    // ===== hot state updates per block =====
+
+    #[test]
+    fn test_hot_state_updates_per_block() {
+        let [a, b] = (0..)
+            .map(|i| key(&format!("k{i}")))
+            .filter(|k| k.get_shard_id() == 0)
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        let empty = LedgerState::new_empty(HotStateConfig {
+            max_items_per_shard: 1,
+            ..TEST_CONFIG
+        });
+        // One block per version, and each write evicts the other key at the end of its block.
+        let write_sets = [
+            creations(std::slice::from_ref(&a)),
+            creations(std::slice::from_ref(&b)),
+            creations(std::slice::from_ref(&a)),
+        ];
+        let (_state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1, 2]);
+
+        let blocks = &updates.shards[0];
+        assert_eq!(blocks.len(), 3);
+        let insertion = |block: usize, k: &StateKey| {
+            let op = &blocks[block].insertions[&khash(k)];
+            (op.value.hot_since_version(), op.superseded_version)
+        };
+        let eviction = |block: usize, k: &StateKey| {
+            let op = &blocks[block].evictions[&khash(k)];
+            (op.eviction_version, op.superseded_version)
+        };
+
+        assert_eq!(blocks[0].insertions.len(), 1);
+        assert_eq!(insertion(0, &a), (0, None));
+        assert!(blocks[0].evictions.is_empty());
+
+        // `b` written and `a` evicted in the same block, `a` superseding its row from block 0.
+        assert_eq!(blocks[1].insertions.len(), 1);
+        assert_eq!(insertion(1, &b), (1, None));
+        assert_eq!(blocks[1].evictions.len(), 1);
+        assert_eq!(eviction(1, &a), (1, Some(0)));
+
+        // `a` is written again. Its tombstone at v1 prunes itself, so the new row supersedes
+        // nothing.
+        assert_eq!(blocks[2].insertions.len(), 1);
+        assert_eq!(insertion(2, &a), (2, None));
+        assert_eq!(blocks[2].evictions.len(), 1);
+        assert_eq!(eviction(2, &b), (2, Some(1)));
     }
 }
