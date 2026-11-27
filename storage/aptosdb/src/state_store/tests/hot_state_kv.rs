@@ -37,16 +37,14 @@ fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
 }
 
 fn create_hot_state_kv_db_with_config(path: &TempPath, rocksdb_config: RocksdbConfig) -> StateKvDb {
-    StateKvDb::new(
-        &StorageDirPaths::from_path(path.path()),
-        rocksdb_config,
-        /* env = */ None,
-        /* block_cache = */ None,
-        /* readonly = */ false,
-        /* is_hot = */ true,
-        /* delete_on_restart = */ false,
-    )
-    .unwrap()
+    StateKvDb::builder()
+        .db_paths(&StorageDirPaths::from_path(path.path()))
+        .state_kv_db_config(rocksdb_config)
+        .readonly(false)
+        .is_hot(true)
+        .delete_on_restart(false)
+        .build()
+        .unwrap()
 }
 
 /// Flush the hot state value CF in every shard so the data lives in SSTs rather than the

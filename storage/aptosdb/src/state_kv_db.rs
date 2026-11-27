@@ -89,6 +89,7 @@ impl std::ops::Deref for StateKvDb {
     }
 }
 
+#[bon::bon]
 impl StateKvDb {
     pub(crate) fn is_hot(&self) -> bool {
         self.is_hot
@@ -102,6 +103,7 @@ impl StateKvDb {
         }
     }
 
+    #[builder(finish_fn = build)]
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,

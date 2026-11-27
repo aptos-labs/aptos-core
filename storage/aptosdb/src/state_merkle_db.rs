@@ -61,11 +61,13 @@ impl Deref for StateMerkleDb {
     }
 }
 
+#[bon::bon]
 impl StateMerkleDb {
     pub(crate) fn is_hot(&self) -> bool {
         self.is_hot
     }
 
+    #[builder(finish_fn = build)]
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
@@ -101,16 +103,14 @@ impl StateMerkleDb {
         is_hot: bool,
     ) -> Result<()> {
         // TODO(grao): Support path override here.
-        let state_merkle_db = Self::new(
-            &StorageDirPaths::from_path(db_root_path),
-            RocksdbConfig::default(),
-            /*env=*/ None,
-            /*block_cache=*/ None,
-            /*readonly=*/ false,
-            /*max_nodes_per_lru_cache_shard=*/ 0,
-            is_hot,
-            /* delete_on_restart = */ false,
-        )?;
+        let state_merkle_db = Self::builder()
+            .db_paths(&StorageDirPaths::from_path(db_root_path))
+            .state_merkle_db_config(RocksdbConfig::default())
+            .readonly(false)
+            .max_nodes_per_lru_cache_shard(0)
+            .is_hot(is_hot)
+            .delete_on_restart(false)
+            .build()?;
         names(is_hot).create_checkpoint(
             state_merkle_db.metadata_db(),
             state_merkle_db.shards(),
