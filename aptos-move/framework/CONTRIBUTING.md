@@ -4,7 +4,7 @@ This guide describes the process for adding, removing, and changing the Move mod
 
 ## Overview
 
-Every state change in the Aptos blockchain occurs via executing a Move *entry function* or a *script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). Entry functions and scripts invoke procedures of Move *modules* that update published *resources*. The Move standard library consists of [modules](modules/) initially published in the genesis transaction.
+Every state change in the Aptos blockchain occurs via executing a Move *entry function* or a *script* embedded in a [SignedTransaction](../../types/src/transaction/mod.rs). Entry functions and scripts invoke procedures of Move *modules* that update published *resources*. The framework consists of Move packages ([move-stdlib](move-stdlib/), [aptos-stdlib](aptos-stdlib/), [aptos-framework](aptos-framework/), and others in this directory) whose modules, under each package's `sources/` directory, are initially published in the genesis transaction.
 
 ## Environment Setup
 
@@ -16,9 +16,9 @@ Start by following the general Aptos setup advice [here](../../CONTRIBUTING.md).
 
 Execute
 
-`cargo run`
+`cargo test`
 
-inside `stdlib` to compile all of the standard library modules, transaction scripts, and supporting Rust wrappers. It is important to do this before running any tests that exercise your change.
+inside this directory (or `cargo test -p aptos-framework` from anywhere) to compile the framework packages and run their Move unit tests. See [Running Move tests](README.md#running-move-tests) for filtering options and how to skip the prover.
 
 ### Testing
 
@@ -28,7 +28,7 @@ Most tests for the standard library live [here](../e2e-move-tests) and can be ru
 
 ### Modules
 
-- Add or edit the relevant `.move` file under [modules](modules/)
+- Add or edit the relevant `.move` file under the `sources/` directory of the package it belongs to (e.g. [aptos-framework/sources](aptos-framework/sources/))
 - [Build](#building) your changes and address compiler errors as needed
 - Once the stdlib builds, add new end-to-end [tests](#testing)
 
