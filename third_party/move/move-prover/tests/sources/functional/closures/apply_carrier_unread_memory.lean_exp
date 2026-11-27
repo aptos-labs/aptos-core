@@ -111,144 +111,42 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:274:5: error:
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:330:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed : True
-permitted :
-  (initialState✝
-          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-            arguments := VerexIR.Proofs.Denote.NRow.nil }
-          (VerexIR.StorageKey.address "0x42")).isSome =
-      true ∧
-    ((initialState✝
-                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-                    arguments := VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address "0x42")).getD
-              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
-      0
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:330:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:330:5: error: verex verification failed: the automatic verification of `reads_frame_across_write` failed; provide a proof in the module:
   verify reads_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:342:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed : True
-permitted :
-  (initialState✝
-          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-            arguments := VerexIR.Proofs.Denote.NRow.nil }
-          (VerexIR.StorageKey.address "0x42")).isSome =
-      true ∧
-    ((initialState✝
-                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-                    arguments := VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address "0x42")).getD
-              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
-      0
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:342:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:342:5: error: verex verification failed: the automatic verification of `reads_frame_unsat_across_write` failed; provide a proof in the module:
   verify reads_frame_unsat_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:354:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed : True
-permitted :
-  (initialState✝
-          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-            arguments := VerexIR.Proofs.Denote.NRow.nil }
-          (VerexIR.StorageKey.address "0x42")).isSome =
-      true ∧
-    ((initialState✝
-                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-                    arguments := VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address "0x42")).getD
-              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
-      0
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:354:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:354:5: error: verex verification failed: the automatic verification of `transparent_reads_frame_across_write` failed; provide a proof in the module:
   verify transparent_reads_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:366:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed : True
-permitted :
-  (initialState✝
-          { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-            arguments := VerexIR.Proofs.Denote.NRow.nil }
-          (VerexIR.StorageKey.address "0x42")).isSome =
-      true ∧
-    ((initialState✝
-                  { type := 0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰,
-                    arguments := VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address "0x42")).getD
-              (0x42.apply_carrier_unread_memory.unit.nominal.namespace.0.declaration✝¹⁻⁰.inhabitant ⋯)).val.fst.val =
-      0
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:366:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:366:5: error: verex verification failed: the automatic verification of `modifies_frame_across_write` failed; provide a proof in the module:
   verify modifies_frame_across_write by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:375:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed permitted : True
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:375:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:375:5: error: verex verification failed: the automatic verification of `reads_frame_twice` failed; provide a proof in the module:
   verify reads_frame_twice by lean =>
     verex_obligations
     verex_on
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/apply_carrier_unread_memory.move:383:5: error: Tactic `assumption` failed
-
-case nativesTyped
-registry✝ : VerexIR.Validation.SemanticsRegistry
-executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
-args✝ : VerexIR.Proofs.Denote.HList params
-initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed permitted : True
-⊢ VerexIR.NativesTyped executable✝
+tests/sources/functional/closures/apply_carrier_unread_memory.move:383:5: error: no hypothesis states the goal
 tests/sources/functional/closures/apply_carrier_unread_memory.move:383:5: error: verex verification failed: the automatic verification of `reads_any_twice` failed; provide a proof in the module:
   verify reads_any_twice by lean =>
     verex_obligations
@@ -353,7 +251,6 @@ tests/sources/functional/closures/apply_carrier_unread_memory.move:561:5: error:
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/apply_carrier_unread_memory.move:567:5: error: verification failed with a residual obligation:
 executable✝ : VerexIR.Validation.ExecutableUnit unit
-verexInhabitants : VerexIR.Proofs.Denote.CarriersNonempty (VerexIR.Proofs.Denote.Carriers.runtime unit)
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
 runsAgree : VerexIR.Proofs.RunsAgree executable✝
@@ -364,53 +261,48 @@ verexResources : VerexIR.Proofs.ResourcesTyped unit
 f :
   (VerexIR.Proofs.Denote.NTy.function
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [false], results := [false] }
-      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
-        VerexIR.Proofs.Denote.NRow.nil)).carrier
+      { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+      (VerexIR.Proofs.Denote.NTy.int 8 false).vector).carrier
 b : (VerexIR.Proofs.Denote.NTy.int 8 false).vector.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
-assumed :
-  VerexIR.Proofs.KeepsMemoryAt executable✝
-    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
-    { parameters := [false], results := [false] }
-    (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f
 permitted : True
-bounds✝ : b.values.size < 18446744073709551616
-bounds : #[].size < 2 ^ 64
+assumed :
+  VerexIR.Proofs.KeepsMemoryAt executable✝ callLayouts
+    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+    (VerexIR.Proofs.Denote.NTy.int 8 false).vector f
+bounds : b.values.size < 18446744073709551616
 ⊢ VerexIR.Proofs.wp
-    (VerexIR.Proofs.Denote.closureMeaning executable✝
+    (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [false], results := [false] }
-      (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ()))
-    (fun result final =>
-      (¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+      { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+      (VerexIR.Proofs.Denote.NTy.int 8 false).vector f (b, ()))
+    (fun value state =>
+      (¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
                 VerexIR.Proofs.Denote.NRow.nil)
-              { parameters := [false], results := [false] }
-              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
-              initialState✝ →
-          result =
-            VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝)
+              { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+              (VerexIR.Proofs.Denote.NTy.int 8 false).vector f (b, ()) initialState✝ →
+          value =
+            VerexIR.Proofs.ResultOf (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
                 VerexIR.Proofs.Denote.NRow.nil)
-              { parameters := [false], results := [false] }
-              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
-              initialState✝ { values := #[], bounded := ⋯ }) ∧
-        final = initialState✝ ∧
-          ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+              { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+              (VerexIR.Proofs.Denote.NTy.int 8 false).vector f (b, ()) initialState✝
+              ((VerexIR.Proofs.Denote.NTy.int 8 false).vector.plainFallback ⋯)) ∧
+        state = initialState✝ ∧
+          ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts)
               (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
                 VerexIR.Proofs.Denote.NRow.nil)
-              { parameters := [false], results := [false] }
-              (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
-              initialState✝)
+              { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+              (VerexIR.Proofs.Denote.NTy.int 8 false).vector f (b, ()) initialState✝)
     (fun error =>
       VerexIR.Proofs.Denote.AbortsAt 883784
-        (VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
+        (VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts)
           (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false).vector
             VerexIR.Proofs.Denote.NRow.nil)
-          { parameters := [false], results := [false] }
-          (VerexIR.Proofs.Denote.ResultShape.one (VerexIR.Proofs.Denote.NTy.int 8 false).vector) f (b, ())
-          initialState✝))
+          { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+          (VerexIR.Proofs.Denote.NTy.int 8 false).vector f (b, ()) initialState✝))
     initialState✝
 tests/sources/functional/closures/apply_carrier_unread_memory.move:567:5: error: verex verification failed: the automatic verification of `apply_bytes` failed; provide a proof in the module:
   verify apply_bytes by lean =>

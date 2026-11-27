@@ -1,35 +1,6 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:11:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:36:5: error: verex verification failed: the automatic verification of `through_field_borrow` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.proof.lean`:
-  verify through_field_borrow by lean =>
-    verex_obligations
-    verex_on
-    | data_invariant => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:11:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:44:5: error: verex verification failed: the automatic verification of `through_named_ref` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.proof.lean`:
-  verify through_named_ref by lean =>
-    verex_obligations
-    verex_on
-    | data_invariant => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:11:5: error: the specification clause `f : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:53:5: error: the precondition of `apply_t` at call 1 is not established
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:53:5: error: verex verification failed: the automatic verification of `through_mut_param` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.proof.lean`:
-  verify through_mut_param by lean =>
-    verex_obligations
-    verex_on
-    | after_call_1_of_apply_t => verex_prepare; sorry
-    | requires_of_apply_t_at_call_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:11:5: error: the data invariant `f : Fn(u64) -> Unit has Copy, Drop` does not hold where a mutation ends
-tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:62:5: error: verex verification failed: the automatic verification of `through_setter` failed; provide a proof in `tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.proof.lean`:
-  verify through_setter by lean =>
-    verex_obligations
-    verex_on
-    | data_invariant => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:39:10: error: frames.unestablished: cannot establish what stored function `f` may modify: it is lent mutably, and what is stored through that reference is not visible here
+tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:55:17: error: frames.unestablished: cannot establish what stored function `f` may modify: it is lent mutably, and what is stored through that reference is not visible here
+tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:47:17: error: frames.unestablished: cannot establish what stored function `f` may modify: it is lent mutably, and what is stored through that reference is not visible here
+tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:65:9: error: frames.outside: function argument may modify resource `0x42::fun_param_frame_field_origin_overwritten::T`, which is not declared in `modifies_of` for `r`. `r` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<r>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_field_origin_overwritten.move:65:16: error: frames.unestablished: cannot establish what stored function `f` may modify: it is lent mutably, and what is stored through that reference is not visible here

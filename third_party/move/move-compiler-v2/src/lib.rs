@@ -14,7 +14,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod plan_builder;
-mod verex;
+pub mod verex;
 pub mod xir;
 
 use crate::{

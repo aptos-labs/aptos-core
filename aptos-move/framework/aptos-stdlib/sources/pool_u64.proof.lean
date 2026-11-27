@@ -55,23 +55,72 @@ theorem PoolU64Proofs.pool_entries_update_read_eq {K V W : Type} [DecidableEq K]
     SpecMap.ofEntries (fun x => x) f after = SpecMap.update .sequence typed key typedValue := by
   rw [PoolU64Proofs.pool_entries_update_read f before after key value updated, read, valueRead]
 
-theorem PoolU64Proofs.pool_push_index_injective {α : Type} (xs : Array α) (x d : α)
+/-- A pushed vector's reads are injective when the vector's are and the pushed
+element is none of them; the pushed reads are in range, so their default is
+arbitrary (`VerexIR.getElem?_getD_in_bounds`). -/
+theorem PoolU64Proofs.push_read_injective {α : Type} {xs : Array α} {x d e : α} {i j : Int}
+    (same : (xs.push x)[i.toNat]?.getD e = (xs.push x)[j.toNat]?.getD e)
     (inj : ∀ i : Int, 0 ≤ i → i < ↑xs.size → ∀ j : Int, 0 ≤ j → j < ↑xs.size →
       xs[i.toNat]?.getD d = xs[j.toNat]?.getD d → i = j)
     (absent : ∀ i : Int, 0 ≤ i → i < ↑xs.size → xs[i.toNat]?.getD d ≠ x)
-    (i : Int) (ilo : 0 ≤ i) (ihi : i < ↑(xs.size + 1))
-    (j : Int) (jlo : 0 ≤ j) (jhi : j < ↑(xs.size + 1))
-    (same : (xs.push x)[i.toNat]?.getD d = (xs.push x)[j.toNat]?.getD d) : i = j := by
+    (ilo : 0 ≤ i) (ihi : i < ↑(xs.size + 1))
+    (jlo : 0 ≤ j) (jhi : j < ↑(xs.size + 1)) : i = j := by
   by_cases hi : i.toNat = xs.size
   · by_cases hj : j.toNat = xs.size
     · omega
     · simp only [Array.getElem?_push, hi, hj, ite_true, ite_false, Option.getD_some] at same
-      exact False.elim (absent j jlo (by omega) same.symm)
+      rw [VerexIR.getElem?_getD_in_bounds (values := xs) (index := j.toNat) e d (by omega)] at same
+      exact absurd same.symm (absent j jlo (by omega))
   · by_cases hj : j.toNat = xs.size
     · simp only [Array.getElem?_push, hi, hj, ite_true, ite_false, Option.getD_some] at same
-      exact False.elim (absent i ilo (by omega) same)
-    · apply inj i ilo (by omega) j jlo (by omega)
-      simpa only [Array.getElem?_push, hi, hj, ite_false] using same
+      rw [VerexIR.getElem?_getD_in_bounds (values := xs) (index := i.toNat) e d (by omega)] at same
+      exact absurd same (absent i ilo (by omega))
+    · simp only [Array.getElem?_push, hi, hj, ite_false] at same
+      rw [VerexIR.getElem?_getD_in_bounds (values := xs) (index := i.toNat) e d (by omega),
+        VerexIR.getElem?_getD_in_bounds (values := xs) (index := j.toNat) e d (by omega)] at same
+      exact inj i ilo (by omega) j jlo (by omega) same
+
+/-- No element of a vector whose entries the map holds equals a key the map
+does not hold. -/
+theorem PoolU64Proofs.absent_of_member {K V : Type} [DecidableEq K] {m : VerexIR.SpecMap K V}
+    {xs : Array K} {x d : K}
+    (member : ∀ i : Int, 0 ≤ i → i < ↑xs.size → m.hasKey (xs[i.toNat]?.getD d) = true)
+    (missing : m.hasKey x = false) :
+    ∀ i : Int, 0 ≤ i → i < ↑xs.size → xs[i.toNat]?.getD d ≠ x := by
+  intro i ilo ihi equal
+  have held := member i ilo ihi
+  rw [equal, missing] at held
+  exact Bool.noConfusion held
+
+/-- A key the map already holds stays held after an update of any key. -/
+theorem PoolU64Proofs.hasKey_update_of_member {K V : Type} [DecidableEq K]
+    {m : VerexIR.SpecMap K V} {xs : Array K} {d key : K} {value : V} {i : Int}
+    (member : ∀ i : Int, 0 ≤ i → i < ↑xs.size → m.hasKey (xs[i.toNat]?.getD d) = true)
+    (ilo : 0 ≤ i) (ihi : i < ↑xs.size) :
+    (VerexIR.SpecMap.update .sequence m key value).hasKey (xs[i.toNat]?.getD d) = true := by
+  rw [VerexIR.SpecMap.hasKey_update, member i ilo ihi]
+  exact Bool.or_true _
+
+/-- The typed update of a map, read off the walk's own facts: the updated
+map's read bridge names its write-back, and the raw table-write equation
+names the source's entries directly, so both are found among the leaf's
+hypotheses by unification. -/
+theorem PoolU64Proofs.typed_update_of_raw {K V V' : Type} [DecidableEq K]
+    {value : V → V'} {updated : VerexIR.SpecMap K V'} {probe : K} {written : V}
+    {before after : VerexIR.SpecEntries (K × V)}
+    (readUpdated : VerexIR.SpecMap.ofEntries (fun x => x) value after = updated)
+    (raw : after.entries =
+      VerexIR.SpecMap.update VerexIR.SpecMap.Discipline.sequence before.entries probe written) :
+    updated = VerexIR.SpecMap.update VerexIR.SpecMap.Discipline.sequence
+      (VerexIR.SpecMap.ofEntries (fun x => x) value before) probe (value written) := by
+  rw [← readUpdated]
+  exact PoolU64Proofs.pool_entries_update_read value before after probe written raw
+
+/-- Two readings of one Boolean disagree: the one that reads it true and
+the one that reads it false cannot both hold. -/
+theorem PoolU64Proofs.bool_contradiction {e : Bool} (held : e = true) (refuted : e = false) : False :=
+  Bool.noConfusion (refuted.symm.trans held)
+
 
 verify shares by
   on _ { }
@@ -106,90 +155,115 @@ verify redeem_shares by
 verify add_shares by
   on ensures 1 {
     lean =>
-      apply VerexIR.SpecMap.eq_writeBack_of_ofEntries
-        (key := fun key => key) (value := VerexIR.SpecInt.val)
-        (fun _ => rfl) (fun value => VerexIR.SpecInt.ofInt_val _ value)
-      apply PoolU64Proofs.pool_entries_update_read_eq
-      all_goals try assumption
+      -- The clause's map values sit under construction wrappers (a SimpleMap
+      -- literal, a row pair) over the raw write-backs. Read the typed update
+      -- off the walk's own facts and rewrite the final map by it; the
+      -- remaining constructor differences close by the definitional equality
+      -- of the two spellings of the integer unread or by the path's value
+      -- facts.
+      have typedUpdate := PoolU64Proofs.typed_update_of_raw
+        (by assumption) (by assumption)
+      rw [typedUpdate]
+      first
+      | rfl
+      | congr 1
+        all_goals first
+        | rfl
+        | omega
+        | congr 1
+          all_goals first
+          | rfl
+          | omega
+          | congr 1
+            all_goals first
+            | rfl
+            | omega
+            | congr 1
+              all_goals first
+              | rfl
+              | omega
   }
   on ensures 2 {
     lean =>
-      apply VerexIR.SpecMap.eq_writeBack_of_ofEntries
-        (key := fun key => key) (value := VerexIR.SpecInt.val)
-        (fun _ => rfl) (fun value => VerexIR.SpecInt.ofInt_val _ value)
-      try assumption
+      -- The new-shareholder path: the schema's own update equation states
+      -- the typed update where the walk derived it; a leaf whose path
+      -- refutes the clause's premise closes by that refutation; otherwise
+      -- read the typed update off the raw table-write equation and close
+      -- the constructor differences as in ensures 1.
+      first
+      | rw [← add_ensures]
+        try rfl
+      | exact (PoolU64Proofs.bool_contradiction (by assumption) (by assumption)).elim
+      | have typedUpdate := PoolU64Proofs.typed_update_of_raw
+          (by assumption) (by assumption)
+        rw [typedUpdate]
+        first
+        | rfl
+        | congr 1
+          all_goals first
+          | rfl
+          | omega
+          | congr 1
+            all_goals first
+            | rfl
+            | omega
+            | congr 1
+              all_goals first
+              | rfl
+              | omega
+              | congr 1
+                all_goals first
+                | rfl
+                | omega
   }
   on data invariant 2 of Pool {
     lean =>
-      try
-        first
-        | rw (transparency := .default) [add_ensures]
-        | have rawUpdate : old_value_0.val.1.entries =
-              VerexIR.SpecMap.update .sequence self_shares.entries shareholder named := by assumption
-          have readUpdate := congrArg
-            (List.map (fun entry => (entry.1, VerexIR.SpecInt.val entry.2))) rawUpdate
-          simp only [PoolU64Proofs.pool_map_update] at readUpdate
-          change VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val old_value_0.val.1 =
-            VerexIR.SpecMap.update .sequence
-              (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares)
-              shareholder named.val at readUpdate
-          rw (transparency := .default) [readUpdate]
-          have present : (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares).hasKey shareholder = true := by assumption
-          rw (transparency := .default) [VerexIR.SpecMap.size_update_sequence, present, if_pos rfl]
-          assumption
+      first
+      | rw (transparency := .default) [add_ensures]
+      | have typedUpdate := PoolU64Proofs.typed_update_of_raw
+          (by assumption) (by assumption)
+        rw (transparency := .default) [typedUpdate]
+      first
+      | rw (transparency := .default) [VerexIR.SpecMap.size_update_sequence_present (by assumption)]
+      | rw (transparency := .default) [VerexIR.SpecMap.size_update_sequence_absent (by assumption)]
+      omega
   }
   on data invariant 1 of Pool {
     lean =>
-      try
-        first
-        | rw (transparency := .default) [add_ensures]
-        | have rawUpdate : old_value_0.val.1.entries =
-              VerexIR.SpecMap.update .sequence self_shares.entries shareholder named := by assumption
-          have readUpdate := congrArg
-            (List.map (fun entry => (entry.1, VerexIR.SpecInt.val entry.2))) rawUpdate
-          simp only [PoolU64Proofs.pool_map_update] at readUpdate
-          change VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val old_value_0.val.1 =
-            VerexIR.SpecMap.update .sequence
-              (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares)
-              shareholder named.val at readUpdate
-          rw (transparency := .default) [readUpdate]
-        intros
-        first
-        | apply PoolU64Proofs.pool_update_push_member
-          all_goals assumption
-        | rw (transparency := .default) [VerexIR.SpecMap.hasKey_update]
-          have oldMember : ∀ k : Int, 0 ≤ k → k < ↑value_4.values.size →
-              (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares).hasKey
-                (value_4.values[k.toNat]?.getD "") = true := by assumption
-          rw (transparency := .default) [oldMember _ (by assumption) (by assumption)]
-          exact Bool.or_true _
+      first
+      | rw (transparency := .default) [add_ensures]
+      | have typedUpdate := PoolU64Proofs.typed_update_of_raw
+          (by assumption) (by assumption)
+        rw (transparency := .default) [typedUpdate]
+      intros
+      first
+      | apply PoolU64Proofs.pool_update_push_member
+        all_goals assumption
+      | exact PoolU64Proofs.hasKey_update_of_member (by assumption) (by assumption) (by assumption)
   }
   on data invariant 4 of Pool {
     lean =>
       try
         intros
-        apply PoolU64Proofs.pool_push_index_injective self_shareholders.values shareholder ""
-        · assumption
-        · intro k klo khi equal
-          have oldMember : ∀ k : Int, 0 ≤ k → k < ↑self_shareholders.values.size →
-              (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares).hasKey
-                (self_shareholders.values[k.toNat]?.getD "") = true := by assumption
-          have member : (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares).hasKey
-              (self_shareholders.values[k.toNat]?.getD "") = true := by
-            exact oldMember k klo khi
-          have absent : (VerexIR.SpecMap.ofEntries (fun x => x) VerexIR.SpecInt.val self_shares).hasKey shareholder = false := by assumption
-          rw [equal, absent] at member
-          contradiction
-        all_goals assumption
+        exact PoolU64Proofs.push_read_injective (by assumption) (by assumption)
+          (PoolU64Proofs.absent_of_member (by assumption) (by assumption))
+          (by assumption) (by assumption) (by assumption) (by assumption)
   }
   on ensures 6 {
     lean =>
       intros
+      -- Optional: this clause's leaves reach the script in both the `SpecVector.push`
+      -- and the raw `Array.push` spelling, and one has no push at all; where the
+      -- conversion applies its room premise is proved, and the no-push leaf is left
+      -- to the block's closer.
+      try rw (transparency := .default) [VerexIR.SpecVector.values_push _ (by omega)]
       try (rw (transparency := .default) [Array.getElem?_push_size]; rfl)
   }
   on ensures 7 {
     lean =>
       intros
+      -- Optional wrapper conversion only; the `Array` rewrites below stay required.
+      try rw (transparency := .default) [VerexIR.SpecVector.values_push _ (by omega)]
       rw (transparency := .default) [Array.getElem?_push_lt (by omega),
         Array.getElem?_eq_getElem (by omega)]
   }

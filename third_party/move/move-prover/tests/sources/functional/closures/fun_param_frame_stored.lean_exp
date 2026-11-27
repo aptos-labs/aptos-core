@@ -1,27 +1,11 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f2 : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored.move:43:5: error: verex verification failed: the automatic verification of `pack_all` failed; provide a proof in the module:
-  verify pack_all by lean =>
-    verex_obligations
-    verex_on
-    | after_bump => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f2 : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored.move:47:5: error: verex verification failed: the automatic verification of `pack_and_invoke` failed; provide a proof in the module:
-  verify pack_and_invoke by lean =>
-    verex_obligations
-    verex_on
-    | after_bump => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_stored.move:26:5: error: the specification clause `f1 : Fn(u64) -> Unit has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored.move:52:5: error: verex verification failed: the automatic verification of `pack_spec` failed; provide a proof in the module:
-  verify pack_spec by lean =>
-    verex_obligations
-    verex_on
-    | after_bump => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored.move:46:22: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `_f`. `_f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<_f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:43:27: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f1`. `f1` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f1>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:43:27: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f2`. `f2` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f2>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:48:9: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f1`. `f1` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f1>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:48:9: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f2`. `f2` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f2>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:52:28: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f1`. `f1` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f1>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:44:53: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:45:44: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:51:48: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored.move:50:27: error: frames.outside: function argument may modify resource `0x42::state_stored::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify

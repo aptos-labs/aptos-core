@@ -3,7 +3,7 @@
 
 //! Backend of the `exchange` command: connects the Move assembler
 //! (`move-asm`) and compiler v2 to the Lean formalization of the Move
-//! Prover (`third_party/move/lean`).
+//! Prover (the Verex repository, located by `VEREX_ROOT`).
 //!
 //! Takes masm source, assembles it with the real assembler, verifies the
 //! resulting module, loads it into a `GlobalEnv` (no source needed), lifts

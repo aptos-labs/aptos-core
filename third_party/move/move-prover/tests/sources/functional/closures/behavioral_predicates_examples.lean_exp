@@ -31,14 +31,6 @@ tests/sources/functional/closures/behavioral_predicates_examples.move:233:5: err
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/behavioral_predicates_examples.move:187:17: error: the loop invariant `∀ (j in 0 .. i), !result_of<pred>(v[j])` is not preserved by an iteration
-tests/sources/functional/closures/behavioral_predicates_examples.move:241:5: error: verex verification failed: the automatic verification of `contains_test_not_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
-  verify contains_test_not_found by lean =>
-    verex_obligations
-    verex_on
-    | contains_invariant_2_step => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/closures/behavioral_predicates_examples.move:250:9: error: the specification clause `ensures result == false` is not established
 tests/sources/functional/closures/behavioral_predicates_examples.move:249:5: error: verex verification failed: the automatic verification of `contains_opaque_test_not_found` failed; provide a proof in `tests/sources/functional/closures/behavioral_predicates_examples.proof.lean`:
   verify contains_opaque_test_not_found by lean =>

@@ -29,7 +29,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ y.val < x.val) (fun failure => True) state
 pathDecision✝ : x.val ≤ y.val
 ⊢ y.val < x.val
@@ -63,7 +63,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ y.val < x.val)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 1562 1578 (x.val ≤ y.val))
@@ -92,7 +92,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ ¬(x.val < y.val ∨ x.val = y.val))
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2072 2087 (x.val < y.val) ∨
@@ -130,7 +130,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => False)
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/aborts_if.move.lean" 2655 2669 True ∨
@@ -166,7 +166,7 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => final = initialState✝ ∧ ¬x.val = 4) (fun failure => True) state
 pathDecision✝ : ¬(x.val = 2 ∨ x.val = 3)
 ⊢ ¬x.val = 4

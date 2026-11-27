@@ -9,9 +9,9 @@
 //! The data structures in this crate describe a Move module — its structs,
 //! functions as basic-block CFGs of stackless bytecode, loop metadata, and
 //! specification contracts — for exchange with external tools.  The primary
-//! consumer today is the Lean formalization of the Move Prover
-//! (`third_party/move/lean`), fed through the Aptos CLI's `aptos move exchange`
-//! command.
+//! consumer today is the Lean formalization of the Move Prover (the Verex
+//! repository, located by `VEREX_ROOT`), fed through the Aptos CLI's
+//! `aptos move exchange` command.
 //!
 //! **These types are the normative schema.**  The wire format is JSON,
 //! exactly as serde derives it from the definitions below:
@@ -79,6 +79,7 @@ pub use dump::dump_ast_module;
 pub mod select;
 pub use select::{module_closure, select_modules};
 pub mod check;
+pub mod roots;
 
 use serde::{Deserialize, Serialize};
 

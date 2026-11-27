@@ -1,11 +1,9 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/type_dependent_code.move:1:1: info: `test1` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:10:5: error: verification failed with a residual obligation:
-case continues.none.continues.continues.none.continues
+case continues.none.continues.continues.continues.none.continues.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-Θ✝ : VerexIR.Proofs.Denote.Skolems unit
 typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
   VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 0 } }
@@ -14,71 +12,38 @@ account : VerexIR.Proofs.Denote.NTy.signer.carrier
 x : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
+x_valid : (VerexIR.Proofs.Denote.NTy.param 0).Holds x
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final =>
-        ¬((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 0))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+        ¬((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true ∨
-            (initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.int 8 false))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            (VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                    VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
-            ((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 0))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true) ∨
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
-            ((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.int 8 false))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                    VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       state
-invariantHolds✝³ left✝⁴ : True
-left✝³ : (VerexIR.Proofs.Denote.NTy.param 0).deepHolds ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ()).fst
-right✝¹ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ()).snd
+invariantHolds✝⁵ : (S (VerexIR.Proofs.Denote.NTy.param 0)).Holds { x := x : S }
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 9 (some account, some x, ()) initialState✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -92,52 +57,37 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denoteIn
-              (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
               (VerexIR.Proofs.Denote.Term.memoryWritten 9) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denoteIn
-            (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+            (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
             (((VerexIR.Proofs.Denote.Term.globalPublish 35
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
                         VerexIR.Proofs.Denote.NRow.nil)
                       (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
-                      (VerexIR.Proofs.Denote.Term.packAt
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)) ⋯ 27
+                      (VerexIR.Proofs.Denote.Term.packAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+                        (0x42.M.NominalPackage.package.selectedLayout✝⁻⁰⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)) 27
                         (VerexIR.Proofs.Denote.Args.cons
-                          (VerexIR.Proofs.Denote.Term.lit { val := 0, fits := ⋯ } _proof_1)
+                          (VerexIR.Proofs.Denote.Term.lit { val := 0, fits := ⋯ } _proof_2)
                           VerexIR.Proofs.Denote.Args.nil)
                         VerexIR.Proofs.Denote.GhostInits.nil)).seqAfter
                   (VerexIR.Proofs.Denote.Term.memoryWritten 35)).drop
-              (VerexIR.Proofs.Denote.Term.lit () _proof_2))
+              (VerexIR.Proofs.Denote.Term.lit () _proof_3))
             env)
         verexContinuation✝¹
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 0))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true) ∨
             VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.int 8 false))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                      VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true))
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
@@ -147,39 +97,18 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 heq✝ :
-  initialState✝
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+  VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) initialState✝ =
     none
-invariantHolds✝² invariantHolds✝¹ left✝¹ : True
-left✝ : (VerexIR.Proofs.Denote.NTy.int 8 false).deepHolds ({ val := 0, fits := ⋯ }, ()).fst
-right✝ : VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil ({ val := 0, fits := ⋯ }, ()).snd
+invariantHolds✝⁴ : (S (VerexIR.Proofs.Denote.NTy.param 0)).Holds { x := x : S }
+invariantHolds✝³ : True
+invariantHolds✝² : (S (VerexIR.Proofs.Denote.NTy.int 8 false)).Holds { x := { val := 0, fits := ⋯ } : S }
 verexAnchor :
   VerexIR.Proofs.Denote.AnchorSaved 35 (some account, some x, ())
-    (initialState✝.set
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account)
-      (some
-        (VerexIR.Proofs.Denote.Skolems.toRuntime
-          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
-          ((0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
-            ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ()) ⋯))))
+    (VerexIR.Proofs.Denote.Skolems.writePlain (S (VerexIR.Proofs.Denote.NTy.param 0))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) (some { x := x : S }) initialState✝)
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil))
@@ -192,40 +121,25 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denoteIn
-              (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
               (VerexIR.Proofs.Denote.Term.memoryWritten 35) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denoteIn
-            (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
-            (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+            (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
+            (VerexIR.Proofs.Denote.Term.lit () _proof_3) env)
         verexContinuation✝¹
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 361 401
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 0))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true) ∨
             VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 406 447
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.int 8 false))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false)
+                      VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true))
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
@@ -235,45 +149,18 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 heq :
-  initialState✝.set
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
+  VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
       (VerexIR.StorageKey.address account)
-      (some
-        (VerexIR.Proofs.Denote.Skolems.toRuntime
-          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
-          ((0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
-            ((VerexIR.Proofs.Denote.Carriers.lent 0).of x, ()) ⋯)))
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.int 8 false))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+      (VerexIR.Proofs.Denote.Skolems.writePlain (S (VerexIR.Proofs.Denote.NTy.param 0))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+        (VerexIR.StorageKey.address account) (some { x := x : S }) initialState✝) =
     none
+invariantHolds✝¹ : (S (VerexIR.Proofs.Denote.NTy.int 8 false)).Holds { x := { val := 0, fits := ⋯ } : S }
 invariantHolds✝ : True
-⊢ initialState✝
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.int 8 false)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.int 8 false))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+⊢ VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.int 8 false))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.int 8 false) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) initialState✝ =
     none
 tests/sources/functional/type_dependent_code.move:11:9: error: the specification clause `aborts_if exists<S<X> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:12:9: error: the specification clause `aborts_if exists<S<u8> >(account.address)` is not established
@@ -285,13 +172,11 @@ tests/sources/functional/type_dependent_code.move:10:5: error: verex verificatio
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:1:1: info: `test2` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:26:5: error: verification failed with a residual obligation:
-case continues.none.continues.continues.none.continues
+case continues.none.continues.continues.continues.none.continues.continues
 registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
 prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
-Θ✝ : VerexIR.Proofs.Denote.Skolems unit
 typeInstantiation✝ : Array (VerexIR.TypeId × VerexIR.TypeId)
 frame✝ :
   VerexIR.Proofs.Denote.FrameOf unit { namespaceId := { index := 0 }, functionId := { index := 1 } }
@@ -301,6 +186,8 @@ t1 : (VerexIR.Proofs.Denote.NTy.param 0).carrier
 t2 : (VerexIR.Proofs.Denote.NTy.param 1).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
+t1_valid : (VerexIR.Proofs.Denote.NTy.param 0).Holds t1
+t2_valid : (VerexIR.Proofs.Denote.NTy.param 1).Holds t2
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
@@ -308,65 +195,29 @@ verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final =>
-        ¬((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 0))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+        ¬((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true ∨
-            (initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 1))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            (VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       (fun failure =>
         VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
-            ((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 0))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true) ∨
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
-            ((initialState✝
-                  {
-                    type :=
-                      VerexIR.Proofs.Denote.Skolems.resolve
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-                    arguments :=
-                      VerexIR.Proofs.Denote.NRow.cons
-                        (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                          (VerexIR.Proofs.Denote.NTy.param 1))
-                        VerexIR.Proofs.Denote.NRow.nil }
-                  (VerexIR.StorageKey.address account)).isSome =
+            ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+                  (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+                  (VerexIR.StorageKey.address account) initialState✝).isSome =
               true))
       state
-invariantHolds✝³ left✝⁴ : True
-left✝³ : (VerexIR.Proofs.Denote.NTy.param 0).deepHolds ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ()).fst
-right✝¹ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ()).snd
+invariantHolds✝⁵ : (S (VerexIR.Proofs.Denote.NTy.param 0)).Holds { x := t1 : S }
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 209 (some account, some t1, some t2, ()) initialState✝
 verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
@@ -381,52 +232,36 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denoteIn
-              (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
               (VerexIR.Proofs.Denote.Term.memoryWritten 209) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denoteIn
-            (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+            (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
             (((VerexIR.Proofs.Denote.Term.globalPublish 299
                       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1)
                         VerexIR.Proofs.Denote.NRow.nil)
                       (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
-                      (VerexIR.Proofs.Denote.Term.packAt
-                        (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)) ⋯ 275
+                      (VerexIR.Proofs.Denote.Term.packAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+                        (0x42.M.NominalPackage.package.selectedLayout✝⁻⁰⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)) 275
                         (VerexIR.Proofs.Denote.Args.cons
                           (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here.there.there)
                           VerexIR.Proofs.Denote.Args.nil)
                         VerexIR.Proofs.Denote.GhostInits.nil)).seqAfter
                   (VerexIR.Proofs.Denote.Term.memoryWritten 299)).drop
-              (VerexIR.Proofs.Denote.Term.lit () _proof_2))
+              (VerexIR.Proofs.Denote.Term.lit () _proof_3))
             env)
         verexContinuation✝¹
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 0))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true) ∨
             VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 1))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true))
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
@@ -436,41 +271,18 @@ verexContinuation✝ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultSh
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 heq✝ :
-  initialState✝
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+  VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) initialState✝ =
     none
-invariantHolds✝² invariantHolds✝¹ left✝¹ : True
-left✝ : (VerexIR.Proofs.Denote.NTy.param 1).deepHolds ((VerexIR.Proofs.Denote.Carriers.lent 1).of t2, ()).fst
-right✝ :
-  VerexIR.Proofs.Denote.HListPlain.deepHolds VerexIR.Proofs.Denote.NRow.nil
-    ((VerexIR.Proofs.Denote.Carriers.lent 1).of t2, ()).snd
+invariantHolds✝⁴ : (S (VerexIR.Proofs.Denote.NTy.param 0)).Holds { x := t1 : S }
+invariantHolds✝³ : True
+invariantHolds✝² : (S (VerexIR.Proofs.Denote.NTy.param 1)).Holds { x := t2 : S }
 verexAnchor :
   VerexIR.Proofs.Denote.AnchorSaved 299 (some account, some t1, some t2, ())
-    (initialState✝.set
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account)
-      (some
-        (VerexIR.Proofs.Denote.Skolems.toRuntime
-          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
-          ((0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
-            ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ()) ⋯))))
+    (VerexIR.Proofs.Denote.Skolems.writePlain (S (VerexIR.Proofs.Denote.NTy.param 0))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) (some { x := t1 : S }) initialState✝)
 verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
     (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.signer
       (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0)
@@ -484,40 +296,24 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
         (VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
             (VerexIR.Proofs.Denote.Term.denoteIn
-              (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
               (VerexIR.Proofs.Denote.Term.memoryWritten 299) env)
             fun x env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value env))
           fun x env =>
           VerexIR.Proofs.Denote.Term.denoteIn
-            (VerexIR.Proofs.Denote.closedMeanings executable✝ typeInstantiation✝).interpreterOps
-            (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+            (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts typeInstantiation✝).interpreterOps
+            (VerexIR.Proofs.Denote.Term.lit () _proof_3) env)
         verexContinuation✝¹
         (fun failure =>
           VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1002 1043
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 0))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 0))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true) ∨
             VerexIR.Proofs.Obligation "tests/sources/functional/.verex/type_dependent_code.move.lean" 1048 1089
-              ((initialState✝
-                    {
-                      type :=
-                        VerexIR.Proofs.Denote.Skolems.resolve
-                          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-                      arguments :=
-                        VerexIR.Proofs.Denote.NRow.cons
-                          (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-                            (VerexIR.Proofs.Denote.NTy.param 1))
-                          VerexIR.Proofs.Denote.NRow.nil }
-                    (VerexIR.StorageKey.address account)).isSome =
+              ((VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+                    (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+                    (VerexIR.StorageKey.address account) initialState✝).isSome =
                 true))
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
@@ -527,45 +323,18 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       verexContinuation✝¹ (VerexIR.Proofs.Denote.Flow.continue_ nest env) state
 heq :
-  initialState✝.set
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 0))
-            VerexIR.Proofs.Denote.NRow.nil }
+  VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
       (VerexIR.StorageKey.address account)
-      (some
-        (VerexIR.Proofs.Denote.Skolems.toRuntime
-          (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0))
-          ((0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 0)).ofDeepHolds
-            ((VerexIR.Proofs.Denote.Carriers.lent 0).of t1, ()) ⋯)))
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 1))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+      (VerexIR.Proofs.Denote.Skolems.writePlain (S (VerexIR.Proofs.Denote.NTy.param 0))
+        (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 0) VerexIR.Proofs.Denote.NRow.nil)
+        (VerexIR.StorageKey.address account) (some { x := t1 : S }) initialState✝) =
     none
+invariantHolds✝¹ : (S (VerexIR.Proofs.Denote.NTy.param 1)).Holds { x := t2 : S }
 invariantHolds✝ : True
-⊢ initialState✝
-      {
-        type :=
-          VerexIR.Proofs.Denote.Skolems.resolve
-            (0x42.M.unit.nominal.namespace.0.declaration✝⁻⁰ (VerexIR.Proofs.Denote.NTy.param 1)),
-        arguments :=
-          VerexIR.Proofs.Denote.NRow.cons
-            (VerexIR.Proofs.Denote.NTy.argumentWith VerexIR.Proofs.Denote.Skolems.argument
-              (VerexIR.Proofs.Denote.NTy.param 1))
-            VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address account) =
+⊢ VerexIR.Proofs.Denote.Skolems.plainAt (S (VerexIR.Proofs.Denote.NTy.param 1))
+      (VerexIR.Proofs.Denote.NRow.cons (VerexIR.Proofs.Denote.NTy.param 1) VerexIR.Proofs.Denote.NRow.nil)
+      (VerexIR.StorageKey.address account) initialState✝ =
     none
 tests/sources/functional/type_dependent_code.move:27:9: error: the specification clause `aborts_if exists<S<T1> >(account.address)` is not established
 tests/sources/functional/type_dependent_code.move:28:9: error: the specification clause `aborts_if exists<S<T2> >(account.address)` is not established
@@ -577,7 +346,6 @@ tests/sources/functional/type_dependent_code.move:26:5: error: verex verificatio
     | aborts_if_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:39:1: info: `test1` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:50:9: error: the specification clause `ensures global<S<u8> >(account.address).x == 0` is not established
 tests/sources/functional/type_dependent_code.move:49:5: error: verex verification failed: the automatic verification of `test1` failed; provide a proof in the module:
   verify test1 by lean =>
@@ -586,7 +354,6 @@ tests/sources/functional/type_dependent_code.move:49:5: error: verex verificatio
     | ensures_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/type_dependent_code.move:39:1: info: `test2` uses concrete verification: Given interpretation does not yet support storage interpretation
 tests/sources/functional/type_dependent_code.move:66:9: error: the specification clause `ensures global<S<T1> >(account.address).x == t1` is not established
 tests/sources/functional/type_dependent_code.move:65:5: error: verex verification failed: the automatic verification of `test2` failed; provide a proof in the module:
   verify test2 by lean =>

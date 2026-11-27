@@ -1,2 +1,0 @@
-`read_generic` uses concrete verification: Given interpretation does not yet support data invariant interpretation: #[({ namespaceId := { index := 0 }, structId := 1 },
-   "its given data invariant requires behavioral or storage interpretation")]

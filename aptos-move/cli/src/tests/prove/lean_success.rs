@@ -4,11 +4,9 @@
 use crate::tests::common;
 
 #[test]
+#[ignore = "needs VEREX_ROOT (a verex checkout)"]
 fn prove_lean_success() {
-    if !move_prover::verex::verifier_available() {
-        eprintln!("skipping prove --lean test: the Verex Move verifier is not built");
-        return;
-    }
+    move_prover::verex::runner().unwrap_or_else(|err| panic!("{err:#}"));
 
     let pkg = common::make_package("lean_ok", &[(
         "lean_ok",

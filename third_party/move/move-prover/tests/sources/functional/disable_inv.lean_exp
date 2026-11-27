@@ -1,9 +1,4 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/disable_inv.move:64:9: error: the module invariant `invariant [suspendable] ∀ (a : Address), exists<R1>(a) ==> exists<R2>(a)` does not hold after a write of memory it reads
-tests/sources/functional/disable_inv.move:18:5: error: verex verification failed: the automatic verification of `f1_incorrect` failed; provide a proof in `tests/sources/functional/disable_inv.proof.lean`:
-  verify f1_incorrect by lean =>
-    verex_obligations
-    verex_on
-    | module_invariant => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/disable_inv.move:13:5: error: a public or entry function cannot delegate invariants to its callers
+tests/sources/functional/disable_inv.move:34:5: error: a function cannot declare `pragma disable_invariants_in_body` where invariant checking is already off: it delegates invariants, or a function that disables or delegates them calls it
+tests/sources/functional/disable_inv.move:50:5: error: a function cannot declare `pragma disable_invariants_in_body` where invariant checking is already off: it delegates invariants, or a function that disables or delegates them calls it

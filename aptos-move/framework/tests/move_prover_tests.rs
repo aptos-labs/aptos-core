@@ -197,13 +197,11 @@ fn move_stdlib_prover_tests() {
 }
 
 /// Verify `path_to_pkg` with the Verex verifier (`prove --lean`) and compare
-/// its messages against the `.exp` baseline next to `test_file`. Skips where
-/// the verifier is not built (`third_party/move/lean/verex-move`).
+/// its messages against the `.exp` baseline next to `test_file`. Fails with
+/// the resolver's standard message when `VEREX_ROOT` (or `VEREX_MOVE_EXE`) is
+/// unset or invalid.
 pub fn run_lean_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl Into<String>) {
-    if !move_prover::verex::verifier_available() {
-        eprintln!("skipping Verex prover test: the Verex Move verifier is not built");
-        return;
-    }
+    move_prover::verex::runner().unwrap_or_else(|err| panic!("{err:#}"));
     let pkg_path = path_in_crate(path_to_pkg);
     let mut options = ProverOptions::default_for_test();
     options.lean = true;
@@ -211,6 +209,7 @@ pub fn run_lean_prover_for_pkg_with_baseline(test_file: &str, path_to_pkg: impl 
 }
 
 #[test]
+#[ignore = "needs VEREX_ROOT (a verex checkout)"]
 fn move_stdlib_lean_prover_tests() {
     run_lean_prover_for_pkg_with_baseline(file!(), "move-stdlib");
 }

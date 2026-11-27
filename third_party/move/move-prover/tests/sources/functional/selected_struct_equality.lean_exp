@@ -1,0 +1,73 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/selected_struct_equality.move:36:9: error: the specification clause `ensures !result` is not established
+tests/sources/functional/selected_struct_equality.move:35:5: error: verex verification failed: the automatic verification of `eq_ghost_differs_false` failed; provide a proof in the module:
+  verify eq_ghost_differs_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:52:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/selected_struct_equality.move:51:5: error: verex verification failed: the automatic verification of `ne_ghost_differs_true` failed; provide a proof in the module:
+  verify ne_ghost_differs_true by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:71:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/selected_struct_equality.move:70:5: error: verex verification failed: the automatic verification of `eq_payload_differs_true` failed; provide a proof in the module:
+  verify eq_payload_differs_true by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:89:9: error: the specification clause `ensures !result` is not established
+tests/sources/functional/selected_struct_equality.move:88:5: error: verex verification failed: the automatic verification of `contains_ghost_differs_false` failed; provide a proof in the module:
+  verify contains_ghost_differs_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:109:9: error: the specification clause `ensures !result` is not established
+tests/sources/functional/selected_struct_equality.move:108:5: error: verex verification failed: the automatic verification of `index_of_ghost_differs_false` failed; provide a proof in the module:
+  verify index_of_ghost_differs_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:138:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/selected_struct_equality.move:137:5: error: verex verification failed: the automatic verification of `ne_closure_field` failed; provide a proof in the module:
+  verify ne_closure_field by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:162:9: error: the specification clause `ensures !result` is not established
+tests/sources/functional/selected_struct_equality.move:161:5: error: verex verification failed: the automatic verification of `same_ghost_differs_false` failed; provide a proof in the module:
+  verify same_ghost_differs_false by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:178:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/selected_struct_equality.move:177:5: error: verex verification failed: the automatic verification of `ne_wrap_ghost_differs` failed; provide a proof in the module:
+  verify ne_wrap_ghost_differs by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/selected_struct_equality.move:214:9: error: the specification clause `ensures result` is not established
+tests/sources/functional/selected_struct_equality.move:213:5: error: verex verification failed: the automatic verification of `ne_imported` failed; provide a proof in the module:
+  verify ne_imported by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

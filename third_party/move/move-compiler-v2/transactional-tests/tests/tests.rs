@@ -10,7 +10,7 @@ use libtest_mimic::{Arguments, Trial};
 use move_compiler_v2::logging;
 use move_transactional_test_matrix::{CompilerV2Payload, MatrixConfig, VmBackend, COMPILER_V2};
 use move_transactional_test_runner::vm_test_harness;
-use std::{fs, path::Path, process::Command};
+use std::{fs, path::Path};
 use walkdir::WalkDir;
 
 fn run(
@@ -26,13 +26,6 @@ fn run(
         Path::new(identity),
         &resolution.canonical_exp_suffix,
     )
-}
-
-fn lake_available() -> bool {
-    Command::new("lake")
-        .arg("--version")
-        .output()
-        .is_ok_and(|output| output.status.success())
 }
 
 fn positive_verex_baselines_are_clean() -> Result<(), String> {
@@ -79,10 +72,11 @@ fn positive_verex_baselines_are_clean() -> Result<(), String> {
 }
 
 fn main() {
-    let has_lake = lake_available();
+    let has_verex_root = move_compiler_v2::verex::verex_root_is_set();
     // The test runs from the corpus root, so each identity is a valid relative
     // source path.
     let identities = COMPILER_V2.sources(Path::new("."));
+    let mut ignored_lean = false;
     let mut tests = COMPILER_V2
         .configs
         .iter()
@@ -90,15 +84,19 @@ fn main() {
             identities
                 .iter()
                 .filter(|identity| config.selects(identity))
-                .map(move |identity| {
+                .map(|identity| {
                     let prompt = format!("compiler-v2-txn[config={}]::{}", config.name, identity);
                     let requires_lean = identity.ends_with(".lean");
+                    if requires_lean && !has_verex_root {
+                        ignored_lean = true;
+                    }
                     let identity = identity.clone();
                     Trial::test(prompt, move || {
                         run(&identity, config).map_err(|err| format!("{:?}", err).into())
                     })
-                    .with_ignored_flag(requires_lean && !has_lake)
+                    .with_ignored_flag(requires_lean && !has_verex_root)
                 })
+                .collect_vec()
         })
         .collect_vec();
     tests.push(Trial::test("verex-positive-baselines-are-clean", || {
@@ -106,5 +104,11 @@ fn main() {
     }));
     tests.sort_unstable_by(|a, b| a.name().cmp(b.name()));
     let args = Arguments::from_args();
+    if ignored_lean && !args.list && !args.ignored && !args.include_ignored {
+        eprintln!(
+            "ignoring Verex transactional .lean trials: {}",
+            move_compiler_v2::verex::VEREX_ROOT_UNSET_MESSAGE
+        );
+    }
     libtest_mimic::run(&args, tests).exit()
 }

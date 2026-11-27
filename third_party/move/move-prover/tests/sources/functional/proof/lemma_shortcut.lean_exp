@@ -5,5 +5,5 @@ warning: proof uses trusted assumption
 31 │         assume [trusted] true;
    │         ^^^^^^^^^^^^^^^^^^^^^^
 
-tests/sources/functional/proof/lemma_shortcut.move:58:9: error: the specification clause `ensures x + 1 == x` is not established
+tests/sources/functional/proof/lemma_shortcut.move:57:10: error: the specification clause `ensures x + 1 == x` is not established
 tests/sources/functional/proof/lemma_shortcut.move:57:10: error: verex verification failed: the lemma `false_identity` is not established

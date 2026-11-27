@@ -65,5 +65,6 @@ module 0x42::folds_of_projection_anchors {
     spec wrong {
         aborts_if false;
         ensures result == 6; // error: the second vector sums to 15
+        pragma heartbeats = 340;
     }
 }

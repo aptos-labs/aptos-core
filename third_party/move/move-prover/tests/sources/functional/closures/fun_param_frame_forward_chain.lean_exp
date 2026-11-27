@@ -1,17 +1,3 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/fun_param_frame_forward_chain.move:52:9: error: the specification clause `ensures global<Counter>(a).x == old(global<Counter>(a).x)` is not established
-tests/sources/functional/closures/fun_param_frame_forward_chain.move:50:5: error: verex verification failed: the automatic verification of `fv_curry_fails` failed; provide a proof in the module:
-  verify fv_curry_fails by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_forward_chain.move:75:9: error: the specification clause `ensures global<Counter>(s.address).x == old(global<Counter>(s.address).x)` is not established
-tests/sources/functional/closures/fun_param_frame_forward_chain.move:72:5: error: verex verification failed: the automatic verification of `fv_forward_depth2_fails` failed; provide a proof in the module:
-  verify fv_forward_depth2_fails by lean =>
-    verex_obligations
-    verex_on
-    | ensures_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:43:17: error: frames.outside: function argument may modify resource `0x42::loop_memory_havoc_forward_chain::Counter`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_forward_chain.move:68:13: error: frames.outside: function argument may modify resource `0x42::loop_memory_havoc_forward_chain::Counter`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify

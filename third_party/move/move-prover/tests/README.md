@@ -90,8 +90,12 @@ convention. It is expected that only errors for functions with this suffix appea
 ## Verex Verifier Tests
 
 `MVP_TEST_FEATURE=lean cargo test -p move-prover --test testsuite` verifies each test with the Verex verifier
-(`third_party/move/lean/verex-move`). Inside a checkout the gate builds and snapshots the verifier; a missing
-Lean toolchain or failed build fails the requested gate. Listing tests or selecting no tests needs no verifier.
+(`$VEREX_ROOT/verex-move`). Set `VEREX_ROOT` to the root of a Verex checkout (or set `VEREX_MOVE_EXE` with
+caller-supplied `LEAN_PATH`, which does not consult `VEREX_ROOT`). With `VEREX_ROOT` set, the gate builds and
+snapshots the verifier; a missing Lean toolchain, invalid `VEREX_ROOT`, or failed build fails the requested gate.
+When neither `VEREX_ROOT` nor `VEREX_MOVE_EXE` is set, the `lean` trials are visibly ignored with the standard
+message on stderr (passing `--ignored` runs them and fails with that message). Listing tests or selecting no tests
+needs no verifier.
 Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
 `MVP_TEST_FILTERS=part1,part2` selects several fixtures in one process, sharing one snapshot.
 
@@ -102,8 +106,8 @@ Its messages differ from Boogie's, so its baselines are `.lean_exp` files.
   nonlinear arithmetic, is proved in a proof file beside the test, `foo.proof.lean` for `foo.move`, whose header
   names the test (`verex proofs for "foo.move"`). The failure message names the file, and `verify f by
   verex_obligations` there shows the obligations left. Only a file declaring a single module can have one. A run
-  writes the test's rendering to `.verex/foo.move.lean`, from which the proof file opens in the editor, in the
-  Lake workspace of `tests/sources`.
+  writes the test's rendering to `.verex/foo.move.lean`; to open the proof file in the Lean editor, generate an
+  untracked local workspace in `tests/sources` with `"$VEREX_ROOT/scripts/verex-editor-workspace.py" tests/sources`.
 - The run uses every core, and each verifier process takes up to about 2 GB of memory.
 
 ## Debugging Long Running Tests
