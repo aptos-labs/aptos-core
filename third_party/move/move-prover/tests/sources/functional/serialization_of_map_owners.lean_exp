@@ -1,0 +1,50 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/serialization_of_map_owners.move:116:9: error: the specification clause `ensures result
+        ==> 0x42::placeholder_table::spec_len::<u64, u64>(a)
+          == 0x42::placeholder_table::spec_len::<u64, u64>(b)` is not established
+tests/sources/functional/serialization_of_map_owners.move:115:5: error: verex verification failed: the automatic verification of `placeholder_len` failed; provide a proof in the module:
+  verify placeholder_len by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/serialization_of_map_owners.move:123:9: error: the specification clause `ensures result
+        ==> spec_contains::<u64, u64>(a, 1) == spec_contains::<u64, u64>(b, 1)` is not established
+tests/sources/functional/serialization_of_map_owners.move:122:5: error: verex verification failed: the automatic verification of `placeholder_contains` failed; provide a proof in the module:
+  verify placeholder_contains by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/serialization_of_map_owners.move:128:9: error: the specification clause `ensures serialize(a) == serialize(b)
+        ==> 0x42::placeholder_table::spec_len::<u64, u64>(a)
+          == 0x42::placeholder_table::spec_len::<u64, u64>(b)` is not established
+tests/sources/functional/serialization_of_map_owners.move:127:5: error: verex verification failed: the automatic verification of `placeholder_spec_only` failed; provide a proof in the module:
+  verify placeholder_spec_only by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/serialization_of_map_owners.move:146:9: error: the specification clause `ensures result
+        ==> 0x42::placeholder_table::spec_len::<u64, u64>(a.table)
+          == 0x42::placeholder_table::spec_len::<u64, u64>(b.table)` is not established
+tests/sources/functional/serialization_of_map_owners.move:145:5: error: verex verification failed: the automatic verification of `placeholder_holder_len` failed; provide a proof in the module:
+  verify placeholder_holder_len by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/serialization_of_map_owners.move:160:9: error: the specification clause `ensures result
+        ==> 0x42::handle_table::spec_len::<u64, u64>(a)
+          == 0x42::handle_table::spec_len::<u64, u64>(b)` is not established
+tests/sources/functional/serialization_of_map_owners.move:159:5: error: verex verification failed: the automatic verification of `handle_len` failed; provide a proof in the module:
+  verify handle_len by lean =>
+    verex_obligations
+    verex_on
+    | ensures_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

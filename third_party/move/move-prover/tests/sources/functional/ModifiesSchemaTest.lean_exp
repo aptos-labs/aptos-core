@@ -5,34 +5,31 @@ addr1 addr2 : VerexIR.Proofs.Denote.NTy.address.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
 verexAnchor✝ : VerexIR.Proofs.Denote.AnchorSaved 2 (some addr1, none, ()) initialState✝
-val✝¹ : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
+val✝¹ : S.carrier
 heq✝ :
-  initialState✝ { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address addr1) =
+  VerexIR.Proofs.Denote.Skolems.plainAt S VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1)
+      initialState✝ =
     some val✝¹
-value✝ : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-a✝³ a✝² : 2 = value✝.val.fst.val
 verexAnchor :
   VerexIR.Proofs.Denote.AnchorSaved 2 (some addr2, none, ())
-    (initialState✝.set
-      { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }
-      (VerexIR.StorageKey.address addr1) (some value✝))
-val✝ : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
+    (VerexIR.Proofs.Denote.Skolems.writePlain S VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1)
+      (some { x := { val := 2, fits := ⋯ } : S }) initialState✝)
+val✝ : S.carrier
 heq :
-  (if addr2 = addr1 then some value✝
+  (if addr2 = addr1 then some { x := { val := 2, fits := ⋯ } : S }
     else
-      initialState✝
-        { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }
-        (VerexIR.StorageKey.address addr2)) =
+      VerexIR.Proofs.Denote.Skolems.plainAt S VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr2)
+        initialState✝) =
     some val✝
-value : 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-a✝¹ a✝ : 2 = value.val.fst.val
 key : VerexIR.StorageKey
 x✝ : ¬key = VerexIR.StorageKey.address addr1
 h✝ : key = VerexIR.StorageKey.address addr2
-⊢ some value =
-    initialState✝ { type := 0x0.A.unit.nominal.namespace.0.declaration✝⁻⁰, arguments := VerexIR.Proofs.Denote.NRow.nil }
-      key
+⊢ VerexIR.Proofs.Denote.Skolems.writePlain S VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr2)
+      (some { x := { val := 2, fits := ⋯ } : S })
+      (VerexIR.Proofs.Denote.Skolems.writePlain S VerexIR.Proofs.Denote.NRow.nil (VerexIR.StorageKey.address addr1)
+        (some { x := { val := 2, fits := ⋯ } : S }) initialState✝)
+      { type := S, arguments := VerexIR.Proofs.Denote.NRow.nil } (VerexIR.StorageKey.address addr2) =
+    initialState✝ { type := S, arguments := VerexIR.Proofs.Denote.NRow.nil } key
 tests/sources/functional/ModifiesSchemaTest.move:33:5: error: verex verification failed: the automatic verification of `mutate_at_wrapper2` failed; provide a proof in `tests/sources/functional/ModifiesSchemaTest.proof.lean`:
   verify mutate_at_wrapper2 by lean =>
     verex_obligations

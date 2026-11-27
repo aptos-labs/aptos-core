@@ -14,6 +14,7 @@ use codespan::Span;
 use codespan_reporting::diagnostic::Severity;
 use move_command_line_common::files::{extension_equals, find_filenames, FileHash, LEAN_EXTENSION};
 use move_model::model::{GlobalEnv, Loc};
+pub use move_model_exchange::roots::{verex_root_is_set, VEREX_ROOT_UNSET_MESSAGE};
 use serde_json::Value;
 use std::{
     collections::BTreeMap,
@@ -311,19 +312,18 @@ fn elaborate_source(
         .tempdir()
         .context("unable to create private XIR output directory")?;
     let xir_path = xir_dir.path().join("module.xir.json");
-    let verex_root = std::env::var_os("VEREX_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/verex-move"));
+    let verex_move_package = move_model_exchange::roots::verex_root()?.join("verex-move");
     let _elaboration_permit = LeanElaborationPermit::acquire();
     let output = Command::new("lake")
         .args(["env", "lean", "--json"])
         .arg(&source_path)
-        .current_dir(&verex_root)
+        .current_dir(&verex_move_package)
         .env("VEREX_XIR_OUTPUT", &xir_path)
         .output()
         .with_context(|| {
             format!(
-                "failed to launch Lean for `{}` (set VEREX_ROOT if the Lean project is elsewhere)",
+                "failed to launch `lake` in `{}` for `{}`",
+                verex_move_package.display(),
                 source_path.display()
             )
         })?;
@@ -388,14 +388,7 @@ mod tests {
 
     /// Verex sources compiler-v2 compiles in these tests.
     fn fixtures() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../lean/verex-move/Tests/CompilerV2")
-    }
-
-    fn lake_available() -> bool {
-        Command::new("lake")
-            .arg("--version")
-            .output()
-            .is_ok_and(|output| output.status.success())
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/verex-sources")
     }
 
     #[test]
@@ -493,7 +486,7 @@ mod tests {
         let mut options = Options {
             sources: vec![fixtures.join("Account.lean").to_string_lossy().into_owned()],
             sources_deps: vec![fixtures
-                .join("../CompilerV2/Account.lean")
+                .join("../verex-sources/Account.lean")
                 .to_string_lossy()
                 .into_owned()],
             ..Default::default()
@@ -504,11 +497,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "needs VEREX_ROOT (a verex checkout)"]
     fn lean_source_runs_complete_compiler_v2_pipeline() {
-        if !lake_available() {
-            eprintln!("skipping Verex integration test: `lake` is unavailable");
-            return;
-        }
         let fixtures = fixtures();
         let options = Options {
             sources: vec![fixtures.join("Account.lean").to_string_lossy().into_owned()],
@@ -528,11 +518,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "needs VEREX_ROOT (a verex checkout)"]
     fn imported_lean_modules_compile_as_move_dependencies() {
-        if !lake_available() {
-            eprintln!("skipping Verex integration test: `lake` is unavailable");
-            return;
-        }
         let fixtures = fixtures();
         // Intentionally put the client first: XIR loading must use declared
         // Move dependencies, not filesystem or command-line order.
@@ -583,11 +570,8 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "needs VEREX_ROOT (a verex checkout)"]
     fn lean_source_dependency_is_not_emitted_as_a_target() {
-        if !lake_available() {
-            eprintln!("skipping Verex integration test: `lake` is unavailable");
-            return;
-        }
         let fixtures = fixtures();
         let options = Options {
             sources: vec![fixtures.join("Client.lean").to_string_lossy().into_owned()],

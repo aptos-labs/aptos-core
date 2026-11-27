@@ -7,11 +7,9 @@ use crate::tests::common;
 /// by the `verify` item of the proof file beside its source; a second
 /// function of the file verifies automatically.
 #[test]
+#[ignore = "needs VEREX_ROOT (a verex checkout)"]
 fn prove_lean_proof() {
-    if !move_prover::verex::verifier_available() {
-        eprintln!("skipping prove --lean test: the Verex Move verifier is not built");
-        return;
-    }
+    move_prover::verex::runner().unwrap_or_else(|err| panic!("{err:#}"));
 
     let pkg = common::make_package("lean_proof", &[(
         "lean_proof",

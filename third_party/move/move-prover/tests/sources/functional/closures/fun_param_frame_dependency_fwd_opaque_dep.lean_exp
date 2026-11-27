@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/fun_param_frame_dependency_fwd_opaque_dep.move:6:28: error: frames.outside: function argument may modify resource `0x42::frame_fwdo_hof::R`, which is not declared in `modifies_of` for `g`. `g` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<g>` for what it may modify

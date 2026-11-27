@@ -1,17 +1,3 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:26:5: error: the specification clause `f : Fn(u64) -> u64 has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:46:5: error: verex verification failed: the automatic verification of `via_modifies` failed; provide a proof in the module:
-  verify via_modifies by lean =>
-    verex_obligations
-    verex_on
-    | after_bump => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:26:5: error: the specification clause `f : Fn(u64) -> u64 has Copy, Drop` is not established
-tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:48:5: error: verex verification failed: the automatic verification of `via_proof` failed; provide a proof in the module:
-  verify via_proof by lean =>
-    verex_obligations
-    verex_on
-    | after_bump => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:46:40: error: frames.outside: function argument may modify resource `0x42::state_stored_spec_mention::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/fun_param_frame_stored_spec_mention.move:48:26: error: frames.outside: function argument may modify resource `0x42::state_stored_spec_mention::S`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify

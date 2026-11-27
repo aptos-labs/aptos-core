@@ -10,7 +10,7 @@ verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.Result
     VerexIR.Proofs.Denote.NTy.unit.carrier →
   VerexIR.Proofs.Denote.Memory unit → Prop :=
   fun value state =>
-    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
       (fun result final => False)
       (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/loops.move.lean" 1459 1473 True) state
 verexContinuation✝¹ : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none

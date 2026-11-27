@@ -6,9 +6,11 @@ by the production VM harness. The dedicated `verex` test configuration runs
 this pipeline once with compiler-v2's default experiments; Verex sources are
 excluded from the generic optimization configuration matrix.
 
-Transactional commands use the Lean-comment-compatible `--#` prefix. The local
-Lake wrapper depends on the Lean project providing `VerexMove`, so these files
-also elaborate in the Lean language server without any preprocessing.
+Transactional commands use the Lean-comment-compatible `--#` prefix. To edit
+or elaborate individual files in the Lean language server (or through
+`lake setup-file`), generate a local editor workspace for this directory with
+`"$VEREX_ROOT/scripts/verex-editor-workspace.py" <dir>` (which writes the
+pinned toolchain and a `VerexMove` Lake dependency on `$VEREX_ROOT/verex-move`).
 
 Each file imports `VerexMove` and declares exactly one module with
 `verex module 0xADDR::Name where ...`; every declaration of that module

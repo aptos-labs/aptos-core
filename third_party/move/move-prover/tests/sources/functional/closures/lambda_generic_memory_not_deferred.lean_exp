@@ -1,0 +1,2 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/lambda_generic_memory_not_deferred.move:35:9: error: frames.outside: function argument may modify resource `0x42::lambda_generic_memory_not_deferred::R`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify

@@ -145,18 +145,6 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> anyhow::Result<()>
     let mut options = Options::create_from_args(&args)?;
     options.setup_logging_for_test();
     let baseline_valid = if options.lean {
-        if !verex::verifier_available() {
-            if NOT_CONFIGURED_WARNED
-                .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
-                .is_ok()
-            {
-                warn!(
-                    "The Verex Move verifier is not built, its tests will be skipped. Build it \
-            with `cd third_party/move/lean/verex-move && lake build verex-move`."
-                );
-            }
-            return Ok(());
-        }
         true
     } else {
         let no_tools = read_env_var("BOOGIE_EXE").is_empty()
@@ -324,13 +312,17 @@ fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature,
 
     for (name, files) in test_groups {
         let feature = get_feature_by_name(name);
+        let ignore_lean = feature.name == "lean" && !verex::verifier_configured();
         for file in files {
             let prompt = format!("prover {}[{}]::{}", group, feature.name, file);
             let runner = feature.runner;
             let path = PathBuf::from(file);
-            tests.push(Trial::test(prompt, move || {
-                runner(&path).map_err(|err| format!("{:?}", err).into())
-            }))
+            tests.push(
+                Trial::test(prompt, move || {
+                    runner(&path).map_err(|err| format!("{:?}", err).into())
+                })
+                .with_ignored_flag(ignore_lean),
+            )
         }
     }
 }
@@ -338,15 +330,13 @@ fn collect_enabled_tests(tests: &mut Vec<Trial>, group: &str, feature: &Feature,
 /// Takes the private copy of the Verex verifier the `lean` tests run, into
 /// a directory under `target/tmp` that lives as long as the returned guard:
 /// a concurrent build of the live Lean packages cannot change what the tests
-/// load. The user's own `VEREX_MOVE_EXE` is run as is, and without the
-/// verifier's package the tests skip as they would anyway.
+/// load. The user's own `VEREX_MOVE_EXE` is run as is (without consulting
+/// `VEREX_ROOT`); otherwise `$VEREX_ROOT/verex-move` is snapshotted.
 fn snapshot_verifier() -> anyhow::Result<Option<TempDir>> {
-    if std::env::var_os(ENV_VEREX_MOVE_EXE).is_some() {
+    if std::env::var_os(ENV_VEREX_MOVE_EXE).is_some_and(|value| !value.is_empty()) {
         return Ok(None);
     }
-    let Some(package) = verex::package(Path::new(".")) else {
-        return Ok(None);
-    };
+    let package = verex::package()?;
     let dir = tempfile::Builder::new()
         .prefix("verex-gate-")
         .tempdir_in(env!("CARGO_TARGET_TMPDIR"))?;
@@ -404,15 +394,29 @@ fn main() {
             name.contains(filter)
         }
     };
+    let lean_ignored = feature_narrow == "lean" && !verex::verifier_configured();
+    let lean_selected_by_ignore = if args.ignored {
+        lean_ignored
+    } else if args.include_ignored {
+        true
+    } else {
+        !lean_ignored
+    };
     let will_run = !args.list
-        && !args.ignored
         && !args.bench
+        && lean_selected_by_ignore
         && tests.iter().any(|test| {
             args.filter
                 .as_ref()
                 .is_none_or(|filter| selected(test.name(), filter))
                 && !args.skip.iter().any(|filter| selected(test.name(), filter))
         });
+    if lean_ignored && !args.list && !args.ignored && !args.include_ignored {
+        eprintln!(
+            "ignoring Verex lean tests: {}",
+            move_model_exchange::roots::VEREX_ROOT_UNSET_MESSAGE
+        );
+    }
     let snapshot = if feature_narrow == "lean" && will_run {
         match snapshot_verifier() {
             Ok(snapshot) => snapshot,

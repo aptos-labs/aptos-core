@@ -2,16 +2,16 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! The Verex backend (`--lean`): the Lean-based verifier of
-//! `third_party/move/lean/verex-move`, which verifies a Move file or package
-//! from its typed-AST export and reports every message at its position in the
-//! Move sources.
+//! `$VEREX_ROOT/verex-move`, which verifies a Move file or package from its
+//! typed-AST export and reports every message at its position in the Move
+//! sources.
 
 use anyhow::{bail, Result};
 use log::info;
 use move_model::model::{GlobalEnv, ModuleId, VerificationScope};
 use move_model_exchange::{
     ast::{Pragma, PragmaValue, Value, XastModule},
-    dump_ast_module, module_closure,
+    dump_ast_module, module_closure, roots,
 };
 use sha2::{digest, Digest, Sha256};
 use std::{
@@ -24,12 +24,7 @@ use std::{
 };
 
 const VEREX_MOVE_EXE_ENV: &str = "VEREX_MOVE_EXE";
-const VEREX_MOVE_HOME_ENV: &str = "VEREX_MOVE_HOME";
 const LAKE_EXE_ENV: &str = "LAKE";
-/// Set where the verifier must be available, so tests fail instead of skip.
-const VEREX_MOVE_REQUIRED_ENV: &str = "VEREX_MOVE_REQUIRED";
-/// The Lean package of the verifier within an Aptos Core checkout.
-const VEREX_MOVE_PACKAGE: &str = "third_party/move/lean/verex-move";
 /// The verifier's executable within its built Lean package.
 const VEREX_MOVE_BINARY: &str = ".lake/build/bin/verex-move";
 /// The Lake target building the executable.
@@ -58,37 +53,19 @@ pub struct Runner {
     pub env: Vec<(String, String)>,
 }
 
-/// Finds the verifier's Lean package by walking up from `start`.
-fn find_package(start: &Path) -> Option<PathBuf> {
-    let mut dir = Some(start);
-    while let Some(candidate) = dir {
-        let package = candidate.join(VEREX_MOVE_PACKAGE);
-        if ["lakefile.lean", "lakefile.toml"]
-            .iter()
-            .any(|lakefile| package.join(lakefile).is_file())
-        {
-            return Some(package);
-        }
-        dir = candidate.parent();
-    }
-    None
+/// The verifier's Lean package (`$VEREX_ROOT/verex-move`).
+pub fn package() -> Result<PathBuf> {
+    Ok(roots::verex_root()?.join("verex-move"))
 }
 
-/// The verifier's Lean package: `VEREX_MOVE_HOME`, or the one of the
-/// enclosing Aptos Core checkout, searched upward from `source` and the
-/// current directory.
-pub fn package(source: &Path) -> Option<PathBuf> {
-    match std::env::var(VEREX_MOVE_HOME_ENV) {
-        Ok(home) => Some(PathBuf::from(home)),
-        Err(_) => std::fs::canonicalize(source)
-            .ok()
-            .and_then(|dir| find_package(&dir))
-            .or_else(|| {
-                std::env::current_dir()
-                    .ok()
-                    .and_then(|dir| find_package(&dir))
-            }),
-    }
+/// Whether either `VEREX_MOVE_EXE` or `VEREX_ROOT` is set (and non-empty).
+///
+/// Lean-route test harnesses use this to ignore tests when Verex is not
+/// configured at all, while still running (and failing with the resolver's
+/// standard message) whenever a root or executable is set.
+pub fn verifier_configured() -> bool {
+    std::env::var_os(VEREX_MOVE_EXE_ENV).is_some_and(|value| !value.is_empty())
+        || roots::verex_root_is_set()
 }
 
 /// An executable on `PATH`.
@@ -130,8 +107,8 @@ fn toolchain_env(package: &Path) -> Vec<(String, String)> {
 fn lake_command(package: &Path) -> Result<Command> {
     let Some(lake) = find_lake() else {
         bail!(
-            "Could not find `lake` to run the Verex Move verifier. Install Lean through elan \
-             (`./scripts/dev_setup.sh -p -l`), or set {} to its path.",
+            "Could not find `lake` to run the Verex Move verifier. Install Lean through elan, \
+             or set {} to its path.",
             LAKE_EXE_ENV,
         );
     };
@@ -357,29 +334,19 @@ pub struct Settings {
 /// Resolves how to run the verifier.
 ///
 /// `VEREX_MOVE_EXE` names the executable and is run as is, so its caller
-/// provides `LEAN_PATH`. Otherwise the verifier's Lean package is
-/// `VEREX_MOVE_HOME` or the one of the enclosing Aptos Core checkout,
-/// searched upward from `source` and the current directory, and its
-/// built executable runs through `lake --dir <package> env`, which supplies
-/// the module path of its dependencies, under the toolchain the package pins.
-pub fn runner(source: &Path) -> Result<Runner> {
-    if let Ok(path) = std::env::var(VEREX_MOVE_EXE_ENV) {
+/// provides `LEAN_PATH` and `VEREX_ROOT` is not consulted. Otherwise the
+/// verifier's Lean package is `$VEREX_ROOT/verex-move`, and its built
+/// executable runs through `lake --dir <package> env`, which supplies the
+/// module path of its dependencies, under the toolchain the package pins.
+pub fn runner() -> Result<Runner> {
+    if let Some(path) = std::env::var_os(VEREX_MOVE_EXE_ENV).filter(|value| !value.is_empty()) {
         return Ok(Runner {
             program: PathBuf::from(path),
             prefix_args: vec![],
             env: vec![],
         });
     }
-    let Some(package) = package(source) else {
-        bail!(
-            "Could not find the Verex Move verifier. Build it with `cd {} && lake build \
-             verex-move` inside an Aptos Core checkout, or set {} to its Lean package or {} to \
-             its executable.",
-            VEREX_MOVE_PACKAGE,
-            VEREX_MOVE_HOME_ENV,
-            VEREX_MOVE_EXE_ENV,
-        );
-    };
+    let package = package()?;
     let binary = package.join(VEREX_MOVE_BINARY);
     if !binary.is_file() {
         bail!(
@@ -391,8 +358,8 @@ pub fn runner(source: &Path) -> Result<Runner> {
     }
     let Some(lake) = find_lake() else {
         bail!(
-            "Could not find `lake` to run the Verex Move verifier. Install Lean through elan \
-             (`./scripts/dev_setup.sh -p -l`), or set {} to its path.",
+            "Could not find `lake` to run the Verex Move verifier. Install Lean through elan, \
+             or set {} to its path.",
             LAKE_EXE_ENV,
         );
     };
@@ -406,21 +373,6 @@ pub fn runner(source: &Path) -> Result<Runner> {
         ],
         env: toolchain_env(&package),
     })
-}
-
-/// Whether the verifier can be run from here; tests skip when it cannot,
-/// unless `VEREX_MOVE_REQUIRED` is set.
-pub fn verifier_available() -> bool {
-    let available = std::env::current_dir()
-        .map_err(anyhow::Error::from)
-        .and_then(|dir| runner(&dir));
-    match available {
-        Ok(_) => true,
-        Err(err) if std::env::var_os(VEREX_MOVE_REQUIRED_ENV).is_some() => {
-            panic!("{} is set: {:#}", VEREX_MOVE_REQUIRED_ENV, err)
-        },
-        Err(_) => false,
-    }
 }
 
 /// The modules of `source` whose source file name contains `filter`: for a
@@ -523,7 +475,7 @@ pub fn verify(
 ) -> Result<()> {
     let build_duration = start_time.elapsed();
     let now = Instant::now();
-    let runner = runner(source)?;
+    let runner = runner()?;
     let export = tempfile::tempdir()?;
     let targets = target_modules(model, source, filter)?;
     let selection = module_closure(model, &targets);
@@ -734,6 +686,75 @@ esac
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn runner_resolution_respects_verex_move_exe_and_verex_root() -> Result<()> {
+        if let Ok(case) = std::env::var("VEREX_RUNNER_TEST_CASE") {
+            match case.as_str() {
+                "exe_without_root" => {
+                    let resolved = runner()?;
+                    assert_eq!(resolved.program, PathBuf::from("/bin/true"));
+                    assert!(resolved.prefix_args.is_empty());
+                    assert!(resolved.env.is_empty());
+                },
+                "unset" => {
+                    let err = runner().unwrap_err().to_string();
+                    assert_eq!(err, roots::VEREX_ROOT_UNSET_MESSAGE);
+                },
+                "wrong" => {
+                    let err = runner().unwrap_err().to_string();
+                    assert_eq!(
+                        err,
+                        "VEREX_ROOT=/nonexistent/verex is not a verex checkout: /nonexistent/verex/verex-ir/lakefile.toml is missing."
+                    );
+                },
+                other => panic!("unexpected case {other}"),
+            }
+            return Ok(());
+        }
+
+        let exe = std::env::current_exe()?;
+        for (case, envs) in [
+            ("exe_without_root", vec![
+                (VEREX_MOVE_EXE_ENV, Some("/bin/true")),
+                (roots::VEREX_ROOT_ENV, None),
+            ]),
+            ("unset", vec![
+                (VEREX_MOVE_EXE_ENV, None),
+                (roots::VEREX_ROOT_ENV, None),
+            ]),
+            ("wrong", vec![
+                (VEREX_MOVE_EXE_ENV, None),
+                (roots::VEREX_ROOT_ENV, Some("/nonexistent/verex")),
+            ]),
+        ] {
+            let mut cmd = Command::new(&exe);
+            cmd.args([
+                "--exact",
+                "verex::tests::runner_resolution_respects_verex_move_exe_and_verex_root",
+                "--nocapture",
+            ])
+            .env("VEREX_RUNNER_TEST_CASE", case);
+            for (key, value) in envs {
+                match value {
+                    Some(v) => {
+                        cmd.env(key, v);
+                    },
+                    None => {
+                        cmd.env_remove(key);
+                    },
+                }
+            }
+            let output = cmd.output()?;
+            assert!(
+                output.status.success(),
+                "case {case} failed:\n{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         Ok(())
     }
 }

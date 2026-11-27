@@ -1,2 +1,2 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/spec_var_receiver_call_err.move:1:1: error: spec variable `initial` has an initializer, which is not supported
+tests/sources/functional/spec_var_receiver_call_err.move:12:9: error: spec variable `initial` has an initializer, which is not supported

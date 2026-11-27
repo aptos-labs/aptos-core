@@ -1,0 +1,3 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/disable_inv_indirect.move:6:5: error: a public or entry function cannot be called, at any depth, by a function that disables or delegates invariants
+tests/sources/functional/disable_inv_indirect.move:10:5: error: a public or entry function cannot be called, at any depth, by a function that disables or delegates invariants

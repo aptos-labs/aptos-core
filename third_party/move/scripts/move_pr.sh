@@ -33,7 +33,7 @@ Usage:
     move_pr <flags>
 Flags:
     -h   Print this help
-    -t   Run the selected Move tests and the Verex Lean packages.
+    -t   Run the selected Move tests and the Verex Lean packages (requires VEREX_ROOT).
          Lean tests build the standalone Move CLI, never the full aptos CLI.
     -i   In addition to -t, run the selected integration tests
          (Aptos framework, e2e, and related Move tests).
@@ -131,14 +131,28 @@ MOVE_CRATES="\
   -p mono-move-aptos-transaction-executor \
 "
 
-# These packages exercise the Verex semantics, verifier, and source frontends.
-# The Move frontend tests use the locally built standalone Move CLI.
-LEAN_TEST_PROJECTS="\
-  $MOVE_BASE/lean/verex-ir \
-  $MOVE_BASE/lean/verex-move \
-  $MOVE_BASE/lean/verex-rust \
-  $MOVE_BASE/lean/verex-e2e-tests \
-"
+# Resolve VEREX_ROOT per the shared Verex root contract (no default, no walk-up).
+resolve_verex_root() {
+  local value="${VEREX_ROOT:-}" marker
+  if [ -z "$value" ]; then
+    echo "VEREX_ROOT is not set: set it to the root of a verex checkout (the directory holding verex-ir, verex-move, verex-rust and verex-e2e-tests)." >&2
+    return 2
+  fi
+  case "$value" in
+    /*) ;;
+    *)
+      echo "VEREX_ROOT=$value is not an absolute path." >&2
+      return 2
+      ;;
+  esac
+  for marker in verex-ir/lakefile.toml verex-move/lakefile.toml; do
+    if [ ! -f "$value/$marker" ]; then
+      echo "VEREX_ROOT=$value is not a verex checkout: $value/$marker is missing." >&2
+      return 2
+    fi
+  done
+  (cd "$value" && pwd -P)
+}
 
 # This is a list of crates for integration testing.
 MOVE_CRATES_INTEGRATION_TEST="\
@@ -196,12 +210,23 @@ if [ ! -z "$GEN_ARTIFACTS" ]; then
 fi
 
 if [ ! -z "$LEAN_TEST" ]; then
+  VEREX_ROOT="$(resolve_verex_root)" || exit 2
+  export VEREX_ROOT
+  export APTOS_CORE_ROOT="$(cd "$BASE" && pwd -P)"
+  # These packages exercise the Verex semantics, verifier, and source frontends.
+  # The Move frontend tests use the locally built standalone Move CLI.
+  LEAN_TEST_PROJECTS=(
+    "$VEREX_ROOT/verex-ir"
+    "$VEREX_ROOT/verex-move"
+    "$VEREX_ROOT/verex-rust"
+    "$VEREX_ROOT/verex-e2e-tests"
+  )
   # The CLI tests invoke this executable before the Lean package suites run.
   # Build it with its imports so those tests cannot use a stale verifier or
   # skip verification because the executable is missing.
   echo "*************** [move-pr] Building the Verex Move verifier"
   (
-    cd "$MOVE_BASE/lean/verex-move"
+    cd "$VEREX_ROOT/verex-move"
     lake build verex-move
   )
 fi
@@ -234,7 +259,7 @@ if [ ! -z "$LEAN_TEST" ]; then
     cd $BASE
     cargo build $CARGO_OP_PARAMS -p aptos-move-cli --features binary --bin move
   )
-  for project in $LEAN_TEST_PROJECTS; do
+  for project in "${LEAN_TEST_PROJECTS[@]}"; do
     (
       cd "$project"
       APTOS_MOVE_CLI="$BASE/target/$MOVE_PR_PROFILE/move" lake test

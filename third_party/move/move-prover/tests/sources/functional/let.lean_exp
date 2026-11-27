@@ -1,23 +1,21 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/let.move:74:5: error: verification failed with a residual obligation:
 case left.right.left.left.right.right
-a b : VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+a a_final b b_final : (VerexIR.Proofs.Denote.NTy.int 64 false).carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
 assumed permitted : True
-named✝¹ : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
-named_eq : named✝¹.val = a.val + b.val
-a✝⁸ : 0 ≤ a.val + b.val
-a✝⁷ : a.val + b.val ≤ 18446744073709551615
-a✝⁶ : ¬named✝¹.val = 0
-named✝ : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
-a✝⁵ : named✝.val = a.val / named✝¹.val
-a✝⁴ : 0 ≤ a.val / named✝¹.val
-a✝³ : a.val / named✝¹.val ≤ 18446744073709551615
 named : VerexIR.SpecInt (VerexIR.IntWidth.bits 64) false
-a✝² : named.val = a.val * b.val
+named_eq : named.val = a.val + b.val
+a✝⁶ : 0 ≤ a.val + b.val
+a✝⁵ : a.val + b.val ≤ 18446744073709551615
+a✝⁴ : ¬named.val = 0
+a✝³ : 0 ≤ a.val / named.val
+a✝² : a.val / named.val ≤ 18446744073709551615
 a✝¹ : 0 ≤ a.val * b.val
 a✝ : a.val * b.val ≤ 18446744073709551615
-symmetric : ¬0 = named✝¹.val
+symmetric : ¬0 = named.val
+a_final_eq : a_final.val = a.val / named.val
+b_final_eq : b_final.val = a.val * b.val
 ⊢ ¬((¬a.val + b.val = 0 ∨ 18446744073709551615 ≤ a.val + b.val) ∨ 18446744073709551615 ≤ a.val * b.val)
 tests/sources/functional/let.move:77:9: error: the specification clause `aborts_if sum != 0` is not established
 tests/sources/functional/let.move:78:9: error: the specification clause `aborts_if sum >= MAX_U64` is not established

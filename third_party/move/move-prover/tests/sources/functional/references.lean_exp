@@ -23,10 +23,11 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
     match flow with
     | VerexIR.Proofs.Denote.Flow.value value env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Term.denoteIn (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps
-          (VerexIR.Proofs.Denote.Term.lit () _proof_2) env)
+        (VerexIR.Proofs.Denote.Term.denoteIn
+          (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps
+          (VerexIR.Proofs.Denote.Term.lit () _proof_3) env)
         (fun value state =>
-          VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape value)
+          VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
             (fun result final => False)
             (fun failure =>
               VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
@@ -35,20 +36,21 @@ verexContinuation : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape
         state
     | VerexIR.Proofs.Denote.Flow.return_ result env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape
+        (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape
           (VerexIR.Proofs.Denote.Flow.return_ result env))
         (fun result final => False)
         (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
     | VerexIR.Proofs.Denote.Flow.break_ nest env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape (VerexIR.Proofs.Denote.Flow.break_ nest env))
+        (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape
+          (VerexIR.Proofs.Denote.Flow.break_ nest env))
         (fun result final => False)
         (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)
         state
     | VerexIR.Proofs.Denote.Flow.continue_ nest env =>
       VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.ResultShape.finish exitSite mutables shape
+        (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape
           (VerexIR.Proofs.Denote.Flow.continue_ nest env))
         (fun result final => False)
         (fun failure => VerexIR.Proofs.Obligation "tests/sources/functional/.verex/references.move.lean" 5943 5957 True)

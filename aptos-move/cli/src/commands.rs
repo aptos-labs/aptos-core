@@ -794,7 +794,7 @@ impl CliCommand<&'static str> for ProvePackage {
 /// and the loop metadata; its schema is defined by the datatypes of the
 /// `move-model-exchange` crate (`third_party/move/move-model/exchange`).
 /// The primary consumer today is the Lean formalization of the Move Prover
-/// (`third_party/move/lean`).
+/// (the Verex repository, located by `VEREX_ROOT`).
 ///
 /// Package mode (default): compiles the package and writes one JSON file
 /// per target module; modules using features outside the supported

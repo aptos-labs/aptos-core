@@ -178,8 +178,8 @@ verify test_verify_iter_sum_symbolic by
     lean =>
       verex_prepare
       all_goals
-        simp only [NTy.inhabitant] at *
-        try simp only [iter_next_result_0_Position_eq, Int.add_sub_cancel] at fact_2_0
+        try simp only [NTy.inhabitant] at *
+        try simp only [iter_next_result_Position_eq, Int.add_sub_cancel] at fact_2_0
         erw [← invariant_3] at fact_2_0
         simp only [iter_borrow_frame] at fact_2_0 ⊢
         exact fact_2_0.symm

@@ -1,5 +1,7 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/closures/amm_example.move:133:9: error: the specification clause `aborts_if false` is not established
+tests/sources/functional/closures/amm_example.move:145:9: error: the specification clause `ensures effective_in > 0
+        ==> result == reserve_out * effective_in / (reserve_in + effective_in)` is not established
 tests/sources/functional/closures/amm_example.move:148:9: error: the specification clause `ensures result <= reserve_out` is not established
 tests/sources/functional/closures/amm_example.move:152:9: error: the specification clause `ensures (reserve_in + amount_in) * (reserve_out - result)
         >= reserve_in * reserve_out` is not established
@@ -8,6 +10,7 @@ tests/sources/functional/closures/amm_example.move:129:5: error: verex verificat
     verex_obligations
     verex_on
     | aborts_if_1 => verex_prepare; sorry
+    | ensures_2 => verex_prepare; sorry
     | ensures_3 => verex_prepare; sorry
     | ensures_4 => verex_prepare; sorry
     | _ => verex_decide

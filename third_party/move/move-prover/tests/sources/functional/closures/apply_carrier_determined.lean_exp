@@ -1,0 +1,34 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:22:33: error: No goals to be solved
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:19:8: error: verex verification failed: the proof of `determined_native_twice` does not establish its specification
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:33:7: error: Application type mismatch: The argument
+  closureMeaning ?m.153
+has type
+  CallLayouts (FunctionCarriers.toNominals.toNominalFunctor unit) → InvokeMeaning
+of sort `Type 1` but is expected to have type
+  InvokeMeaning
+of sort `Type` in the application
+  ResultOf (closureMeaning ?m.153)
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:34:81: error: Type mismatch
+  [false]
+has type
+  List Bool
+but is expected to have type
+  ResultSharing
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:35:8: error: Unknown constant `VerexIR.Proofs.Denote.NTy.one`
+
+Note: Inferred this name from the expected resulting type of `.one`:
+  NTy
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:38:33: error: `simp` made no progress
+
+Note: The target expression is not type-correct under the `instances` transparency level, which may have triggered the failure. This is usually caused by unfolding of semireducible definitions in prior tactic steps. Use `set_option linter.tacticCheckInstances true` to investigate the source of the issue.
+Full error:
+  Application type mismatch: The argument
+    ()
+  has type
+    Unit
+  but is expected to have type
+    HList NRow.nil
+  in the application
+    (b, ())
+tests/sources/functional/closures/apply_carrier_determined.proof.lean:28:8: error: verex verification failed: the proof of `prelude_native_through_hof` does not establish its specification

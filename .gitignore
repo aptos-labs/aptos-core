@@ -62,6 +62,23 @@ build/
 # workspaces those proof files are opened in
 .verex/
 .lake/
+# Generated Verex proof editor workspaces (written by verex-editor-workspace.py)
+/aptos-move/framework/lakefile.toml
+/aptos-move/framework/lake-manifest.json
+/aptos-move/framework/lean-toolchain
+/aptos-move/framework/.lake/
+/third_party/move/move-prover/tests/sources/lakefile.toml
+/third_party/move/move-prover/tests/sources/lake-manifest.json
+/third_party/move/move-prover/tests/sources/lean-toolchain
+/third_party/move/move-prover/tests/sources/.lake/
+/third_party/move/move-prover/doc/higher-order-paper-26/examples/lakefile.toml
+/third_party/move/move-prover/doc/higher-order-paper-26/examples/lake-manifest.json
+/third_party/move/move-prover/doc/higher-order-paper-26/examples/lean-toolchain
+/third_party/move/move-prover/doc/higher-order-paper-26/examples/.lake/
+/third_party/move/move-compiler-v2/transactional-tests/tests/verex/lakefile.toml
+/third_party/move/move-compiler-v2/transactional-tests/tests/verex/lake-manifest.json
+/third_party/move/move-compiler-v2/transactional-tests/tests/verex/lean-toolchain
+/third_party/move/move-compiler-v2/transactional-tests/tests/verex/.lake/
 
 # Move coverage and tracing information
 .trace

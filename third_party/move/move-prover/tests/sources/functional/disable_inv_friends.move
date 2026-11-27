@@ -39,7 +39,7 @@ module M2 {
     }
 
     spec f2 {
-        pragma opaque;
+        pragma opaque; pragma delegate_invariants_to_caller;
         modifies global<R2>(signer::address_of(s));
         ensures exists<R2>(signer::address_of(s));
     }
@@ -57,7 +57,7 @@ module M3 {
     }
 
     spec f3 {
-        pragma opaque;
+        pragma opaque; pragma delegate_invariants_to_caller;
         modifies global<R3>(signer::address_of(s));
         ensures exists<R3>(signer::address_of(s));
     }

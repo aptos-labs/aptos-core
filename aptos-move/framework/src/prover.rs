@@ -138,8 +138,8 @@ pub struct ProverOptions {
     /// every specified function is verified against its `spec` blocks in
     /// Lean, with each message reported at its Move source position. A
     /// function or module raises its heartbeat budget with `pragma heartbeats`.
-    /// The verifier is `third_party/move/lean/verex-move`, located through
-    /// `VEREX_MOVE_EXE`, `VEREX_MOVE_HOME`, or the enclosing checkout.
+    /// The verifier is `$VEREX_ROOT/verex-move`, located through
+    /// `VEREX_MOVE_EXE` (with caller-supplied `LEAN_PATH`) or `VEREX_ROOT`.
     #[clap(long)]
     pub lean: bool,
 

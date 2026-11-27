@@ -32,10 +32,6 @@ verify verify_swap_remove by lean =>
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega
   all_goals have last : ((v.values.size : Int) - 1).toNat = v.values.size - 1 := by omega
-  case ensures_3 =>
-    rw [Array.getElem_swapIfInBounds_right within,
-      Array.getElem?_eq_getElem within]
-    rfl
   case ensures_2 =>
     apply VerexIR.SpecVector.ext
     simp only [VerexIR.Proofs.Denote.eraseBounded_values, VerexIR.Proofs.Denote.swapBounded_values,
@@ -43,21 +39,12 @@ verify verify_swap_remove by lean =>
       last]
     rw [swap_erase_last v.values i.val.toNat within, Array.getElem?_eq_getElem (by omega)]
     rfl
-  case ensures_1 =>
-    have bounded : ((v.values.size : Int) - 1).toNat < v.values.size := by omega
-    rw [Array.eraseIdxIfInBounds_eq, dif_pos (by simpa using bounded)]
-    simp only [Array.size_eraseIdx, Array.size_swapIfInBounds]
-    omega
 
 verify verify_model_swap_remove by lean =>
   verex_obligations
   all_goals (first | verex_decide | (verex_prepare; all_goals try verex_decide))
   all_goals have within : i.val.toNat < v.values.size := by omega
   all_goals have last : ((v.values.size : Int) - 1).toNat = v.values.size - 1 := by omega
-  case ensures_3 =>
-    rw [Array.getElem_swapIfInBounds_right within,
-      Array.getElem?_eq_getElem within]
-    rfl
   case ensures_2 =>
     apply VerexIR.SpecVector.ext
     simp only [VerexIR.Proofs.Denote.eraseBounded_values, VerexIR.Proofs.Denote.swapBounded_values,
@@ -65,8 +52,3 @@ verify verify_model_swap_remove by lean =>
       last]
     rw [swap_erase_last v.values i.val.toNat within, Array.getElem?_eq_getElem (by omega)]
     rfl
-  case ensures_1 =>
-    have bounded : ((v.values.size : Int) - 1).toNat < v.values.size := by omega
-    rw [Array.eraseIdxIfInBounds_eq, dif_pos (by simpa using bounded)]
-    simp only [Array.size_eraseIdx, Array.size_swapIfInBounds]
-    omega

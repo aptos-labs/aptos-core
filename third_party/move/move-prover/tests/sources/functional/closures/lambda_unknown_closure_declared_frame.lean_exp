@@ -1,9 +1,3 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:35:5: error: the precondition of `op` at call 1 is not established
-tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:35:5: error: verex verification failed: the automatic verification of `wildcard_target` failed; provide a proof in `tests/sources/functional/closures/lambda_unknown_closure_declared_frame.proof.lean`:
-  verify wildcard_target by lean =>
-    verex_obligations
-    verex_on
-    | requires_of_op_at_call_1 => verex_prepare; sorry
-    | _ => verex_decide
-  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
+tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:58:12: error: frames.outside: function argument may modify resource `0x42::lambda_unknown_closure_declared_frame::R`, which is not declared in `modifies_of` for `f`. `f` declares no `modifies_of`, so an invocation of it is taken to leave global memory unchanged; declare `modifies_of<f>` for what it may modify
+tests/sources/functional/closures/lambda_unknown_closure_declared_frame.move:32:9: error: frames.unestablished: cannot establish what function argument `h` may modify: the closure's target invokes a function value whose `modifies_of` leaves all of global memory open

@@ -15,8 +15,6 @@ subsystems through configuration. Move is configured as follows:
 ```toml
 [subsystems.move]
 roots = ["third_party/move", "aptos-move"]
-excluded_roots = ["third_party/move/lean"]
-e2e_tests = ["lean"]
 ignored_paths = [
     "third_party/move/documentation",
     "third_party/move/move-prover/doc",
@@ -48,21 +46,6 @@ related_test_packages = [
 | `path_rules` | Subsystem | Add package seeds for filesystem dependencies missing from Cargo; matching rules are additive and can activate a subsystem. |
 | `e2e_tests` | Subsystem | Eligible named suites, selected when a declared dependency is affected or an input changes. |
 | `ignored_paths` | Both | Global: repository-wide. Subsystem: within its roots, without suppressing overlapping subsystems. Global inputs and explicit package/E2E mappings take precedence; a mapped path inside an ignored tree seeds only its mapped packages, not the crate containing it. |
-
-Lean owns `third_party/move/lean`, excluded from Move's roots. Its named `lean`
-runner executes the Lake suites, XAST/XIR compiler integration, and linked
-MonoVM smoke/differential tests. Move and Lean both reference that runner;
-its Rust dependency anchors are declared once in `[e2e_tests.lean]`.
-Dependency changes affecting the CLI, compiler tests, or MonoVM adapter select
-Lean even when no Lean file changes. Production Lean IR/Move sources explicitly
-map back to Rust consumer tests; fixture-only changes select the Lean runner
-without broadening Rust tests. Direct inputs of a subsystem's named suite do
-not need a Cargo owner to avoid the all-candidate fallback.
-
-The Lean workflow runs selection for every PR, so transitive Rust dependencies
-are not hidden behind a manually maintained workflow path filter. Selection
-failures fail its result check. During rollout, a trusted base registry without
-`lean` conservatively runs the suite. Push/manual/nightly runs use full coverage.
 
 `Cargo.lock` remains a global input unless parsed lockfiles differ only in the
 dependency lists of existing workspace packages. In that case, subsystem and
@@ -102,9 +85,8 @@ explicit names are errors.
 
 ## E2E configuration and CI
 
-Move selects the Lean runner when its dependency anchors are affected. Other
-registered runners remain available for legacy fallback, global changes, and
-the nightly backstop.
+Move selects **no automatic E2E suites**. Registered runners remain available for
+other subsystems, legacy fallback, global changes, and the nightly backstop.
 Top-level definitions supply dependencies, for example
 (abbreviated; see the configuration for all input paths):
 
@@ -123,8 +105,7 @@ cargo x list-e2e-tests                  # Also supports --format json
 ```
 
 The shared [registry](../../.github/actions/e2e-test-determinator/registry.json)
-covers CLI/API, Forge E2E and compatibility, smoke tests, batch encryption, and
-Lean cross-language integration.
+covers CLI/API, Forge E2E and compatibility, smoke tests, and batch encryption.
 Each runner declares whether it consumes the release Docker images. Unknown E2E names or missing referenced definitions fail both `subsystem`
 and `compare` with a nonzero exit. Registry tests verify workflow jobs and required
 nightly coverage. A new runner needs registration, dependencies, workflow wiring,
@@ -203,7 +184,6 @@ suites fail the aggregate result; independent suites continue.
 
 | Coverage | Execution |
 | --- | --- |
-| Lean integration | Lake suites, compiler XAST/XIR integration, linked MonoVM smoke/differential tests. |
 | Rust baseline | Workspace Nextest (`ci`, three retries), doc tests, VM feature validation, and framework bundle freshness. |
 | Dedicated Rust suites | Eight smoke partitions and batch encryption with Node/pnpm. |
 | Application E2E | CLI against devnet/testnet/mainnet, API specs, and two deployed Forge variants (E2E, compatibility). |
@@ -273,9 +253,8 @@ for GitHub's `queue: max` setting.
 
 ## Appendix: selection accuracy
 
-These historical source-change probes predate registration of the Lean runner;
-their zero-E2E results are not current expectations for compiler or MonoVM
-changes. They exclude manual suites from selection. An isolated worktree changed one tracked file at a time,
+Four source-change probes use the configuration above, excluding manual suites
+from selection. An isolated worktree changed one tracked file at a time,
 with all-features base metadata cached and `--base HEAD` excluding implementation
 changes. An empty-diff control selected zero Rust packages.
 

@@ -1,0 +1,9 @@
+Move prover returns: exiting with verification errors
+tests/sources/functional/closures/lambda_deferred_frame_invokes_stored.move:41:5: error: the precondition of `call_g` at call 1 is not established
+tests/sources/functional/closures/lambda_deferred_frame_invokes_stored.move:41:5: error: verex verification failed: the automatic verification of `caller` failed; provide a proof in `tests/sources/functional/closures/lambda_deferred_frame_invokes_stored.proof.lean`:
+  verify caller by lean =>
+    verex_obligations
+    verex_on
+    | requires_of_call_g_at_call_1 => verex_prepare; sorry
+    | _ => verex_decide
+  (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)

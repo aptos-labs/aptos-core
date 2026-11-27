@@ -9,10 +9,11 @@
 //! Where the XIR wrapper in the crate root exchanges *stackless bytecode* for
 //! a semantic consumer, XAST exchanges the move-model AST of a module —
 //! declarations, typed expressions, and specifications — for source-level
-//! consumers such as the Lean transpiler (`third_party/move/lean/transpiler`).
-//! It is a faithful, policy-free snapshot of the model after compiler v2's
-//! env checking and rewriting (inlining, spec rewriting, match transforms) and
-//! before AST optimization; all transpilation policy lives in the consumer.
+//! consumers such as the Lean transpiler (`v0/transpiler` of the Verex
+//! repository). It is a faithful, policy-free snapshot of the model after
+//! compiler v2's env checking and rewriting (inlining, spec rewriting, match
+//! transforms) and before AST optimization; all transpilation policy lives in
+//! the consumer.
 //!
 //! **These types are the normative schema.**  The wire format is JSON as
 //! serde derives it, with the same conventions as the XIR format: structs are

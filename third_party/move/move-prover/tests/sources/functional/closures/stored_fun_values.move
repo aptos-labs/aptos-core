@@ -196,6 +196,7 @@ module 0x42::stored_fun_values {
         f: |&signer| has copy+store+drop,
     }
     spec Modifier {
+        modifies_of<f>(s: signer) Counter[std::signer::address_of(s)];
         invariant forall s: signer: !aborts_of<f>(s);
     }
 

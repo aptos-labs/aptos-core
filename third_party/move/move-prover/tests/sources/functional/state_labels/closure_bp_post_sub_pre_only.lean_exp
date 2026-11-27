@@ -1,7 +1,9 @@
 Move prover returns: exiting with verification errors
 tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verification failed with a residual obligation:
 case continues
+registry✝ : VerexIR.Validation.SemanticsRegistry
 executable✝ : VerexIR.Validation.ExecutableUnit unit
+prepared✝ : VerexIR.Validation.prepareExecution registry✝ unit = Except.ok executable✝
 nativesTyped : VerexIR.NativesTyped executable✝
 nativesShift : VerexIR.NativesShift executable✝
 runsAgree : VerexIR.Proofs.RunsAgree executable✝
@@ -9,105 +11,131 @@ ownersRepresentable : VerexIR.Proofs.OwnersRepresentable unit
 verexAgree : VerexIR.Proofs.TypesAgree unit
 verexResources : VerexIR.Proofs.ResourcesTyped unit
 f :
-  (VerexIR.Proofs.Denote.NTy.function
-      (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-        VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil).carrier
-x_final : 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.carrier
-x_value :
-  VerexIR.Proofs.Denote.NTy.plainOf VerexIR.Proofs.Denote.Carriers.toPlain (VerexIR.Proofs.Denote.NTy.int 64 false)
+  (VerexIR.Proofs.Denote.NTy.function (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+      VerexIR.Proofs.Denote.NTy.unit).carrier
+snd✝ : VerexIR.Proofs.Denote.HList VerexIR.Proofs.Denote.NRow.nil
+x x_final : Acc.carrier
 initialState✝ : VerexIR.Proofs.Denote.Memory unit
+x_valid : Acc.Holds x_final
 assumed :
-  VerexIR.Proofs.KeepsMemoryAt executable✝
-    (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-      VerexIR.Proofs.Denote.NRow.nil)
-    { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f
-permitted invariantHolds✝ : True
-x_value_lower : 0 ≤ x_value.val
-x_value_upper : x_value.val ≤ 18446744073709551615
-⊢ VerexIR.Proofs.wp
-    (VerexIR.Proofs.Denote.closureMeaning executable✝
-      (VerexIR.Proofs.Denote.NRow.cons 0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-        VerexIR.Proofs.Denote.NRow.nil)
-      { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f (((x_value, ()), x_final), ()))
-    (fun value state =>
-      VerexIR.Proofs.wp
-        (VerexIR.Proofs.Denote.Flow.bind
+  VerexIR.Proofs.KeepsMemoryAt executable✝ callLayouts
+    (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+    { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned } VerexIR.Proofs.Denote.NTy.unit f
+permitted : Acc.Holds x
+verexContinuation✝² : VerexIR.Proofs.Denote.Flow VerexIR.Proofs.Denote.ResultShape.none
+    (VerexIR.Proofs.Denote.NRow.cons
+      (VerexIR.Proofs.Denote.NTy.function (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+        { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned } VerexIR.Proofs.Denote.NTy.unit)
+      (VerexIR.Proofs.Denote.NRow.cons Acc.ref
+        (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit VerexIR.Proofs.Denote.NRow.nil)))
+    VerexIR.Proofs.Denote.NTy.unit.carrier →
+  VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp (VerexIR.Proofs.Denote.ResultShape.finish callLayouts.table exitSite mutables shape value)
+      (fun result final =>
+        VerexIR.Proofs.Obligation "tests/sources/functional/state_labels/.verex/closure_bp_post_sub_pre_only.move.lean"
+            813 907
+            (∃ S S_x,
+              VerexIR.Proofs.RequiresOfEntries (functionRequires (VerexIR.Proofs.requiresForeign unit))
+                  (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+                  VerexIR.Proofs.Denote.NTy.unit f ((S_x, S_x), ()) S ∧
+                ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts)
+                    (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+                    { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+                    VerexIR.Proofs.Denote.NTy.unit f ((S_x, S_x), ()) S) ∧
+          final = initialState✝)
+      (fun failure => True) state
+verexContinuation✝¹ : Unit → VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp
+      (VerexIR.Proofs.Denote.Flow.bind
+        (VerexIR.Proofs.Spec.pure
+          (VerexIR.Proofs.Denote.Flow.value ()
+            (VerexIR.Proofs.Denote.initialEnv
+              (VerexIR.Proofs.Denote.NRow.cons
+                (VerexIR.Proofs.Denote.NTy.function
+                  (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+                  { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+                  VerexIR.Proofs.Denote.NTy.unit)
+                (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil))
+              (VerexIR.Proofs.Denote.NRow.cons VerexIR.Proofs.Denote.NTy.unit VerexIR.Proofs.Denote.NRow.nil) frame_eq
+              (f, (x, x_final), snd✝))))
+        fun x env =>
+        VerexIR.Proofs.Denote.Term.denoteIn
+          (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps
+          ((VerexIR.Proofs.Denote.Term.invoke 5 VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                (VerexIR.Proofs.Denote.Args.cons
+                  (VerexIR.Proofs.Denote.Term.handedOver 2
+                    (VerexIR.Proofs.Denote.Term.take VerexIR.Proofs.Denote.Var.here.there))
+                  VerexIR.Proofs.Denote.Args.nil)).drop
+            ((VerexIR.Proofs.Denote.Term.invoke 20 VerexIR.Proofs.Denote.NTy.unit
+                  (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                  (VerexIR.Proofs.Denote.Args.cons
+                    (VerexIR.Proofs.Denote.Term.handedOver 14
+                      (VerexIR.Proofs.Denote.Term.take VerexIR.Proofs.Denote.Var.here.there))
+                    VerexIR.Proofs.Denote.Args.nil)).drop
+              (VerexIR.Proofs.Denote.Term.lit () _proof_1)))
+          env)
+      verexContinuation✝² (fun failure => True) state
+a✝ : Acc.Holds x
+verexContinuation✝ : Unit → VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp
+      (VerexIR.Proofs.Denote.Flow.bind
+        (VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value (x, x_final) (some f, none, none, ())))
+        fun value env =>
+        VerexIR.Proofs.Denote.Flow.bind
           (VerexIR.Proofs.Denote.Flow.bind
-            (VerexIR.Proofs.Denote.Flow.bind
-              (VerexIR.Proofs.Denote.Flow.bind VerexIR.Proofs.Spec.bottom fun v env =>
-                (VerexIR.Proofs.Denote.certifyingAt 14 VerexIR.Proofs.Denote.CertifyKind.handOver
-                      0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ v.fst).bind
-                  fun x => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value v env))
-              fun value env =>
-              VerexIR.Proofs.Denote.Flow.bind
-                (VerexIR.Proofs.Denote.Args.denoteIn
-                  (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps VerexIR.Proofs.Denote.Args.nil
-                  env)
-                fun values env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value (value, values) env))
-            fun values env =>
-            (VerexIR.Proofs.Denote.opAt 20
-                  ((VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps.invoke
-                    (VerexIR.Proofs.Denote.NRow.cons
-                      0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-                      VerexIR.Proofs.Denote.NRow.nil)
-                    { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f values)).bind
-              fun result =>
-              VerexIR.Proofs.Spec.pure
-                (VerexIR.Proofs.Denote.Flow.value (VerexIR.Proofs.Denote.ResultShape.none.toBody result) env))
-          fun x env =>
-          VerexIR.Proofs.Denote.Term.denoteIn (VerexIR.Proofs.Denote.closedMeanings executable✝ #[]).interpreterOps
-            (VerexIR.Proofs.Denote.Term.lit () _proof_1) env)
-        (fun value state =>
-          VerexIR.Proofs.wp
-            (match value with
-            | VerexIR.Proofs.Denote.Flow.value value env =>
-              match env.snd.fst with
-              | some reference =>
-                (VerexIR.Proofs.Denote.certifyingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
-                      0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ reference.fst).bind
-                  fun x =>
-                  (VerexIR.Proofs.Spec.assume
-                        (reference.fst =
-                          0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.forget
-                            reference.snd)).bind
-                    fun x =>
-                    VerexIR.Proofs.Denote.Mutables.resolve exitSite VerexIR.Proofs.Denote.Mutables.nil env
-                      (VerexIR.Proofs.Spec.pure ())
-              | none => VerexIR.Proofs.Spec.pure ()
-            | VerexIR.Proofs.Denote.Flow.return_ result env =>
-              match env.snd.fst with
-              | some reference =>
-                (VerexIR.Proofs.Denote.certifyingAt exitSite VerexIR.Proofs.Denote.CertifyKind.exit
-                      0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰ reference.fst).bind
-                  fun x =>
-                  (VerexIR.Proofs.Spec.assume
-                        (reference.fst =
-                          0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.forget
-                            reference.snd)).bind
-                    fun x =>
-                    VerexIR.Proofs.Denote.Mutables.resolve exitSite VerexIR.Proofs.Denote.Mutables.nil env
-                      (VerexIR.Proofs.Spec.pure result)
-              | none => VerexIR.Proofs.Spec.pure result
-            | VerexIR.Proofs.Denote.Flow.break_ nest env => VerexIR.Proofs.Spec.bottom
-            | VerexIR.Proofs.Denote.Flow.continue_ nest env => VerexIR.Proofs.Spec.bottom)
-            (fun result final =>
-              (∃ S S_x,
-                  VerexIR.Proofs.RequiresOfEntries (functionRequires (VerexIR.Proofs.requiresForeign unit))
-                      (VerexIR.Proofs.Denote.NRow.cons
-                        0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-                        VerexIR.Proofs.Denote.NRow.nil)
-                      { parameters := [false], results := [] } VerexIR.Proofs.Denote.NRow.nil f ((S_x, S_x), ()) S ∧
-                    ¬VerexIR.Proofs.AbortsOfEntries (VerexIR.Proofs.Denote.closureMeaning executable✝)
-                        (VerexIR.Proofs.Denote.NRow.cons
-                          0x42.closure_bp_post_sub_pre_only.unit.nominal.namespace.0.declaration✝⁻⁰.ref
-                          VerexIR.Proofs.Denote.NRow.nil)
-                        { parameters := [false], results := [] } VerexIR.Proofs.Denote.ResultShape.none f
-                        ((S_x, S_x), ()) S) ∧
-                final = initialState✝)
-            (fun failure => True) state)
-        (fun failure => True) state)
-    (fun failure => True) initialState✝
+            (VerexIR.Proofs.Denote.Args.denoteIn
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps
+              VerexIR.Proofs.Denote.Args.nil env)
+            fun values env => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value (value, values) env))
+          fun value env =>
+          VerexIR.Proofs.Denote.Flow.bind
+            ((VerexIR.Proofs.Denote.opAt 5
+                  ((VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps.invoke
+                    (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+                    { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned }
+                    VerexIR.Proofs.Denote.NTy.unit f value)).bind
+              fun v => VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value v env))
+            fun x env =>
+            VerexIR.Proofs.Denote.Term.denoteIn
+              (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps
+              ((VerexIR.Proofs.Denote.Term.invoke 20 VerexIR.Proofs.Denote.NTy.unit
+                    (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                    (VerexIR.Proofs.Denote.Args.cons
+                      (VerexIR.Proofs.Denote.Term.handedOver 14
+                        (VerexIR.Proofs.Denote.Term.take VerexIR.Proofs.Denote.Var.here.there))
+                      VerexIR.Proofs.Denote.Args.nil)).drop
+                (VerexIR.Proofs.Denote.Term.lit () _proof_1))
+              env)
+      verexContinuation✝² (fun failure => True) state
+invariantHolds✝ : Acc.Holds x
+verexContinuation : VerexIR.Proofs.Denote.NTy.unit.carrier → VerexIR.Proofs.Denote.Memory unit → Prop :=
+  fun value state =>
+    VerexIR.Proofs.wp
+      (VerexIR.Proofs.Denote.Flow.bind
+        (VerexIR.Proofs.Spec.pure (VerexIR.Proofs.Denote.Flow.value value (some f, none, none, ()))) fun x env =>
+        VerexIR.Proofs.Denote.Term.denoteIn
+          (VerexIR.Proofs.Denote.closedMeanings executable✝ callLayouts #[]).interpreterOps
+          ((VerexIR.Proofs.Denote.Term.invoke 20 VerexIR.Proofs.Denote.NTy.unit
+                (VerexIR.Proofs.Denote.Term.var VerexIR.Proofs.Denote.Var.here)
+                (VerexIR.Proofs.Denote.Args.cons
+                  (VerexIR.Proofs.Denote.Term.handedOver 14
+                    (VerexIR.Proofs.Denote.Term.take VerexIR.Proofs.Denote.Var.here.there))
+                  VerexIR.Proofs.Denote.Args.nil)).drop
+            (VerexIR.Proofs.Denote.Term.lit () _proof_1))
+          env)
+      verexContinuation✝² (fun failure => True) state
+⊢ VerexIR.Proofs.wp
+    (VerexIR.Proofs.Denote.closureMeaning executable✝ callLayouts
+      (VerexIR.Proofs.Denote.NRow.cons Acc.ref VerexIR.Proofs.Denote.NRow.nil)
+      { parameters := [false], results := VerexIR.Proofs.Denote.ResultSharing.owned } VerexIR.Proofs.Denote.NTy.unit f
+      ((x, x_final), ()))
+    verexContinuation (fun failure => True) initialState✝
 tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.move:17:5: error: verex verification failed: the automatic verification of `apply_twice` failed; provide a proof in `tests/sources/functional/state_labels/closure_bp_post_sub_pre_only.proof.lean`:
   verify apply_twice by lean =>
     verex_obligations

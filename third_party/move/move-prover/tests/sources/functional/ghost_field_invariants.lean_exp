@@ -1,5 +1,5 @@
 Move prover returns: exiting with verification errors
-tests/sources/functional/ghost_field_invariants.move:84:9: error: the specification clause `invariant max_seen >= x` is not established
+tests/sources/functional/ghost_field_invariants.move:84:9: error: the data invariant `invariant max_seen >= x` does not hold where a mutable parameter's loan ends, at the function's exit
 tests/sources/functional/ghost_field_invariants.move:106:5: error: verex verification failed: the automatic verification of `mono_break_write` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
   verify mono_break_write by lean =>
     verex_obligations
@@ -15,8 +15,8 @@ tests/sources/functional/ghost_field_invariants.move:53:5: error: verex verifica
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_invariants.move:60:9: error: the specification clause `invariant total >= x` is not established
-tests/sources/functional/ghost_field_invariants.move:61:9: error: the specification clause `invariant total >= y` is not established
+tests/sources/functional/ghost_field_invariants.move:60:9: error: the data invariant `invariant total >= x` does not hold where a mutable parameter's loan ends, at the function's exit
+tests/sources/functional/ghost_field_invariants.move:61:9: error: the data invariant `invariant total >= y` does not hold where a mutable parameter's loan ends, at the function's exit
 tests/sources/functional/ghost_field_invariants.move:76:5: error: verex verification failed: the automatic verification of `sum_break` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
   verify sum_break by lean =>
     verex_obligations
@@ -33,7 +33,7 @@ tests/sources/functional/ghost_field_invariants.move:120:5: error: verex verific
     | data_invariant_1 => verex_prepare; sorry
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
-tests/sources/functional/ghost_field_invariants.move:127:9: error: the specification clause `invariant h < 100` is not established
+tests/sources/functional/ghost_field_invariants.move:127:9: error: the data invariant `invariant h < 100` does not hold where a mutable parameter's loan ends, at the function's exit
 tests/sources/functional/ghost_field_invariants.move:134:5: error: verex verification failed: the automatic verification of `einit_update_bad` failed; provide a proof in `tests/sources/functional/ghost_field_invariants.proof.lean`:
   verify einit_update_bad by lean =>
     verex_obligations

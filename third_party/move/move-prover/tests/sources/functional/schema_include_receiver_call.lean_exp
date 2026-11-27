@@ -24,7 +24,7 @@ tests/sources/functional/schema_include_receiver_call.move:60:5: error: verex ve
     | _ => verex_decide
   (`verex_prepare` states a leaf in source form; `trace_state` after it shows the goal)
 tests/sources/functional/schema_include_receiver_call.move:18:9: error: the specification clause `ensures [export] result == s.get_f()` is not established
-tests/sources/functional/schema_include_receiver_call.move:3:1: error: verex verification failed: the automatic verification of `applied_f_off_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
+tests/sources/functional/schema_include_receiver_call.move:108:5: error: verex verification failed: the automatic verification of `applied_f_off_incorrect` failed; provide a proof in `tests/sources/functional/schema_include_receiver_call.proof.lean`:
   verify applied_f_off_incorrect by lean =>
     verex_obligations
     verex_on

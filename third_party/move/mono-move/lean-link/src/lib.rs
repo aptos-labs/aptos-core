@@ -4,7 +4,7 @@
 //! Linked MonoVM execution adapter for the Lean differential test harness.
 //!
 //! This crate is the Rust half of the Lean/MonoVM boundary described in
-//! `third_party/move/lean/designs/monovm-link-design.md`. It exports a
+//! `doc/designs/monovm-link-design.md` of the Verex repository. It exports a
 //! minimal versioned C ABI that a small C shim, written against the pinned
 //! Lean toolchain's `lean/lean.h`, links into the Lean test executable:
 //!
