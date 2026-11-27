@@ -15,10 +15,10 @@ variable "ami_prefix" {
   type = string
 }
 
-
+# The minimal image ships only the Actions runner and Docker; install_runner_tools.sh adds what CI jobs use.
 data "amazon-ami" "runs-on-ami-x64" {
   filters = {
-    name                = "runs-on-v2.2-ubuntu22-full-x64-*"
+    name                = "runs-on-v2.2-ubuntu24-minimal-x64-*"
     root-device-type    = "ebs"
     virtualization-type = "hvm"
   }
@@ -36,10 +36,18 @@ source "amazon-ebs" "build-ebs" {
   source_ami     = "${data.amazon-ami.runs-on-ami-x64.id}"
   ssh_username   = "ubuntu"
   user_data_file = "./user_data.sh"
+
+  # The minimal source AMI has a 4 GB root volume, too small for the toolchain; 30 GB matches the full image.
+  launch_block_device_mappings {
+    device_name           = "/dev/sda1"
+    volume_size           = 30
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
 }
 
 build {
-  name = "setup-ubuntu-22.04"
+  name = "setup-runs-on-runner"
   sources = [
     "source.amazon-ebs.build-ebs"
   ]
@@ -54,21 +62,23 @@ build {
     destination = "/tmp/scripts"
   }
 
+  provisioner "file" {
+    source      = "./install_runner_tools.sh"
+    destination = "/tmp/install_runner_tools.sh"
+  }
+
+  provisioner "file" {
+    source      = "./verify_runner_image.sh"
+    destination = "/tmp/verify_runner_image.sh"
+  }
+
   provisioner "shell" {
     inline = [
       "whoami",
+      "sudo bash /tmp/install_runner_tools.sh",
       "chmod +x /tmp/scripts/dev_setup.sh",
-      "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k",
-
-      // Install GCloud SDK and kubectl
-      "sudo apt-get install apt-transport-https ca-certificates gnupg -y",
-      "echo 'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list",
-      "curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -",
-      "sudo apt-get update && sudo apt-get install kubectl google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin -y",
-      // Verify installations
-      "gcloud --version",
-      "kubectl version --client",
-      "gke-gcloud-auth-plugin --version"
+      "sudo -u runner /tmp/scripts/dev_setup.sh -b -r -y -P -J -t -k -i awscli",
+      "sudo -u runner -H bash /tmp/verify_runner_image.sh",
     ]
   }
 }
