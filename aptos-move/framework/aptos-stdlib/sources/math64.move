@@ -65,11 +65,23 @@ module aptos_std::math64 {
         } else {
             let p = 1;
             while (e > 1) {
+                spec {
+                    assert spec_pow(n, e) == n * spec_pow(n, e - 1);
+                    assert spec_pow(n, e - 1) == n * spec_pow(n, e - 2);
+                    assert n > 0 ==> p * spec_pow(n, e) >= p * (n * n);
+                    assert n > 0 ==> p * (n * n) >= p * n;
+                    assert n * n <= MAX_U64 ==> spec_pow(n, e)
+                        == (if (e % 2 == 1) n else 1) * spec_pow(n * n, e / 2);
+                };
                 if (e % 2 == 1) {
                     p *= n;
                 };
                 e /= 2;
                 n *= n;
+            } spec {
+                invariant e >= 1;
+                invariant n > 0 ==> p > 0;
+                invariant p * spec_pow(n, e) == spec_pow(old(n), old(e));
             };
             p * n
         }
@@ -88,8 +100,19 @@ module aptos_std::math64 {
             };
             n >>= 1;
         } spec {
+            invariant n == 32 || n == 16 || n == 8 || n == 4 || n == 2 || n == 1 || n == 0;
             invariant (res as u64) + 2 * (n as u64) <= 64;
-            invariant n == 0 ==> (res as u64) <= 63;
+            invariant n == 32 ==> res == 0;
+            invariant n == 16 ==> res % 32 == 0;
+            invariant n == 8 ==> res % 16 == 0;
+            invariant n == 4 ==> res % 8 == 0;
+            invariant n == 2 ==> res % 4 == 0;
+            invariant n == 1 ==> res % 2 == 0;
+            invariant x >= 1;
+            invariant n > 0 ==> x < spec_pow(2, 2 * n);
+            invariant n == 0 ==> x == 1;
+            invariant spec_pow(2, res) * x <= old(x);
+            invariant old(x) < spec_pow(2, res) * (x + 1);
         };
         res
     }

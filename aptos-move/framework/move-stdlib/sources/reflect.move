@@ -43,8 +43,9 @@ module std::reflect {
         native_resolve(addr, module_name, func_name)
     }
     spec resolve {
-        pragma verify = false;
-        pragma opaque; // Make uninterpreted
+        pragma opaque;
+        /// Resolution failures are returned as errors; only a disabled feature aborts.
+        aborts_if !features::spec_is_enabled(features::FUNCTION_REFLECTION);
     }
 
     /// Represents errors returned by the reflection API.
@@ -79,4 +80,9 @@ module std::reflect {
     native fun native_resolve<FuncType>(
         addr: address, module_name: &String, func_name: &String
     ): Result<FuncType, ReflectionError>;
+    spec native_resolve {
+        pragma opaque;
+        // The native reports failures in its result.
+        aborts_if [abstract] false;
+    }
 }

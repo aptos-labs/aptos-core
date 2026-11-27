@@ -1755,6 +1755,8 @@ module aptos_token::token {
                 let prefix = key.sub_string(0, 6);
                 assert!(prefix != string::utf8(b"TOKEN_"), error::permission_denied(EPROPERTY_RESERVED_BY_STANDARD));
             };
+        } spec {
+            ensures !spec_has_reserved_prefix(key);
         });
     }
 

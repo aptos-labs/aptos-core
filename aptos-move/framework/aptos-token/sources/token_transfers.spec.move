@@ -1,24 +1,23 @@
 spec aptos_token::token_transfers {
     spec module {
-        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 
     spec initialize_token_transfers(account: &signer) {
         include InitializeTokenTransfersAbortsIf;
+        ensures exists<PendingClaims>(signer::address_of(account));
     }
 
-    /// Abort according to the code
+    /// Creating the three event handles bumps the account's GUID counter three times.
     spec schema InitializeTokenTransfersAbortsIf {
         use aptos_framework::account::{Account};
         account: &signer;
 
         let addr = signer::address_of(account);
         aborts_if exists<PendingClaims>(addr);
-        let account = global<Account>(addr);
-        aborts_if !exists<Account>(addr);
-        aborts_if account.guid_creation_num + 3 >= account::MAX_GUID_CREATION_NUM;
-        aborts_if account.guid_creation_num + 3 > MAX_U64;
+        include account::NewEventHandleAbortsIf;
+        let creation_num = if (exists<Account>(addr)) { global<Account>(addr).guid_creation_num } else { 2 };
+        aborts_if creation_num + 3 >= account::MAX_GUID_CREATION_NUM;
     }
 
     spec create_token_offer_id(to_addr: address, token_id: TokenId): TokenOfferId {
@@ -34,8 +33,10 @@ spec aptos_token::token_transfers {
         property_version: u64,
         amount: u64,
     ){
-        pragma verify = false;
+        include token::CreateTokenDataIdAbortsIf;
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
+        include OfferAbortsIf { sender };
+        include OfferEnsures { sender };
     }
 
     spec offer(
@@ -44,44 +45,48 @@ spec aptos_token::token_transfers {
         token_id: TokenId,
         amount: u64,
     ){
-        use aptos_token::token::{TokenStore,Self};
-
-        // TODO: Can't get the return from `withdraw_token`.
-        pragma verify = false;
-
-        let sender_addr = signer::address_of(sender);
-        include !exists<PendingClaims>(sender_addr) ==> InitializeTokenTransfersAbortsIf{account : sender};
-        let pending_claims = global<PendingClaims>(sender_addr).pending_claims;
-        let token_offer_id = create_token_offer_id(receiver, token_id);
-
-        let tokens = global<TokenStore>(sender_addr).tokens;
-        aborts_if amount <= 0;
-        aborts_if token::spec_balance_of(sender_addr, token_id) < amount;
-        aborts_if !exists<TokenStore>(sender_addr);
-        aborts_if !table::spec_contains(tokens, token_id);
-
-        aborts_if !table::spec_contains(pending_claims, token_offer_id);
-        let a = table::spec_contains(pending_claims, token_offer_id);
-        let dst_token = table::spec_get(pending_claims, token_offer_id);
-
-        aborts_if dst_token.amount + spce_get(signer::address_of(sender), token_id, amount) > MAX_U64;
+        include OfferAbortsIf;
+        include OfferEnsures;
     }
 
-    /// Get the amount from sender token
-    spec fun spce_get(
-        account_addr: address,
-        id: TokenId,
-        amount: u64
-    ): u64 {
+    spec schema OfferAbortsIf {
         use aptos_token::token::{TokenStore};
-        use aptos_std::table::{Self};
-        let tokens = global<TokenStore>(account_addr).tokens;
-        let balance = table::spec_get(tokens, id).amount;
-        if (balance > amount) {
-            amount
-        } else {
-            table::spec_get(tokens, id).amount
-        }
+        sender: signer;
+        receiver: address;
+        token_id: TokenId;
+        amount: u64;
+
+        let sender_addr = signer::address_of(sender);
+        include !exists<PendingClaims>(sender_addr) ==> InitializeTokenTransfersAbortsIf { account: sender };
+        include token::WithdrawWithEventInternalAbortsIf { account_addr: sender_addr, id: token_id };
+        // Withdrawing the whole entry moves the stored token, which carries its own id.
+        let stored = table::spec_get(global<TokenStore>(sender_addr).tokens, token_id);
+        let moved_id = if (stored.amount > amount) { token_id } else { stored.id };
+        // A freshly created PendingClaims is empty, so only an existing offer is merged into.
+        let pending_claims = global<PendingClaims>(sender_addr).pending_claims;
+        let token_offer_id = create_token_offer_id(receiver, token_id);
+        let merging = exists<PendingClaims>(sender_addr) && table::spec_contains(pending_claims, token_offer_id);
+        let dst_token = table::spec_get(pending_claims, token_offer_id);
+        aborts_if merging && dst_token.id != moved_id;
+        aborts_if merging && dst_token.amount + amount > MAX_U64;
+    }
+
+    spec schema OfferEnsures {
+        sender: signer;
+        receiver: address;
+        token_id: TokenId;
+        amount: u64;
+
+        let sender_addr = signer::address_of(sender);
+        let token_offer_id = create_token_offer_id(receiver, token_id);
+        let pending_claims = global<PendingClaims>(sender_addr).pending_claims;
+        let merging = exists<PendingClaims>(sender_addr) && table::spec_contains(pending_claims, token_offer_id);
+        let post post_pending_claims = global<PendingClaims>(sender_addr).pending_claims;
+        ensures token::spec_balance_of(sender_addr, token_id)
+            == old(token::spec_balance_of(sender_addr, token_id)) - amount;
+        ensures table::spec_contains(post_pending_claims, token_offer_id);
+        ensures table::spec_get(post_pending_claims, token_offer_id).amount
+            == if (merging) { table::spec_get(pending_claims, token_offer_id).amount + amount } else { amount };
     }
 
     spec claim_script(
@@ -92,27 +97,13 @@ spec aptos_token::token_transfers {
         name: String,
         property_version: u64,
     ){
-        use aptos_token::token::{TokenStore};
-
-        // TODO: deposit_token has pending issues
-        pragma aborts_if_is_partial;
-
+        include token::CreateTokenDataIdAbortsIf;
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
-        aborts_if !exists<PendingClaims>(sender);
-        let pending_claims = global<PendingClaims>(sender).pending_claims;
-        let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
-        aborts_if !table::spec_contains(pending_claims, token_offer_id);
-        let tokens = table::spec_get(pending_claims, token_offer_id);
-
-        include token::InitializeTokenStore{account: receiver };
-
-        let account_addr = signer::address_of(receiver);
-        let token = tokens;
-        let token_store = global<TokenStore>(account_addr);
-        let recipient_token = table::spec_get(token_store.tokens, token.id);
-        let b = table::spec_contains(token_store.tokens, token.id);
-        aborts_if token.amount <= 0;
-
+        include TakeOfferAbortsIfAndEnsures {
+            owner: sender,
+            to_addr: signer::address_of(receiver),
+            account: receiver,
+        };
     }
 
     spec claim(
@@ -120,24 +111,11 @@ spec aptos_token::token_transfers {
         sender: address,
         token_id: TokenId,
     ){
-        use aptos_token::token::{TokenStore};
-        // TODO: deposit_token has pending issues
-        pragma aborts_if_is_partial;
-
-        aborts_if !exists<PendingClaims>(sender);
-        let pending_claims = global<PendingClaims>(sender).pending_claims;
-        let token_offer_id = create_token_offer_id(signer::address_of(receiver), token_id);
-        aborts_if !table::spec_contains(pending_claims, token_offer_id);
-        let tokens = table::spec_get(pending_claims, token_offer_id);
-
-        include token::InitializeTokenStore{account: receiver };
-
-        let account_addr = signer::address_of(receiver);
-        let token = tokens;
-        let token_store = global<TokenStore>(account_addr);
-        let recipient_token = table::spec_get(token_store.tokens, token.id);
-        let b = table::spec_contains(token_store.tokens, token.id);
-        aborts_if token.amount <= 0;
+        include TakeOfferAbortsIfAndEnsures {
+            owner: sender,
+            to_addr: signer::address_of(receiver),
+            account: receiver,
+        };
     }
 
     spec cancel_offer_script(
@@ -148,28 +126,13 @@ spec aptos_token::token_transfers {
         name: String,
         property_version: u64,
     ){
-        use aptos_token::token::{TokenStore};
-
-        // TODO: deposit_token has pending issues.
-        pragma aborts_if_is_partial;
-
+        include token::CreateTokenDataIdAbortsIf;
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
-
-        let sender_addr = signer::address_of(sender);
-        aborts_if !exists<PendingClaims>(sender_addr);
-        let pending_claims = global<PendingClaims>(sender_addr).pending_claims;
-        let token_offer_id = create_token_offer_id(receiver, token_id);
-        aborts_if !table::spec_contains(pending_claims, token_offer_id);
-
-        include token::InitializeTokenStore{account: sender };
-        let dst_token = table::spec_get(pending_claims, token_offer_id);
-
-        let account_addr = sender_addr;
-        let token = dst_token;
-        let token_store = global<TokenStore>(account_addr);
-        let recipient_token = table::spec_get(token_store.tokens, token.id);
-        let b = table::spec_contains(token_store.tokens, token.id);
-        aborts_if token.amount <= 0;
+        include TakeOfferAbortsIfAndEnsures {
+            owner: signer::address_of(sender),
+            to_addr: receiver,
+            account: sender,
+        };
     }
 
     spec cancel_offer(
@@ -177,25 +140,36 @@ spec aptos_token::token_transfers {
         receiver: address,
         token_id: TokenId,
     ){
+        include TakeOfferAbortsIfAndEnsures {
+            owner: signer::address_of(sender),
+            to_addr: receiver,
+            account: sender,
+        };
+    }
+
+    /// Removes the offer of `owner` to `to_addr` and deposits its token into `account`.
+    spec schema TakeOfferAbortsIfAndEnsures {
         use aptos_token::token::{TokenStore};
+        owner: address;
+        to_addr: address;
+        token_id: TokenId;
+        account: signer;
 
-        // TODO: deposit_token has pending issues.
-        pragma aborts_if_is_partial;
-
-        let sender_addr = signer::address_of(sender);
-        aborts_if !exists<PendingClaims>(sender_addr);
-        let pending_claims = global<PendingClaims>(sender_addr).pending_claims;
-        let token_offer_id = create_token_offer_id(receiver, token_id);
+        aborts_if !exists<PendingClaims>(owner);
+        let pending_claims = global<PendingClaims>(owner).pending_claims;
+        let token_offer_id = create_token_offer_id(to_addr, token_id);
         aborts_if !table::spec_contains(pending_claims, token_offer_id);
-
-        include token::InitializeTokenStore{account: sender };
-        let dst_token = table::spec_get(pending_claims, token_offer_id);
-
-        let account_addr = sender_addr;
-        let token = dst_token;
-        let token_store = global<TokenStore>(account_addr);
-        let recipient_token = table::spec_get(token_store.tokens, token.id);
-        let b = table::spec_contains(token_store.tokens, token.id);
+        let token = table::spec_get(pending_claims, token_offer_id);
+        let account_addr = signer::address_of(account);
         aborts_if token.amount <= 0;
+        include token::InitializeTokenStore;
+        include exists<TokenStore>(account_addr) ==> token::DirectDepositAbortsIf {
+            account_addr,
+            token_id: token.id,
+            token_amount: token.amount,
+        };
+        ensures !table::spec_contains(global<PendingClaims>(owner).pending_claims, token_offer_id);
+        ensures token::spec_balance_of(account_addr, token.id)
+            == old(token::spec_balance_of(account_addr, token.id)) + token.amount;
     }
 }
