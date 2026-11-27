@@ -55,7 +55,7 @@ use move_core_types::{
     value::{check_layout_within_bounds, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
 use serde::de::DeserializeSeed;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ptr::NonNull};
 
 /// Returns the fixed BCS size of a value of the given type, or [`None`] when it
 /// is data-dependent (e.g., for vectors, enums, function values) or the type
@@ -1049,7 +1049,8 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
             heap,
             OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + blob.len(),
             TRIVIAL_DESCRIPTOR_ID,
-        )?;
+        )?
+        .as_ptr();
         // SAFETY: the allocation covers the header and the blob after it. The
         // values region is empty, so the blob starts where values would.
         unsafe {
@@ -1069,7 +1070,8 @@ fn deserialize_closure<T: LayoutProvider + ?Sized>(
         heap,
         OBJECT_HEADER_SIZE + CLOSURE_DATA_SIZE,
         CLOSURE_DESCRIPTOR_ID,
-    )?;
+    )?
+    .as_ptr();
     // A closure in storage was serialized, so its target was persistent.
     //
     // SAFETY: the allocation covers a closure's whole data region.
@@ -1155,7 +1157,7 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
     capture_layouts: &[LayoutId],
     values_size: u32,
     descriptor_id: DescriptorId,
-) -> AllocationResult<*mut u8> {
+) -> AllocationResult<NonNull<u8>> {
     // Copying the blob out first keeps the decode independent of the heap: the
     // allocations below may hand out the bytes `raw` occupies back to the
     // collector before the last capture is read.
@@ -1172,7 +1174,7 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
     };
 
     let total_size = OBJECT_HEADER_SIZE + CAPTURED_DATA_VALUES_OFFSET + values_size as usize;
-    let obj = heap_alloc(
+    let obj_ptr = heap_alloc(
         heap,
         total_size
             .checked_add(blob.len())
@@ -1181,6 +1183,7 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
             })?,
         descriptor_id,
     )?;
+    let obj = obj_ptr.as_ptr();
     // SAFETY: the allocation covers the header, the values region and the blob
     // after it.
     unsafe {
@@ -1238,7 +1241,7 @@ pub(crate) unsafe fn materialize_raw_captures<T: LayoutProvider + ?Sized>(
         }
         .into());
     }
-    Ok(obj)
+    Ok(obj_ptr)
 }
 
 /// Whether a capture stored under `stored` decodes as a value of `current`. A
@@ -3132,7 +3135,8 @@ mod tests {
                 16,
                 TRIVIAL_DESCRIPTOR_ID,
             )
-            .unwrap();
+            .unwrap()
+            .as_ptr();
             assert_eq!(*materialized.add(CAPTURED_DATA_TAG_OFFSET), {
                 CAPTURED_DATA_TAG_MATERIALIZED_RAW
             });
@@ -3243,7 +3247,8 @@ mod tests {
                 8,
                 TRIVIAL_DESCRIPTOR_ID,
             )
-            .unwrap();
+            .unwrap()
+            .as_ptr();
             write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, materialized);
 
             let copy = heap

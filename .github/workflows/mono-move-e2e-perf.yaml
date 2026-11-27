@@ -90,6 +90,10 @@ jobs:
           RUNNER_NAME: ${{ inputs.RUNNER_NAME || 'benchmark-c3d-60' }}
           REPEATS: ${{ inputs.REPEATS || '3' }}
           NUM_BLOCKS_PER_TEST: ${{ inputs.NUM_BLOCKS_PER_TEST || '30' }}
+          # This is a single-thread job, see
+          # .github/workflows/mono-move-e2e-perf-parallel.yaml for parallel
+          # execution.
+          EXECUTION_THREADS: "1"
           SELF_COMPARE: ${{ inputs.SELF_COMPARE && '1' || '' }}
           BUILD: ${{ inputs.BUILD || 'release' }}
           REPORT_PATH: ${{ runner.temp }}/mono-move-e2e-perf.md
