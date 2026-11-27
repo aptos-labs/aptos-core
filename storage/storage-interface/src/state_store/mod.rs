@@ -108,13 +108,13 @@ pub fn empty_hot_state_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
 
 #[derive(Clone, Debug)]
 pub struct HotStateUpdates {
-    pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
+    pub shards: [HotStateShardUpdates; NUM_STATE_SHARDS],
 }
 
 impl HotStateUpdates {
     pub fn new_empty() -> Self {
         Self {
-            for_last_checkpoint: None,
+            shards: empty_hot_state_updates(),
         }
     }
 }

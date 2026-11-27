@@ -8,7 +8,7 @@ use crate::{
         state::LedgerState,
         state_update_refs::{BatchedStateUpdateRefs, StateUpdateRefs},
         state_with_summary::LedgerWithSummary,
-        HotStateShardUpdates, HotStateUpdates,
+        HotStateUpdates,
     },
     CheckpointStateReader, DbReader,
 };
@@ -20,9 +20,7 @@ use aptos_crypto::{
 use aptos_logger::warn;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
-use aptos_types::{
-    proof::SparseMerkleProofExt, state_store::NUM_STATE_SHARDS, transaction::Version,
-};
+use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
 use derive_more::Deref;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -103,7 +101,7 @@ impl StateSummary {
     fn update(
         &self,
         persisted: &ProvableStateSummary,
-        hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+        hot_updates: &HotStateUpdates,
         updates: &BatchedStateUpdateRefs,
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
@@ -147,7 +145,7 @@ impl StateSummary {
     fn update_hot_state_summary(
         &self,
         persisted: &ProvableStateSummary,
-        hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
+        hot_updates: &HotStateUpdates,
     ) -> Result<SparseMerkleTree> {
         let current_hot = self.hot_state_summary.as_ref().ok_or_else(|| {
             anyhow::anyhow!("update_hot_state_summary on a StateSummary with no hot half")
@@ -158,6 +156,7 @@ impl StateSummary {
             .expect("hot half present on self implies same on persisted");
 
         let hot_smt_updates = hot_updates
+            .shards
             .par_iter()
             .flat_map(|shard| {
                 shard
@@ -249,11 +248,8 @@ impl LedgerStateSummary {
         let _timer = TIMER.timer_with(&["ledger_state_summary__update"]);
 
         let last_checkpoint = if let Some(updates) = updates.for_last_checkpoint_batched() {
-            self.last_checkpoint.update(
-                persisted,
-                hot_state_updates.for_last_checkpoint.as_ref().unwrap(),
-                updates,
-            )?
+            self.last_checkpoint
+                .update(persisted, hot_state_updates, updates)?
         } else {
             self.last_checkpoint.clone()
         };

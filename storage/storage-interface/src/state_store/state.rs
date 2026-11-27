@@ -199,7 +199,7 @@ impl State {
         per_version_updates: &PerVersionStateUpdateRefs,
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
-    ) -> Result<(Self, [HotStateShardUpdates; NUM_STATE_SHARDS])> {
+    ) -> Result<(Self, HotStateUpdates)> {
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
@@ -284,21 +284,10 @@ impl State {
                                 .expect("LRU eviction must succeed.");
                         }
                     }
-                    for (key, update) in all_updates {
-                        let key_hash = *key.crypto_hash_ref();
-                        if let Some(op) = Self::apply_one_update(
-                            &mut lru,
-                            overlay,
-                            cache,
-                            key,
-                            update,
-                            cursor
-                                .for_update(update.version)
-                                .refresh_interval_versions(),
-                        ) {
-                            shard_updates.insert(key_hash, op);
-                        }
-                    }
+                    assert!(
+                        all_updates.next().is_none(),
+                        "The last version must be a checkpoint."
+                    );
 
                     let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                         lru.into_updates();
@@ -320,9 +309,11 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let new_metadata = new_metadata.try_into().expect("Known to be 16 shards.");
         let usage = self.update_usage(usage_delta_per_shard);
-        let hot_state_updates = hot_state_updates
-            .try_into()
-            .expect("Known to be 16 shards.");
+        let hot_state_updates = HotStateUpdates {
+            shards: hot_state_updates
+                .try_into()
+                .expect("Known to be 16 shards."),
+        };
 
         let new_config = config_changes
             .last()
@@ -530,23 +521,21 @@ impl LedgerState {
     ) -> Result<(LedgerState, HotStateUpdates)> {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let mut all_hot_state_updates = HotStateUpdates::new_empty();
-        let last_checkpoint = if let Some(batched) = updates.for_last_checkpoint_batched() {
-            let (new_ckpt, hot_state_updates) = self.last_checkpoint.update(
-                persisted_hot_view,
-                persisted_snapshot,
-                batched,
-                &updates.per_version,
-                updates.all_checkpoint_versions(),
-                reads,
-            )?;
-            all_hot_state_updates.for_last_checkpoint = Some(hot_state_updates);
-            new_ckpt
-        } else {
-            self.last_checkpoint.clone()
-        };
+        let (last_checkpoint, hot_state_updates) =
+            if let Some(batched) = updates.for_last_checkpoint_batched() {
+                self.last_checkpoint.update(
+                    persisted_hot_view,
+                    persisted_snapshot,
+                    batched,
+                    &updates.per_version,
+                    updates.all_checkpoint_versions(),
+                    reads,
+                )?
+            } else {
+                (self.last_checkpoint.clone(), HotStateUpdates::new_empty())
+            };
 
-        Ok((LedgerState::new(last_checkpoint), all_hot_state_updates))
+        Ok((LedgerState::new(last_checkpoint), hot_state_updates))
     }
 
     /// Old values of the updated keys are read from `reader` at the version of the
@@ -1186,7 +1175,6 @@ mod tests {
             )]];
             let (state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1]);
 
-            let updates = updates.for_last_checkpoint.unwrap();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let num_hot = if shard_id == config_shard {
                     num_hot_in_config_shard
@@ -1194,7 +1182,7 @@ mod tests {
                     num_keys[shard_id].min(1)
                 };
                 assert_eq!(state.num_hot_items(shard_id), num_hot);
-                let evictions = &updates[shard_id].evictions;
+                let evictions = &updates.shards[shard_id].evictions;
                 assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
                 // None at v0, before the change.
                 assert!(evictions.values().all(|op| op.eviction_version == 1));
@@ -1216,7 +1204,7 @@ mod tests {
             vec![0],
         );
         let refreshed = |updates: &HotStateUpdates| {
-            updates.for_last_checkpoint.as_ref().unwrap()[k.get_shard_id()]
+            updates.shards[k.get_shard_id()]
                 .insertions
                 .contains_key(&khash(&k))
         };

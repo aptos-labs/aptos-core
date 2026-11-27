@@ -595,14 +595,17 @@ impl CheckpointStateReader for StateByVersion {
 fn assert_hot_state_ops(
     state_by_version: &StateByVersion,
     hot_state_updates: &HotStateUpdates,
-    for_ckpt_base: Option<Version>,
-    for_ckpt_result: Option<Version>,
+    base_version: Option<Version>,
+    result_version: Option<Version>,
 ) {
-    if let Some(shards) = &hot_state_updates.for_last_checkpoint {
-        let base = state_by_version.get_state(for_ckpt_base);
-        let result = state_by_version.get_state(for_ckpt_result);
-        assert_hot_state_shard_ops(state_by_version, &base.hot_state, &result.hot_state, shards);
-    }
+    let base = state_by_version.get_state(base_version);
+    let result = state_by_version.get_state(result_version);
+    assert_hot_state_shard_ops(
+        state_by_version,
+        &base.hot_state,
+        &result.hot_state,
+        &hot_state_updates.shards,
+    );
 }
 
 fn assert_hot_state_shard_ops(
