@@ -84,6 +84,61 @@ use tokio::time::{sleep, Instant};
 #[cfg(test)]
 mod tests;
 
+/// Serializes tests that relocate the working directory and home directory,
+/// since both are process-global.
+static ISOLATED_CONFIG_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Runs a test inside a fresh temporary directory with no `.aptos` config,
+/// restoring the original working directory and `HOME` afterwards.
+pub(crate) struct IsolatedConfigDir {
+    _guard: std::sync::MutexGuard<'static, ()>,
+    original_dir: std::path::PathBuf,
+    original_home: Option<std::ffi::OsString>,
+    _temp_dir: TempDir,
+}
+
+impl IsolatedConfigDir {
+    // Env mutation is process-global, so it is serialized by the lock above.
+    // A panicking test poisons the lock; recover so later tests still run.
+    #[allow(unsafe_code)]
+    pub(crate) fn new() -> Self {
+        let guard = ISOLATED_CONFIG_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let original_dir = std::env::current_dir().unwrap();
+        let original_home = std::env::var_os("HOME");
+        let temp_dir = TempDir::new().unwrap();
+        std::env::set_current_dir(temp_dir.path()).unwrap();
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+        }
+        Self {
+            _guard: guard,
+            original_dir,
+            original_home,
+            _temp_dir: temp_dir,
+        }
+    }
+}
+
+impl Drop for IsolatedConfigDir {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        if let Err(err) = std::env::set_current_dir(&self.original_dir) {
+            eprintln!(
+                "Failed to restore working directory {}: {err}",
+                self.original_dir.display()
+            );
+        }
+        unsafe {
+            match &self.original_home {
+                Some(home) => std::env::set_var("HOME", home),
+                None => std::env::remove_var("HOME"),
+            }
+        }
+    }
+}
+
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
 pub const FIRST_MOVE_FILE: &str = "
