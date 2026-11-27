@@ -22,7 +22,9 @@ pub mod versioned_state_value;
 use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    state_store::{hot_state::HotStateValue, state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{
+        hot_state::HotStateValue, state_key::StateKey, state_slot::ColdCopy, NUM_STATE_SHARDS,
+    },
     transaction::Version,
 };
 use std::collections::HashMap;
@@ -33,6 +35,7 @@ pub struct HotInsertionOp {
     pub value: HotStateValue,
     /// `Some(version)` for occupied entries and `None` for vacant.
     pub value_version: Option<Version>,
+    pub cold_copy: ColdCopy,
     /// The `hot_since_version` of the DB entry being superseded.
     /// `None` means this is a first write (creation or promotion).
     pub superseded_version: Option<Version>,
@@ -42,14 +45,13 @@ pub struct HotInsertionOp {
 pub struct HotEvictionOp {
     pub eviction_version: Version,
     /// The `hot_since_version` of the DB entry being superseded. `None` if the key was never
-    /// persisted to hot DB (e.g. promoted and evicted in the same batch, unlikely though).
+    /// persisted to hot DB (e.g. promoted and evicted in the same block, unlikely though).
     pub superseded_version: Option<Version>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct HotStateShardUpdates {
     pub insertions: HashMap<HashValue, HotInsertionOp>,
-    // TODO(HotState): per-block eviction tracking will be needed for cold-write elimination.
     pub evictions: HashMap<HashValue, HotEvictionOp>,
 }
 
@@ -108,13 +110,15 @@ pub fn empty_hot_state_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
 
 #[derive(Clone, Debug)]
 pub struct HotStateUpdates {
-    pub for_last_checkpoint: Option<[HotStateShardUpdates; NUM_STATE_SHARDS]>,
+    /// Per shard, the updates of each block in the chunk, in order. Blocks are kept apart so that
+    /// the hot state KV reflects every block end, not only the last one in the chunk.
+    pub shards: [Vec<HotStateShardUpdates>; NUM_STATE_SHARDS],
 }
 
 impl HotStateUpdates {
     pub fn new_empty() -> Self {
         Self {
-            for_last_checkpoint: None,
+            shards: std::array::from_fn(|_| Vec::new()),
         }
     }
 }
@@ -132,6 +136,7 @@ mod tests {
             state_key: StateKey::raw(b"test"),
             value: HotStateValue::new(None, value_version.unwrap_or(0)),
             value_version,
+            cold_copy: ColdCopy::InSync,
             superseded_version: superseded,
         }
     }

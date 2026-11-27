@@ -89,6 +89,7 @@ impl std::ops::Deref for StateKvDb {
     }
 }
 
+#[bon::bon]
 impl StateKvDb {
     pub(crate) fn is_hot(&self) -> bool {
         self.is_hot
@@ -102,6 +103,7 @@ impl StateKvDb {
         }
     }
 
+    #[builder(finish_fn = build)]
     pub(crate) fn new(
         db_paths: &StorageDirPaths,
         state_kv_db_config: RocksdbConfig,
@@ -544,14 +546,17 @@ impl StateKvDb {
                 Some(HotStateEntry::Occupied {
                     value,
                     value_version,
+                    cold_copy,
                 }) => Some(StateSlotKind::HotOccupied {
                     value_version,
                     value,
                     hot_since_version,
+                    cold_copy,
                     lru_info: LRUEntry::uninitialized(),
                 }),
-                Some(HotStateEntry::Vacant) => Some(StateSlotKind::HotVacant {
+                Some(HotStateEntry::Vacant { cold_copy }) => Some(StateSlotKind::HotVacant {
                     hot_since_version,
+                    cold_copy,
                     lru_info: LRUEntry::uninitialized(),
                 }),
             } {

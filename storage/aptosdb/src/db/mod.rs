@@ -86,17 +86,17 @@ impl AptosDB {
         internal_indexer_db: Option<InternalIndexerDB>,
         hot_state_config: HotStateConfig,
     ) -> Result<Self> {
-        Self::open_internal(
-            &db_paths,
-            readonly,
-            pruner_config,
-            rocksdb_configs,
-            buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
-            false,
-            internal_indexer_db,
-            hot_state_config,
-        )
+        Self::open_internal()
+            .db_paths(&db_paths)
+            .readonly(readonly)
+            .pruner_config(pruner_config)
+            .rocksdb_configs(rocksdb_configs)
+            .buffered_state_target_items(buffered_state_target_items)
+            .max_num_nodes_per_lru_cache_shard(max_num_nodes_per_lru_cache_shard)
+            .for_restore(false)
+            .maybe_internal_indexer_db(internal_indexer_db)
+            .hot_state_config(hot_state_config)
+            .build()
     }
 
     pub fn open_kv_only(
@@ -108,20 +108,20 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
         internal_indexer_db: Option<InternalIndexerDB>,
     ) -> Result<Self> {
-        Self::open_internal(
-            &db_paths,
-            readonly,
-            pruner_config,
-            rocksdb_configs,
-            buffered_state_target_items,
-            max_num_nodes_per_lru_cache_shard,
-            true,
-            internal_indexer_db,
-            HotStateConfig {
+        Self::open_internal()
+            .db_paths(&db_paths)
+            .readonly(readonly)
+            .pruner_config(pruner_config)
+            .rocksdb_configs(rocksdb_configs)
+            .buffered_state_target_items(buffered_state_target_items)
+            .max_num_nodes_per_lru_cache_shard(max_num_nodes_per_lru_cache_shard)
+            .for_restore(true)
+            .maybe_internal_indexer_db(internal_indexer_db)
+            .hot_state_config(HotStateConfig {
                 delete_on_restart: !readonly,
                 ..Default::default()
-            },
-        )
+            })
+            .build()
     }
 
     pub fn open_dbs(
@@ -144,50 +144,50 @@ impl AptosDB {
                 )
             });
             let hot_state_kv_handle = s.spawn(|| {
-                StateKvDb::new(
-                    db_paths,
-                    rocksdb_configs.state_kv_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    /* is_hot = */ true,
-                    hot_state_config.delete_on_restart,
-                )
+                StateKvDb::builder()
+                    .db_paths(db_paths)
+                    .state_kv_db_config(rocksdb_configs.state_kv_db_config)
+                    .maybe_env(env)
+                    .maybe_block_cache(block_cache)
+                    .readonly(readonly)
+                    .is_hot(true)
+                    .delete_on_restart(hot_state_config.delete_on_restart)
+                    .build()
             });
             let state_kv_handle = s.spawn(|| {
-                StateKvDb::new(
-                    db_paths,
-                    rocksdb_configs.state_kv_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    /* is_hot = */ false,
-                    /* delete_on_restart = */ false,
-                )
+                StateKvDb::builder()
+                    .db_paths(db_paths)
+                    .state_kv_db_config(rocksdb_configs.state_kv_db_config)
+                    .maybe_env(env)
+                    .maybe_block_cache(block_cache)
+                    .readonly(readonly)
+                    .is_hot(false)
+                    .delete_on_restart(false)
+                    .build()
             });
             let hot_state_merkle_handle = s.spawn(|| {
-                StateMerkleDb::new(
-                    db_paths,
-                    rocksdb_configs.state_merkle_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    max_num_nodes_per_lru_cache_shard,
-                    /* is_hot = */ true,
-                    hot_state_config.delete_on_restart,
-                )
+                StateMerkleDb::builder()
+                    .db_paths(db_paths)
+                    .state_merkle_db_config(rocksdb_configs.state_merkle_db_config)
+                    .maybe_env(env)
+                    .maybe_block_cache(block_cache)
+                    .readonly(readonly)
+                    .max_nodes_per_lru_cache_shard(max_num_nodes_per_lru_cache_shard)
+                    .is_hot(true)
+                    .delete_on_restart(hot_state_config.delete_on_restart)
+                    .build()
             });
             let state_merkle_handle = s.spawn(|| {
-                StateMerkleDb::new(
-                    db_paths,
-                    rocksdb_configs.state_merkle_db_config,
-                    env,
-                    block_cache,
-                    readonly,
-                    max_num_nodes_per_lru_cache_shard,
-                    /* is_hot = */ false,
-                    /* delete_on_restart = */ false,
-                )
+                StateMerkleDb::builder()
+                    .db_paths(db_paths)
+                    .state_merkle_db_config(rocksdb_configs.state_merkle_db_config)
+                    .maybe_env(env)
+                    .maybe_block_cache(block_cache)
+                    .readonly(readonly)
+                    .max_nodes_per_lru_cache_shard(max_num_nodes_per_lru_cache_shard)
+                    .is_hot(false)
+                    .delete_on_restart(false)
+                    .build()
             });
 
             Ok((

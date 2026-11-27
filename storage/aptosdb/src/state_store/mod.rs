@@ -68,7 +68,7 @@ use aptos_storage_interface::{
         },
         state_with_summary::{LedgerStateWithSummary, StateWithSummary},
         versioned_state_value::StateUpdateRef,
-        HotStateShardUpdates, HotStateUpdates,
+        HotStateUpdates,
     },
     AptosDbError, CheckpointStateReader, Result, StateSnapshotReceiver,
 };
@@ -357,7 +357,7 @@ impl StateDb {
                 Some((hot_since_version, Some(HotStateEntry::Occupied { value, .. }))) => {
                     Some(HotStateValue::new(Some(value), hot_since_version))
                 },
-                Some((hot_since_version, Some(HotStateEntry::Vacant))) => {
+                Some((hot_since_version, Some(HotStateEntry::Vacant { .. }))) => {
                     Some(HotStateValue::new(None, hot_since_version))
                 },
             },
@@ -401,15 +401,15 @@ impl StateStore {
         squash_state_kv_writes_per_block: bool,
     ) -> Self {
         if mode == StateStoreMode::ReadWrite {
-            Self::sync_commit_progress(
-                Arc::clone(&ledger_db),
-                Arc::clone(&state_kv_db),
-                Arc::clone(&state_merkle_db),
-                Arc::clone(&hot_state_kv_db),
-                Arc::clone(&hot_state_merkle_db),
-                /*crash_if_difference_is_too_large=*/ true,
-                hot_state_config.delete_on_restart,
-            );
+            Self::sync_commit_progress()
+                .ledger_db(Arc::clone(&ledger_db))
+                .state_kv_db(Arc::clone(&state_kv_db))
+                .state_merkle_db(Arc::clone(&state_merkle_db))
+                .hot_state_kv_db(Arc::clone(&hot_state_kv_db))
+                .hot_state_merkle_db(Arc::clone(&hot_state_merkle_db))
+                .crash_if_difference_is_too_large(true)
+                .delete_hot_state_on_restart(hot_state_config.delete_on_restart)
+                .call();
         }
         let state_db = Arc::new(StateDb {
             ledger_db,
@@ -449,6 +449,7 @@ impl StateStore {
 
     // We commit the overall commit progress at the last, and use it as the source of truth of the
     // commit progress.
+    #[builder]
     pub fn sync_commit_progress(
         ledger_db: Arc<LedgerDb>,
         state_kv_db: Arc<StateKvDb>,
@@ -622,6 +623,7 @@ impl StateStore {
     /// Rebuilds state from the latest snapshot like a regular open: replays the write sets
     /// committed after it, and rebuilds hot state if `delete_on_restart` wiped it.
     #[cfg(any(test, feature = "db-debugger"))]
+    #[builder]
     pub fn catch_up_state_merkle_db(
         ledger_db: Arc<LedgerDb>,
         hot_state_merkle_db: Arc<StateMerkleDb>,
@@ -1126,36 +1128,34 @@ impl StateStore {
             })
     }
 
-    // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`)
-    // and only the last one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS.timer_with(&["put_hot_state_updates"]);
 
-        fn write_shard_updates(
-            shard_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
-            batches: &mut ShardedStateKvSchemaBatch,
-        ) -> Result<()> {
-            batches
-                .par_iter_mut()
-                .zip_eq(shard_updates.par_iter())
-                .try_for_each(|(batch, shard)| {
-                    for (key_hash, op) in &shard.insertions {
+        sharded_hot_state_kv_batches
+            .par_iter_mut()
+            .zip_eq(hot_state_updates.shards.par_iter())
+            .try_for_each(|(batch, blocks)| {
+                for block in blocks {
+                    for (key_hash, op) in &block.insertions {
                         let schema_value = match op.value.value_opt() {
                             Some(value) => HotStateEntry::Occupied {
                                 value: value.clone(),
                                 value_version: op
                                     .value_version
                                     .expect("occupied must have value_version"),
+                                cold_copy: op.cold_copy,
                             },
                             None => {
                                 assert!(
                                     op.value_version.is_none(),
                                     "vacant must not have value_version"
                                 );
-                                HotStateEntry::Vacant
+                                HotStateEntry::Vacant {
+                                    cold_copy: op.cold_copy,
+                                }
                             },
                         };
                         batch.put::<HotStateValueByKeyHashSchema>(
@@ -1173,7 +1173,7 @@ impl StateStore {
                             &(),
                         )?;
                     }
-                    for (key_hash, op) in &shard.evictions {
+                    for (key_hash, op) in &block.evictions {
                         batch.put::<HotStateValueByKeyHashSchema>(
                             &(*key_hash, op.eviction_version),
                             &None,
@@ -1198,15 +1198,9 @@ impl StateStore {
                             &(),
                         )?;
                     }
-                    Ok(())
-                })
-        }
-
-        if let Some(updates) = &hot_state_updates.for_last_checkpoint {
-            write_shard_updates(updates, sharded_hot_state_kv_batches)?;
-        }
-
-        Ok(())
+                }
+                Ok(())
+            })
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {

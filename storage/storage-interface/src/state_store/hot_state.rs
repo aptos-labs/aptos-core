@@ -111,7 +111,7 @@ impl<'a> HotStateLRU<'a> {
     }
 
     /// Returns the list of entries evicted, beginning from the LRU.
-    pub fn maybe_evict(&mut self) -> Vec<(HashValue, StateSlot)> {
+    pub fn maybe_evict(&mut self, eviction_version: Version) -> Vec<(HashValue, StateSlot)> {
         let mut evicted = Vec::new();
         // n.b. If the newest entry alone exceeds `max_bytes`, it gets evicted too, leaving the
         // cache empty.
@@ -122,7 +122,7 @@ impl<'a> HotStateLRU<'a> {
             let slot = self.delete(&tail).expect("Tail must be hot.");
             self.total_value_bytes -= slot.size();
             evicted.push((tail, slot.clone()));
-            self.pending.insert(tail, slot.to_cold());
+            self.pending.insert(tail, slot.to_cold(eviction_version));
             self.num_items -= 1;
         }
         evicted
@@ -273,7 +273,7 @@ mod tests {
         state_store::{
             hot_state::LRUEntry,
             state_key::StateKey,
-            state_slot::{StateSlot, StateSlotKind},
+            state_slot::{ColdCopy, StateSlot, StateSlotKind},
             state_value::{StateValue, ARB_STATE_VALUE_MAX_SIZE},
         },
         transaction::Version,
@@ -351,10 +351,12 @@ mod tests {
                     value_version: version,
                     value,
                     hot_since_version: version,
+                    cold_copy: ColdCopy::InSync,
                     lru_info: LRUEntry::uninitialized(),
                 }),
                 1 => Just(StateSlotKind::HotVacant {
                     hot_since_version: version,
+                    cold_copy: ColdCopy::InSync,
                     lru_info: LRUEntry::uninitialized(),
                 }),
             ]
@@ -433,7 +435,7 @@ mod tests {
             assert_lru_equal(&lru, naive_lru);
         }
 
-        let actual_evicted = lru.maybe_evict();
+        let actual_evicted = lru.maybe_evict(0);
         let mut expected_evicted = Vec::new();
         let mut naive_value_bytes: usize = naive_lru.iter().map(|(_, s)| s.size()).sum();
         while naive_lru.len() > capacity.get()
@@ -545,6 +547,7 @@ mod tests {
             value_version: version,
             value,
             hot_since_version: version,
+            cold_copy: ColdCopy::InSync,
             lru_info: LRUEntry::uninitialized(),
         };
 
@@ -558,6 +561,7 @@ mod tests {
         let slot_c = base_slot(
             StateSlotKind::HotVacant {
                 hot_since_version: 9,
+                cold_copy: ColdCopy::InSync,
                 lru_info: LRUEntry::uninitialized(),
             },
             Some(b),
@@ -590,7 +594,7 @@ mod tests {
         refreshed_b.refresh(11);
         lru.insert(&key_b, refreshed_b);
         // c is the oldest, so it gets evicted.
-        let evicted = lru.maybe_evict();
+        let evicted = lru.maybe_evict(11);
         assert_eq!(evicted.len(), 1);
         assert_eq!(evicted[0].0, c);
         lru.validate();
@@ -621,6 +625,7 @@ mod tests {
             value_version: 0,
             value: StateValue::new_legacy(vec![0; value_len].into()),
             hot_since_version: 0,
+            cold_copy: ColdCopy::InSync,
             lru_info: LRUEntry::uninitialized(),
         }
     }
@@ -628,6 +633,7 @@ mod tests {
     fn hot_vacant() -> StateSlotKind {
         StateSlotKind::HotVacant {
             hot_since_version: 0,
+            cold_copy: ColdCopy::InSync,
             lru_info: LRUEntry::uninitialized(),
         }
     }
@@ -660,7 +666,7 @@ mod tests {
         };
 
         let evicted = lru
-            .maybe_evict()
+            .maybe_evict(0)
             .into_iter()
             .map(|(key_hash, _)| index_of(key_hash))
             .collect();
@@ -717,6 +723,41 @@ mod tests {
             evict_by_bytes(32, vec![hot_vacant(), hot_occupied(0)]),
             (vec![0], vec![1])
         );
+    }
+
+    #[test]
+    fn test_evict_behind_cold_at_eviction_version() {
+        let test_obj = LRUTest::new_empty();
+        let mut lru = HotStateLRU::new(
+            NonZeroUsize::new(1).unwrap(),
+            usize::MAX,
+            Arc::clone(&test_obj.hot_state) as Arc<dyn HotStateView>,
+            &test_obj.overlay,
+            None,
+            None,
+            0,
+            0,
+        );
+        let key_a = StateKey::raw(b"a");
+        let key_b = StateKey::raw(b"b");
+        lru.insert(
+            &key_a,
+            StateSlot::new(key_a.clone(), StateSlotKind::HotOccupied {
+                value_version: 1,
+                value: StateValue::new_legacy(b"v".to_vec().into()),
+                hot_since_version: 1,
+                cold_copy: ColdCopy::Behind { version: None },
+                lru_info: LRUEntry::uninitialized(),
+            }),
+        );
+        lru.insert(&key_b, StateSlot::new(key_b.clone(), hot_vacant()));
+
+        let evicted = lru.maybe_evict(5);
+        assert_eq!(evicted.len(), 1);
+        // Cold gets the value at the eviction.
+        let slot = lru.get_slot(key_a.crypto_hash_ref()).unwrap();
+        assert!(slot.is_cold());
+        assert_eq!(slot.expect_value_version(), 5);
     }
 
     proptest! {

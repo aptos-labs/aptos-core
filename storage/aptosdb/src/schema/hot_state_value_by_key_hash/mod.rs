@@ -11,8 +11,9 @@
 //! |  state key hash | hot since version  |  Option<HotStateEntry>  |
 //! ```
 //!
-//! `HotStateEntry` is either `Occupied { value, value_version }` or `Vacant`.
-//! `None` means the key was evicted from hot state at that version.
+//! `HotStateEntry` is either `Occupied { value, value_version, cold_copy }` or
+//! `Vacant { cold_copy }`. `None` means the key was evicted from hot state at
+//! that version.
 
 use crate::schema::{ensure_slice_len_eq, HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME};
 use anyhow::Result;
@@ -21,7 +22,10 @@ use aptos_schemadb::{
     define_schema,
     schema::{KeyCodec, ValueCodec},
 };
-use aptos_types::{state_store::state_value::StateValue, transaction::Version};
+use aptos_types::{
+    state_store::{state_slot::ColdCopy, state_value::StateValue},
+    transaction::Version,
+};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -38,8 +42,11 @@ pub(crate) enum HotStateEntry {
     Occupied {
         value: StateValue,
         value_version: Version,
+        cold_copy: ColdCopy,
     },
-    Vacant,
+    Vacant {
+        cold_copy: ColdCopy,
+    },
 }
 
 define_schema!(

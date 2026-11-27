@@ -199,7 +199,7 @@ impl State {
         per_version_updates: &PerVersionStateUpdateRefs,
         all_checkpoint_versions: &[Version],
         state_cache: &ShardedStateCache,
-    ) -> Result<(Self, [HotStateShardUpdates; NUM_STATE_SHARDS])> {
+    ) -> Result<(Self, HotStateUpdates)> {
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
@@ -249,8 +249,9 @@ impl State {
                         hot_metadata.total_value_bytes,
                     );
                     let mut all_updates = per_version.iter();
-                    let mut shard_updates = HotStateShardUpdates::default();
+                    let mut updates_per_block = Vec::with_capacity(all_checkpoint_versions.len());
                     for ckpt_version in all_checkpoint_versions {
+                        let mut shard_updates = HotStateShardUpdates::default();
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
@@ -274,7 +275,7 @@ impl State {
                             eviction_config.max_items(shard_id),
                             eviction_config.max_bytes(shard_id),
                         );
-                        for (key_hash, slot) in lru.maybe_evict() {
+                        for (key_hash, slot) in lru.maybe_evict(*ckpt_version) {
                             assert!(slot.is_hot());
                             shard_updates
                                 .evict(key_hash, HotEvictionOp {
@@ -283,22 +284,12 @@ impl State {
                                 })
                                 .expect("LRU eviction must succeed.");
                         }
+                        updates_per_block.push(shard_updates);
                     }
-                    for (key, update) in all_updates {
-                        let key_hash = *key.crypto_hash_ref();
-                        if let Some(op) = Self::apply_one_update(
-                            &mut lru,
-                            overlay,
-                            cache,
-                            key,
-                            update,
-                            cursor
-                                .for_update(update.version)
-                                .refresh_interval_versions(),
-                        ) {
-                            shard_updates.insert(key_hash, op);
-                        }
-                    }
+                    assert!(
+                        all_updates.next().is_none(),
+                        "The last version must be a checkpoint."
+                    );
 
                     let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
                         lru.into_updates();
@@ -313,16 +304,18 @@ impl State {
                         total_value_bytes: new_total_value_bytes,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    (((new_layer, new_metadata), new_usage), shard_updates)
+                    (((new_layer, new_metadata), new_usage), updates_per_block)
                 },
             )
             .unzip();
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let new_metadata = new_metadata.try_into().expect("Known to be 16 shards.");
         let usage = self.update_usage(usage_delta_per_shard);
-        let hot_state_updates = hot_state_updates
-            .try_into()
-            .expect("Known to be 16 shards.");
+        let hot_state_updates = HotStateUpdates {
+            shards: hot_state_updates
+                .try_into()
+                .expect("Known to be 16 shards."),
+        };
 
         let new_config = config_changes
             .last()
@@ -383,12 +376,14 @@ impl State {
     ) -> Option<HotInsertionOp> {
         let key_hash = *key.crypto_hash_ref();
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            let superseded_version =
-                lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
+            let slot = update.to_result_slot((*key).clone()).unwrap();
+            let cold_copy = slot.expect_cold_copy();
+            let superseded_version = lru.insert(key, slot);
             return Some(HotInsertionOp {
                 state_key: (*key).clone(),
                 value: HotStateValue::new(state_value_opt.cloned(), update.version),
                 value_version: state_value_opt.map(|_| update.version),
+                cold_copy,
                 superseded_version,
             });
         }
@@ -411,12 +406,14 @@ impl State {
             };
             if refreshed {
                 let value_version = slot_to_insert.value_version_opt();
+                let cold_copy = slot_to_insert.expect_cold_copy();
                 let value = HotStateValue::clone_from_slot(&slot_to_insert);
                 let superseded_version = lru.insert(key, slot_to_insert);
                 Some(HotInsertionOp {
                     state_key: (*key).clone(),
                     value,
                     value_version,
+                    cold_copy,
                     superseded_version,
                 })
             } else {
@@ -427,12 +424,14 @@ impl State {
             assert!(slot.is_cold());
             let value_version = slot.value_version_opt();
             let slot = slot.to_hot(update.version);
+            let cold_copy = slot.expect_cold_copy();
             let value = HotStateValue::clone_from_slot(&slot);
             let superseded_version = lru.insert(key, slot);
             Some(HotInsertionOp {
                 state_key: (*key).clone(),
                 value,
                 value_version,
+                cold_copy,
                 superseded_version,
             })
         }
@@ -530,23 +529,21 @@ impl LedgerState {
     ) -> Result<(LedgerState, HotStateUpdates)> {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
-        let mut all_hot_state_updates = HotStateUpdates::new_empty();
-        let last_checkpoint = if let Some(batched) = updates.for_last_checkpoint_batched() {
-            let (new_ckpt, hot_state_updates) = self.last_checkpoint.update(
-                persisted_hot_view,
-                persisted_snapshot,
-                batched,
-                &updates.per_version,
-                updates.all_checkpoint_versions(),
-                reads,
-            )?;
-            all_hot_state_updates.for_last_checkpoint = Some(hot_state_updates);
-            new_ckpt
-        } else {
-            self.last_checkpoint.clone()
-        };
+        let (last_checkpoint, hot_state_updates) =
+            if let Some(batched) = updates.for_last_checkpoint_batched() {
+                self.last_checkpoint.update(
+                    persisted_hot_view,
+                    persisted_snapshot,
+                    batched,
+                    &updates.per_version,
+                    updates.all_checkpoint_versions(),
+                    reads,
+                )?
+            } else {
+                (self.last_checkpoint.clone(), HotStateUpdates::new_empty())
+            };
 
-        Ok((LedgerState::new(last_checkpoint), all_hot_state_updates))
+        Ok((LedgerState::new(last_checkpoint), hot_state_updates))
     }
 
     /// Old values of the updated keys are read from `reader` at the version of the
@@ -588,7 +585,11 @@ mod tests {
     use crate::state_store::state_view::hot_state_view::EmptyHotState;
     use aptos_types::{
         on_chain_config::{HotStateConfigV1, OnChainHotStateConfig},
-        state_store::{state_slot::StateSlotKind, state_value::StateValue},
+        state_store::{
+            hot_state::LRUEntry,
+            state_slot::{ColdCopy, StateSlotKind},
+            state_value::StateValue,
+        },
         write_set::{BaseStateOp, WriteOp},
     };
     use std::{iter::once, num::NonZeroUsize};
@@ -699,6 +700,7 @@ mod tests {
         assert_eq!(result.value.value_opt(), Some(&val(b"v0")));
         assert_eq!(result.value.hot_since_version(), 7);
         assert_eq!(result.value_version, Some(7));
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
         assert_eq!(result.superseded_version, None);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
@@ -722,6 +724,7 @@ mod tests {
         assert_eq!(result.value.value_opt(), None);
         assert_eq!(result.value.hot_since_version(), 3);
         assert_eq!(result.value_version, None);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
         assert_eq!(result.superseded_version, None);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
@@ -782,6 +785,7 @@ mod tests {
         assert_eq!(result.value_version, Some(2));
         assert_eq!(result.value.value_opt(), Some(&val(b"v")));
         assert_eq!(result.value.hot_since_version(), 9);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
         assert!(slot.is_hot() && slot.is_occupied());
@@ -810,6 +814,7 @@ mod tests {
         assert_eq!(result.value_version, None);
         assert_eq!(result.value.value_opt(), None);
         assert_eq!(result.value.hot_since_version(), 4);
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
 
         let slot = lru.get_slot(&khash(&k)).unwrap();
         assert!(slot.is_hot() && !slot.is_occupied());
@@ -944,6 +949,47 @@ mod tests {
         let result =
             State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(100, &op), Version::MAX);
         assert!(result.is_none());
+    }
+
+    // ===== apply_one_update: cold copy =====
+
+    #[test]
+    fn test_cold_copy_kept_by_refresh_and_reset_by_write() {
+        let (base, top) = layers(&[]);
+        let overlay = top.view_layers_after(&base);
+        let cache = StateCacheShard::new();
+        let mut lru = empty_lru(&overlay);
+
+        let k = key("a");
+        let behind = ColdCopy::Behind { version: Some(1) };
+        lru.insert(
+            &k,
+            StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
+                value_version: 2,
+                value: val(b"v"),
+                hot_since_version: 2,
+                cold_copy: behind,
+                lru_info: LRUEntry::uninitialized(),
+            }),
+        );
+
+        let op = BaseStateOp::MakeHot;
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(20, &op), REFRESH)
+                .unwrap();
+        assert_eq!(result.cold_copy, behind);
+        assert_eq!(lru.get_slot(&khash(&k)).unwrap().expect_cold_copy(), behind);
+
+        // The write goes to cold too.
+        let op = BaseStateOp::Modification(val(b"v1"));
+        let result =
+            State::apply_one_update(&mut lru, &overlay, &cache, &k, &upd(21, &op), REFRESH)
+                .unwrap();
+        assert_eq!(result.cold_copy, ColdCopy::InSync);
+        assert_eq!(
+            lru.get_slot(&khash(&k)).unwrap().expect_cold_copy(),
+            ColdCopy::InSync
+        );
     }
 
     // ===== usage accounting =====
@@ -1186,7 +1232,6 @@ mod tests {
             )]];
             let (state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1]);
 
-            let updates = updates.for_last_checkpoint.unwrap();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let num_hot = if shard_id == config_shard {
                     num_hot_in_config_shard
@@ -1194,9 +1239,13 @@ mod tests {
                     num_keys[shard_id].min(1)
                 };
                 assert_eq!(state.num_hot_items(shard_id), num_hot);
-                let evictions = &updates[shard_id].evictions;
-                assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
+                let [before, at_change] = &updates.shards[shard_id][..] else {
+                    panic!("Expected two blocks.");
+                };
                 // None at v0, before the change.
+                assert!(before.evictions.is_empty());
+                let evictions = &at_change.evictions;
+                assert_eq!(evictions.len(), num_keys[shard_id] - num_hot);
                 assert!(evictions.values().all(|op| op.eviction_version == 1));
             }
             let config = state.hot_state_config;
@@ -1216,9 +1265,9 @@ mod tests {
             vec![0],
         );
         let refreshed = |updates: &HotStateUpdates| {
-            updates.for_last_checkpoint.as_ref().unwrap()[k.get_shard_id()]
-                .insertions
-                .contains_key(&khash(&k))
+            updates.shards[k.get_shard_id()]
+                .iter()
+                .any(|block| block.insertions.contains_key(&khash(&k)))
         };
 
         // `k` became hot at v0. With the local refresh interval (100), a promotion at v1 doesn't
@@ -1277,5 +1326,57 @@ mod tests {
         }
         // The shrink did happen.
         assert!((0..NUM_STATE_SHARDS).all(|i| one_batch.last_checkpoint().num_hot_items(i) <= 2));
+    }
+
+    // ===== hot state updates per block =====
+
+    #[test]
+    fn test_hot_state_updates_per_block() {
+        let [a, b] = (0..)
+            .map(|i| key(&format!("k{i}")))
+            .filter(|k| k.get_shard_id() == 0)
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+        let empty = LedgerState::new_empty(HotStateConfig {
+            max_items_per_shard: 1,
+            ..TEST_CONFIG
+        });
+        // One block per version, and each write evicts the other key at the end of its block.
+        let write_sets = [
+            creations(std::slice::from_ref(&a)),
+            creations(std::slice::from_ref(&b)),
+            creations(std::slice::from_ref(&a)),
+        ];
+        let (_state, updates) = apply_write_sets(&empty, &empty, &write_sets, vec![0, 1, 2]);
+
+        let blocks = &updates.shards[0];
+        assert_eq!(blocks.len(), 3);
+        let insertion = |block: usize, k: &StateKey| {
+            let op = &blocks[block].insertions[&khash(k)];
+            (op.value.hot_since_version(), op.superseded_version)
+        };
+        let eviction = |block: usize, k: &StateKey| {
+            let op = &blocks[block].evictions[&khash(k)];
+            (op.eviction_version, op.superseded_version)
+        };
+
+        assert_eq!(blocks[0].insertions.len(), 1);
+        assert_eq!(insertion(0, &a), (0, None));
+        assert!(blocks[0].evictions.is_empty());
+
+        // `b` written and `a` evicted in the same block, `a` superseding its row from block 0.
+        assert_eq!(blocks[1].insertions.len(), 1);
+        assert_eq!(insertion(1, &b), (1, None));
+        assert_eq!(blocks[1].evictions.len(), 1);
+        assert_eq!(eviction(1, &a), (1, Some(0)));
+
+        // `a` is written again. Its tombstone at v1 prunes itself, so the new row supersedes
+        // nothing.
+        assert_eq!(blocks[2].insertions.len(), 1);
+        assert_eq!(insertion(2, &a), (2, None));
+        assert_eq!(blocks[2].evictions.len(), 1);
+        assert_eq!(eviction(2, &b), (2, Some(1)));
     }
 }
