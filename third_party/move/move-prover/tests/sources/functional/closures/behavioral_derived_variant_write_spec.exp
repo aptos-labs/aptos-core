@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_spec.move:41:31
+   │
+41 │     spec c_aborts_incorrect { aborts_if !(s is A); }
+   │                               ^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_spec.move:40: c_aborts_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_spec.move:12: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_spec.move:40: c_aborts_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_spec.move:41: c_aborts_incorrect (spec)

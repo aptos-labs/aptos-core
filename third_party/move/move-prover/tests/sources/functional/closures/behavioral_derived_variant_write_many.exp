@@ -1,0 +1,53 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_many.move:38:29
+   │
+38 │     spec c_many_incorrect { ensures s.f1 == 1; }
+   │                             ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:37: c_many_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:37: c_many_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:38: c_many_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_many.move:49:31
+   │
+49 │     spec c_shared_incorrect { ensures s is A; }
+   │                               ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:48: c_shared_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:48: c_shared_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:49: c_shared_incorrect (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_many.move:75:31
+   │
+75 │     spec c_nested_incorrect { ensures s.t.n == 1; }
+   │                               ^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:74: c_nested_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:10: apply_to (spec)
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:74: c_nested_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:75: c_nested_incorrect (spec)
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/closures/behavioral_derived_variant_write_many.move:77:5
+   │
+10 │         requires requires_of<f>(s);
+   │         --------------------------- abort happened here with code 0x0
+   ·
+77 │     spec c_nested_aborts_incorrect { aborts_if !(s is A); }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:76: c_nested_aborts_incorrect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/behavioral_derived_variant_write_many.move:10: apply_to (spec)
+   =         ABORTED
