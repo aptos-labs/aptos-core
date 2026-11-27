@@ -10,6 +10,7 @@ use crate::{
     transaction::Version,
 };
 use aptos_crypto::HashValue;
+use serde::{Deserialize, Serialize};
 use StateSlotKind::*;
 
 /// Represents the content of a state slot along with its key and information about
@@ -23,6 +24,20 @@ pub struct StateSlot {
     kind: StateSlotKind,
 }
 
+/// What the cold state holds for a hot slot.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub enum ColdCopy {
+    /// Cold has the hot value, at `value_version` if occupied.
+    InSync,
+    /// Cold doesn't have the hot value yet.
+    Behind {
+        /// Version of the cold KV row with the key's current cold value. `None` if cold has no
+        /// value.
+        version: Option<Version>,
+    },
+}
+
 /// The variant of a state slot.
 ///
 /// value_version: non-empty value changed at this version
@@ -33,6 +48,7 @@ pub enum StateSlotKind {
     ColdVacant,
     HotVacant {
         hot_since_version: Version,
+        cold_copy: ColdCopy,
         lru_info: LRUEntry<HashValue>,
     },
     ColdOccupied {
@@ -43,6 +59,7 @@ pub enum StateSlotKind {
         value_version: Version,
         value: StateValue,
         hot_since_version: Version,
+        cold_copy: ColdCopy,
         lru_info: LRUEntry<HashValue>,
     },
 }
@@ -55,17 +72,22 @@ impl StateSlotKind {
                 value_version,
                 value,
                 hot_since_version,
+                cold_copy,
                 ..
             } => StateSlotKind::HotOccupied {
                 value_version,
                 value,
                 hot_since_version,
+                cold_copy,
                 lru_info,
             },
             StateSlotKind::HotVacant {
-                hot_since_version, ..
+                hot_since_version,
+                cold_copy,
+                ..
             } => StateSlotKind::HotVacant {
                 hot_since_version,
+                cold_copy,
                 lru_info,
             },
             _ => panic!("with_lru_info called on cold variant"),
@@ -232,6 +254,13 @@ impl StateSlot {
         self.hot_since_version_opt().expect("expecting hot")
     }
 
+    pub fn expect_cold_copy(&self) -> ColdCopy {
+        match &self.kind {
+            HotVacant { cold_copy, .. } | HotOccupied { cold_copy, .. } => *cold_copy,
+            ColdVacant | ColdOccupied { .. } => panic!("expecting hot"),
+        }
+    }
+
     pub fn refresh(&mut self, version: Version) {
         match &mut self.kind {
             HotOccupied {
@@ -266,10 +295,12 @@ impl StateSlot {
                 value_version,
                 value,
                 hot_since_version,
+                cold_copy: ColdCopy::InSync,
                 lru_info: LRUEntry::uninitialized(),
             },
             ColdVacant => HotVacant {
                 hot_since_version,
+                cold_copy: ColdCopy::InSync,
                 lru_info: LRUEntry::uninitialized(),
             },
             _ => panic!("Should not be called on hot slots."),
@@ -280,14 +311,20 @@ impl StateSlot {
         }
     }
 
-    pub fn to_cold(self) -> Self {
+    /// If the cold copy is behind, the hot value must be written to cold at `eviction_version`,
+    /// as a cold slot's `value_version` is the version of its cold KV row.
+    pub fn to_cold(self, eviction_version: Version) -> Self {
         let kind = match self.kind {
             HotOccupied {
                 value_version,
                 value,
+                cold_copy,
                 ..
             } => ColdOccupied {
-                value_version,
+                value_version: match cold_copy {
+                    ColdCopy::InSync => value_version,
+                    ColdCopy::Behind { .. } => eviction_version,
+                },
                 value,
             },
             HotVacant { .. } => ColdVacant,
@@ -328,6 +365,76 @@ impl THotStateSlot for StateSlot {
         match &mut self.kind {
             HotOccupied { lru_info, .. } | HotVacant { lru_info, .. } => lru_info.next = next,
             _ => panic!("Should not be called on cold slots."),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hot_occupied(value_version: Version, cold_copy: ColdCopy) -> StateSlot {
+        StateSlot::new(StateKey::raw(b"k"), HotOccupied {
+            value_version,
+            value: StateValue::new_legacy(b"v".to_vec().into()),
+            hot_since_version: 20,
+            cold_copy,
+            lru_info: LRUEntry::uninitialized(),
+        })
+    }
+
+    fn hot_vacant(cold_copy: ColdCopy) -> StateSlot {
+        StateSlot::new(StateKey::raw(b"k"), HotVacant {
+            hot_since_version: 20,
+            cold_copy,
+            lru_info: LRUEntry::uninitialized(),
+        })
+    }
+
+    #[test]
+    fn test_to_hot_is_in_sync() {
+        let occupied = StateSlot::from_db_get(
+            StateKey::raw(b"k"),
+            Some((10, StateValue::new_legacy(b"v".to_vec().into()))),
+        )
+        .to_hot(20);
+        assert_eq!(occupied.expect_cold_copy(), ColdCopy::InSync);
+        assert_eq!(occupied.expect_value_version(), 10);
+
+        let vacant = StateSlot::from_db_get(StateKey::raw(b"k"), None).to_hot(20);
+        assert_eq!(vacant.expect_cold_copy(), ColdCopy::InSync);
+    }
+
+    #[test]
+    fn test_refresh_keeps_cold_copy() {
+        let behind = ColdCopy::Behind { version: Some(5) };
+        let mut slot = hot_occupied(10, behind);
+        slot.refresh(30);
+        assert_eq!(slot.expect_cold_copy(), behind);
+    }
+
+    #[test]
+    fn test_to_cold_in_sync_keeps_value_version() {
+        let slot = hot_occupied(10, ColdCopy::InSync).to_cold(30);
+        assert_eq!(slot.kind(), &ColdOccupied {
+            value_version: 10,
+            value: StateValue::new_legacy(b"v".to_vec().into()),
+        });
+        assert_eq!(hot_vacant(ColdCopy::InSync).to_cold(30).kind(), &ColdVacant);
+    }
+
+    #[test]
+    fn test_to_cold_behind_takes_eviction_version() {
+        for version in [None, Some(5)] {
+            let slot = hot_occupied(10, ColdCopy::Behind { version }).to_cold(30);
+            assert_eq!(slot.kind(), &ColdOccupied {
+                value_version: 30,
+                value: StateValue::new_legacy(b"v".to_vec().into()),
+            });
+            assert_eq!(
+                hot_vacant(ColdCopy::Behind { version }).to_cold(30).kind(),
+                &ColdVacant
+            );
         }
     }
 }

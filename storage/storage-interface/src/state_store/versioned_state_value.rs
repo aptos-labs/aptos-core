@@ -5,7 +5,7 @@ use aptos_types::{
     state_store::{
         hot_state::LRUEntry,
         state_key::StateKey,
-        state_slot::{StateSlot, StateSlotKind},
+        state_slot::{ColdCopy, StateSlot, StateSlotKind},
     },
     transaction::Version,
     write_set::BaseStateOp,
@@ -27,11 +27,13 @@ impl StateUpdateRef<'_> {
                     value_version: self.version,
                     value,
                     hot_since_version: self.version,
+                    cold_copy: ColdCopy::InSync,
                     lru_info: LRUEntry::uninitialized(),
                 }))
             },
             BaseStateOp::Deletion(_) => Some(StateSlot::new(state_key, StateSlotKind::HotVacant {
                 hot_since_version: self.version,
+                cold_copy: ColdCopy::InSync,
                 lru_info: LRUEntry::uninitialized(),
             })),
             BaseStateOp::MakeHot => None,

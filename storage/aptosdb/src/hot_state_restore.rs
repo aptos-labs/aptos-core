@@ -21,7 +21,8 @@ use aptos_schemadb::batch::{SchemaBatch, WriteBatch};
 use aptos_storage_interface::{db_other_bail as bail, Result, StateSnapshotReceiver};
 use aptos_types::{
     state_store::{
-        hot_state::HotStateValue, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        hot_state::HotStateValue, state_key::StateKey, state_slot::ColdCopy,
+        state_storage_usage::StateStorageUsage,
     },
     transaction::Version,
 };
@@ -51,17 +52,18 @@ impl StateValueWriter<StateKey, HotStateValue> for HotStateValueWriter {
                 },
             };
             let hot_since_version = hot_value.hot_since_version();
-            // NOTE: `value_version` for this hot state entry MUST be set to `version` which is the
-            // version where the snapshot restore happens. The reason is that the cold state restore
-            // saves all keys at this version, and when an entry is overwritten, its `value_version`
-            // in hot state is used to derive the stale index for the old entry in cold state.
-            // TODO(HotState): maybe revisit when hot and cold are exclusive.
+            // The cold state restore saves every value at `version`, and they match the hot ones
+            // since every write goes to both. So the entry is in sync with cold at `version`.
+            // TODO(HotState): mark as behind once writes to hot items can skip cold.
             let entry = match hot_value.value_opt() {
                 Some(value) => HotStateEntry::Occupied {
                     value: value.clone(),
                     value_version: version,
+                    cold_copy: ColdCopy::InSync,
                 },
-                None => HotStateEntry::Vacant,
+                None => HotStateEntry::Vacant {
+                    cold_copy: ColdCopy::InSync,
+                },
             };
             sharded_batches[state_key.get_shard_id()].put::<HotStateValueByKeyHashSchema>(
                 &(*state_key.crypto_hash_ref(), hot_since_version),
