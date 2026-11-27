@@ -1,0 +1,62 @@
+#!/bin/bash
+# Installs the system tools CI jobs expect on the RunsOn minimal Ubuntu image. Runs as root during
+# the AMI build.
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+# The minimal image only grants the ubuntu user sudo; dev_setup.sh and CI jobs run as runner.
+echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/91-runner-nopasswd
+chmod 0440 /etc/sudoers.d/91-runner-nopasswd
+visudo -cf /etc/sudoers.d/91-runner-nopasswd
+
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates curl gpg jq zip unzip \
+  python3-pip python3-venv python-is-python3
+
+# Jobs call docker as runner; the minimal image restricts the socket to the docker group.
+usermod -aG docker runner
+
+# Jobs pip-install into the system Python, which Ubuntu 24.04 otherwise refuses (PEP 668).
+printf '[global]\nbreak-system-packages = true\n' > /etc/pip.conf
+
+# The full image put runner's user tool dirs on the system PATH; jobs rely on it (e.g. boogie for
+# the Move prover tests). dev_setup.sh only writes these to a shell profile.
+sed -i -E '/^(PATH|DOTNET_ROOT|Z3_EXE|CVC5_EXE|BOOGIE_EXE)=/d' /etc/environment
+cat >> /etc/environment <<'EOF'
+PATH="/home/runner/bin:/home/runner/.cargo/bin:/home/runner/.dotnet/tools:/home/runner/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+DOTNET_ROOT=/home/runner/.dotnet
+Z3_EXE=/home/runner/bin/z3
+CVC5_EXE=/home/runner/bin/cvc5
+BOOGIE_EXE=/home/runner/.dotnet/tools/boogie
+EOF
+
+# rolaunch runs the user data under its 3-minute startup timeout, and RunsOn stacks before v2.12
+# run the agent inside the user data, so jobs were killed 3 minutes in. 24h covers the longest job.
+install -d /etc/systemd/system/rolaunch.service.d
+printf '[Service]\nExecStart=\nExecStart=/usr/bin/rolaunch -timeout 24h\n' \
+  > /etc/systemd/system/rolaunch.service.d/90-job-timeout.conf
+systemctl daemon-reload
+
+install -d -m 0755 /etc/apt/keyrings
+
+curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+  | gpg --dearmor --yes -o /usr/share/keyrings/cloud.google.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+  > /etc/apt/sources.list.d/google-cloud-sdk.list
+
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+  -o /etc/apt/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  > /etc/apt/sources.list.d/github-cli.list
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  gh kubectl google-cloud-cli google-cloud-cli-gke-gcloud-auth-plugin
+
+gcloud --version
+kubectl version --client
+gke-gcloud-auth-plugin --version
+gh --version
+jq --version
+command -v zip

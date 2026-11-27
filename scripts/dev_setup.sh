@@ -323,11 +323,11 @@ function install_kubectl {
 }
 
 function install_awscli {
-  PACKAGE_MANAGER=$1
+  local package_manager="${1:-$PACKAGE_MANAGER}"
   if ! command -v aws &>/dev/null; then
     if [[ $(uname -s) == "Darwin" ]]; then
       install_pkg awscli brew
-    elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+    elif [[ "$package_manager" == "apk" ]]; then
       apk add --no-cache python3 py3-pip &&
         pip3 install --upgrade pip &&
         pip3 install awscli
