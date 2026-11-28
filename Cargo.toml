@@ -589,7 +589,7 @@ derive_builder = "0.20.0"
 derive_more = { version = "2.1.1", features = ["add", "deref", "deref_mut"] }
 determinator = "0.13.0"
 diesel = { version = "~2.3", features = ["uuid"] }
-diesel-async = { version = "0.7.4", features = [
+diesel-async = { version = "0.9.0", features = [
     "async-connection-wrapper",
     "postgres",
     "bb8",
