@@ -774,7 +774,7 @@ fn test_replayer_keeps_partial_block_on_failure() {
             .map(|events| events.unwrap())
             .collect();
         if forge_epoch_change {
-            // Fails applying the outputs, since the new validator set isn't written.
+            // Fails applying the outputs, since the epoch isn't bumped.
             event_vecs.last_mut().unwrap().push(
                 ContractEvent::new_v2(
                     NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG.clone(),
@@ -798,7 +798,9 @@ fn test_replayer_keeps_partial_block_on_failure() {
     // Txn 19-25 complete the block, which fails to be applied.
     let error = replay(19..=25, true).unwrap_err();
     assert!(
-        error.to_string().contains("ValidatorSet not touched"),
+        error
+            .to_string()
+            .contains("Configuration resource not written by the last transaction"),
         "{error:?}"
     );
     // The retry still has the partial block held back.
