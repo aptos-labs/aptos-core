@@ -12,6 +12,7 @@ use aptos_rosetta::{bootstrap, common::native_coin, types::Currency};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
+use reqwest::header::HeaderName;
 use std::{
     collections::HashSet,
     fs::File,
@@ -94,6 +95,7 @@ async fn main() {
         args.api_config(),
         args.rest_client(),
         args.supported_currencies(),
+        args.forward_headers(),
     )
     .expect("aptos-rosetta: Should bootstrap rosetta server");
 
@@ -118,6 +120,9 @@ trait ServerArgs {
 
     /// Supported currencies for the service
     fn supported_currencies(&self) -> HashSet<Currency>;
+
+    /// Allowlist of incoming HTTP request header names to forward to the fullnode
+    fn forward_headers(&self) -> HashSet<HeaderName>;
 }
 
 /// Aptos Rosetta API Server
@@ -164,6 +169,14 @@ impl ServerArgs for CommandArgs {
             CommandArgs::OnlineRemote(args) => args.supported_currencies(),
             CommandArgs::Offline(args) => args.supported_currencies(),
             CommandArgs::Online(args) => args.supported_currencies(),
+        }
+    }
+
+    fn forward_headers(&self) -> HashSet<HeaderName> {
+        match self {
+            CommandArgs::OnlineRemote(args) => args.forward_headers(),
+            CommandArgs::Offline(args) => args.forward_headers(),
+            CommandArgs::Online(args) => args.forward_headers(),
         }
     }
 }
@@ -271,6 +284,10 @@ impl ServerArgs for OfflineArgs {
 
         supported_currencies
     }
+
+    fn forward_headers(&self) -> HashSet<HeaderName> {
+        HashSet::new()
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -283,6 +300,12 @@ pub struct OnlineRemoteArgs {
     /// DEPRECATED: Owner addresses file as a YAML file with a list
     #[clap(long, value_parser)]
     owner_address_file: Option<PathBuf>,
+    /// Allowlist of incoming HTTP request header names to forward onto outbound node calls.
+    ///
+    /// Can be specified multiple times, e.g. `--forward-header x-client-id --forward-header x-request-id`.
+    /// Empty by default, so no incoming headers are forwarded unless configured.
+    #[clap(long = "forward-header", value_delimiter = ',')]
+    forward_headers: Vec<HeaderName>,
 }
 
 impl ServerArgs for OnlineRemoteArgs {
@@ -301,6 +324,10 @@ impl ServerArgs for OnlineRemoteArgs {
     fn supported_currencies(&self) -> HashSet<Currency> {
         self.offline_args.supported_currencies()
     }
+
+    fn forward_headers(&self) -> HashSet<HeaderName> {
+        self.forward_headers.iter().cloned().collect()
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -317,9 +344,7 @@ impl ServerArgs for OnlineLocalArgs {
     }
 
     fn rest_client(&self) -> Option<aptos_rest_client::Client> {
-        Some(aptos_rest_client::Client::new(
-            self.online_args.rest_api_url.clone(),
-        ))
+        self.online_args.rest_client()
     }
 
     fn chain_id(&self) -> ChainId {
@@ -329,10 +354,96 @@ impl ServerArgs for OnlineLocalArgs {
     fn supported_currencies(&self) -> HashSet<Currency> {
         self.online_args.offline_args.supported_currencies()
     }
+
+    fn forward_headers(&self) -> HashSet<HeaderName> {
+        self.online_args.forward_headers()
+    }
 }
 
-#[test]
-fn verify_tool() {
+#[cfg(test)]
+mod tests {
+    use super::*;
     use clap::CommandFactory;
-    CommandArgs::command().debug_assert()
+
+    #[test]
+    fn verify_tool() {
+        CommandArgs::command().debug_assert()
+    }
+
+    #[test]
+    fn test_forward_header_default_is_empty() {
+        let args = CommandArgs::try_parse_from(["aptos-rosetta", "online-remote"]).unwrap();
+        assert!(args.forward_headers().is_empty());
+
+        let offline = CommandArgs::try_parse_from(["aptos-rosetta", "offline"]).unwrap();
+        assert!(offline.forward_headers().is_empty());
+    }
+
+    #[test]
+    fn test_forward_header_repeated_and_case_normalized() {
+        let args = CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "online-remote",
+            "--forward-header",
+            "x-client-id",
+            "--forward-header",
+            "X-Request-ID",
+        ])
+        .unwrap();
+
+        let expected: HashSet<HeaderName> = [
+            HeaderName::from_static("x-client-id"),
+            HeaderName::from_static("x-request-id"),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(args.forward_headers(), expected);
+    }
+
+    #[test]
+    fn test_forward_header_comma_delimited() {
+        let args = CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "online-remote",
+            "--forward-header",
+            "x-client-id,x-request-id",
+        ])
+        .unwrap();
+
+        let expected: HashSet<HeaderName> = [
+            HeaderName::from_static("x-client-id"),
+            HeaderName::from_static("x-request-id"),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(args.forward_headers(), expected);
+    }
+
+    #[test]
+    fn test_forward_header_rejects_invalid_header_name() {
+        assert!(CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "online-remote",
+            "--forward-header",
+            "invalid header!",
+        ])
+        .is_err());
+
+        assert!(CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "online-remote",
+            "--forward-header",
+            "",
+        ])
+        .is_err());
+
+        // Offline mode does not connect to a node, so `--forward-header` is rejected there.
+        assert!(CommandArgs::try_parse_from([
+            "aptos-rosetta",
+            "offline",
+            "--forward-header",
+            "x-client-id",
+        ])
+        .is_err());
+    }
 }

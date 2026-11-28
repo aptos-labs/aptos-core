@@ -7,7 +7,10 @@
 
 use crate::{
     block::BlockRetriever,
-    common::{handle_request, native_coin, usdc_currency, usdc_testnet_currency, with_context},
+    common::{
+        filter_headers, handle_request, native_coin, sanitize_forward_headers, usdc_currency,
+        usdc_testnet_currency, with_context,
+    },
     error::{ApiError, ApiResult},
     types::Currency,
 };
@@ -18,7 +21,7 @@ use aptos_warp_webserver::{logger, Error, WebServer};
 use std::{collections::HashSet, convert::Infallible, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{
-    http::{HeaderValue, Method, StatusCode},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     reply, Filter, Rejection, Reply,
 };
 
@@ -49,6 +52,8 @@ pub struct RosettaContext {
     pub block_cache: Option<Arc<BlockRetriever>>,
     /// Set of supported currencies
     pub currencies: HashSet<Currency>,
+    /// Allowlist of incoming request header names to forward onto outbound node calls
+    pub forward_headers: Arc<HashSet<HeaderName>>,
 }
 
 impl RosettaContext {
@@ -57,6 +62,7 @@ impl RosettaContext {
         chain_id: ChainId,
         block_cache: Option<Arc<BlockRetriever>>,
         mut currencies: HashSet<Currency>,
+        forward_headers: HashSet<HeaderName>,
     ) -> Self {
         // Always add APT
         currencies.insert(native_coin());
@@ -73,6 +79,39 @@ impl RosettaContext {
             chain_id,
             block_cache,
             currencies,
+            forward_headers: Arc::new(sanitize_forward_headers(forward_headers)),
+        }
+    }
+
+    /// Returns a request-scoped `RosettaContext` with allowlisted headers from
+    /// `incoming_headers` attached to its outbound `rest_client` and `block_cache`.
+    pub fn with_forwarded_headers(&self, incoming_headers: &HeaderMap) -> Self {
+        if self.forward_headers.is_empty() {
+            return self.clone();
+        }
+
+        let forwarded = filter_headers(incoming_headers, &self.forward_headers);
+        if forwarded.is_empty() {
+            return self.clone();
+        }
+
+        let rest_client = self
+            .rest_client
+            .as_ref()
+            .map(|client| Arc::new(client.with_headers(forwarded)));
+        let block_cache = match (&self.block_cache, &rest_client) {
+            (Some(block_cache), Some(rest_client)) => {
+                Some(Arc::new(block_cache.with_rest_client(rest_client.clone())))
+            },
+            (None, _) | (Some(_), None) => self.block_cache.clone(),
+        };
+
+        RosettaContext {
+            rest_client,
+            chain_id: self.chain_id,
+            block_cache,
+            currencies: self.currencies.clone(),
+            forward_headers: self.forward_headers.clone(),
         }
     }
 
@@ -99,6 +138,7 @@ pub fn bootstrap(
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
     supported_currencies: HashSet<Currency>,
+    forward_headers: HashSet<HeaderName>,
 ) -> anyhow::Result<tokio::runtime::Runtime> {
     let runtime = aptos_runtimes::spawn_named_runtime("rosetta".into(), None);
 
@@ -109,6 +149,7 @@ pub fn bootstrap(
         api_config,
         rest_client,
         supported_currencies,
+        forward_headers,
     ));
     Ok(runtime)
 }
@@ -119,6 +160,7 @@ pub async fn bootstrap_async(
     api_config: ApiConfig,
     rest_client: Option<aptos_rest_client::Client>,
     supported_currencies: HashSet<Currency>,
+    forward_headers: HashSet<HeaderName>,
 ) -> anyhow::Result<JoinHandle<()>> {
     debug!("Starting up Rosetta server with {:?}", api_config);
 
@@ -153,6 +195,7 @@ pub async fn bootstrap_async(
             chain_id,
             block_cache,
             supported_currencies,
+            forward_headers,
         )
         .await;
         api.serve(routes(context)).await;
@@ -164,6 +207,13 @@ pub async fn bootstrap_async(
 pub fn routes(
     context: RosettaContext,
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
+    let mut allowed_headers = vec![warp::http::header::CONTENT_TYPE];
+    for header in context.forward_headers.iter() {
+        if header != warp::http::header::CONTENT_TYPE {
+            allowed_headers.push(header.clone());
+        }
+    }
+
     account::routes(context.clone())
         .or(block::block_route(context.clone()))
         .or(construction::combine_route(context.clone()))
@@ -182,7 +232,7 @@ pub fn routes(
             warp::cors()
                 .allow_any_origin()
                 .allow_methods(vec![Method::GET, Method::POST])
-                .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
+                .allow_headers(allowed_headers),
         )
         .with(logger())
         .recover(handle_rejection)

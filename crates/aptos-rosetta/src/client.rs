@@ -23,7 +23,10 @@ use aptos_crypto::{
 };
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
 use aptos_types::{account_address::AccountAddress, transaction::RawTransaction};
-use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
+use reqwest::{
+    header::{HeaderMap, CONTENT_TYPE},
+    Client as ReqwestClient,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, str::FromStr};
 use url::Url;
@@ -33,6 +36,7 @@ use url::Url;
 pub struct RosettaClient {
     address: Url,
     inner: ReqwestClient,
+    headers: HeaderMap,
 }
 
 impl RosettaClient {
@@ -40,6 +44,16 @@ impl RosettaClient {
         RosettaClient {
             address,
             inner: ReqwestClient::new(),
+            headers: HeaderMap::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_headers(&self, headers: HeaderMap) -> RosettaClient {
+        RosettaClient {
+            address: self.address.clone(),
+            inner: self.inner.clone(),
+            headers,
         }
     }
 
@@ -133,13 +147,18 @@ impl RosettaClient {
         path: &'static str,
         request: &'a I,
     ) -> anyhow::Result<O> {
-        let response = self
+        let mut req = self
             .inner
             .post(self.address.join(path)?)
-            .header(CONTENT_TYPE, JSON)
+            .headers(self.headers.clone())
             .body(serde_json::to_string(request)?)
-            .send()
-            .await?;
+            .build()?;
+        req.headers_mut().insert(
+            CONTENT_TYPE,
+            reqwest::header::HeaderValue::from_static(JSON),
+        );
+        let response = self.inner.execute(req).await?;
+
         if !response.status().is_success() {
             let error: Error = response.json().await?;
             return Err(anyhow!("Failed API with: {:?}", error));
